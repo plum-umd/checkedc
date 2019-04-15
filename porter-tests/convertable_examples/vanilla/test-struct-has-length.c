@@ -13,7 +13,7 @@ void print_arr(int* arr, struct len* ls)
 
 int main(int argc, char const *argv[])
 {
-	int[] arr = {8, 1, 2, 3, 7, 7, 7, 7};
+	int arr[] = {8, 1, 2, 3, 7, 7, 7, 7};
 	struct len ls;
 	ls.length = 8; 
 

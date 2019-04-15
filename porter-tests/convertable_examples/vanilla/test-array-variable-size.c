@@ -1,7 +1,7 @@
 #include <stdio.h>
 
 void make_array(int len) {
-	int[len] arr;
+	int arr[len];
 
 	for (int i = 0; i < len; ++i) {
 		arr[i] = i;

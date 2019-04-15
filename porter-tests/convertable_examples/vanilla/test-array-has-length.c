@@ -8,7 +8,7 @@ void print_arr(int* arr)
 
 int main(int argc, char const *argv[])
 {
-	int[] arr = {8, 1, 2, 3, 7, 7, 7, 7};
+	int arr[] = {8, 1, 2, 3, 7, 7, 7, 7};
 
 	print_arr(arr);
 

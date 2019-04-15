@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 int garbage_sum(int *arr, int *len) 
 {
