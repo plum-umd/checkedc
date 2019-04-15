@@ -8,7 +8,7 @@ void print_arr(int* arr) {
 
 int main(int argc, char const *argv[])
 {
-	int[] arr = new arr[8];
+	int arr[8];
 
 	for (int i = 0; i < 6; ++i) {
 		arr[i] = i;

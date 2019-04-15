@@ -10,7 +10,7 @@ void print_arr(int* arr, int y, int low, int high, char c, int* x) {
 
 int main(int argc, char const *argv[])
 {
-	int[] arr = new arr[50];
+	int arr[50];
 	int x = 2;
 
 	for (int i = 0; i < 50; ++i) {

@@ -1,8 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 
 struct example {
 	int* arr;
-}
+};
 
 void print_arr(struct example obj, int len) {
 	for (int i = 0; i < len; i++)
