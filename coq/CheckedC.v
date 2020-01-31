@@ -48,7 +48,7 @@ Inductive mode : Set :=
 
 (** Types, <<w>>, are either a word type, [TNat, TPtr], a struct type, [TStruct],
     or an array type, [TArray]. Struct types must be annotated with a struct identifier.
-    Array types are annotated with their upper-bound and the (word) type of their elements.
+    Array types are annotated with their lower-bound, upper-bound, and the (word) type of their elements.
 
     The metavariable, [w], was chosen to abbreviate "wide" or compound types.
 
@@ -74,7 +74,7 @@ Inductive type : Set :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-  | TArray : nat -> type -> type.
+  | TArray : nat -> nat -> type -> type.
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
@@ -111,10 +111,10 @@ Inductive type_wf (D : structdef) : type -> Prop :=
   | WFTStruct : forall T,
       (exists (fs : fields), StructDef.MapsTo T fs D) ->
       type_wf D (TStruct T)
-  | WFArray : forall n t,
+  | WFArray : forall l h t,
       word_type t ->
       type_wf D t ->
-      type_wf D (TArray n t).
+      type_wf D (TArray l h t).
 
 Definition fields_wf (D : structdef) (fs : fields) : Prop :=
   forall f t,
@@ -1872,9 +1872,9 @@ Lemma alloc_correct : forall w D env H ptr H',
     heap_wf D H'.
 Proof.
   intros w D env H ptr H' Alloc HSd HWf.
-  unfold allocate.
+  unfold allocate in *.
   unfold allocate_meta in *.
-  unfold pbind in *; simpl in *.
+  unfold bind in *; simpl in *.
   destruct w; simpl in *; eauto; inv Alloc; simpl in *; eauto.
   - split; [| split].
     * apply well_typed_preserved; eauto.
