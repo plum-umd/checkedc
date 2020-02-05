@@ -263,13 +263,15 @@ Import ListNotations.
 Import MonadNotation.
 Local Open Scope monad_scope.
 
+(*???should you be able to allocate backwards?*)
+
 Definition allocate_meta (D : structdef) (w : type) : option (list type) :=
   match w with
   | TStruct T =>
     fs <- StructDef.find T D ;;
        ret (List.map snd (Fields.elements fs))
-  | TArray 0 T => None
-  | TArray l T => Some (replicate l T)
+  | TArray 0 0 T => None
+  | TArray 0 h T => Some (replicate h T)
   | _ => Some [w]
   end.
 
@@ -386,19 +388,24 @@ Qed.
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 
 Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
-  | SPlusChecked : forall H n1 l t n2,
+  | SPlusChecked : forall H n1 h l t n2,
       n1 <> 0 ->
       step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l t))) (ELit n2 TNat))
-        H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) t))))
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
+ | SMinusChecked : forall H n1 h l t n2,
+      n1 <> 0 ->
+      step D
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H (RExpr (ELit (n1 - n2) (TPtr Checked (TArray (l + n2) (h + n2) t))))
   | SPlus : forall H n1 t1 n2 t2,
-      (forall l t, t1 <> TPtr Checked (TArray l t)) -> 
+      (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
         H (EPlus (ELit n1 t1) (ELit n2 t2))
         H (RExpr (ELit (n1 + n2) t1))
-  | SPlusNull : forall H l t n2 ,
+  | SPlusNull : forall H l h t n2 ,
       step D
-        H (EPlus (ELit 0 (TPtr Checked (TArray l t))) (ELit n2 TNat))
+        H (EPlus (ELit 0 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H RNull
   | SCast : forall H t n t',
       step D
@@ -407,18 +414,18 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
   | SDeref : forall H n n1 t1 t,
       (expr_wf D (ELit n1 t1)) ->
       Heap.MapsTo n (n1, t1) H ->
-      (forall l t', t = TPtr Checked (TArray l t') -> l > 0) ->
+      (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) ->
       step D
         H (EDeref (ELit n t))
         H (RExpr (ELit n1 t1))
   | SDerefOOB : forall H n t t1,
-      t = TPtr Checked (TArray 0 t1) ->
+      t = TPtr Checked (TArray 0 0 t1) ->
       step D
         H (EDeref (ELit n t))
         H RBounds
   | SAssign : forall H n t n1 t1 H',
       Heap.In n H ->
-      (forall l t', t = TPtr Checked (TArray l t') -> l > 0) -> 
+      (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) -> 
       H' = Heap.add n (n1, t1) H ->
       step D
         H  (EAssign (ELit n t) (ELit n1 t1))
@@ -464,7 +471,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
         H (EUnchecked (ELit n t))
         H (RExpr (ELit n t))
   | SAssignOOB : forall H n t n1 t1,
-      t = TPtr Checked (TArray 0 t1) ->
+      t = TPtr Checked (TArray 0 0 t1) ->
       step D
         H (EAssign (ELit n t) (ELit n1 t1))
         H RBounds
@@ -532,7 +539,7 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> nat -> type -> Pr
   | TyLitInt : forall s n,
       well_typed_lit D H s n TNat
   | TyLitArray : forall s n w,
-      well_typed_lit D H s n (TPtr Checked (TArray 0 w))
+      well_typed_lit D H s n (TPtr Checked (TArray 0 0 w))
   | TyLitU : forall s n w,
       well_typed_lit D H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
@@ -562,7 +569,7 @@ Hint Constructors well_typed_lit.
 Lemma well_typed_lit_ind' :
   forall (D : structdef) (H : heap) (P : scope -> nat -> type -> Prop),
     (forall (s : scope) (n : nat), P s n TNat) ->
-    (forall (s : scope) (n : nat) (w : type), P s n (TPtr Checked (TArray 0 w))) ->
+    (forall (s : scope) (n : nat) (w : type), P s n (TPtr Checked (TArray 0 0 w))) ->
        (forall (s : scope) (n : nat) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
        (forall (s : scope) (n : nat) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
@@ -638,7 +645,7 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       well_typed env m e2 TNat ->
       well_typed env m (EPlus e1 e2) TNat
   | TyMalloc : forall env m w,
-      (forall l t, w = TArray l t -> l > 0) ->
+      (forall l h t, w = TArray l h t -> l <= 0 /\ h > 0) ->
       well_typed env m (EMalloc w) (TPtr Checked w)
   | TyUnchecked : forall env m e t,
       well_typed env Unchecked e t ->
@@ -647,26 +654,26 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       (m = Checked -> forall w, t <> TPtr Checked w) ->
       well_typed env m e t' ->
       well_typed env m (ECast t e) t
-  | TyDeref : forall env m e m' t n t',
+  | TyDeref : forall env m e m' t l h t',
       well_typed env m e (TPtr m' t) ->
-      ((word_type t /\ t = t') \/ (t = TArray n t' /\ word_type t' /\ type_wf D t')) ->
+      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref e) t'
-  | TyIndex : forall env m e1 m' n t e2,
+  | TyIndex : forall env m e1 m' l h t e2,
       word_type t -> type_wf D t ->
-      well_typed env m e1 (TPtr m' (TArray n t)) ->
+      well_typed env m e1 (TPtr m' (TArray l h t)) ->
       well_typed env m e2 TNat ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref (EPlus e1 e2)) t
-  | TyAssign : forall env m e1 m' t n t' e2,
+  | TyAssign : forall env m e1 m' t l h t' e2,
       well_typed env m e1 (TPtr m' t) ->
       well_typed env m e2 t' ->
-      ((word_type t /\ t = t') \/ (t = TArray n t' /\ word_type t' /\ type_wf D t')) ->
+      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EAssign e1 e2) t'
-  | TyIndexAssign : forall env m e1 m' n t e2 e3,
+  | TyIndexAssign : forall env m e1 m' l h t e2 e3,
       word_type t -> type_wf D t ->
-      well_typed env m e1 (TPtr m' (TArray n t)) ->
+      well_typed env m e1 (TPtr m' (TArray l h t)) ->
       well_typed env m e2 TNat ->
       well_typed env m e3 t ->
       (m' = Unchecked -> m = Unchecked) ->
@@ -753,7 +760,7 @@ Require Import Omega.
 
 Lemma wf_implies_allocate_meta :
   forall (D : structdef) (w : type),
-    (forall l t, w = TArray l t -> l > 0) ->
+    (forall l h t, w = TArray l h t -> l <= 0 /\ h > 0) ->
     type_wf D w -> exists allocs, allocate_meta D w = Some allocs.
 Proof.
   intros D w HL HT.
@@ -762,13 +769,15 @@ Proof.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
-  - specialize (HL n w eq_refl).
-    destruct n; [omega | eauto].
+  - specialize (HL n n0 w eq_refl).
+    destruct HL. destruct n.
+      +destruct n0; [omega | eauto].
+      +destruct n; [omega | eauto].
 Qed.
 
 Lemma wf_implies_allocate :
   forall (D : structdef) (w : type) (H : heap),
-    (forall l t, w = TArray l t -> l > 0) ->
+    (forall l h t, w = TArray l h t -> l <= 0 /\ h > 0) ->
     type_wf D w -> exists n H', allocate D H w = Some (n, H').
 Proof.
   intros D w H HL HT.
@@ -943,7 +952,7 @@ Proof with eauto 20 with Progress.
         inv HVal2 as [ n2 t2 ]...
         eapply step_implies_reduces; eauto.
         apply SPlus.
-        intros l t Eq; subst.
+        intros l h t Eq; subst.
         inv HTy1.
       (* Case: `e2` reduces *)
       * (* We can take a step by reducing `e2` *)
@@ -1019,8 +1028,8 @@ Proof with eauto 20 with Progress.
     destruct IH as [ HVal | [ HRed | HUnchk ] ].
     (* Case: `e` is a value *)
     + (* We can take a step... but how? *)
-      left.
-      inv HVal.
+
+      (*inv HVal.
       inv HTy.
       (* We proceed by case analysis on `w`, the type of the pointer *)
       destruct HPtrType.
@@ -1110,7 +1119,7 @@ Proof with eauto 20 with Progress.
               - intros.
                 inv H2.
                 omega.
-        } } }
+        } } }*)
     (* Case: `e` reduces *)
     + (* We can take a step by reducing `e` *)
       left.
@@ -1969,7 +1978,8 @@ Proof.
             (fun (acc : nat * heap) (t : type) =>
              let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
             l (Heap.cardinal (elt:=nat * type) H, H)) as p.
-      destruct p as (n0, h).
+      
+      destruct p as (n1, h). (*n0 already used???*)
       clear Heqp.
       inv H1.
       apply H0; eauto.
