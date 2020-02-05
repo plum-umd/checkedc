@@ -30,6 +30,14 @@ From CHKC Require Import Tactics ListUtil Map.
     the language. *)
 
 Require Import Arith.
+Require Import ZArith.
+Require Import ZArith.BinIntDef.
+
+Require Export BinNums.
+Require Import BinPos BinNat.
+
+Local Open Scope Z_scope.
+
 
 Definition var    := nat.
 Definition field  := nat.
@@ -74,7 +82,7 @@ Inductive type : Set :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-  | TArray : nat -> nat -> type -> type.
+  | TArray : Z -> Z -> type -> type.
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
@@ -149,6 +157,7 @@ Inductive expression : Set :=
   | ELet : var -> expression -> expression -> expression
   | EMalloc : type -> expression
   | ECast : type -> expression -> expression
+(*???? EMinus?*)
   | EPlus : expression -> expression -> expression
   | EFieldAddr : expression -> field -> expression
   | EDeref : expression -> expression
@@ -252,10 +261,10 @@ Hint Constructors literal.
 
 Module Heap := Map.Make Nat_as_OT.
 
-Definition heap : Type := Heap.t (nat * type).
+Definition heap : Type := Heap.t (Z * type).
 
 Definition heap_wf (D : structdef) (H : heap) : Prop :=
-  forall (addr : nat), 0 < addr <= (Heap.cardinal H) <-> Heap.In addr H.
+  forall (addr : Z), 0 < addr <= (Heap.cardinal H) <-> Heap.In addr H.
 
 Section allocation.
 
@@ -265,13 +274,20 @@ Local Open Scope monad_scope.
 
 (*???should you be able to allocate backwards?*)
 
+
+Definition to_nat (z:Z) : nat :=
+  match z with
+    | pos p => Pos.to_nat p
+    | _ => O
+  end.
+
 Definition allocate_meta (D : structdef) (w : type) : option (list type) :=
   match w with
   | TStruct T =>
     fs <- StructDef.find T D ;;
        ret (List.map snd (Fields.elements fs))
   | TArray 0 0 T => None
-  | TArray 0 h T => Some (replicate h T)
+  | TArray 0 h T => Some (replicate (to_nat h) T)
   | _ => Some [w]
   end.
 
