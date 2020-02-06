@@ -152,12 +152,11 @@ Definition structdef_wf (D : structdef) : Prop :=
     ever provide a value (defined below). *)
 
 Inductive expression : Set :=
-  | ELit : nat -> type -> expression
+  | ELit : Z -> type -> expression
   | EVar : var -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : type -> expression
   | ECast : type -> expression -> expression
-(*???? EMinus?*)
   | EPlus : expression -> expression -> expression
   | EFieldAddr : expression -> field -> expression
   | EDeref : expression -> expression
@@ -223,7 +222,7 @@ Fixpoint subst (x : var) (v : expression) (e : expression) : expression :=
 (** Values, [v], are expressions [e] which are literals. *)
 
 Inductive value (D : structdef) : expression -> Prop :=
-  VLit : forall (n : nat) (t : type),
+  VLit : forall (n : Z) (t : type),
     word_type t ->
     type_wf D t ->
     value D (ELit n t).
@@ -234,7 +233,7 @@ Hint Constructors value.
     enforce the syntactic constraints on the literal type. *)
 
 Inductive literal : expression -> Prop :=
-  Lit : forall (n : nat) (t : type),
+  Lit : forall (n : Z) (t : type),
     literal (ELit n t).
 
 Hint Constructors literal.
@@ -259,12 +258,12 @@ Hint Constructors literal.
     the allocated region and [H'] is [H] with the allocation. *)
 
 
-Module Heap := Map.Make Nat_as_OT.
+Module Heap := Map.Make Z_as_OT.
 
 Definition heap : Type := Heap.t (Z * type).
 
 Definition heap_wf (D : structdef) (H : heap) : Prop :=
-  forall (addr : Z), 0 < addr <= (Heap.cardinal H) <-> Heap.In addr H.
+  forall (addr : Z), 0 < addr <= (Z.of_nat (Heap.cardinal H)) <-> Heap.In addr H.
 
 Section allocation.
 
@@ -275,11 +274,12 @@ Local Open Scope monad_scope.
 (*???should you be able to allocate backwards?*)
 
 
-Definition to_nat (z:Z) : nat :=
-  match z with
-    | pos p => Pos.to_nat p
-    | _ => O
-  end.
+Print replicate.
+Definition Zreplicate (z:Z) (T : type) : (list type) :=
+match z with
+  |Z.pos p => (replicate (Pos.to_nat p) T)
+  |_ => []
+end.
 
 Definition allocate_meta (D : structdef) (w : type) : option (list type) :=
   match w with
@@ -287,16 +287,17 @@ Definition allocate_meta (D : structdef) (w : type) : option (list type) :=
     fs <- StructDef.find T D ;;
        ret (List.map snd (Fields.elements fs))
   | TArray 0 0 T => None
-  | TArray 0 h T => Some (replicate (to_nat h) T)
+  | TArray 0 h T => Some (Zreplicate h T)
   | _ => Some [w]
   end.
 
-Definition allocate (D : structdef) (H : heap) (w : type) : option (nat * heap) :=
-  let H_size := Heap.cardinal H in
+
+Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
+  let H_size := Z.of_nat(Heap.cardinal H) in
   let base   := H_size + 1 in
   am <- allocate_meta D w ;;
      let (_, H') := List.fold_left
-                  (fun (acc : nat * heap) (t : type) =>
+                  (fun (acc : Z * heap) (t : type) =>
                      let (sizeAcc, heapAcc) := acc in
                      let sizeAcc' := sizeAcc + 1 in
                      let heapAcc' := Heap.add sizeAcc' (0, t) heapAcc in
@@ -328,12 +329,12 @@ Inductive context : Set :=
   | CHole : context
   | CLet : var -> context -> expression -> context
   | CPlusL : context -> expression -> context
-  | CPlusR : nat -> type -> context -> context
+  | CPlusR : Z -> type -> context -> context
   | CFieldAddr : context -> field -> context
   | CCast : type -> context -> context
   | CDeref : context -> context
   | CAssignL : context -> expression -> context
-  | CAssignR : nat -> type -> context -> context
+  | CAssignR : Z -> type -> context -> context
   | CUnchecked : context -> context.
 
 Fixpoint in_hole (e : expression) (E : context) : expression :=
@@ -409,11 +410,6 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
- | SMinusChecked : forall H n1 h l t n2,
-      n1 <> 0 ->
-      step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H (RExpr (ELit (n1 - n2) (TPtr Checked (TArray (l + n2) (h + n2) t))))
   | SPlus : forall H n1 t1 n2 t2,
       (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
@@ -452,7 +448,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
-      n0 = n + i ->
+      n0 = n + Z.of_nat(i) ->
       t0 = TPtr Checked ti ->
       word_type ti ->
       step D
@@ -467,7 +463,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
-      n0 = n + i ->
+      n0 = n + Z.of_nat(i) ->
       t0 = TPtr Unchecked ti ->
       word_type ti ->
       step D
@@ -544,14 +540,14 @@ Hint Unfold reduces.
 
 Require Import Lists.ListSet.
 
-Definition eq_dec_nt (x y : nat * type) : {x = y} + { x <> y}.
+Definition eq_dec_nt (x y : Z * type) : {x = y} + { x <> y}.
 repeat decide equality.
 Defined. 
 
-Definition scope := set (nat *type)%type. 
-Definition empty_scope := empty_set (nat * type).
+Definition scope := set (Z *type)%type. 
+Definition empty_scope := empty_set (Z * type).
 
-Inductive well_typed_lit (D : structdef) (H : heap) : scope -> nat -> type -> Prop :=
+Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop :=
   | TyLitInt : forall s n,
       well_typed_lit D H s n TNat
   | TyLitArray : forall s n w,
@@ -565,9 +561,9 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> nat -> type -> Pr
       well_typed_lit D H s n (TPtr Checked w)
   | TyLitC : forall s n w ts,
       Some ts = allocate_meta D w ->
-      (forall k, 0 <= k < List.length ts ->
+      (forall k, 0 <= k < Z.of_nat(List.length ts) ->
                  exists n' t',
-                   Some t' = List.nth_error ts k /\
+                   Some t' = List.nth_error ts (Z.to_nat k)(*???*) /\
                    Heap.MapsTo (n + k) (n', t') H /\
                    well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
       well_typed_lit D H s n (TPtr Checked w).
@@ -583,22 +579,22 @@ Hint Constructors well_typed_lit.
     TODO: write blog post about this *)
 
 Lemma well_typed_lit_ind' :
-  forall (D : structdef) (H : heap) (P : scope -> nat -> type -> Prop),
-    (forall (s : scope) (n : nat), P s n TNat) ->
-    (forall (s : scope) (n : nat) (w : type), P s n (TPtr Checked (TArray 0 0 w))) ->
-       (forall (s : scope) (n : nat) (w : type), P s n (TPtr Unchecked w)) ->
+  forall (D : structdef) (H : heap) (P : scope -> Z -> type -> Prop),
+    (forall (s : scope) (n : Z), P s n TNat) ->
+    (forall (s : scope) (n : Z) (w : type), P s n (TPtr Checked (TArray 0 0 w))) ->
+       (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s : scope) (n : nat) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
-       (forall (s : scope) (n : nat) (w : type) (ts : list type),
+       (forall (s : scope) (n : Z) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
+       (forall (s : scope) (n : Z) (w : type) (ts : list type),
         Some ts = allocate_meta D w ->
-        (forall k : nat,
-         0 <= k < length ts ->
-         exists (n' : nat) (t' : type),
-           Some t' = nth_error ts k /\
+        (forall k : Z,
+         0 <= k < (Z.of_nat (length ts)) ->
+         exists (n' : Z) (t' : type),
+           Some t' = nth_error ts (Z.to_nat k) /\
            Heap.MapsTo (n + k) (n', t') H /\
            well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t' /\
            P (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
-        P s n (TPtr Checked w)) -> forall (s : scope) (n : nat) (w : type), well_typed_lit D H s n w -> P s n w.
+        P s n (TPtr Checked w)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D H s n w -> P s n w.
 Proof.
   intros D H P.
   intros HTyLitInt
@@ -785,10 +781,8 @@ Proof.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
-  - specialize (HL n n0 w eq_refl).
-    destruct HL. destruct n.
-      +destruct n0; [omega | eauto].
-      +destruct n; [omega | eauto].
+  - specialize (HL z z0 w eq_refl).
+    destruct HL. destruct z; try (destruct z0; [omega | eauto | eauto]).
 Qed.
 
 Lemma wf_implies_allocate :
@@ -801,12 +795,12 @@ Proof.
   destruct HT.
   unfold allocate.
   rewrite H0.
-  simpl.
+  simpl. Print fold_left.
   (* TODO(ins): there must be a better way *)
   edestruct (fold_left
-               (fun (acc : nat * heap) (t : type) =>
+               (fun (acc : Z * heap) (t : type) =>
                   let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) x
-               (Heap.cardinal (elt:=nat * type) H, H)).
+               ((Z.of_nat (Heap.cardinal H)), H)).
   eauto.
 Qed.
 
@@ -834,7 +828,7 @@ Module HeapFacts := WFacts_fun Heap.E Heap.
 Module HeapProp := WProperties_fun Heap.E Heap.
 Lemma cardinal_plus_one :
   forall (H : heap) n v, ~ Heap.In n H ->
-                         Heap.cardinal (Heap.add n v H) = Heap.cardinal H + 1.
+                         (Heap.cardinal (Heap.add n v H) = (Heap.cardinal H) + 1)%nat.
 Proof.
   intros H n v NotIn.
   pose proof HeapProp.cardinal_2 as Fact.
@@ -882,7 +876,7 @@ Proof with eauto 20 with Progress.
                      env m w                                                | (* Malloc *)
                      env m e t HTy IH                                       | (* Unchecked *)
                      env m t e t' HChkPtr HTy IH                            | (* Cast *)
-                     env m e m' w n t HTy IH HPtrType HMode                 | (* Deref *)
+                     env m e m' w l h t HTy IH HPtrType HMode                 | (* Deref *)
                      env m e1 m' n t e2 WT Twf HTy1 IH1 HTy2 IH2 HMode             | (* Index *)
                      env m e1 m' w n t e2 HTy1 IH1 HTy2 IH2 HPtrType HMode  | (* Assign *)
                      env m e1 m' n t e2 e3 WT Twf HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode   (* IndAssign *)
@@ -926,7 +920,7 @@ Proof with eauto 20 with Progress.
       destruct m'.
       (* Case: m' = Checked *)
       * (* We now proceed by case analysis on 'n = 0' *)
-        destruct (Nat.eq_dec n 0).
+        destruct (Z.eq_dec n 0).
         (* Case: n = 0 *)
         { (* We can step according to SFieldAddrNull *)
           subst... }
@@ -1043,16 +1037,16 @@ Proof with eauto 20 with Progress.
     (* Invoke the IH on `e` *)
     destruct IH as [ HVal | [ HRed | HUnchk ] ].
     (* Case: `e` is a value *)
-    + (* We can take a step... but how? *)
+     (* We can take a step... but how? *)
 
-      (*inv HVal.
+  inv HVal.
       inv HTy.
       (* We proceed by case analysis on `w`, the type of the pointer *)
       destruct HPtrType.
       (* Case: `w` is a word pointer *)
-      * (* We now proceed by case analysis on 'n0 = 0' *)
-        destruct (Nat.eq_dec n0 0) as [ Hn0eq0 | Hn0neq0 ].
-        (* Case: n0 = 0 *)
+      * (* We now proceed by case analysis on 'n = 0' *)
+        destruct (Z.eq_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
+        (* Case: n = 0 *)
         { (* We can step according to SDerefNull *)
           subst... }
         (* Case: n <> 0 *)
@@ -1074,8 +1068,9 @@ Proof with eauto 20 with Progress.
             subst.
             destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ];
             [ inv H2; subst; inv H3; inv H4; simpl; omega | ].
-            rewrite Nat.add_0_r in Hheap;
-            inv Ht'tk;
+            rewrite Z.add_0_r in Hheap;
+            inv Ht'tk. 
+            left.
             eapply step_implies_reduces.
             apply SDeref; eauto.
             - destruct H2; subst.
@@ -1089,8 +1084,8 @@ Proof with eauto 20 with Progress.
           }
         }
       (* Case: `w` is an array pointer *)
-      * (* We now perform case analysis on 'n0 = 0' *)
-        destruct (Nat.eq_dec n0 0) as [ Hn0eq0 | Hn0neq0 ].
+      * (* We now perform case analysis on 'n = 0' *)
+        destruct (Z.eq_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
         (* Case: n0 = 0 *)
         { (* We can step according to SDerefNull *)
           subst... }
@@ -1114,7 +1109,7 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We proceed by case analysis on 'n = 0' -- the size of the array *)
             destruct H2 as [Hyp1 Hyp2]; subst.
-            destruct (Nat.eq_dec n 0) as [ Hneq0 | Hnneq0 ].
+            destruct (Z.eq_dec n 0) as [ Hneq0 | Hnneq0 ].
             (* Case: n = 0 *)
             { (* We can step according to SDerefOOB *)
               subst... }
@@ -1123,7 +1118,7 @@ Proof with eauto 20 with Progress.
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               subst.
               inv H4.
-              destruct n; [omega | ].
+              destruct n; (try omega).
               inv H3.
               destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
               { simpl; omega. } 
@@ -1135,7 +1130,7 @@ Proof with eauto 20 with Progress.
               - intros.
                 inv H2.
                 omega.
-        } } }*)
+        } } }
     (* Case: `e` reduces *)
     + (* We can take a step by reducing `e` *)
       left.
