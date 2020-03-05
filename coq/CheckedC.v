@@ -1948,6 +1948,20 @@ Proof.
     omega.
 Qed.
 
+Print length_nth.
+
+Lemma Zlength_nth : forall {A} (l : list A) (z : Z),
+0 <= z < Z.of_nat(length l) -> exists n, nth_error l (Z.to_nat z) = Some n.
+Proof.
+intros. destruct z.
+  -apply (length_nth l (Z.to_nat 0) H).
+  -assert (H1: Z.of_nat (Z.to_nat (Z.pos p)) = (Z.pos p)).
+    {destruct (Z.pos p) eqn:P; inv P.
+      +simpl. rewrite positive_nat_Z. reflexivity. }
+   rewrite <- H1 in H. apply (length_nth l (Z.to_nat (Z.pos p)) H).
+  -exfalso. inv H. apply H0. simpl. reflexivity.
+Qed.
+
 Lemma alloc_correct : forall w D env H ptr H',
     allocate D H w = Some (ptr, H') ->
     structdef_wf D ->
@@ -2031,14 +2045,20 @@ Proof.
       pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
       apply Hyp in HOrd.
       destruct HOrd as [[n' t'] HM'].
-      
+      (*This bit is very annoying, quite a bit of converting back and forth
+        between ints and nats. This could definately be more automated DP*)
       exists n'. exists t'.
-      destruct (length_nth (map snd (Fields.elements f)) (Z.to_nat k) HK) as [x Hnth].
-      specialize (HF k x HK Hnth).
-      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
+      assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
+        split.
+          *zify. omega.
+          *zify. eauto. admit. }
+      specialize (HF (Z.to_nat k) x HK' Hnth).
+      admit.
+(*pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
       inv Eq.
       
-      repeat (split; eauto).
+      repeat (split; eauto).*)
   - split.
     * unfold allocate in H1.
       unfold allocate_meta in H1.
