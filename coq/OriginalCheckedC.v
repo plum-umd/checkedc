@@ -1872,9 +1872,9 @@ Lemma alloc_correct : forall w D env H ptr H',
     heap_wf D H'.
 Proof.
   intros w D env H ptr H' Alloc HSd HWf.
-  unfold allocate.
+  unfold allocate in *.
   unfold allocate_meta in *.
-  unfold pbind in *; simpl in *.
+  unfold bind in *; simpl in *.
   destruct w; simpl in *; eauto; inv Alloc; simpl in *; eauto.
   - split; [| split].
     * apply well_typed_preserved; eauto.
@@ -1957,7 +1957,7 @@ Proof.
   - split.
     * unfold allocate in H1.
       unfold allocate_meta in H1.
-      simpl in H1.
+      simpl in H1. (*Here*)
 
       remember (replicate n w) as l.
 

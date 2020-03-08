@@ -2050,30 +2050,45 @@ Proof.
       exists n'. exists t'.
       destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
       assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
-        split.
-          *zify. omega.
-          *zify. eauto. admit. }
+        destruct k.
+          +zify. simpl. assumption.
+          +simpl. zify. omega.
+          +exfalso. inv HK. apply H0. simpl. reflexivity. }
       specialize (HF (Z.to_nat k) x HK' Hnth).
-      admit.
-(*pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      assert (K0 : k = Z.of_nat (Z.to_nat k)). {
+      destruct k.
+        +simpl. reflexivity.
+        +simpl. zify. reflexivity.
+        +inv HK. exfalso. apply H0. simpl. reflexivity. }
+      rewrite <- K0 in HF.
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
       inv Eq.
       
-      repeat (split; eauto).*)
+      repeat (split; eauto).
   - split.
     * unfold allocate in H1.
       unfold allocate_meta in H1.
       simpl in H1.
 
-      remember (replicate n w) as l.
+      remember (Zreplicate z0 w) as l.
 
       pose proof (fold_preserves_consistency l D H ptr HWf).
-
-      destruct n; simpl in *; try congruence.
-
+      assert (Hzz0 : z = 0 /\ exists p, z0 = Z.pos p). {
+      destruct z; simpl in H1; destruct z0; inv H1.
+      split. reflexivity. exists p. reflexivity. } destruct Hzz0. rewrite H2 in H1.
+      destruct H3. rewrite H3 in H1. simpl in H1.
+      (*could be automated DP*)
       remember (fold_left
-            (fun (acc : nat * heap) (t : type) =>
-             let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
-            l (Heap.cardinal (elt:=nat * type) H, H)) as p.
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1,
+          Heap.add (sizeAcc + 1) (0, t) heapAcc))
+         l
+         (Z.of_nat
+            (Heap.cardinal (elt:=Z * type) H),
+         H)) as p.
       
       destruct p as (n1, h). (*n0 already used???*)
       clear Heqp.
@@ -2082,51 +2097,79 @@ Proof.
     * unfold allocate in H1.
       simpl in *.
 
-      remember (replicate n w) as l.
+      remember (Zreplicate z0 w) as l.
       
-      destruct n; simpl in *; try congruence.
+      assert (Hzz0 : z = 0 /\ exists p, z0 = Z.pos p). {
+      destruct z; simpl in H1; destruct z0; inv H1.
+      split. reflexivity. exists p. reflexivity. } 
+      destruct Hzz0. rewrite H0 in H1.
+      destruct H2. rewrite H2 in H1. simpl in H1.
 
       pose proof (fold_summary l D H ptr HWf) as Hyp.
       remember
         (fold_left
-           (fun (acc : nat * heap) (t : type) =>
-            let (sizeAcc, heapAcc) := acc in
-            (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
-           l
-           (Heap.cardinal (elt:=nat * type) H, H)) as p.
+          (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+          (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
       destruct p.
       clear Heqp.
       inv H1.
-
+      
       destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
-
+      
       split; auto.
       constructor.
       eapply TyLitC; simpl in *; eauto.
-
+      assert (Hw : exists (n : nat), (Pos.to_nat x) = S n). {
+      apply pos_succ. } 
+      destruct Hw. rewrite H0. simpl.
       intros k HK.
       simpl in *.
-      assert (HOrd: 0 < Heap.cardinal H + 1 + k <= Heap.cardinal H') by omega.
-      pose proof (H'wf (Heap.cardinal H + 1 + k)) as Hyp.
+      assert (HOrd: 0 < Z.of_nat(Heap.cardinal H) + 1 + k <= Z.of_nat(Heap.cardinal H')). {
+      split.
+        +zify. omega.
+        +rewrite Card2. simpl. destruct (Pos.to_nat x).
+          -simpl. zify. omega.
+          -simpl. inversion H0.
+           zify. omega. }
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
       destruct k; subst; simpl in *; eauto.
-      + exists 0; exists w. split; auto.
+      + exists 0; exists w. split.
+        auto.
+        rewrite H0 in HF. simpl in HF. rewrite H0 in Card2. simpl in Card2.
+        simple apply conj. simple apply (HF 0%nat w). 
+        assert (H1 :  0 <= 0 < Z.pos (Pos.of_succ_nat (length (replicate x0 w))) 
+                      -> (0 <= 0 < S (length (replicate x0 w)))%nat). {
+          intros. zify. simpl. omega. }
+        apply (H1 HK). simple apply eq_refl.
+        simple apply TyLitZero.
       + apply Hyp in HOrd.
         { destruct HOrd as [[n' t'] HM'].
-          destruct (length_nth (replicate n w) k) as [x Hnth].
-          - rewrite replicate_length in *. omega.
-          - exists n'. exists x.
-            specialize (HF (S k) w HK).
+          destruct (length_nth (replicate (S x0) w) (Pos.to_nat p)) as [n Hnth].
+          - rewrite replicate_length in *. zify. omega.
+          - exists n'. exists n.
+            assert (H1 : 0 <= Z.pos p < Z.pos (Pos.of_succ_nat (length (replicate x0 w))) 
+                         -> (0 <= Pos.to_nat p < length (replicate (Pos.to_nat x) w))%nat). {
+              intros. rewrite H0. zify. simpl. zify. assumption. }
+            apply H1 in HK.
+            specialize (HF (Pos.to_nat p) w HK).
             split; eauto.
-            assert (w = x).
+            assert (w = n).
             { eapply replicate_nth; eauto. }
             subst.
-            assert (Hyp' : nth_error (x :: replicate n x) (S k) = Some x).
+            assert (Hyp' : nth_error (n :: replicate x0 n) (Pos.to_nat p) = Some n).
             { simpl; auto. }
+            rewrite H0 in HF. simpl in HF.
             specialize (HF Hyp').
+            assert (H2: Z.pos p = Z.of_nat (Pos.to_nat p)). {
+              zify. omega. }
+            rewrite <- H2 in HF.
             pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
             inv Eq.
             split; auto.
-        } 
+        }
+      +destruct HK. exfalso. apply H1. simpl. reflexivity.
 Qed.
 
 Lemma values_are_nf : forall D H e,
