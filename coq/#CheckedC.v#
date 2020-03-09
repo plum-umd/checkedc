@@ -3108,7 +3108,7 @@ Proof with eauto 20 with Preservation.
             eapply TyDeref with (l0 := l - n2) (h0 := h - n2); eauto.
             constructor.
             remember H5 as Backup; clear HeqBackup.
-            inv H5; eauto; try omega.
+            inv H5; eauto; try omega. admit.
             inv H1. (* HERE *)
             destruct n; try congruence.
             assert (HLen: length ts = S n).
@@ -3295,6 +3295,8 @@ Qed.
 (* ... for Blame *)
 
 Create HintDb Blame.
+
+Print heap_add_in_cardinal.
 
 Lemma heap_wf_step : forall D H e H' e',
     @structdef_wf D ->
