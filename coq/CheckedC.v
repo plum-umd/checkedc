@@ -408,9 +408,7 @@ Qed.
 
 Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
   | SPlusChecked : forall H n1 h l t n2,
-      n1 <> 0 ->
-      (*Unsure if necessary to add this DP 
-      l <= 0 /\ h > 0 -> *)
+      n1 > 0 ->
       step D
         H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
@@ -419,9 +417,20 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EPlus (ELit n1 t1) (ELit n2 t2))
         H (RExpr (ELit (n1 + n2) t1))
-  | SPlusNull : forall H l h t n2 ,
+  | SPlusNull : forall H n1 l h t n2,
+      n1 <= 0 ->
       step D
-        H (EPlus (ELit 0 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H RNull
+  | SPlusNullHigh : forall H n1 l h t n2,
+      h <= 0 ->
+      step D
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H RNull
+  | SPlusNullLow : forall H n1 l h t n2,
+      l > 0 ->
+      step D
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H RNull
   | SCast : forall H t n t',
       step D
@@ -434,8 +443,15 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EDeref (ELit n t))
         H (RExpr (ELit n1 t1))
-  | SDerefOOB : forall H n t t1,
-      t = TPtr Checked (TArray 0 0 t1) ->
+  | SDerefHighOOB : forall H n t t1 l h,
+      h <= 0 ->
+      t = TPtr Checked (TArray l h t1) ->
+      step D
+        H (EDeref (ELit n t))
+        H RBounds
+  | SDerefLowOOB : forall H n t t1 l h,
+      l > 0 ->
+      t = TPtr Checked (TArray l h t1) ->
       step D
         H (EDeref (ELit n t))
         H RBounds
@@ -447,7 +463,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
         H  (EAssign (ELit n t) (ELit n1 t1))
         H' (RExpr (ELit n1 t1))
   | SFieldAddrChecked : forall H n t (fi : field) n0 t0 T fs i fi ti,
-      n <> 0 ->
+      n > 0 ->
       t = TPtr Checked (TStruct T) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
@@ -486,20 +502,29 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EUnchecked (ELit n t))
         H (RExpr (ELit n t))
-  | SAssignOOB : forall H n t n1 t1,
-      t = TPtr Checked (TArray 0 0 t1) ->
+  | SAssignHighOOB : forall H n t n1 t1 l h,
+      h <= 0 ->
+      t = TPtr Checked (TArray l h t1) ->
       step D
         H (EAssign (ELit n t) (ELit n1 t1))
         H RBounds
-  | SDerefNull : forall H t w,
+  | SAssignLowOOB : forall H n t n1 t1 l h,
+      l > 0 ->
+      t = TPtr Checked (TArray l h t1) ->
+      step D
+        H (EAssign (ELit n t) (ELit n1 t1))
+        H RBounds
+  | SDerefNull : forall H t n w,
+      n <= 0 ->
       t = TPtr Checked w ->
       step D
-        H (EDeref (ELit 0 t))
+        H (EDeref (ELit n t))
         H RNull
-  | SAssignNull : forall H t w n t',
+  | SAssignNull : forall H t w n n1 t',
+      n1 <= 0 ->
       t = TPtr Checked w ->
       step D
-        H (EAssign (ELit 0 t) (ELit n t'))
+        H (EAssign (ELit n1 t) (ELit n t'))
         H RNull.
 
 Hint Constructors step.
@@ -554,8 +579,10 @@ Definition empty_scope := empty_set (Z * type).
 Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop :=
   | TyLitInt : forall s n,
       well_typed_lit D H s n TNat
-  | TyLitArray : forall s n w,
-      well_typed_lit D H s n (TPtr Checked (TArray 0 0 w))
+  | TyLitArray : forall s n w l h,
+      l <= 0 ->
+      h <= 0 ->
+      well_typed_lit D H s n (TPtr Checked (TArray l h w))
   | TyLitU : forall s n w,
       well_typed_lit D H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
@@ -585,7 +612,7 @@ Hint Constructors well_typed_lit.
 Lemma well_typed_lit_ind' :
   forall (D : structdef) (H : heap) (P : scope -> Z -> type -> Prop),
     (forall (s : scope) (n : Z), P s n TNat) ->
-    (forall (s : scope) (n : Z) (w : type), P s n (TPtr Checked (TArray 0 0 w))) ->
+    (forall (s : scope) (n : Z) (w : type) (l : Z) (h : Z), l <= 0 -> h <= 0 -> P s n (TPtr Checked (TArray l h w))) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
        (forall (s : scope) (n : Z) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
@@ -610,7 +637,7 @@ Proof.
   refine (fix F s n t Hwtl :=
             match Hwtl with
             | TyLitInt _ _ s' n' => HTyLitInt s' n'
-            | TyLitArray _ _ s' n' w' => HTyLitArray s' n' w'
+            | TyLitArray _ _ s' n' w' l h Hl Hh => HTyLitArray s' n' w' l h Hl Hh
             | TyLitU _ _ s' n' w' => HTyLitU s' n' w'
             | TyLitZero _ _ s' t' => HTyLitZero s' t'
             | TyLitRec _ _ s' n' w' Hscope => HTyLitRec s' n' w' Hscope
@@ -855,6 +882,7 @@ Proof.
 Qed.
 
 (* This should be part of the stupid map library. *)
+(* Change to Z to push final proof DP*)
 Lemma heap_add_in_cardinal : forall n v H,
   Heap.In n H -> 
   Heap.cardinal (elt:=nat * type) (Heap.add n v H) =
@@ -1276,7 +1304,7 @@ Proof with eauto 20 with Progress.
             + destruct Hw as [? [? ?]]; subst.
               inv HTy2.
               inv H0.
-              left; eauto...
+              left. eapply step_implies_reduces. eapply SAssignHighOOB; eauto.
             + solve_empty_scope.
             + left.
               destruct Hw as [? [? ?]]; subst.
@@ -1284,7 +1312,7 @@ Proof with eauto 20 with Progress.
               * (* h = 0 - Null *)
                 destruct l;
                 eapply step_implies_reduces;
-                inv HTy2; subst; eapply SAssignOOB;
+                inv HTy2; subst; eapply SAssignHighOOB;
                 try reflexivity; try (simpl in H1; inv H1).
               * (* n <> 0 - Assign *)
                 eapply step_implies_reduces.
@@ -1344,26 +1372,38 @@ Proof with eauto 20 with Progress.
             + inv HVal3.
               inv HTy3.
               left; eauto...
-              destruct (Z.eq_dec n 0); subst; eauto...
+              destruct (Z_gt_dec n 0); subst; rewrite HCtx; eexists;
+              eexists; eexists. 
+                  *eapply RSExp. apply SPlusChecked. eauto. eauto.
+                  *eapply RSHaltNull. apply SPlusNull. omega. eauto.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              destruct (Z.eq_dec n 0); subst; eauto...
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                  *eapply RSExp. apply SPlusChecked. eauto. eauto.
+                  *eapply RSHaltNull. apply SPlusNull. omega. eauto.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z.eq_dec n 0); subst; eauto...
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                  *eapply RSExp. apply SPlusChecked. eauto. eauto.
+                  *eapply RSHaltNull. apply SPlusNull. omega. eauto.
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
             + inv HVal3.
               inv HTy3.
-              left; eauto...
-              destruct (Z.eq_dec n 0); subst; eauto...
+              
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                  *eapply RSExp. apply SPlusChecked. eauto. eauto. (*why does this go through? DP*)
+                  *assert (H20 : (mode_of (CAssignL CHole (ELit n0 t))) = Checked). {
+                   simpl. reflexivity. }
+                   eapply RSHaltNull. eapply SPlusNull. eauto. eauto.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              destruct (Z.eq_dec n 0); subst; eauto...
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                    *eapply RSHaltNull. 
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z.eq_dec n 0); subst; eauto...
+              destruct (Z_gt_dec n 0); subst; eauto...
           - inv H7.
             left.
-            destruct (Z.eq_dec n 0); subst; eauto...
+            destruct (Z_gt_dec n 0); subst; eauto...
           - inv H7.
             left.
-            destruct (Z.eq_dec n 0); subst; eauto...
+            destruct (Z_gt_dec n 0); subst; eauto...
         }
       * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -3110,7 +3150,8 @@ Proof with eauto 20 with Preservation.
             remember H5 as Backup; clear HeqBackup.
             inv H5; eauto; try omega.
             inv H1. (* HERE *)
-            destruct n; try congruence.
+            destruct l; destruct h; try congruence.
+              +simpl in H2.
             assert (HLen: length ts = S n).
             { inv H2. simpl. rewrite replicate_length; auto. }
             (* destruct on whether n2 <= length ts or not *)
@@ -3295,6 +3336,8 @@ Qed.
 (* ... for Blame *)
 
 Create HintDb Blame.
+
+Print heap_add_in_cardinal.
 
 Lemma heap_wf_step : forall D H e H' e',
     @structdef_wf D ->
