@@ -1410,7 +1410,9 @@ Proof with eauto 20 with Progress.
               eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
               
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z_gt_dec n 0); subst; eauto...
+              rewrite HCtx; left; eexists; eexists; eexists.
+              eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              
           - inv H7.
             left.
             destruct (Z_gt_dec n 0); subst; eauto...
