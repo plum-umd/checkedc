@@ -422,6 +422,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H RNull
+(*
   | SPlusNullHigh : forall H n1 l h t n2,
       h <= 0 ->
       step D
@@ -432,6 +433,7 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H RNull
+*)
   | SCast : forall H t n t',
       step D
         H (ECast t (ELit n t'))
@@ -1388,33 +1390,57 @@ Proof with eauto 20 with Progress.
             + inv HVal3.
               inv HTy3.
               left; eauto...
-              destruct (Z_gt_dec n 0); subst; rewrite HCtx; eexists;
-              eexists; eexists. (*This is weird, the 0 is in the wrong place*)
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 3 eexists.
+              * eapply RSExp... 
+              * eapply RSHaltNull...
             + destruct HRed3 as [H' [? [r HRed3]]].
-              destruct (Z_gt_dec n0 0); rewrite HCtx; left; eexists; eexists; eexists.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+              * eapply RSExp...
+              * eapply RSHaltNull... 
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z_gt_dec n0 0); rewrite HCtx; left; eexists; eexists; eexists.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+              * eapply RSExp... 
+              * eapply RSHaltNull...
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
             + inv HVal3.
               inv HTy3.
               
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                  *eapply RSExp. apply SPlusChecked. omega. reflexivity.
+                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+            + destruct HRed3 as [H' [? [r HRed3]]].
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                *eapply RSExp. apply SPlusChecked. omega. reflexivity.
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                *eapply RSExp. apply SPlusChecked. omega. reflexivity.
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+          - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
+            +inv HVal3.
+             inv HTy3.
+             destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
                   *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
                   *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
             + destruct HRed3 as [H' [? [r HRed3]]].
               rewrite HCtx; left; eexists; eexists; eexists.
-              eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-              
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               rewrite HCtx; left; eexists; eexists; eexists.
-              eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-              
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+          -destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
+            +inv HVal3.
+             inv HTy3.
+             destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+            + destruct HRed3 as [H' [? [r HRed3]]].
+              rewrite HCtx; left; eexists; eexists; eexists.
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              rewrite HCtx; left; eexists; eexists; eexists.
+                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+
           - inv H7.
             left.
             destruct (Z_gt_dec n 0); subst; eauto...
