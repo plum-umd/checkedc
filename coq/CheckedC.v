@@ -583,7 +583,7 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
   | TyLitInt : forall s n,
       well_typed_lit D H s n TNat
   | TyLitArray : forall s n w l h,
-      l <= 0 ->
+      l <= 0 -> (* This is probably wrong *)
       h <= 0 ->
       well_typed_lit D H s n (TPtr Checked (TArray l h w))
   | TyLitU : forall s n w,
@@ -1346,13 +1346,8 @@ Proof with eauto 20 with Progress.
                     apply allocate_bounds in H1. omega.
                 } 
               * (* h <= 0 - Null *)
-                destruct l;
-                eapply step_implies_reduces;
-                inv HTy2; subst; eapply SAssignHighOOB;
-                try reflexivity; try (simpl in H1; inv H1).
-                exfalso. assert (H6: h > 0). {
-                  destruct h; inv H5. zify. omega. }
-                eauto.
+                eapply step_implies_reduces.
+                inv HTy2; subst; eauto.
         } 
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -1404,48 +1399,30 @@ Proof with eauto 20 with Progress.
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
             + inv HVal3.
               inv HTy3.
-              
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-                  *eapply RSExp. apply SPlusChecked. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              * eapply RSExp... 
+              * eapply RSHaltNull...
             + destruct HRed3 as [H' [? [r HRed3]]].
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSExp. apply SPlusChecked. omega. reflexivity.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              * eapply RSExp... 
+              * eapply RSHaltNull...
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSExp. apply SPlusChecked. omega. reflexivity.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-          - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            +inv HVal3.
-             inv HTy3.
-             destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-            + destruct HRed3 as [H' [? [r HRed3]]].
-              rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-          -destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            +inv HVal3.
-             inv HTy3.
-             destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-                  *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-            + destruct HRed3 as [H' [? [r HRed3]]].
-              rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; eexists; eexists; eexists.
-                *eapply RSHaltNull. apply SPlusNull. omega. reflexivity.
+              * eapply RSExp... 
+              * eapply RSHaltNull...
+          - rewrite HCtx; left; do 3 eexists.
+            eapply RSHaltNull...
+            apply SPlusNull.
+            omega.
+          - rewrite HCtx; left; do 3 eexists.
+            eapply RSHaltNull...
+            apply SPlusNull.
+            omega.
           - inv H7.
             left.
             destruct (Z_gt_dec n 0); subst; eauto...
           - inv H7.
-            left.
-            destruct (Z_gt_dec n 0); subst; eauto...
+            left. destruct (Z_gt_dec n 0); subst; eauto...
         }
       * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -3185,13 +3162,23 @@ Proof with eauto 20 with Preservation.
     + clear H1.
       destruct E; inversion H2; simpl in *; subst.
       * { (* Plus step *)
-          inv H6; split; eauto...
+          match goal with
+          | [ H : step _ _ _ _ _ |- _ ] => inv H
+          end; split; eauto...
           - inv HTy1.
             eapply TyDeref with (l0 := l - n2) (h0 := h - n2); eauto.
             constructor.
-            remember H5 as Backup; clear HeqBackup.
-            inv H5; eauto; try omega.
-            
+            match goal with
+            | [ H : well_typed_lit _ _ _ _ _ |- _ ] =>
+              remember H as Backup; clear HeqBackup; inv H; eauto; try omega
+            end.
+            + (* Addition preservation problem: 
+              apply TyLitArray.
+              * admit.
+              * admit.
+              
+            + {
+              
             inv H1. (* HERE *)
             destruct l; destruct h; try congruence.
               +simpl in H2.
