@@ -282,15 +282,16 @@ match z with
   |_ => []
 end.
 
-Definition allocate_meta (D : structdef) (w : type) : option (list type) :=
+(* Change this, to return the lower bound *)
+Definition allocate_meta (D : structdef) (w : type)
+  : option (Z * list type) :=
   match w with
   | TStruct T =>
     fs <- StructDef.find T D ;;
-       ret (List.map snd (Fields.elements fs))
-  | TArray 0 0 T => None
-  | TArray 0 h T => if (h >? 0) then Some (Zreplicate h T) else None
-  | TArray l h T => None
-  | _ => Some [w]
+    ret (0, List.map snd (Fields.elements fs))
+  | TArray l h T =>
+    Some (l, ZReplicate (h - l) T)
+  | _ => Some (0, [w])
   end.
 
 
