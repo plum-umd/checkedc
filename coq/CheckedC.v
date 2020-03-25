@@ -282,7 +282,7 @@ match z with
   |_ => []
 end.
 
-(* Change this, to return the lower bound *)
+(* Changed this, to return the lower bound *)
 Definition allocate_meta (D : structdef) (w : type)
   : option (Z * list type) :=
   match w with
@@ -290,15 +290,31 @@ Definition allocate_meta (D : structdef) (w : type)
     fs <- StructDef.find T D ;;
     ret (0, List.map snd (Fields.elements fs))
   | TArray l h T =>
-    Some (l, ZReplicate (h - l) T)
+    Some (l, Zreplicate (h - l) T)
   | _ => Some (0, [w])
   end.
+
+
+Definition allocate_meta_no_bounds (D : structdef) (w : type)
+  : option (list type) :=
+  match (allocate_meta D w) with
+  |Some( _ , x) => Some x
+  |None => None
+end.
+
+
+
+Lemma allocate_meta_implies_allocate_meta_no_bounds : forall D w ts b,
+allocate_meta D w = Some (b, ts) -> allocate_meta_no_bounds D w = Some ts.
+Proof.
+  intros. unfold allocate_meta_no_bounds. rewrite H. reflexivity.
+Qed.
 
 
 Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
   let H_size := Z.of_nat(Heap.cardinal H) in
   let base   := H_size + 1 in
-  am <- allocate_meta D w ;;
+  am <- allocate_meta_no_bounds D w ;;
      let (_, H') := List.fold_left
                   (fun (acc : Z * heap) (t : type) =>
                      let (sizeAcc, heapAcc) := acc in
@@ -423,18 +439,6 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
         H RNull
-(*
-  | SPlusNullHigh : forall H n1 l h t n2,
-      h <= 0 ->
-      step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H RNull
-  | SPlusNullLow : forall H n1 l h t n2,
-      l > 0 ->
-      step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H RNull
-*)
   | SCast : forall H t n t',
       step D
         H (ECast t (ELit n t'))
@@ -580,13 +584,10 @@ Defined.
 Definition scope := set (Z *type)%type. 
 Definition empty_scope := empty_set (Z * type).
 
+
 Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop :=
   | TyLitInt : forall s n,
       well_typed_lit D H s n TNat
-  | TyLitArray : forall s n w l h,
-      l <= 0 -> (* This is probably wrong *)
-      h <= 0 ->
-      well_typed_lit D H s n (TPtr Checked (TArray l h w))
   | TyLitU : forall s n w,
       well_typed_lit D H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
@@ -594,9 +595,9 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
   | TyLitRec : forall s n w,
       set_In (n, TPtr Checked w) s ->
       well_typed_lit D H s n (TPtr Checked w)
-  | TyLitC : forall s n w ts,
-      Some ts = allocate_meta D w ->
-      (forall k, 0 <= k < Z.of_nat(List.length ts) ->
+  | TyLitC : forall s n w b ts,
+      Some (b, ts) = allocate_meta D w ->
+      (forall k, b <= k < Z.of_nat(List.length ts) ->
                  exists n' t',
                    Some t' = List.nth_error ts (Z.to_nat k)(*???*) /\
                    Heap.MapsTo (n + k) (n', t') H /\
@@ -620,10 +621,10 @@ Lemma well_typed_lit_ind' :
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
        (forall (s : scope) (n : Z) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
-       (forall (s : scope) (n : Z) (w : type) (ts : list type),
-        Some ts = allocate_meta D w ->
+       (forall (s : scope) (n : Z) (w : type) (ts : list type) (b : Z),
+        Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
-         0 <= k < (Z.of_nat (length ts)) ->
+         b <= k < (Z.of_nat (length ts)) ->
          exists (n' : Z) (t' : type),
            Some t' = nth_error ts (Z.to_nat k) /\
            Heap.MapsTo (n + k) (n', t') H /\
@@ -641,12 +642,11 @@ Proof.
   refine (fix F s n t Hwtl :=
             match Hwtl with
             | TyLitInt _ _ s' n' => HTyLitInt s' n'
-            | TyLitArray _ _ s' n' w' l h Hl Hh => HTyLitArray s' n' w' l h Hl Hh
             | TyLitU _ _ s' n' w' => HTyLitU s' n' w'
             | TyLitZero _ _ s' t' => HTyLitZero s' t'
             | TyLitRec _ _ s' n' w' Hscope => HTyLitRec s' n' w' Hscope
-            | TyLitC _ _ s' n' w' ts Hts IH =>
-              HTyLitC s' n' w' ts Hts (fun k Hk =>
+            | TyLitC _ _ s' n' w' b ts Hts IH =>
+              HTyLitC s' n' w' ts b Hts (fun k Hk =>
                                          match IH k Hk with
                                          | ex_intro _ n' Htmp =>
                                            match Htmp with
@@ -810,7 +810,7 @@ Require Import Omega.
 Lemma wf_implies_allocate_meta :
   forall (D : structdef) (w : type),
     (forall l h t, w = TArray l h t -> l= 0 /\ h > 0) ->
-    type_wf D w -> exists allocs, allocate_meta D w = Some allocs.
+    type_wf D w -> exists b allocs, allocate_meta D w = Some (b, allocs).
 Proof.
   intros D w HL HT.
   destruct w; simpl in *; eauto.
@@ -818,15 +818,17 @@ Proof.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
-  - specialize (HL z z0 w eq_refl).
+  (*- specialize (HL z z0 w eq_refl).
     destruct HL. destruct z; try (destruct z0; [omega | eauto | eauto]).
       +simpl. eauto.
       +zify. omega.
       +zify. omega.
       +zify. omega.
       +zify. omega.
-      +zify. omega.
+      +zify. omega.*)
 Qed.
+
+(*HERE*)
 
 Lemma wf_implies_allocate :
   forall (D : structdef) (w : type) (H : heap),
@@ -835,16 +837,17 @@ Lemma wf_implies_allocate :
 Proof.
   intros D w H HL HT.
   eapply wf_implies_allocate_meta in HT; eauto.
-  destruct HT.
+  destruct HT. destruct H0.
   unfold allocate.
+  unfold allocate_meta_no_bounds.
   rewrite H0.
   simpl. Print fold_left.
   (* TODO(ins): there must be a better way *)
   edestruct (fold_left
                (fun (acc : Z * heap) (t : type) =>
-                  let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) x
+                  let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) x0
                ((Z.of_nat (Heap.cardinal H)), H)).
-  eauto. 
+  eauto.
 Qed.
 
 Definition unchecked (m : mode) (e : expression) : Prop :=
@@ -886,7 +889,7 @@ Proof.
 Qed.
 
 (* This should be part of the stupid map library. *)
-(* Change to Z to push final proof DP*)
+(* Changed to Z to push final proof DP*)
 Lemma heap_add_in_cardinal : forall n v H,
   Heap.In n H -> 
   Heap.cardinal (elt:=Z * type) (Heap.add n v H) =
@@ -914,8 +917,11 @@ Proof.
     +exists n. reflexivity.
 Qed.
 
-Lemma allocate_bounds : forall D l h t ts,
-Some ts = allocate_meta D (TArray l h t) ->
+
+(*No longer provable since we can allocate
+bounds that are less than 0 now.
+Lemma allocate_bounds : forall D l h t b ts,
+Some(b, ts) = allocate_meta D (TArray l h t) ->
 l = 0 /\ h > 0.
 Proof.
 intros.
@@ -927,7 +933,7 @@ destruct l.
   +simpl in H. inv H.
   +simpl in H. inv H.
 Qed.
-
+*)
 Lemma progress : forall D H m e t,
     structdef_wf D ->
     heap_wf D H ->
@@ -1121,17 +1127,15 @@ Proof with eauto 20 with Progress.
         (* Case: n > 0 *)
         { (* We now proceed by case analysis on '|- n0 : ptr_C w' *)
           inversion H7.
-          (* Case: TyLitArray *)
-          {
-            subst. inv H2. inv H3.
-          }
           (* Case: TyLitZero *)
-          { (* Impossible, since n0 > 0 *)
-            exfalso. rewrite <- H4 in Hn0eq0. inversion Hn0eq0. }
+          {
+           (* Impossible, since n > 0 *)
+           exfalso. omega.
+            (*subst. inv H2. inv H3.*)
+          }
           (* Case: TyLitRec *)
           { (* Impossible, since scope is empty *)
-            solve_empty_scope.
-          } 
+            solve_empty_scope. }
           (* Case: TyLitC *)
           { (* We can step according to SDeref *)
             subst.
@@ -1164,10 +1168,6 @@ Proof with eauto 20 with Progress.
           match goal with
           | [ H : well_typed_lit _ _ _ _ _ |- _ ] => inv H
           end.
-          (* Case: TyLitArray *)
-          { (* Step according to OOB *)
-            eauto...
-          }
           (* Case: TyLitZero *)
           { (* Impossible, since n0 <> 0 *)
             exfalso. inv Hn0eq0.
@@ -1185,41 +1185,45 @@ Proof with eauto 20 with Progress.
             {left. (* We can step according to SDeref *)
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               subst.
-              inv H4.
-              assert (Hts: exists p, ts = (Zreplicate (Z.pos p) t)). {
-                destruct h eqn:Hp. {destruct l; inv H3. }
-                {destruct l. simpl in H3. inv H3.
-                  *simpl. exists p. reflexivity.
-                  *inv H3.
-                  *inv H3. }
-                {inv H3. destruct l; inv H4. }
-              }
-              inv Hts.
+              inv H4. destruct (Z_gt_dec l 0). (* if l > 0 we have a bounds error*)
+              {eapply step_implies_reduces. eapply SDerefLowOOB. eapply g. eauto.
+              }(*if l <= 0 we can step according to SDeref. *)
+              assert (Hhl : h - l > 0). {
+                destruct h. inv Hneq0. omega. inv Hneq0. }
+              assert (Hhlp : exists p, Z.pos p = h - l). {
+              destruct (h - l); inv Hhl. exists p. reflexivity. }
+              destruct Hhlp. 
               destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
-{ simpl. destruct (pos_succ x) as [x' Hx']. rewrite Hx'. simpl. zify. omega.
-
-}
+              { simpl. zify. split. omega.
+                simpl. eauto. destruct(pos_succ x). rewrite <- H2.
+                simpl. rewrite H5. simpl. zify. omega. }
               simpl in Hheap. simpl in Ht'tk. destruct (pos_succ x) as [x' Hx'].
-              rewrite Hx' in  Ht'tk. simpl in Ht'tk.
+              rewrite <- H2 in Ht'tk. simpl in Ht'tk.
+              rewrite Hx' in  Ht'tk. 
+              simpl in Ht'tk.
               rewrite Z.add_0_r in Hheap.
               inv Ht'tk. eapply step_implies_reduces.
-               
-                 apply SDeref; eauto.
+              apply SDeref; eauto.
                  - destruct Hyp2; repeat constructor; zify; eauto.
                  
                   
                 -intros. inv H2. destruct l0.
-                  {destruct h0; inv H3. zify. omega. }
-                  {destruct h0; inv H3. }
-                  {destruct h0; inv H3. }
+                  {destruct h0; inv H3. zify. omega.
+                    *omega.
+                    *inv H5. }
+                  {destruct h0; inv H3.
+                    *exfalso. inv H5.
+                    *exfalso. eauto.
+                    *exfalso. zify. omega. }
+                  {destruct h0; inv H3. 
+                    *exfalso. zify. omega.
+                    *omega.
+                    *exfalso. zify. omega. }
  }
              (* Case: h <= 0 *)
             { (* We can step according to SDerefOOB *)
-              subst. left. assert (H9: l = 0). 
-                {apply allocate_bounds in H4. destruct H4. assumption. }  
-              rewrite H9 in H4. inv H4. exfalso.
-              assert (Hpos : h > 0). { destruct h; inv H3. zify. omega. }
-              omega.
+              subst. left. eapply step_implies_reduces. 
+              eapply SDerefHighOOB. eauto. eauto.
 }}}
         (* Case: n <= 0 *)
         { (* We can step according to SDerefNull *)
@@ -1293,7 +1297,6 @@ Proof with eauto 20 with Progress.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] => inv H
             end...
-            + inv H0. 
             + (*This is weird, why is 0 a case? DP*)
               left. eapply step_implies_reduces with (H' := H) (r := RNull).
               apply (SAssignNull D H (TPtr Checked t) t n2' 0 t2').
@@ -1313,10 +1316,6 @@ Proof with eauto 20 with Progress.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] => inv H
             end...
-            + destruct Hw as [? [? ?]]; subst.
-              inv HTy2.
-              inv H0.
-              left. eapply step_implies_reduces. eapply SAssignHighOOB; eauto.
             + (*Same issue here as above DP*)
               left. eapply step_implies_reduces with (H' := H) (r := RNull).
               apply (SAssignNull D H (TPtr Checked w) w n2' 0 t2').
@@ -1330,12 +1329,9 @@ Proof with eauto 20 with Progress.
                 { eapply SAssign; eauto...
                   - inv H1.
                     destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; eauto.
-                    + destruct h; [omega | | ].
-                      inv H5. destruct l. 
-                        {simpl. inv H1. rewrite replicate_length. zify. omega. }
-                        {inv H1. }
-                        {inv H1. }
-                     destruct l; inv H5.
+                    +split.
+                      
+                     (*destruct l; inv H5.*)
                     + inv HNth.
                       rewrite Z.add_0_r in HMap.
                       destruct h.
@@ -1387,12 +1383,11 @@ Proof with eauto 20 with Progress.
               inv HTy3.
               left; eauto...
               destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 3 eexists.
-              * eapply RSExp... 
-              * eapply RSHaltNull...
+              * eapply RSHaltNull... eapply SPlusNull. omega.
+              * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSExp...
-              * eapply RSHaltNull... 
+              rewrite HCtx; left; eexists; eexists; eexists.
+              eapply RSHaltNull... eapply SPlusNull. omega. 
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
               * eapply RSExp... 
