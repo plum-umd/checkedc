@@ -2041,12 +2041,8 @@ Proof.
     * apply heap_add_preserves_wf; auto.
   - split.
     * unfold allocate in H1. 
-      assert (Halloc : exists v, allocate_meta_no_bounds D
-         (TStruct s) = Some v) . {
-      destruct (allocate_meta_no_bounds D (TStruct s)).
-      exists l. reflexivity. inv H1. }
-      destruct Halloc.
-      rewrite H0 in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      simpl in *.
       destruct (StructDef.find s D) eqn:Find; try congruence.
       remember (Fields.elements f) as l.
 
@@ -2055,18 +2051,12 @@ Proof.
       remember (fold_left
             (fun (acc : Z * heap) (t : type) =>
              let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
-            (map snd l) (Z.of_nat(Heap.cardinal H), H)).
-      rewrite <- Heqp in H1. destruct p.
+            (map snd l) (Z.of_nat(Heap.cardinal H), H)) as p.
+      destruct p.
       clear Heqp.
-      assert (Hheap : Some
-        (Z.of_nat
-           (Heap.cardinal
-              (elt:=Z * type) H) + 1,
-        h) = Some (ptr, H')). {
-        eapply (H1 h).
-      inv H1.
-      apply H2; eauto.
+      inv H1. eauto.
     * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
       simpl in *.
       destruct (StructDef.find s D) eqn:Find; try congruence.
 
@@ -2121,17 +2111,13 @@ Proof.
       repeat (split; eauto).
   - split.
     * unfold allocate in H1.
-      unfold allocate_meta in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
       simpl in H1.
 
-      remember (Zreplicate z0 w) as l.
+      remember (Zreplicate (z0 - z) w) as l.
 
-      pose proof (fold_preserves_consistency l D H ptr HWf).
-      assert (Hzz0 : z = 0 /\ exists p, z0 = Z.pos p). {
-      destruct z; simpl in H1; destruct z0; inv H1.
-      split. reflexivity. exists p. reflexivity. } destruct Hzz0. rewrite H2 in H1.
-      destruct H3. rewrite H3 in H1. simpl in H1.
-      (*could be automated DP*)
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+      
       remember (fold_left
          (fun (acc : Z * heap) (t : type) =>
           let (sizeAcc, heapAcc) := acc in
@@ -3149,13 +3135,13 @@ Proof with eauto 20 with Preservation.
                  { exfalso.
                  assert (Hf : 0 > 0). {apply (H11 (Z.neg p) 0 t). reflexivity. }
                  omega. }
-                { destruct (H3 (Z.neg p)) as [N [T' [HT' [HM' HWT']]]]; [ | ].
-                    + assert (Z.pos p0 - Z.neg p > 0). { zify. omega. }
-                      assert ( exists x, Z.pos x = Z.pos p0 - Z.neg p ). {destruct (Z.pos p0 - Z.neg p). zify. omega. exists p1. reflexivity. zify. omega. }
-                      destruct H0. assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H4.
-                      rewrite <- H0. simpl. rewrite H4. simpl. zify. omega.
+                { assert (Hgt : Z.pos p0 - Z.neg p > 0). { zify. omega. }
+                  assert (Hpos : exists x, Z.pos x = Z.pos p0 - Z.neg p ). {destruct (Z.pos p0 - Z.neg p). zify. omega. exists p1. reflexivity. zify. omega. }
+                  destruct (H3 (Z.neg p)) as [N [T' [HT' [HM' HWT']]]]; [ | ].
+                    + destruct Hpos. assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H0.
+                      rewrite <- H. simpl. rewrite H0. simpl. zify. omega.
                     + inv HT'. assert (H4 : exists n, Pos.to_nat (p0 + p) = S n) by apply pos_succ.
-                      maps_to_fun. inv H4. rewrite H in H0. inv H0.
+                      maps_to_fun. inv H4. destruct Hpos. rewrite <- H4 in H3. rewrite H in H0. inv H0.
                       constructor.
                       assert (Hyp: set_remove_all (n, TPtr Checked (TArray (Z.neg p) (Z.pos p) t))
                                         ((n,TPtr Checked (TArray (Z.neg p) (Z.pos p) t))::nil) = empty_scope).
