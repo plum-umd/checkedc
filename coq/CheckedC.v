@@ -298,11 +298,9 @@ Definition allocate_meta (D : structdef) (w : type)
 Definition allocate_meta_no_bounds (D : structdef) (w : type)
   : option (list type) :=
   match (allocate_meta D w) with
-  |Some( _ , x) => Some x
-  |None => None
+  | Some( _ , x) => Some x
+  | None => None
 end.
-
-
 
 Lemma allocate_meta_implies_allocate_meta_no_bounds : forall D w ts b,
 allocate_meta D w = Some (b, ts) -> allocate_meta_no_bounds D w = Some ts.
@@ -2040,37 +2038,29 @@ Proof.
       apply Heap.add_1; eauto. omega.
     * apply heap_add_preserves_wf; auto.
   - split.
-    * unfold allocate in H1. 
-      assert (Halloc : exists v, allocate_meta_no_bounds D
-         (TStruct s) = Some v) . {
-      destruct (allocate_meta_no_bounds D (TStruct s)).
-      exists l. reflexivity. inv H1. }
-      destruct Halloc.
-      rewrite H0 in H1.
-      destruct (StructDef.find s D) eqn:Find; try congruence.
+    * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      destruct (StructDef.find s D) eqn:Find; simpl in *; try congruence.
+
       remember (Fields.elements f) as l.
 
       pose proof (fold_preserves_consistency (map snd l) D H ptr HWf).
-
+      
       remember (fold_left
             (fun (acc : Z * heap) (t : type) =>
              let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
-            (map snd l) (Z.of_nat(Heap.cardinal H), H)).
-      rewrite <- Heqp in H1. destruct p.
-      clear Heqp.
-      assert (Hheap : Some
-        (Z.of_nat
-           (Heap.cardinal
-              (elt:=Z * type) H) + 1,
-        h) = Some (ptr, H')). {
-        eapply (H1 h).
+            (map snd l) (Z.of_nat(Heap.cardinal H), H)) as p.
+      
+      destruct p.
+      clear Heqp.      
       inv H1.
-      apply H2; eauto.
-    * unfold allocate in H1.
+      eauto.
+    * unfold allocate_meta_no_bounds, allocate_meta in H1.
       simpl in *.
       destruct (StructDef.find s D) eqn:Find; try congruence.
 
       pose proof (fold_summary (map snd (Fields.elements f)) D H ptr HWf) as Hyp.
+
       remember
         (fold_left
            (fun (acc : Z * heap) (t : type) =>
@@ -2078,7 +2068,7 @@ Proof.
             (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
            (map snd (Fields.elements (elt:=type) f))
            (Z.of_nat(Heap.cardinal H), H)) as p.
-      destruct p.
+      destruct p as [z h].
       clear Heqp.
       inv H1.
 
@@ -2124,23 +2114,24 @@ Proof.
       unfold allocate_meta in H1.
       simpl in H1.
 
-      remember (Zreplicate z0 w) as l.
+      remember (Zreplicate (z0 - z) w) as l.
 
-      pose proof (fold_preserves_consistency l D H ptr HWf).
-      assert (Hzz0 : z = 0 /\ exists p, z0 = Z.pos p). {
-      destruct z; simpl in H1; destruct z0; inv H1.
-      split. reflexivity. exists p. reflexivity. } destruct Hzz0. rewrite H2 in H1.
-      destruct H3. rewrite H3 in H1. simpl in H1.
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+      (*
+      assert (Hzz0 : z = 0 /\ exists p, z0 = Z.pos p).
+      {
+        destruct z; simpl in H1; destruct z0; inv H1.
+        split. reflexivity. exists p. reflexivity.
+      } destruct Hzz0. rewrite H2 in H1 .
+      destruct H3. rewrite H3 in H1. simpl in H1. *)
+
       (*could be automated DP*)
       remember (fold_left
          (fun (acc : Z * heap) (t : type) =>
           let (sizeAcc, heapAcc) := acc in
-          (sizeAcc + 1,
-          Heap.add (sizeAcc + 1) (0, t) heapAcc))
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
          l
-         (Z.of_nat
-            (Heap.cardinal (elt:=Z * type) H),
-         H)) as p.
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
       
       destruct p as (n1, h). (*n0 already used???*)
       clear Heqp.
