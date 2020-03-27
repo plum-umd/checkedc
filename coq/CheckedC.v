@@ -617,7 +617,6 @@ Hint Constructors well_typed_lit.
 Lemma well_typed_lit_ind' :
   forall (D : structdef) (H : heap) (P : scope -> Z -> type -> Prop),
     (forall (s : scope) (n : Z), P s n TNat) ->
-    (forall (s : scope) (n : Z) (w : type) (l : Z) (h : Z), l <= 0 -> h <= 0 -> P s n (TPtr Checked (TArray l h w))) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
        (forall (s : scope) (n : Z) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
@@ -634,7 +633,6 @@ Lemma well_typed_lit_ind' :
 Proof.
   intros D H P.
   intros HTyLitInt
-         HTyLitArray
          HTyLitU
          HTyLitZero
          HTyLitRec
@@ -818,17 +816,7 @@ Proof.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
-  (*- specialize (HL z z0 w eq_refl).
-    destruct HL. destruct z; try (destruct z0; [omega | eauto | eauto]).
-      +simpl. eauto.
-      +zify. omega.
-      +zify. omega.
-      +zify. omega.
-      +zify. omega.
-      +zify. omega.*)
 Qed.
-
-(*HERE*)
 
 Lemma wf_implies_allocate :
   forall (D : structdef) (w : type) (H : heap),
@@ -1325,26 +1313,33 @@ Proof with eauto 20 with Progress.
               destruct Hw as [? [? ?]]; subst.
               destruct (Z_gt_dec h 0).
               * (* h > 0 - Assign  *)
+                destruct (Z_gt_dec l 0).
+                { (* l > 0 *)
                 eapply step_implies_reduces.
-                { eapply SAssign; eauto...
-                  - inv H1.
-                    destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; eauto.
-                    +split.
-                      
-                     (*destruct l; inv H5.*)
-                    + inv HNth.
-                      rewrite Z.add_0_r in HMap.
-                      destruct h.
-                        {destruct l; inv H5. }
-                        {destruct l; eexists; eauto. }
+                eapply SAssignLowOOB; eauto... inv HTy2. eauto. }
+                { (* l <= 0 *)
+                  eapply step_implies_reduces.
+                  eapply SAssign; eauto...  inv H1.
+                  assert (Hpos : exists p, (h - l) = Z.pos p). {
+                      destruct (h - l)eqn:P.
+                       -omega.
+                       -exists p. reflexivity.
+                       -zify. omega. }
+                  destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; eauto.
+                    + destruct Hpos. rewrite H0. simpl. 
+                      symmetry in H0. assert (Hsucc : exists n, Pos.to_nat x = S n) by eapply pos_succ.
+                      destruct Hsucc. rewrite H1. simpl. zify. omega.
+                    + inv HNth. 
+                      rewrite Z.add_0_r in HMap. destruct Hpos.
+                      rewrite H0 in H1. assert (Hsucc : exists n, Pos.to_nat x = S n) by eapply pos_succ.
+                      destruct Hsucc. simpl in H1. rewrite H5 in H1. simpl in H1.
                       inv H1.
                       eexists; eauto.
-                  - intros l0 h0 t' Hyp; inv Hyp.
-                    apply allocate_bounds in H1. omega.
-                } 
-              * (* h <= 0 - Null *)
+                    + intros. inv H0. omega.
+                }
+              * (* h <= 0 *)
                 eapply step_implies_reduces.
-                inv HTy2; subst; eauto.
+                eapply SAssignHighOOB; eauto... inv HTy2. eauto.
         } 
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -1389,36 +1384,26 @@ Proof with eauto 20 with Progress.
               rewrite HCtx; left; eexists; eexists; eexists.
               eapply RSHaltNull... eapply SPlusNull. omega. 
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSExp... 
-              * eapply RSHaltNull...
+              rewrite HCtx; left; eexists; eexists; eexists.
+              * eapply RSHaltNull... eapply SPlusNull. omega.
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
             + inv HVal3.
               inv HTy3.
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSExp... 
-              * eapply RSHaltNull...
+              * eapply RSHaltNull... eapply SPlusNull. omega.
+              * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSExp... 
-              * eapply RSHaltNull...
+              rewrite HCtx; left; eexists; eexists; eexists.
+              * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSExp... 
-              * eapply RSHaltNull...
-          - rewrite HCtx; left; do 3 eexists.
-            eapply RSHaltNull...
-            apply SPlusNull.
-            omega.
-          - rewrite HCtx; left; do 3 eexists.
-            eapply RSHaltNull...
-            apply SPlusNull.
-            omega.
-          - inv H7.
-            left.
-            destruct (Z_gt_dec n 0); subst; eauto...
-          - inv H7.
-            left. destruct (Z_gt_dec n 0); subst; eauto...
+              rewrite HCtx; left; eexists; eexists; eexists.
+              * eapply RSHaltNull... eapply SPlusNull. omega.
+          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+              * eapply RSExp. eapply SPlusChecked. omega. eauto.
+              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
+          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+              * eapply RSExp. eapply SPlusChecked. omega. eauto.
+              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
         }
       * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -2055,9 +2040,13 @@ Proof.
       apply Heap.add_1; eauto. omega.
     * apply heap_add_preserves_wf; auto.
   - split.
-    * unfold allocate in H1.
-      unfold allocate_meta in H1.
-      simpl in H1.
+    * unfold allocate in H1. 
+      assert (Halloc : exists v, allocate_meta_no_bounds D
+         (TStruct s) = Some v) . {
+      destruct (allocate_meta_no_bounds D (TStruct s)).
+      exists l. reflexivity. inv H1. }
+      destruct Halloc.
+      rewrite H0 in H1.
       destruct (StructDef.find s D) eqn:Find; try congruence.
       remember (Fields.elements f) as l.
 
@@ -2067,10 +2056,16 @@ Proof.
             (fun (acc : Z * heap) (t : type) =>
              let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
             (map snd l) (Z.of_nat(Heap.cardinal H), H)).
-      destruct p.
+      rewrite <- Heqp in H1. destruct p.
       clear Heqp.
+      assert (Hheap : Some
+        (Z.of_nat
+           (Heap.cardinal
+              (elt:=Z * type) H) + 1,
+        h) = Some (ptr, H')). {
+        eapply (H1 h).
       inv H1.
-      apply H0; eauto.
+      apply H2; eauto.
     * unfold allocate in H1.
       simpl in *.
       destruct (StructDef.find s D) eqn:Find; try congruence.
@@ -3075,7 +3070,6 @@ Proof with eauto 20 with Preservation.
       * { inv HTy.
           remember H7 as Backup; clear HeqBackup.
           inv H7.
-          - inv Hw.
           - exfalso.
             eapply heap_wf_maps_nonzero; eauto.
           - inversion H4.
@@ -3117,14 +3111,81 @@ Proof with eauto 20 with Preservation.
           clear H1.
           remember H7 as Backup; clear HeqBackup.
           inv H7.
-          - specialize (H11 l0 h0 w0 eq_refl); omega.
           - exfalso.
             eapply heap_wf_maps_nonzero; eauto.
           - inversion H2.
           - simpl in H0. subst.
             destruct Hw as [? [? ?]]; subst.
             inv H0; simpl in *.
-            destruct l; inv H4. 
+            destruct l.
+              *destruct h.
+                 { exfalso.
+                 assert (Hf : 0 > 0). {apply (H11 0 0 t). reflexivity. }
+                 omega. }
+                { assert (H4 : exists x, Pos.to_nat p = S x) by apply pos_succ.
+                  destruct (H3 0) as [N [T' [HT' [HM' HWT']]]]; [ simpl; inv H4; rewrite H; simpl; zify; omega | ].
+                  inv HT'.  rewrite Z.add_0_r in HM'.
+                  maps_to_fun. inv H4. rewrite H in H0. inv H0.
+                  constructor.
+                  assert (Hyp: set_remove_all (n, TPtr Checked (TArray 0 (Z.pos p) t))
+                                        ((n,TPtr Checked (TArray 0 (Z.pos p) t))::nil) = empty_scope).
+                    { 
+                      destruct (eq_dec_nt (n, TPtr Checked (TArray 0 (Z.pos p) t))
+                                    (n, TPtr Checked (TArray 0 (Z.pos p) t))) eqn:EQ; try congruence.
+                      unfold set_remove_all.
+                      rewrite EQ.
+                      auto.
+                    }
+
+                  rewrite <- Hyp.
+                  apply scope_strengthening; eauto. }
+                { exfalso.
+                 assert (Hf : Z.neg p > 0). {apply (H11 0 (Z.neg p) t). reflexivity. }
+                 zify. omega. }
+              *exfalso.
+                 assert (Hf : Z.pos p <= 0). {apply (H11 (Z.pos p) h t). reflexivity. }
+                 zify. omega.
+              *destruct h.
+                 { exfalso.
+                 assert (Hf : 0 > 0). {apply (H11 (Z.neg p) 0 t). reflexivity. }
+                 omega. }
+                { destruct (H3 (Z.neg p)) as [N [T' [HT' [HM' HWT']]]]; [ | ].
+                    + assert (Z.pos p0 - Z.neg p > 0). { zify. omega. }
+                      assert ( exists x, Z.pos x = Z.pos p0 - Z.neg p ). {destruct (Z.pos p0 - Z.neg p). zify. omega. exists p1. reflexivity. zify. omega. }
+                      destruct H0. assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H4.
+                      rewrite <- H0. simpl. rewrite H4. simpl. zify. omega.
+                    + inv HT'. assert (H4 : exists n, Pos.to_nat (p0 + p) = S n) by apply pos_succ.
+                      maps_to_fun. inv H4. rewrite H in H0. inv H0.
+                      constructor.
+                      assert (Hyp: set_remove_all (n, TPtr Checked (TArray (Z.neg p) (Z.pos p) t))
+                                        ((n,TPtr Checked (TArray (Z.neg p) (Z.pos p) t))::nil) = empty_scope).
+                        { 
+                          destruct (eq_dec_nt (n, TPtr Checked (TArray (Z.neg p) (Z.pos p) t))
+                                        (n, TPtr Checked (TArray (Z.neg p) (Z.pos p) t))) eqn:EQ; try congruence.
+                          unfold set_remove_all.
+                          rewrite EQ.
+                          auto.
+                        }
+
+                      rewrite <- Hyp.
+                      apply scope_strengthening; eauto. }
+                { exfalso.
+                 assert (Hf : Z.neg p > 0). {apply (H11 0 (Z.neg p) t). reflexivity. }
+                 zify. omega. }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
             destruct h; inv H0. 
             (*inv H4; simpl in *.*)
             assert (H4 : exists x, Pos.to_nat p = S x). {apply pos_succ. }
@@ -3168,10 +3229,6 @@ Proof with eauto 20 with Preservation.
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] =>
               remember H as Backup; clear HeqBackup; inv H; eauto; try omega
             end.
-            + (* Addition preservation problem: 
-              apply TyLitArray.
-              * admit.
-              * admit.
               
             + {
               

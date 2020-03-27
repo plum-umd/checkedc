@@ -1624,7 +1624,7 @@ Lemma well_typed_preserved : forall D H t, heap_wf D H ->
   @heap_consistent D (Heap.add (Heap.cardinal (elt:=nat * type) H + 1) (0, t) H) H.
 Proof.
   intros D H t0 Hwf n t HT.
-  induction HT using well_typed_lit_ind'; pose proof (cardinal_not_in D H Hwf); eauto.
+  induction HT using well_typed_lit_ind'. pose proof (cardinal_not_in D H Hwf); eauto.
   eapply TyLitC; eauto.
   intros k HK.  
   destruct (H1 k HK) as [n' [t' [HNth [HMap HWT]]]].
