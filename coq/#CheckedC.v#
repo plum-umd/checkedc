@@ -3167,15 +3167,16 @@ Proof with eauto 20 with Preservation.
           | [ H : step _ _ _ _ _ |- _ ] => inv H
           end; split; eauto...
           - inv HTy1.
-            eapply TyDeref with (l0 := l - n2) (h0 := h - n2); eauto.
+            eapply TyDeref; eauto.
             constructor.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] =>
               remember H as Backup; clear HeqBackup; inv H; eauto; try omega
             end.
               
-            + eapply TyLitC. simpl. eauto.
-              intros k Hk. 
+            + inv H1. eapply TyLitC. simpl. eauto.
+              intros k HK.
+              exists (l - n2). exists t.
             { inv H2. simpl. rewrite replicate_length; auto. }
             (* destruct on whether n2 <= length ts or not *)
             destruct (dec_lt n2 (S n)).
