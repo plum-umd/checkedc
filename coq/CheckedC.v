@@ -2167,9 +2167,17 @@ Proof.
           inv HK; inv H1; exists p. reflexivity. } destruct Hpos.
         assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
         destruct Hnat. rewrite H0. simpl. rewrite H1. simpl. reflexivity.
-        
-      + apply Hyp in HOrd.
+        rewrite Z.add_0_r in *. eauto. 
+      + assert (HOrd : 0 <
+        Z.of_nat (Heap.cardinal (elt:=Z * type) H) + 1 + Z.pos p <=
+        Z.of_nat (Heap.cardinal (elt:=Z * type) H')). { zify. omega. }
+        apply Hyp in HOrd.
         { destruct HOrd as [[n' t'] HM'].
+        exists (Z.pos p); exists w. split.
+        auto. destruct HK. assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
+          inv H1. exists p0. reflexivity. } destruct Hpos.
+        rewrite H2. simpl.
+      
           destruct (length_nth (replicate (S x0) w) (Pos.to_nat p)) as [n Hnth].
           - rewrite replicate_length in *. zify. omega.
           - exists n'. exists n.
@@ -3174,14 +3182,16 @@ Proof with eauto 20 with Preservation.
               remember H as Backup; clear HeqBackup; inv H; eauto; try omega
             end.
               
-            + inv H1. eapply TyLitC. simpl. eauto.
+           (* + inv H1. constructor.
+              eapply TyDeref with (l0 := (l - n2)) (h0 := (h - n2)). simpl. eauto.
               intros k HK.
               exists (l - n2). exists t.
             { inv H2. simpl. rewrite replicate_length; auto. }
             (* destruct on whether n2 <= length ts or not *)
-            destruct (dec_lt n2 (S n)).
+            destruct (dec_lt n2 (S n)).*)
             (* Case n2 < S n: in bounds, use hypothesis *)
-            + remember (S n - n2) as m.
+            inv H1. destruct (Z_le_dec l n2).
+              + destruct (Z_lt_dec n2 (h - l)).
 
               eapply TyLitC with (ts := replicate m t) ; eauto.
               * destruct m; try omega; simpl in *; eauto.
