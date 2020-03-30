@@ -824,17 +824,21 @@ Lemma wf_implies_allocate :
 Proof.
   intros D w H HL HT.
   eapply wf_implies_allocate_meta in HT; eauto.
-  destruct HT. destruct H0.
-  unfold allocate.
-  unfold allocate_meta_no_bounds.
-  rewrite H0.
-  simpl. Print fold_left.
-  (* TODO(ins): there must be a better way *)
+  destruct HT as [l [ts HT]]. 
+  unfold allocate. unfold allocate_meta in *.
+  rewrite HT.
+
   edestruct (fold_left
                (fun (acc : Z * heap) (t : type) =>
-                  let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) x0
-               ((Z.of_nat (Heap.cardinal H)), H)).
-  eauto.
+                  let (sizeAcc, heapAcc) := acc in
+                  (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) ts
+               ((Z.of_nat (Heap.cardinal H)), H)) as (z, h).
+
+  destruct w eqn:Hw; inv HT; simpl in *; eauto.
+
+  - destruct (StructDef.find s D) eqn:HFind; inv H1; eauto.
+  - edestruct HL; eauto.
+    subst; eauto.
 Qed.
 
 Definition unchecked (m : mode) (e : expression) : Prop :=
@@ -1901,7 +1905,8 @@ Lemma fold_summary : forall l D H ptr,
   heap_wf D H' /\
   ptr = Z.of_nat(Heap.cardinal  H) + 1 /\
   (Heap.cardinal  H') = ((Heap.cardinal H) + length l)%nat /\
-  (forall (k : nat) v, (0 <= k < (length l))%nat -> nth_error l k = Some v ->
+  (forall (k : nat) v,
+      (0 <= k < (length l))%nat -> nth_error l k = Some v ->
                Heap.MapsTo (Z.of_nat(Heap.cardinal  H) + 1 + Z.of_nat(k)) (0,v) H') /\
   forall x v, Heap.MapsTo x v H -> Heap.MapsTo x v H'.                                               
 Proof.
@@ -2130,7 +2135,7 @@ Proof.
       
       destruct p as (n1, h). (*n0 already used???*)
       clear Heqp.
-      inv H1.
+      destruct z; inv H1.
       apply H0; eauto.
     * unfold allocate in H1.
       unfold allocate_meta_no_bounds, allocate_meta in H1.
@@ -2148,8 +2153,10 @@ Proof.
       destruct p.
       clear Heqp.
       inv H1.
-      
+
+      destruct z; inv H2; eauto.
       destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
       
       split; auto.
       constructor.
@@ -2157,117 +2164,44 @@ Proof.
       intros k HK.
       simpl in *.
       pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
-      destruct k; subst; simpl in *; eauto.
-      + exists 0; exists w. split.
-        auto. destruct HK. assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
-          inv H1. exists p. reflexivity. } destruct Hpos.
-        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
-        destruct Hnat. rewrite H2. simpl. rewrite H3. simpl. reflexivity.
-        split. apply (HF 0%nat w). omega. 
-        assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
-          inv HK; inv H1; exists p. reflexivity. } destruct Hpos.
-        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
-        destruct Hnat. rewrite H0. simpl. rewrite H1. simpl. reflexivity.
-        rewrite Z.add_0_r in *. eauto. 
-      + remember (Heap.cardinal H ) as c.
-        remember (Heap.cardinal H') as c'.
+      rewrite Z.sub_0_r in *.
+
+      remember (Heap.cardinal H ) as c.
+      remember (Heap.cardinal H') as c'.
+      
+      assert (HOrd : 0 < Z.of_nat c + 1 + k <= Z.of_nat c')
+        by (zify; omega).
+      
+      destruct Hyp as [HIn Useless].
+      destruct (HIn HOrd) as [[n' t'] HM'].
+
+      destruct HK as [HP1 HP2].
+
+      destruct z0 as [ | p | ?]; simpl in *; [ omega | | omega].
+      rewrite replicate_length in *.
+
+      destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
+      { rewrite replicate_length ; zify; split; try omega. }
+
+      rewrite Hnth.
+      remember Hnth as Hyp; clear HeqHyp.
+      apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
         
-        assert (HOrd : 0 < Z.of_nat c + 1 + Z.pos p <= Z.of_nat c')
-          by (zify; omega).
+      exists n'; exists t.
+      split; [ reflexivity | ].
 
-        destruct Hyp as [HIn Useless].
-        destruct (HIn HOrd) as [[n' t'] HM'].
-
-        destruct HK as [HP1 HP2].
-        assert (Hpos : exists p, (z0 - z) = Z.pos p). {
-          destruct (z0 - z).
-          - inv HP2.
-          - eauto.
-          - inv HP2.
-        }
-        destruct Hpos as [x Hx].
-        rewrite Hx in *; simpl in *.
-        
-        destruct (length_nth (replicate (Pos.to_nat x) w) (Pos.to_nat p)) as [t Hnth].
-        { rewrite replicate_length in *. zify; split; omega. }
-
-        rewrite Hnth.
-        remember Hnth as Hyp; clear HeqHyp.
-        apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
-        
-        exists n'; exists t.
-        split; [ reflexivity | ].
-
-        specialize (HF (Z.to_nat (Z.pos p)) t).
-        assert (HF1 : (0 <= Z.to_nat (Z.pos p) < length (replicate (Pos.to_nat x) t))%nat)
+      specialize (HF (Z.to_nat k) t).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat)
           by (split; zify; omega).
 
-        specialize (HF HF1 Hyp).
+      specialize (HF HF1 Hyp).
 
-        assert (HId: Z.of_nat (Z.to_nat (Z.pos p)) = Z.pos p) by (zify; omega).
-        rewrite HId in HF.
-        
-        pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
-        inv Eq.
-        split; auto.
-      +remember (Heap.cardinal H ) as c.
-        remember (Heap.cardinal H') as c'.
-        
-        assert (HOrd : 0 < Z.of_nat c + 1 + Z.neg p <= Z.of_nat c')
-          by (zify; omega).
-
-        destruct Hyp as [HIn Useless].
-        destruct (HIn HOrd) as [[n' t'] HM'].
-
-        destruct HK as [HP1 HP2].
-        assert (Hpos : exists p, (z0 - z) = Z.pos p). {
-          destruct (z0 - z).
-          - inv HP2.
-          - eauto.
-          - inv HP2.
-        }
-        destruct Hpos as [x Hx].
-        rewrite Hx in *; simpl in *.
-        
-        destruct (length_nth (replicate (Pos.to_nat x) w) (Pos.to_nat p)) as [t Hnth].
-        { rewrite replicate_length in *. zify; split; omega. }
-
-        rewrite Hnth.
-        remember Hnth as Hyp; clear HeqHyp.
-        apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
-        
-        exists n'; exists t.
-        split; [ reflexivity | ].
-
-        specialize (HF (Z.to_nat (Z.pos p)) t).
-        assert (HF1 : (0 <= Z.to_nat (Z.pos p) < length (replicate (Pos.to_nat x) t))%nat)
-          by (split; zify; omega).
-
-        specialize (HF HF1 Hyp).
-
-        assert (HId: Z.of_nat (Z.to_nat (Z.pos p)) = Z.pos p) by (zify; omega).
-        rewrite HId in HF.
-        
-        pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
-        inv Eq.
-        split; auto.
-
-
-        destruct HK. exfalso. apply H1. simpl. reflexivity.
-
-      + exists 0; exists w. split.
-        auto. destruct HK. assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
-          inv H1. exists p. reflexivity. } destruct Hpos.
-        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
-        destruct Hnat. rewrite H2. simpl. rewrite H3. simpl. reflexivity.
-        split. apply (HF 0%nat w). omega. 
-        assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
-          inv HK; inv H1; exists p. reflexivity. } destruct Hpos.
-        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
-        destruct Hnat. rewrite H0. simpl. rewrite H1. simpl. reflexivity.
-        rewrite Z.add_0_r in *. eauto. 
-
-        
+      assert (HId: Z.of_nat (Z.to_nat k) = k) by (zify; omega).
+      rewrite HId in HF.
+      
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      split; auto.
 Qed.
 
 Lemma values_are_nf : forall D H e,
@@ -2954,32 +2888,37 @@ Proof.
     omega.
   - inv H3.
   - inv H1.
-    destruct l; try omega.
-    destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
-    + simpl. destruct h; inv Hl. zify. simpl.
-      assert (H2 : exists s, Pos.to_nat(p) = S s). {
-        apply pos_succ. } inv H2. rewrite H3. 
-        simpl. zify. omega.
-    + rewrite Z.add_0_r in *.
-      inv HNth.
-      exists n'; eauto.
-      assert (H3 : t' = w). {
-        destruct h; inv Hl. inv H1. 
-        assert (exists s, Pos.to_nat(p) = S s) by apply pos_succ.
-        inv H0. rewrite H1 in H2. simpl in H2. inv H2. reflexivity. }
-      rewrite <- H3. assumption.
-    +exfalso. apply Hh. simpl. reflexivity.
-    +assert ((h - (Z.neg p)) > 0). {
-      zify. omega. }
-    assert (exists n, (h - (Z.neg p)) = Z.pos n). {
-      destruct (h - (Z.neg p)); inv H0. exists p0. reflexivity. }
-    destruct H1. assert (exists n, Pos.to_nat x = S n) by apply pos_succ.
-    destruct H2. 
-    destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
-    rewrite H1. simpl. rewrite H2. simpl. zify. omega.
-    rewrite H1 in HNth. simpl in HNth. rewrite H2 in HNth. 
-    simpl in HNth. inv HNth. exists n'. rewrite Z.add_0_r in HMap.
-    assumption.
+    destruct l.
+    + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      * simpl. destruct h; inv Hl. simpl.
+        assert (Hyp : exists s, Pos.to_nat(p) = S s).
+        { apply pos_succ. }
+        inv Hyp.
+        rewrite replicate_length.
+        simpl. omega.
+      * rewrite Z.sub_0_r in *.
+        inv HNth.
+        exists n'; eauto.
+        assert (H3 : t' = w). {
+          destruct h; inv Hl. inv H1. 
+          assert (HP: exists s, Pos.to_nat(p) = S s) by apply pos_succ.
+          inv HP.
+          rewrite H0 in H2. simpl in H2. inv H2. reflexivity.
+        }
+        rewrite <- H3. rewrite Z.add_0_r in *. assumption.
+    + zify; omega.
+    + assert (H1: (h - (Z.neg p)) > 0) by (zify; omega).
+      assert (H2: exists n, (h - (Z.neg p)) = Z.pos n). {
+        destruct (h - (Z.neg p)); inv H1. exists p0. reflexivity.
+      }
+      destruct H2 as [pos Hpos].
+      assert (Hpos': exists n, Pos.to_nat pos = S n) by apply pos_succ.
+      destruct Hpos' as [N HN].
+      destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      rewrite Hpos. simpl. rewrite HN. simpl. zify. omega.
+      rewrite Hpos in HNth. simpl in HNth. rewrite HN in HNth. 
+      simpl in HNth. inv HNth. exists n'. rewrite Z.add_0_r in HMap.
+      assumption.
 Qed.
 
 Lemma preservation : forall D H env e t H' e',
