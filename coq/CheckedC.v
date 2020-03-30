@@ -2213,7 +2213,15 @@ Proof.
       rewrite replicate_length in *.
 
       destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
-      { rewrite replicate_length ; zify; split; try omega. }
+      { rewrite replicate_length ; zify; split; try omega. 
+        (*This should go through with omega but it doesn't*)
+        assert (Hk : Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. apply HP1. simpl. reflexivity. }
+        rewrite Hk. assumption.
+      }
 
       rewrite Z.sub_0_r in *.
       
@@ -2225,12 +2233,17 @@ Proof.
       split; [ reflexivity | ].
 
       specialize (HF (Z.to_nat k) t).
-      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat)
-          by (split; zify; omega).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat). {
+        split; zify; (try omega). destruct k; simpl; zify; omega.
+      }
 
       specialize (HF HF1 Hyp).
 
-      assert (HId: Z.of_nat (Z.to_nat k) = k) by (zify; omega).
+      assert (HId: Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. omega. }
       rewrite HId in HF.
       
       pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
