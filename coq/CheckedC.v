@@ -272,9 +272,6 @@ Import ListNotations.
 Import MonadNotation.
 Local Open Scope monad_scope.
 
-(*???should you be able to allocate backwards?*)
-
-
 Print replicate.
 Definition Zreplicate (z:Z) (T : type) : (list type) :=
 match z with
@@ -308,11 +305,12 @@ Proof.
   intros. unfold allocate_meta_no_bounds. rewrite H. reflexivity.
 Qed.
 
-
+(* allocate_meta can succeed with bad bounds. allocate itself shouldn't *)
 Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
   let H_size := Z.of_nat(Heap.cardinal H) in
   let base   := H_size + 1 in
-  am <- allocate_meta_no_bounds D w ;;
+  match allocate_meta D w with
+  | Some (0, am) => 
      let (_, H') := List.fold_left
                   (fun (acc : Z * heap) (t : type) =>
                      let (sizeAcc, heapAcc) := acc in
@@ -322,7 +320,9 @@ Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
                   am
                   (H_size, H)
      in
-     ret (base, H').
+     ret (base, H')
+  | _ => None
+  end.
 
 End allocation.
 
@@ -803,9 +803,10 @@ Require Import Omega.
 
 (*changed THIS!! REMEMBER*)
 
+Open Scope Z.
 Lemma wf_implies_allocate_meta :
   forall (D : structdef) (w : type),
-    (forall l h t, w = TArray l h t -> l= 0 /\ h > 0) ->
+    (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
     type_wf D w -> exists b allocs, allocate_meta D w = Some (b, allocs).
 Proof.
   intros D w HL HT.
@@ -1182,7 +1183,7 @@ Proof with eauto 20 with Progress.
               destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
               { simpl. zify. split. omega.
                 simpl. eauto. destruct(pos_succ x). rewrite <- H2.
-                simpl. rewrite H5. simpl. zify. omega. }
+                simpl. rewrite H3. simpl. zify. omega. }
               simpl in Hheap. simpl in Ht'tk. destruct (pos_succ x) as [x' Hx'].
               rewrite <- H2 in Ht'tk. simpl in Ht'tk.
               rewrite Hx' in  Ht'tk. 
@@ -1598,7 +1599,7 @@ Lemma env_neq_commute_eq : forall x1 x2 (t1 t2 : type) env env',
 Proof.
   intros x1 x2 t1 t2 env env' NEq Eq x.
   destruct (Nat.eq_dec x x1) eqn:Eq1; destruct (Nat.eq_dec x x2) eqn:Eq2; subst; eauto.
-  - exfalso; eapply NEq; eauto.
+  - unfold Env.E.eq in *; exfalso; eapply NEq; eauto.
   - repeat (try rewrite env_find_add1 in *; auto; try rewrite env_find_add2 in *; auto).
   - specialize (Eq x2); repeat (try rewrite env_find_add1 in *; auto; try rewrite env_find_add2 in *; auto).
   - specialize (Eq x); repeat (try rewrite env_find_add1 in *; auto; try rewrite env_find_add2 in *; auto).
@@ -2168,40 +2169,105 @@ Proof.
         assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
         destruct Hnat. rewrite H0. simpl. rewrite H1. simpl. reflexivity.
         rewrite Z.add_0_r in *. eauto. 
-      + assert (HOrd : 0 <
-        Z.of_nat (Heap.cardinal (elt:=Z * type) H) + 1 + Z.pos p <=
-        Z.of_nat (Heap.cardinal (elt:=Z * type) H')). { zify. omega. }
-        apply Hyp in HOrd.
-        { destruct HOrd as [[n' t'] HM'].
-        exists (Z.pos p); exists w. split.
-        auto. destruct HK. assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
-          inv H1. exists p0. reflexivity. } destruct Hpos.
-        rewrite H2. simpl.
-      
-          destruct (length_nth (replicate (S x0) w) (Pos.to_nat p)) as [n Hnth].
-          - rewrite replicate_length in *. zify. omega.
-          - exists n'. exists n.
-            assert (H1 : 0 <= Z.pos p < Z.pos (Pos.of_succ_nat (length (replicate x0 w))) 
-                         -> (0 <= Pos.to_nat p < length (replicate (Pos.to_nat x) w))%nat). {
-              intros. rewrite H0. zify. simpl. zify. assumption. }
-            apply H1 in HK.
-            specialize (HF (Pos.to_nat p) w HK).
-            split; eauto.
-            assert (w = n).
-            { eapply replicate_nth; eauto. }
-            subst.
-            assert (Hyp' : nth_error (n :: replicate x0 n) (Pos.to_nat p) = Some n).
-            { simpl; auto. }
-            rewrite H0 in HF. simpl in HF.
-            specialize (HF Hyp').
-            assert (H2: Z.pos p = Z.of_nat (Pos.to_nat p)). {
-              zify. omega. }
-            rewrite <- H2 in HF.
-            pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
-            inv Eq.
-            split; auto.
+      + remember (Heap.cardinal H ) as c.
+        remember (Heap.cardinal H') as c'.
+        
+        assert (HOrd : 0 < Z.of_nat c + 1 + Z.pos p <= Z.of_nat c')
+          by (zify; omega).
+
+        destruct Hyp as [HIn Useless].
+        destruct (HIn HOrd) as [[n' t'] HM'].
+
+        destruct HK as [HP1 HP2].
+        assert (Hpos : exists p, (z0 - z) = Z.pos p). {
+          destruct (z0 - z).
+          - inv HP2.
+          - eauto.
+          - inv HP2.
         }
-      +destruct HK. exfalso. apply H1. simpl. reflexivity.
+        destruct Hpos as [x Hx].
+        rewrite Hx in *; simpl in *.
+        
+        destruct (length_nth (replicate (Pos.to_nat x) w) (Pos.to_nat p)) as [t Hnth].
+        { rewrite replicate_length in *. zify; split; omega. }
+
+        rewrite Hnth.
+        remember Hnth as Hyp; clear HeqHyp.
+        apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+        exists n'; exists t.
+        split; [ reflexivity | ].
+
+        specialize (HF (Z.to_nat (Z.pos p)) t).
+        assert (HF1 : (0 <= Z.to_nat (Z.pos p) < length (replicate (Pos.to_nat x) t))%nat)
+          by (split; zify; omega).
+
+        specialize (HF HF1 Hyp).
+
+        assert (HId: Z.of_nat (Z.to_nat (Z.pos p)) = Z.pos p) by (zify; omega).
+        rewrite HId in HF.
+        
+        pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+        inv Eq.
+        split; auto.
+      +remember (Heap.cardinal H ) as c.
+        remember (Heap.cardinal H') as c'.
+        
+        assert (HOrd : 0 < Z.of_nat c + 1 + Z.neg p <= Z.of_nat c')
+          by (zify; omega).
+
+        destruct Hyp as [HIn Useless].
+        destruct (HIn HOrd) as [[n' t'] HM'].
+
+        destruct HK as [HP1 HP2].
+        assert (Hpos : exists p, (z0 - z) = Z.pos p). {
+          destruct (z0 - z).
+          - inv HP2.
+          - eauto.
+          - inv HP2.
+        }
+        destruct Hpos as [x Hx].
+        rewrite Hx in *; simpl in *.
+        
+        destruct (length_nth (replicate (Pos.to_nat x) w) (Pos.to_nat p)) as [t Hnth].
+        { rewrite replicate_length in *. zify; split; omega. }
+
+        rewrite Hnth.
+        remember Hnth as Hyp; clear HeqHyp.
+        apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+        exists n'; exists t.
+        split; [ reflexivity | ].
+
+        specialize (HF (Z.to_nat (Z.pos p)) t).
+        assert (HF1 : (0 <= Z.to_nat (Z.pos p) < length (replicate (Pos.to_nat x) t))%nat)
+          by (split; zify; omega).
+
+        specialize (HF HF1 Hyp).
+
+        assert (HId: Z.of_nat (Z.to_nat (Z.pos p)) = Z.pos p) by (zify; omega).
+        rewrite HId in HF.
+        
+        pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+        inv Eq.
+        split; auto.
+
+
+        destruct HK. exfalso. apply H1. simpl. reflexivity.
+
+      + exists 0; exists w. split.
+        auto. destruct HK. assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
+          inv H1. exists p. reflexivity. } destruct Hpos.
+        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
+        destruct Hnat. rewrite H2. simpl. rewrite H3. simpl. reflexivity.
+        split. apply (HF 0%nat w). omega. 
+        assert (Hpos : exists p, (z0 - z) = Z.pos p). {destruct (z0 - z);
+          inv HK; inv H1; exists p. reflexivity. } destruct Hpos.
+        assert (Hnat : exists n, Pos.to_nat x = S n) by apply pos_succ.
+        destruct Hnat. rewrite H0. simpl. rewrite H1. simpl. reflexivity.
+        rewrite Z.add_0_r in *. eauto. 
+
+        
 Qed.
 
 Lemma values_are_nf : forall D H e,
