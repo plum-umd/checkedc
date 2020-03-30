@@ -595,7 +595,7 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
       well_typed_lit D H s n (TPtr Checked w)
   | TyLitC : forall s n w b ts,
       Some (b, ts) = allocate_meta D w ->
-      (forall k, b <= k < Z.of_nat(List.length ts) ->
+      (forall k, b <= k < b + Z.of_nat(List.length ts) ->
                  exists n' t',
                    Some t' = List.nth_error ts (Z.to_nat k)(*???*) /\
                    Heap.MapsTo (n + k) (n', t') H /\
@@ -621,7 +621,7 @@ Lemma well_typed_lit_ind' :
        (forall (s : scope) (n : Z) (w : type) (ts : list type) (b : Z),
         Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
-         b <= k < (Z.of_nat (length ts)) ->
+         b <= k < b + Z.of_nat (length ts) ->
          exists (n' : Z) (t' : type),
            Some t' = nth_error ts (Z.to_nat k) /\
            Heap.MapsTo (n + k) (n', t') H /\
@@ -908,6 +908,10 @@ Proof.
     +exists n. reflexivity.
 Qed.
 
+Ltac remove_options :=
+  match goal with
+  | [ H: Some ?X = Some ?Y |- _ ] => inversion H; subst X; clear H
+  end.
 
 (*No longer provable since we can allocate
 bounds that are less than 0 now.
@@ -1169,49 +1173,51 @@ Proof with eauto 20 with Progress.
           } 
           (* Case: TyLitC *)
           { (* We proceed by case analysis on 'h > 0' -- the size of the array *)
-            destruct H2 as [Hyp1 Hyp2]; subst.
+            destruct H2 as [Hyp1 [Hyp2 Hyp3]]; subst.
             (* should this also be on ' h > 0' instead? DP*)
             destruct (Z_gt_dec h 0) as [ Hneq0 | Hnneq0 ].
             (* Case: h > 0 *)
-            {left. (* We can step according to SDeref *)
+            { left. (* We can step according to SDeref *)
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               subst.
-              inv H4. destruct (Z_gt_dec l 0). (* if l > 0 we have a bounds error*)
-              {eapply step_implies_reduces. eapply SDerefLowOOB. eapply g. eauto.
-              }(*if l <= 0 we can step according to SDeref. *)
+              inv H4.
+              destruct (Z_gt_dec l 0).
+
+              (* if l > 0 we have a bounds error*)
+              {
+                eapply step_implies_reduces. eapply SDerefLowOOB. eapply g. eauto.
+              }
+              
+              (* if l <= 0 we can step according to SDeref. *)
+
               assert (Hhl : h - l > 0). {
-                destruct h. inv Hneq0. omega. inv Hneq0. }
-              assert (Hhlp : exists p, Z.pos p = h - l). {
-              destruct (h - l); inv Hhl. exists p. reflexivity. }
-              destruct Hhlp. 
+                destruct h. inv Hneq0. omega. inv Hneq0.
+              }
+              destruct (h - l) as [| p | ?] eqn:Hp; zify; [omega | |omega].
+              simpl in *.
+              rewrite replicate_length in *.
+              assert (HL: l + Z.of_nat (Pos.to_nat p) = h) by (zify; omega).
+              rewrite HL in *; try omega.
+
               destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
-              { simpl. zify. split. omega.
-                simpl. eauto. destruct(pos_succ x). rewrite <- H2.
-                simpl. rewrite H3. simpl. zify. omega. }
-              simpl in Hheap. simpl in Ht'tk. destruct (pos_succ x) as [x' Hx'].
-              rewrite <- H2 in Ht'tk. simpl in Ht'tk.
-              rewrite Hx' in  Ht'tk. 
-              simpl in Ht'tk.
+              { (split;  omega). }
+
               rewrite Z.add_0_r in Hheap.
-              inv Ht'tk. eapply step_implies_reduces.
+              simpl in *.
+
+              destruct (pos_succ p) as [p' Hp'].
+              rewrite Hp' in Ht'tk; simpl in *.
+
+              remove_options.
+              
+              eapply step_implies_reduces.
               apply SDeref; eauto.
-                 - destruct Hyp2; repeat constructor; zify; eauto.
-                 
-                  
-                -intros. inv H2. destruct l0.
-                  {destruct h0; inv H3. zify. omega.
-                    *omega.
-                    *inv H5. }
-                  {destruct h0; inv H3.
-                    *exfalso. inv H5.
-                    *exfalso. eauto.
-                    *exfalso. zify. omega. }
-                  {destruct h0; inv H3. 
-                    *exfalso. zify. omega.
-                    *omega.
-                    *exfalso. zify. omega. }
- }
-             (* Case: h <= 0 *)
+              - repeat constructor; eauto.
+              - intros l' h' t' HT.
+                injection HT; intros Hh Hl Ht; subst h l t.
+                split; zify; omega.
+            }
+            (* Case: h <= 0 *)
             { (* We can step according to SDerefOOB *)
               subst. left. eapply step_implies_reduces. 
               eapply SDerefHighOOB. eauto. eauto.
@@ -3168,13 +3174,25 @@ Proof with eauto 20 with Preservation.
     + subst.
       destruct (IH (in_hole e'0 c) H') as [HC HWT]; eauto. 
   - inv HHwf.
-    inv H1.
+
+    (* TODO: Move outside, cleanup *)
+    Ltac invert_expr_wf e :=
+      match goal with
+      | [ H : expr_wf _ e |- _ ] => inv H
+      end.
+
+    invert_expr_wf (EPlus e1 e2).
     inv Hreduces.
-    destruct E; inversion H1; simpl in *; subst.
-    + clear H0. clear H9.
-      inv H6.
-    + clear H1.
-      destruct E; inversion H2; simpl in *; subst.
+
+    Ltac invert_ctx_and_hole :=
+      match goal with
+      | [H : in_hole _ ?C = _ |- _] => destruct C; inversion H; simpl in *; subst; clear H
+      end.
+
+    invert_ctx_and_hole.
+
+    + inv H6. (*TODO: auto *)
+    + invert_ctx_and_hole.
       * { (* Plus step *)
           match goal with
           | [ H : step _ _ _ _ _ |- _ ] => inv H
@@ -3182,12 +3200,27 @@ Proof with eauto 20 with Preservation.
           - inv HTy1.
             eapply TyDeref; eauto.
             constructor.
+
+            Ltac cleanup :=
+              repeat (match goal with
+                      | [H : ?X =  ?X |- _ ] => clear H
+                      | [H : ?X -> ?X |- _ ] => clear H
+                      end).
+            cleanup.
+            
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] =>
               remember H as Backup; clear HeqBackup; inv H; eauto; try omega
             end.
-              
-           (* + inv H1. constructor.
+
+            unfold allocate_meta in *.
+
+            remove_options.
+            
+            eapply TyLitC; unfold allocate_meta in *; eauto.
+
+            intros k Hk.
+              (* + inv H1. constructor.
               eapply TyDeref with (l0 := (l - n2)) (h0 := (h - n2)). simpl. eauto.
               intros k HK.
               exists (l - n2). exists t.
