@@ -597,7 +597,7 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
       Some (b, ts) = allocate_meta D w ->
       (forall k, b <= k < b + Z.of_nat(List.length ts) ->
                  exists n' t',
-                   Some t' = List.nth_error ts (Z.to_nat k)(*???*) /\
+                   Some t' = List.nth_error ts (Z.to_nat (k - b)) /\
                    Heap.MapsTo (n + k) (n', t') H /\
                    well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
       well_typed_lit D H s n (TPtr Checked w).
@@ -623,7 +623,7 @@ Lemma well_typed_lit_ind' :
         (forall k : Z,
          b <= k < b + Z.of_nat (length ts) ->
          exists (n' : Z) (t' : type),
-           Some t' = nth_error ts (Z.to_nat k) /\
+           Some t' = nth_error ts (Z.to_nat (k - b)) /\
            Heap.MapsTo (n + k) (n', t') H /\
            well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t' /\
            P (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
@@ -894,6 +894,19 @@ Proof.
   intros n T. induction n.
     -simpl. reflexivity.
     -simpl. rewrite IHn. reflexivity.
+Qed.
+
+Lemma replicate_length_nth {A} : forall (n k : nat) (w x : A),
+    nth_error (replicate n w) k = Some x -> (k < n)%nat.
+Proof.
+  intros n; induction n; intros; simpl in *; auto.
+  - inv H.
+    destruct k; inv H1.
+  - destruct k.
+    + omega.
+    + simpl in *.
+      apply IHn in H.
+      omega.
 Qed.
 
 (* Progress:
@@ -1205,23 +1218,31 @@ Proof with eauto 20 with Progress.
               rewrite Z.add_0_r in Hheap.
               simpl in *.
 
-              destruct (pos_succ p) as [p' Hp'].
-              rewrite Hp' in Ht'tk; simpl in *.
+              assert (Hp': Z.of_nat (Pos.to_nat p) = Z.pos p) by omega.
+              rewrite Hp' in *; clear Hp'.
+              assert (Hp': Pos.to_nat p = Z.to_nat (Z.pos p)) by (zify; omega).
+              rewrite Hp' in *; clear Hp'. 
 
-              remove_options.
-              
+              assert (t = t').
+              {
+                eapply replicate_nth; eauto.
+              }
+              subst t'.
+
               eapply step_implies_reduces.
               apply SDeref; eauto.
               - repeat constructor; eauto.
               - intros l' h' t' HT.
-                injection HT; intros Hh Hl Ht; subst h l t.
+                injection HT; intros ? ? ?; subst h l t.
                 split; zify; omega.
             }
             (* Case: h <= 0 *)
             { (* We can step according to SDerefOOB *)
               subst. left. eapply step_implies_reduces. 
               eapply SDerefHighOOB. eauto. eauto.
-}}}
+            } 
+          }
+        } 
         (* Case: n <= 0 *)
         { (* We can step according to SDerefNull *)
           subst... }
@@ -1329,17 +1350,24 @@ Proof with eauto 20 with Progress.
                 { (* l <= 0 *)
                   eapply step_implies_reduces.
                   eapply SAssign; eauto...  inv H1.
-                  assert (Hpos : exists p, (h - l) = Z.pos p). {
-                      destruct (h - l)eqn:P.
-                       -omega.
-                       -exists p. reflexivity.
-                       -zify. omega. }
+                  assert (Hpos : exists p, (h - l) = Z.pos p).
+                  {
+                    destruct (h - l)eqn:P.
+                    -omega.
+                    -exists p. reflexivity.
+                    -zify. omega.
+                  }
                   destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; eauto.
-                    + destruct Hpos. rewrite H0. simpl. 
-                      symmetry in H0. assert (Hsucc : exists n, Pos.to_nat x = S n) by eapply pos_succ.
-                      destruct Hsucc. rewrite H1. simpl. zify. omega.
-                    + inv HNth. 
-                      rewrite Z.add_0_r in HMap. destruct Hpos.
+                  + destruct Hpos. rewrite H0. simpl. 
+                    symmetry in H0.
+                    assert (Hsucc : exists n, Pos.to_nat x = S n) by eapply pos_succ.
+                    destruct Hsucc. rewrite H1. simpl. zify.
+                    rewrite replicate_length.
+                    rewrite <- H1.
+                    rewrite H0.
+                    omega.
+                  + inv HNth. 
+                    rewrite Z.add_0_r in HMap. destruct Hpos.
                       rewrite H0 in H1. assert (Hsucc : exists n, Pos.to_nat x = S n) by eapply pos_succ.
                       destruct Hsucc. simpl in H1. rewrite H5 in H1. simpl in H1.
                       inv H1.
@@ -2105,6 +2133,7 @@ Proof.
       (*This bit is very annoying, quite a bit of converting back and forth
         between ints and nats. This could definately be more automated DP*)
       exists n'. exists t'.
+      rewrite Z.sub_0_r in *.
       destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
       assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
         destruct k.
@@ -2120,9 +2149,6 @@ Proof.
       rewrite <- K0 in HF.
       pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
       inv Eq.
-      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
-      inv Eq.
-      
       repeat (split; eauto).
   - split.
     * unfold allocate in H1.
@@ -2189,6 +2215,8 @@ Proof.
       destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
       { rewrite replicate_length ; zify; split; try omega. }
 
+      rewrite Z.sub_0_r in *.
+      
       rewrite Hnth.
       remember Hnth as Hyp; clear HeqHyp.
       apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
@@ -2686,11 +2714,12 @@ Proof.
                  (@Fields.elements type fs)) i)
            (@Some type (@snd nat type (@pair Fields.key type fi ti)))
         ) by auto.
-      assert (H0 : (Z.to_nat (Z.of_nat i)) = i). {
+      assert (Hi : (Z.to_nat (Z.of_nat i)) = i). {
         destruct i.
           +simpl. reflexivity.
           +simpl. zify. omega. }
-      rewrite H0 in HNth.
+      simpl in *.
+      rewrite Z.sub_0_r in *. rewrite Hi in HNth.
       rewrite <- HNth in Hnth'.
       inv Hnth'.
       inv Hwt.
@@ -2921,11 +2950,21 @@ Proof.
       assert (Hpos': exists n, Pos.to_nat pos = S n) by apply pos_succ.
       destruct Hpos' as [N HN].
       destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
-      rewrite Hpos. simpl. rewrite HN. simpl. zify. omega.
+      rewrite Hpos. simpl. rewrite HN.
+      rewrite replicate_length.
+      simpl. 
+      admit.
+      admit.
+Admitted.
+(*split; try omega.
+
+      
+      split; zify; try omega.
+      
       rewrite Hpos in HNth. simpl in HNth. rewrite HN in HNth. 
       simpl in HNth. inv HNth. exists n'. rewrite Z.add_0_r in HMap.
       assumption.
-Qed.
+Qed. *)
 
 Lemma preservation : forall D H env e t H' e',
     @structdef_wf D ->
@@ -3142,20 +3181,39 @@ Proof with eauto 20 with Preservation.
                  assert (Hf : Z.pos p <= 0). {apply (H11 (Z.pos p) h t). reflexivity. }
                  zify. omega.
               *destruct h.
-                 { exfalso.
-                 assert (Hf : 0 > 0). {apply (H11 (Z.neg p) 0 t). reflexivity. }
-                 omega. }
-                { assert (Hgt : Z.pos p0 - Z.neg p > 0). { zify. omega. }
-                  assert (Hpos : exists x, Z.pos x = Z.pos p0 - Z.neg p ). {destruct (Z.pos p0 - Z.neg p). zify. omega. exists p1. reflexivity. zify. omega. }
-                  destruct (H3 0) as [N [T' [HT' [HM' HWT']]]]; [ | ].
-                    + destruct Hpos. assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H0.
-                      rewrite <- H. simpl. rewrite H0. simpl. zify. omega.
-                    + destruct Hpos. rewrite <- H in HT'. simpl in HT'. 
-                      assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H0. rewrite H0 in HT'. simpl in HT'.
-                      inv HT'. rewrite Z.add_0_r in HM'.
-                      maps_to_fun.
-                      constructor.
-                      assert (Hyp: set_remove_all (n, TPtr Checked (TArray (Z.neg p) (Z.pos p0) t))
+               { exfalso.
+                 assert (Hf : 0 > 0).
+                 { apply (H11 (Z.neg p) 0 t). reflexivity. }
+                 omega.
+               }
+               { assert (Hgt : Z.pos p0 - Z.neg p > 0).
+                 { zify. omega. }
+                 assert (Hpos : exists x, Z.pos x = Z.pos p0 - Z.neg p ).
+                 { destruct (Z.pos p0 - Z.neg p). zify. omega.
+                   exists p1. reflexivity. zify. omega.
+                 }
+                 destruct (H3 0) as [N [T' [HT' [HM' HWT']]]]; [ | ].
+                 + destruct Hpos.
+                   assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H0.
+                   rewrite <- H. simpl. rewrite H0. simpl. zify.
+                   rewrite replicate_length.
+                   rewrite Z.pos_sub_gt.
+                   { zify; omega. } 
+                   zify; omega.
+                 + destruct Hpos as [x Hx].
+                   rewrite <- Hx in HT'. simpl in HT'. 
+
+                   rewrite Z.add_0_r in HM'.
+
+                   assert (t = T').
+                   { 
+                     eapply replicate_nth; eauto.
+                   } 
+                   subst T'.
+
+                   maps_to_fun.
+                   constructor.
+                   assert (Hyp: set_remove_all (n, TPtr Checked (TArray (Z.neg p) (Z.pos p0) t))
                                         ((n,TPtr Checked (TArray (Z.neg p) (Z.pos p0) t))::nil) = empty_scope).
                         { 
                           destruct (eq_dec_nt (n, TPtr Checked (TArray (Z.neg p) (Z.pos p0) t))
@@ -3215,7 +3273,7 @@ Proof with eauto 20 with Preservation.
 
             unfold allocate_meta in *.
 
-            remove_options.
+            inversion H0; subst b; subst ts; clear H0.
             
             eapply TyLitC; unfold allocate_meta in *; eauto.
 
@@ -3228,58 +3286,44 @@ Proof with eauto 20 with Preservation.
             (* destruct on whether n2 <= length ts or not *)
             destruct (dec_lt n2 (S n)).*)
             (* Case n2 < S n: in bounds, use hypothesis *)
-            inv H1. destruct (Z_le_dec l n2).
-              + destruct (Z_lt_dec n2 (h - l)).
+            
+            assert (Hyp: h - n2 - (l - n2) = h - l) by omega.
+            rewrite Hyp in * ; clear Hyp.
+            
+            destruct (H6 (n2 + k)) as [n' [t' [HNth [HMap HWT]]]]; [omega | ].
 
-              eapply TyLitC with (ts := replicate m t) ; eauto.
-              * destruct m; try omega; simpl in *; eauto.
-              * intros k Hk.
-                
-                destruct (H7 (n2+k)) as [N [T [HNth [HMap HWT]]]]; try omega.
-                { (* Arithmetic for n2 + k *)
-                  subst.
-                  rewrite HLen.
-                  rewrite replicate_length in Hk.
-                  omega.
-                }
-                assert (t = T).
-                { inversion H2.
-                  rewrite H5 in HNth.
-                  replace (t :: replicate n t) with (replicate (S n) t) in HNth by auto.
-                  symmetry in HNth.
-                  apply replicate_nth in HNth.
-                  auto.
-                } 
-                subst.
-                exists N. exists T.
-                { repeat (split; eauto).
-                  - destruct (length_nth (replicate (S n - n2) T) k Hk).
-                    rewrite H1.
-                    apply replicate_nth in H1; subst.
-                    auto.
-                  - rewrite <- plus_assoc; auto.
-                  - eapply scope_strengthening in HWT; eauto.
-                    assert (HAdd : set_add eq_dec_nt (n1, TPtr Checked (TArray (S n) T)) empty_scope =
-                            (n1, TPtr Checked (TArray (S n) T)) :: nil) by auto.
-                    rewrite HAdd in HWT.
-                    
-                    assert (HEmpty : empty_scope = set_remove_all (n1, TPtr Checked (TArray (S n) T))
-                                             ((n1, TPtr Checked (TArray (S n) T)) :: nil)).
-                    {
-                      unfold set_remove_all.
-                      destruct (eq_dec_nt (n1, TPtr Checked (TArray (S n) T))
-                                          (n1, TPtr Checked (TArray (S n) T))); auto.
-                      congruence.
-                    }
-                    
-                    eapply scope_strengthening in HWT; eauto.
-                    rewrite <- HEmpty in HWT.
-                    apply scope_weakening_cons.
-                    auto.
-                }
-            + assert (S n - n2 = 0) by omega.
-              rewrite H1.
-              eauto.
+            exists n'. exists t'.
+
+            rewrite Z.add_assoc in HMap.
+
+            split; [ | split]; auto.
+            + destruct (h - l) eqn:HHL; simpl in *.
+              * rewrite Z.add_0_r in Hk.
+                destruct (Z.to_nat (n2 + k - l)); inv HNth.
+              * assert (HR: k - (l - n2) = n2 + k - l) by (zify; omega).
+                rewrite HR.
+                auto.
+              * destruct (Z.to_nat (n2 + k - l)); inv HNth.
+            + apply scope_weakening_cons.
+
+              eapply scope_strengthening in HWT; eauto.
+              assert (HAdd : set_add eq_dec_nt (n1, TPtr Checked (TArray l h t))
+                                     empty_scope =
+                             (n1, TPtr Checked (TArray l h t)) :: nil) by auto.
+              rewrite HAdd in HWT.
+              clear HAdd.
+
+              assert (HEmpty : empty_scope =
+                               set_remove_all (n1, TPtr Checked (TArray l h t)) 
+                                             ((n1, TPtr Checked (TArray l h t)) :: nil)).
+              {
+                unfold set_remove_all.
+                destruct (eq_dec_nt (n1, TPtr Checked (TArray l h t))
+                                    (n1, TPtr Checked (TArray l h t))); auto.
+                congruence.
+              }
+              rewrite <- HEmpty in HWT.
+              auto.
           - inv HTy1.
             destruct m'.
             + exfalso; eapply H10; eauto.
@@ -3320,7 +3364,7 @@ Proof with eauto 20 with Preservation.
           - constructor.
             eapply PtrUpd; eauto.
           - eapply (H12 l h). eauto.
-          
+          - 
         } 
     + destruct (IHHwt1 H5 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
       split; eauto...
