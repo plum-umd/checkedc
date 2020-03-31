@@ -3293,14 +3293,6 @@ Proof with eauto 20 with Preservation.
             eapply TyLitC; unfold allocate_meta in *; eauto.
 
             intros k Hk.
-              (* + inv H1. constructor.
-              eapply TyDeref with (l0 := (l - n2)) (h0 := (h - n2)). simpl. eauto.
-              intros k HK.
-              exists (l - n2). exists t.
-            { inv H2. simpl. rewrite replicate_length; auto. }
-            (* destruct on whether n2 <= length ts or not *)
-            destruct (dec_lt n2 (S n)).*)
-            (* Case n2 < S n: in bounds, use hypothesis *)
             
             assert (Hyp: h - n2 - (l - n2) = h - l) by omega.
             rewrite Hyp in * ; clear Hyp.
@@ -3394,72 +3386,65 @@ Proof with eauto 20 with Preservation.
       * { (* Plus step *)
           inv H7; split; eauto...
           - inv Hwt1.
-            destruct (Nat.eq_dec (n - n2) 0).
-            + rewrite e.
-              eapply TyAssign; eauto.
-            + remember H6 as Backup; clear HeqBackup.
-              inv H6; try omega; eauto.
-              { inv H7. }
-              clear IHHwt1 IHHwt2 IHHwt3 H8.
-              destruct n; try omega.
+            eapply TyAssign; eauto.
+            constructor.
+            cleanup.
             
-              remember (S n - n2) as m.
-              eapply TyAssign with (n3 := m); eauto.
-              constructor.
-              eapply TyLitC with (ts := replicate m t) ; eauto.
-              * destruct m; try omega; simpl in *; eauto.
-              * intros k Hk.
+            match goal with
+            | [ H : well_typed_lit _ _ _ _ _ |- _ ] =>
+              remember H as Backup; clear HeqBackup; inv H; eauto; try omega
+            end.
 
-                assert (HLen: length ts = S n).
-                { inv H4. simpl. rewrite replicate_length; auto. }
-                
-                destruct (H12 (n2+k)) as [N [T [HNth [HMap HWT]]]]; try omega.
-                { (* Arithmetic for n2 + k *)
-                  subst.
-                  rewrite HLen.
-                  rewrite replicate_length in Hk.
-                  omega.
-                }
-                assert (t = T).
-                { inversion H4.
-                  rewrite H5 in HNth.
-                  replace (t :: replicate n t) with (replicate (S n) t) in HNth by auto.
-                  symmetry in HNth.
-                  apply replicate_nth in HNth.
-                  auto.
-                } 
-                subst.
-                exists N. exists T.
-                { repeat (split; eauto).
-                  - destruct (length_nth (replicate (S n - n2) T) k Hk).
-                    rewrite H.
-                    apply replicate_nth in H; subst.
-                    auto.
-                  - rewrite <- plus_assoc; auto.
-                  - eapply scope_strengthening in HWT; eauto.
-                    assert (HAdd : set_add eq_dec_nt (n1, TPtr Checked (TArray (S n) T)) empty_scope =
-                            (n1, TPtr Checked (TArray (S n) T)) :: nil) by auto.
-                    rewrite HAdd in HWT.
-                    
-                    assert (HEmpty : empty_scope = set_remove_all (n1, TPtr Checked (TArray (S n) T))
-                                             ((n1, TPtr Checked (TArray (S n) T)) :: nil)).
-                    {
-                      unfold set_remove_all.
-                      destruct (eq_dec_nt (n1, TPtr Checked (TArray (S n) T))
-                                          (n1, TPtr Checked (TArray (S n) T))); auto.
-                      congruence.
-                    }
-                    
-                    eapply scope_strengthening in HWT; eauto.
-                    rewrite <- HEmpty in HWT.
-                    apply scope_weakening_cons.
-                    auto.
-                }
+            unfold allocate_meta in *.
+
+            inversion H2; subst b; subst ts; clear H0.
+            
+            eapply TyLitC; unfold allocate_meta in *; eauto.
+
+            intros k Hk.
+            
+            assert (Hyp: h - n2 - (l - n2) = h - l) by omega.
+            rewrite Hyp in * ; clear Hyp.
+            
+            destruct (H5 (n2 + k)) as [n' [t' [HNth [HMap HWT]]]]; [omega | ].
+
+            exists n'. exists t'.
+
+            rewrite Z.add_assoc in HMap.
+
+            split; [ | split]; auto.
+            + destruct (h - l) eqn:HHL; simpl in *.
+              * rewrite Z.add_0_r in Hk.
+                destruct (Z.to_nat (n2 + k - l)); inv HNth.
+              * assert (HR: k - (l - n2) = n2 + k - l) by (zify; omega).
+                rewrite HR.
+                auto.
+              * destruct (Z.to_nat (n2 + k - l)); inv HNth.
+            + apply scope_weakening_cons.
+
+              eapply scope_strengthening in HWT; eauto.
+              assert (HAdd : set_add eq_dec_nt (n1, TPtr Checked (TArray l h t))
+                                     empty_scope =
+                             (n1, TPtr Checked (TArray l h t)) :: nil) by auto.
+              rewrite HAdd in HWT.
+              clear HAdd.
+
+              assert (HEmpty : empty_scope =
+                               set_remove_all (n1, TPtr Checked (TArray l h t)) 
+                                             ((n1, TPtr Checked (TArray l h t)) :: nil)).
+              {
+                unfold set_remove_all.
+                destruct (eq_dec_nt (n1, TPtr Checked (TArray l h t))
+                                    (n1, TPtr Checked (TArray l h t))); auto.
+                congruence.
+              }
+              rewrite <- HEmpty in HWT.
+              auto.
           - inv Hwt1.
             destruct m'.
             + exfalso; eapply H14; eauto.
-            + specialize (H2 eq_refl). inv H2.
-        } 
+            + specialize (H2 eq_refl). eapply TyAssign; eauto.
+         }
       * destruct (IHHwt1 H9 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
         split ; eauto...
       * destruct (IHHwt2 H11 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
