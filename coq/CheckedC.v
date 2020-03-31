@@ -2965,19 +2965,21 @@ Proof.
       destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
       rewrite Hpos. simpl. rewrite HN.
       rewrite replicate_length.
-      simpl. 
-      admit.
-      admit.
-Admitted.
-(*split; try omega.
-
-      
-      split; zify; try omega.
-      
-      rewrite Hpos in HNth. simpl in HNth. rewrite HN in HNth. 
-      simpl in HNth. inv HNth. exists n'. rewrite Z.add_0_r in HMap.
-      assumption.
-Qed. *)
+      simpl. split.
+        * zify. omega.
+        * rewrite Z.pos_sub_gt. 
+          { zify. omega. }
+          { zify. omega. }
+        * rewrite Z.add_0_r in HMap.
+          rewrite Hpos in HNth. simpl in HNth.
+          rewrite HN in HNth. 
+          assert (w = t').
+              {
+                eapply replicate_nth; eauto.
+              }
+              subst w.
+          exists n'. assumption.
+Qed.
 
 Lemma preservation : forall D H env e t H' e',
     @structdef_wf D ->
@@ -3369,7 +3371,7 @@ Proof with eauto 20 with Preservation.
         } 
       * destruct Eq as [? [? ?]]; subst.
         { destruct m'; [| specialize (H1 eq_refl); inv H1].
-          eapply (well_typed_heap_in_array n D H n) in H10; eauto.
+          eapply (well_typed_heap_in_array n D H l h) in H10; eauto.
           destruct H10 as [N HMap].
           split.
           - apply HeapUpd with (n := N); eauto...
@@ -3377,7 +3379,7 @@ Proof with eauto 20 with Preservation.
           - constructor.
             eapply PtrUpd; eauto.
           - eapply (H12 l h). eauto.
-          - 
+          - eapply H12. eauto.
         } 
     + destruct (IHHwt1 H5 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
       split; eauto...
