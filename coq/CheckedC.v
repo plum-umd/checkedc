@@ -1220,7 +1220,7 @@ Proof with eauto 20 with Progress.
 
               assert (Hp': Z.of_nat (Pos.to_nat p) = Z.pos p) by omega.
               rewrite Hp' in *; clear Hp'.
-              assert (Hp': Pos.to_nat p = Z.to_nat (Z.pos p)) by (zify; omega).
+              assert (Hp': Pos.to_nat p = Z.to_nat (Z.pos p)) by (simpl; reflexivity).
               rewrite Hp' in *; clear Hp'. 
 
               assert (t = t').
