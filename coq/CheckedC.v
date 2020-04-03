@@ -84,6 +84,8 @@ Inductive type : Set :=
   | TStruct : struct -> type
   | TArray : Z -> Z -> type -> type.
 
+
+
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
 
@@ -120,7 +122,6 @@ Inductive type_wf (D : structdef) : type -> Prop :=
       (exists (fs : fields), StructDef.MapsTo T fs D) ->
       type_wf D (TStruct T)
   | WFArray : forall l h t,
-      (*l <= 0 /\ h > 0 ->*)
       word_type t ->
       type_wf D t ->
       type_wf D (TArray l h t).
@@ -134,6 +135,32 @@ Definition structdef_wf (D : structdef) : Prop :=
   forall (T : struct) (fs : fields),
     StructDef.MapsTo T fs D ->
     fields_wf D fs.
+   
+
+Inductive subtype : type -> type -> Prop :=
+  | SubTyRefl : forall t,
+    subtype t t
+  | SubTyTrans : forall t1 t2 t3,
+    subtype t1 t2 ->
+    subtype t2 t3 ->
+    subtype t1 t3
+  | SubTyPtr : forall m t1 t2,
+    subtype t1 t2 ->
+    subtype (TPtr m t1) (TPtr m t2)
+  | SubTyArray : forall l h t1 t2,
+    subtype t1 t2 ->
+    subtype (TArray l h t1) (TArray l h t2)
+  | SubTySubsume : forall l h l' h' t,
+    l' >= l /\ h' <= h ->
+    subtype (TArray l' h' t) (TArray l h t)
+  | SubTyStructArrayField : forall (T : struct) (fs : fields) (D : structdef) t,
+    StructDef.MapsTo T fs D ->
+    Some t = (Fields.find 0%nat fs) ->
+    subtype (TStruct T) (TArray 0 1 t)
+  | SubTyStructArrayNoField : forall (T : struct) (fs : fields) (D : structdef) t,
+    StructDef.MapsTo T fs D ->
+    None = (Fields.find 0%nat fs) ->
+    subtype (TStruct T) (TArray 0 1 t).
 
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
@@ -714,6 +741,10 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EAssign e1 e2) t'
+  | TySubType : forall env m e t1 t2,
+      well_typed env m e t1 ->
+      subtype t1 t2 ->
+      well_typed env m e t2
   | TyIndexAssign : forall env m e1 m' l h t e2 e3,
       word_type t -> type_wf D t ->
       well_typed env m e1 (TPtr m' (TArray l h t)) ->
