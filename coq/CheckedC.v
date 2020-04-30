@@ -144,23 +144,13 @@ Inductive subtype : type -> type -> Prop :=
     subtype t1 t2 ->
     subtype t2 t3 ->
     subtype t1 t3
-  | SubTyPtr : forall m t1 t2,
-    subtype t1 t2 ->
-    subtype (TPtr m t1) (TPtr m t2)
-  | SubTyArray : forall l h t1 t2,
-    subtype t1 t2 ->
-    subtype (TArray l h t1) (TArray l h t2)
-  | SubTySubsume : forall l h l' h' t,
+  | SubTySubsume : forall l h l' h' t m,
     l' >= l /\ h' <= h ->
-    subtype (TArray l' h' t) (TArray l h t)
-  | SubTyStructArrayField : forall (T : struct) (fs : fields) (D : structdef) t,
+    subtype (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyStructArrayField : forall (T : struct) (fs : fields) (D : structdef) m t,
     StructDef.MapsTo T fs D ->
     Some t = (Fields.find 0%nat fs) ->
-    subtype (TStruct T) (TArray 0 1 t)
-  | SubTyStructArrayNoField : forall (T : struct) (fs : fields) (D : structdef) t,
-    StructDef.MapsTo T fs D ->
-    None = (Fields.find 0%nat fs) ->
-    subtype (TStruct T) (TArray 0 1 t).
+    subtype (TPtr m (TStruct T)) (TPtr m t).
 
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
@@ -617,8 +607,9 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
       well_typed_lit D H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
       well_typed_lit D H s 0 t
-  | TyLitRec : forall s n w,
-      set_In (n, TPtr Checked w) s ->
+  | TyLitRec : forall s n w t,
+      set_In (n, t) s ->
+      subtype t (TPtr Checked w) ->
       well_typed_lit D H s n (TPtr Checked w)
   | TyLitC : forall s n w b ts,
       Some (b, ts) = allocate_meta D w ->
@@ -644,7 +635,7 @@ Lemma well_typed_lit_ind' :
     (forall (s : scope) (n : Z), P s n TNat) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s : scope) (n : Z) (w : type), set_In (n, TPtr Checked w) s -> P s n (TPtr Checked w)) ->
+       (forall (s : scope) (n : Z) (w : type) (t : type), set_In (n, t) s -> subtype t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
        (forall (s : scope) (n : Z) (w : type) (ts : list type) (b : Z),
         Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
@@ -667,7 +658,7 @@ Proof.
             | TyLitInt _ _ s' n' => HTyLitInt s' n'
             | TyLitU _ _ s' n' w' => HTyLitU s' n' w'
             | TyLitZero _ _ s' t' => HTyLitZero s' t'
-            | TyLitRec _ _ s' n' w' Hscope => HTyLitRec s' n' w' Hscope
+            | TyLitRec _ _ s' n' w' t' Hscope Hsub => HTyLitRec s' n' w' t' Hscope Hsub
             | TyLitC _ _ s' n' w' b ts Hts IH =>
               HTyLitC s' n' w' ts b Hts (fun k Hk =>
                                          match IH k Hk with
@@ -724,36 +715,136 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       (m = Checked -> forall w, t <> TPtr Checked w) ->
       well_typed env m e t' ->
       well_typed env m (ECast t e) t
-  | TyDeref : forall env m e m' t l h t',
-      well_typed env m e (TPtr m' t) ->
-      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
+  | TyDeref : forall env m e m' t l h t' t'',
+      well_typed env m e t ->
+      subtype t (TPtr m' t'') ->
+      ((word_type t'' /\ t'' = t') \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref e) t'
-  | TyIndex : forall env m e1 m' l h t e2,
+  | TyIndex : forall env m e1 m' l h t e2 t',
       word_type t -> type_wf D t ->
-      well_typed env m e1 (TPtr m' (TArray l h t)) ->
+      well_typed env m e1 t ->
+      subtype t (TPtr m' (TArray l h t')) ->
       well_typed env m e2 TNat ->
       (m' = Unchecked -> m = Unchecked) ->
-      well_typed env m (EDeref (EPlus e1 e2)) t
-  | TyAssign : forall env m e1 m' t l h t' e2,
+      well_typed env m (EDeref (EPlus e1 e2)) t'
+  | TyAssign : forall env m e1 m' t l h t' t'' e2,
       well_typed env m e1 (TPtr m' t) ->
       well_typed env m e2 t' ->
-      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
+      subtype t (TPtr m' t'') ->
+      ((word_type t /\ t'' = t') \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EAssign e1 e2) t'
-  | TySubType : forall env m e t1 t2,
-      well_typed env m e t1 ->
-      subtype t1 t2 ->
-      well_typed env m e t2
-  | TyIndexAssign : forall env m e1 m' l h t e2 e3,
+  | TyIndexAssign : forall env m e1 m' l h t e2 e3 t',
       word_type t -> type_wf D t ->
-      well_typed env m e1 (TPtr m' (TArray l h t)) ->
+      well_typed env m e1 t ->
+      subtype t (TPtr m' (TArray l h t')) ->
       well_typed env m e2 TNat ->
       well_typed env m e3 t ->
       (m' = Unchecked -> m = Unchecked) ->
-      well_typed env m (EAssign (EPlus e1 e2) e3) t.
+      well_typed env m (EAssign (EPlus e1 e2) e3) t'.
+
+Inductive well_typed' { D : structdef } { H : heap } : env -> mode -> expression -> type -> Prop :=
+  | TyLit' : forall env m n t,
+      @well_typed_lit D H empty_scope n t ->
+      well_typed' env m (ELit n t) t
+  | TyVar' : forall env m x t,
+      Env.MapsTo x t env ->
+      well_typed' env m (EVar x) t
+  | TyLet' : forall env m x e1 t1 e2 t,
+      well_typed' env m e1 t1 ->
+      well_typed' (Env.add x t1 env) m e2 t ->
+      well_typed' env m (ELet x e1 e2) t
+  | TyFieldAddr' : forall env m e m' T fs i fi ti,
+      well_typed' env m e (TPtr m' (TStruct T)) ->
+      StructDef.MapsTo T fs D ->
+      Fields.MapsTo fi ti fs ->
+      List.nth_error (Fields.this fs) i = Some (fi, ti) ->
+      well_typed' env m (EFieldAddr e fi) (TPtr m' ti)
+  | TyPlus' : forall env m e1 e2,
+      well_typed' env m e1 TNat ->
+      well_typed' env m e2 TNat ->
+      well_typed' env m (EPlus e1 e2) TNat
+  | TyMalloc' : forall env m w,
+      (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
+      well_typed' env m (EMalloc w) (TPtr Checked w)
+  | TyUnchecked' : forall env m e t,
+      well_typed' env Unchecked e t ->
+      well_typed' env m (EUnchecked e) t
+  | TyCast' : forall env m t e t',
+      (m = Checked -> forall w, t <> TPtr Checked w) ->
+      well_typed' env m e t' ->
+      well_typed' env m (ECast t e) t
+  | TyDeref' : forall env m e m' t l h t',
+      well_typed' env m e (TPtr m' t) ->
+      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
+      (m' = Unchecked -> m = Unchecked) ->
+      well_typed' env m (EDeref e) t'
+  | TyIndex' : forall env m e1 m' l h t e2,
+      word_type t -> type_wf D t ->
+      well_typed' env m e1 (TPtr m' (TArray l h t)) ->
+      well_typed' env m e2 TNat ->
+      (m' = Unchecked -> m = Unchecked) ->
+      well_typed' env m (EDeref (EPlus e1 e2)) t
+  | TyAssign' : forall env m e1 m' t l h t' e2,
+      well_typed' env m e1 (TPtr m' t) ->
+      well_typed' env m e2 t' ->
+      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
+      (m' = Unchecked -> m = Unchecked) ->
+      well_typed' env m (EAssign e1 e2) t'
+  | TySubType' : forall env m e t1 t2,
+      well_typed' env m e t2 ->
+      subtype t1 t2 ->
+      well_typed' env m e t1
+  | TyIndexAssign' : forall env m e1 m' l h t e2 e3,
+      word_type t -> type_wf D t ->
+      well_typed' env m e1 (TPtr m' (TArray l h t)) ->
+      well_typed' env m e2 TNat ->
+      well_typed' env m e3 t ->
+      (m' = Unchecked -> m = Unchecked) ->
+      well_typed' env m (EAssign (EPlus e1 e2) e3) t.
 
 Hint Constructors well_typed.
+
+Lemma ptr_subtype_equiv : forall m w t,
+subtype w (TPtr m t) ->
+exists t', w = (TPtr m t').
+Proof.
+  intros. remember (TPtr m t) as p. generalize dependent t. induction H.
+  - intros. exists t0. rewrite Heqp. reflexivity.
+  - intros. destruct (IHsubtype2 t Heqp).
+    destruct (IHsubtype1 x H1). exists x0.
+    assumption.
+  - intros. exists (TArray l h t).
+    assert (m0 = m). {
+      inv Heqp. reflexivity. 
+    }
+    rewrite H0. reflexivity.
+  - intros. exists (TStruct T).
+    assert (m0 = m). {
+      inv Heqp. reflexivity. 
+    }
+    rewrite H1. reflexivity.
+Qed.
+
+
+
+Lemma well_type_equiv : forall { D : structdef } { H : heap } env m e t,
+@well_typed D H env m e t <-> @well_typed' D H env m e t.
+Proof.
+  intros. split.
+  - intros. induction H0.
+    + eapply TyLit'; eauto.
+    + eapply TyVar'; eauto.
+    + eapply TyLet'; eauto.
+    + eapply TyFieldAddr'; eauto.
+    + eapply TyPlus'; eauto.
+    + eapply TyMalloc'; eauto.
+    + eapply TyUnchecked'; eauto.
+    + eapply TyCast'; eauto.
+    + assert (Hsub : exists t0, t = (TPtr m' t0)).
+        { eapply ptr_subtype_equiv. eapply H1. }
+      destruct Hsub. rewrite H4 in H1. inv H1.
 
 (** ** Metatheory *)
 
@@ -996,6 +1087,7 @@ Proof with eauto 20 with Progress.
                      env m e m' w l h t HTy IH HPtrType HMode                 | (* Deref *)
                      env m e1 m' l h t e2 WT Twf HTy1 IH1 HTy2 IH2 HMode             | (* Index *)
                      env m e1 m' w l h t e2 HTy1 IH1 HTy2 IH2 HPtrType HMode  | (* Assign *)
+                     env m e t1 t2 WT ST IH                                 | (* SubType *)
                      env m e1 m' l h t e2 e3 WT Twf HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode   (* IndAssign *)
                    ]; clean.
 
@@ -1033,27 +1125,33 @@ Proof with eauto 20 with Progress.
       left.
       inv HVal.
       inv HTy.
-      (* We proceed by case analysis on `m'` -- the mode of the pointer *)
-      destruct m'.
-      (* Case: m' = Checked *)
-      * (* We now proceed by case analysis on 'n > 0' *)
-        destruct (Z_gt_dec n 0).
-        (* Case: n > 0 *)
-        { (* We can step according to SFieldAddrChecked  *)
-          assert (HWf3 := HDwf T fs HWf1). (* TODO(ins): turn these into lemmas, and stick into Progress db *)
-          assert (HWf4 := HWf3 fi ti HWf2).
-          destruct HWf4... }
-        (* Case: n <= 0 *)
-        { (* We can step according to SFieldAddrNull *)
-           subst...   }
-      (* Case: m' = Unchecked *)
-      * (* We can step according to SFieldAddr *)
-        eapply step_implies_reduces; eapply SFieldAddr; eauto.
-        { (* LEO: This should probably be abstracted into a lemma *)
-          apply HDwf in HWf1.
-          apply HWf1 in HWf2.
-          destruct HWf2...
-        } 
+      {
+        (* We proceed by case analysis on `m'` -- the mode of the pointer *)
+        destruct m'.
+        (* Case: m' = Checked *)
+        * (* We now proceed by case analysis on 'n > 0' *)
+          destruct (Z_gt_dec n 0).
+          (* Case: n > 0 *)
+          { (* We can step according to SFieldAddrChecked  *)
+            assert (HWf3 := HDwf T fs HWf1). (* TODO(ins): turn these into lemmas, and stick into Progress db *)
+            assert (HWf4 := HWf3 fi ti HWf2).
+            destruct HWf4... }
+          (* Case: n <= 0 *)
+          { (* We can step according to SFieldAddrNull *)
+             subst...   }
+        (* Case: m' = Unchecked *)
+        * (* We can step according to SFieldAddr *)
+          eapply step_implies_reduces; eapply SFieldAddr; eauto.
+          { (* LEO: This should probably be abstracted into a lemma *)
+            apply HDwf in HWf1.
+            apply HWf1 in HWf2.
+            destruct HWf2...
+          }
+      }
+      {
+        inv H4.
+        *unfold nth_error in H0. 
+        
     (* Case: `e` reduces *)
     + (* We can take a step by reducing `e` *)
       left.
