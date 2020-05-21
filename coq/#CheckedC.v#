@@ -152,6 +152,21 @@ Inductive subtype : type -> type -> Prop :=
     Some t = (Fields.find 0%nat fs) ->
     subtype (TPtr m (TStruct T)) (TPtr m t).
 
+Inductive alg_subtype : type -> type -> Prop :=
+  | AlgSubTySubsume : forall l h l' h' t m,
+    l' >= l /\ h' <= h ->
+    alg_subtype (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | AlgSubTyStructArrayField : forall (T : struct) (fs : fields) (D : structdef) m t,
+    StructDef.MapsTo T fs D ->
+    Some t = (Fields.find 0%nat fs) ->
+    alg_subtype (TPtr m (TStruct T)) (TPtr m t).
+
+Lemma subtype_equiv : forall t1 t2,
+subtype t1 t2 <-> alg_subtype t1 t2.
+Proof.
+  intros. split.
+  -
+
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
     with their word type. Memory allocation, [EMalloc], is annotated with a type rather
@@ -688,14 +703,12 @@ Definition env := Env.t type.
 Definition empty_env := @Env.empty type.
 
 Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression -> type -> Prop :=
-  | TyLit : forall env m n t t1,
+  | TyLit : forall env m n t,
       @well_typed_lit D H empty_scope n t ->
-      subtype t t1 ->
-      well_typed env m (ELit n t) t1
-  | TyVar : forall env m x t1 t2,
-      Env.MapsTo x t1 env ->
-      subtype t1 t2 ->
-      well_typed env m (EVar x) t2
+      well_typed env m (ELit n t) t
+  | TyVar : forall env m x t,
+      Env.MapsTo x t env ->
+      well_typed env m (EVar x) t
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
       well_typed (Env.add x t1 env) m e2 t ->
@@ -890,7 +903,37 @@ subtype t1 t2 ->
 @well_typed D H env m e t2.
 Proof.
   intros. induction H0; inv H1; eauto.
-  - inv H0.
+  - assert (Htrans : subtype t t2). 
+      {
+        eapply SubTyTrans; eauto.
+        eapply SubTyTrans; eauto.
+      }
+    eapply TyLit; eauto.
+  - assert (Hsub : subtype (TPtr m0 (TArray l h t0)) (TPtr m0 (TArray l' h' t0))).
+      {
+        eapply SubTySubsume; eauto.
+      }
+    eapply TyLit; eauto. eapply SubTyTrans; eauto.
+  - assert (Hsub : subtype (TPtr m0 (TStruct T)) (TPtr m0 t0)).
+      {
+        eapply SubTyStructArrayField; eauto.
+      }
+    eapply TyLit; eauto. eapply SubTyTrans; eauto.
+  - assert (Hsub : subtype t1 t2).
+      {
+        eapply SubTyTrans; eauto. eapply SubTyTrans; eauto.
+      }
+      induction Hsub.
+      * eapply TyVar; eauto. eapply SubTyRefl.
+      * eapply TyVar; eauto. eapply SubTyTrans; eauto.
+      * admit.
+      * admit.
+  - admit.
+  - admit.
+  -  
+
+
+
     * assert (H0: t3 = TNat) by (eapply nat_subtype; assumption).
       rewrite H0 in H3.
       assert (H1: t2 = TNat) by (eapply nat_subtype; assumption).
@@ -905,13 +948,13 @@ Proof.
   - induction H0.
 Admitted.
 
+(*if it has a type t in well_typed then it has type s in well_typed' and subtype s t*)
+
 Lemma well_type_equiv : forall { D : structdef } { H : heap } env m e t,
 @well_typed D H env m e t <-> @well_typed' D H env m e t.
 Proof.
   intros. split.
   - intros. induction H0; try solve [econstructor; eauto using TySubType'].
-    +  eapply TySubType'; eauto.
-       eapply TyVar'; eauto.
   - intros. induction H0; try solve [econstructor; eauto using SubTyRefl].
     + inv H1; eauto.
       * admit.
