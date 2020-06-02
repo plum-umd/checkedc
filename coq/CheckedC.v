@@ -152,6 +152,7 @@ Inductive subtype : type -> type -> Prop :=
     Some t = (Fields.find 0%nat fs) ->
     subtype (TPtr m (TStruct T)) (TPtr m t).
 
+
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
     with their word type. Memory allocation, [EMalloc], is annotated with a type rather
@@ -688,14 +689,12 @@ Definition env := Env.t type.
 Definition empty_env := @Env.empty type.
 
 Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression -> type -> Prop :=
-  | TyLit : forall env m n t t1,
+  | TyLit : forall env m n t,
       @well_typed_lit D H empty_scope n t ->
-      subtype t t1 ->
-      well_typed env m (ELit n t) t1
-  | TyVar : forall env m x t1 t2,
-      Env.MapsTo x t1 env ->
-      subtype t1 t2 ->
-      well_typed env m (EVar x) t2
+      well_typed env m (ELit n t) t
+  | TyVar : forall env m x t,
+      Env.MapsTo x t env ->
+      well_typed env m (EVar x) t
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
       well_typed (Env.add x t1 env) m e2 t ->
@@ -749,65 +748,7 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EAssign (EPlus e1 e2) e3) t'.
 
-Inductive well_typed' { D : structdef } { H : heap } : env -> mode -> expression -> type -> Prop :=
-  | TyLit' : forall env m n t,
-      @well_typed_lit D H empty_scope n t ->
-      well_typed' env m (ELit n t) t
-  | TyVar' : forall env m x t,
-      Env.MapsTo x t env ->
-      well_typed' env m (EVar x) t
-  | TyLet' : forall env m x e1 t1 e2 t,
-      well_typed' env m e1 t1 ->
-      well_typed' (Env.add x t1 env) m e2 t ->
-      well_typed' env m (ELet x e1 e2) t
-  | TyFieldAddr' : forall env m e m' T fs i fi ti,
-      well_typed' env m e (TPtr m' (TStruct T)) ->
-      StructDef.MapsTo T fs D ->
-      Fields.MapsTo fi ti fs ->
-      List.nth_error (Fields.this fs) i = Some (fi, ti) ->
-      well_typed' env m (EFieldAddr e fi) (TPtr m' ti)
-  | TyPlus' : forall env m e1 e2,
-      well_typed' env m e1 TNat ->
-      well_typed' env m e2 TNat ->
-      well_typed' env m (EPlus e1 e2) TNat
-  | TyMalloc' : forall env m w,
-      (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
-      well_typed' env m (EMalloc w) (TPtr Checked w)
-  | TyUnchecked' : forall env m e t,
-      well_typed' env Unchecked e t ->
-      well_typed' env m (EUnchecked e) t
-  | TyCast' : forall env m t e t',
-      (m = Checked -> forall w, t <> TPtr Checked w) ->
-      well_typed' env m e t' ->
-      well_typed' env m (ECast t e) t
-  | TyDeref' : forall env m e m' t l h t',
-      well_typed' env m e (TPtr m' t) ->
-      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
-      (m' = Unchecked -> m = Unchecked) ->
-      well_typed' env m (EDeref e) t'
-  | TyIndex' : forall env m e1 m' l h t e2,
-      word_type t -> type_wf D t ->
-      well_typed' env m e1 (TPtr m' (TArray l h t)) ->
-      well_typed' env m e2 TNat ->
-      (m' = Unchecked -> m = Unchecked) ->
-      well_typed' env m (EDeref (EPlus e1 e2)) t
-  | TyAssign' : forall env m e1 m' t l h t' e2,
-      well_typed' env m e1 (TPtr m' t) ->
-      well_typed' env m e2 t' ->
-      ((word_type t /\ t = t') \/ (t = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
-      (m' = Unchecked -> m = Unchecked) ->
-      well_typed' env m (EAssign e1 e2) t'
-  | TyIndexAssign' : forall env m e1 m' l h t e2 e3,
-      word_type t -> type_wf D t ->
-      well_typed' env m e1 (TPtr m' (TArray l h t)) ->
-      well_typed' env m e2 TNat ->
-      well_typed' env m e3 t ->
-      (m' = Unchecked -> m = Unchecked) ->
-      well_typed' env m (EAssign (EPlus e1 e2) e3) t
-  | TySubType' : forall env m e t1 t2,
-      well_typed' env m e t1 ->
-      subtype t1 t2 ->
-      well_typed' env m e t2.
+
 
 Hint Constructors well_typed.
 
@@ -865,103 +806,6 @@ Proof.
   - exfalso. inv Heqt'.
   - exfalso. inv Heqt'.
 Qed.
-
-
-Lemma word_ptr_equiv : forall m w t,
-subtype (TPtr m w) (TPtr m t) ->
-word_type t ->
-word_type w.
-Proof.
-  intros. remember (TPtr m t) as p.
-  induction H0.
-    - rewrite Heqp in H. inv H. 
-      * eauto.
-      * inv H1.
-remember (TPtr m t) as p0. 
-      remember (TPtr m TNat) as p1.
-      induction H.
-      * rewrite Heqp0 in Heqp1. inv Heqp1. reflexivity.
-      * assert (t = TNat). { apply (IHsubtype2 Heqp0 Heqp).  
-Admitted.
-
-Lemma well_type_aux : forall { D : structdef } { H : heap } env m e t1 t2,
-@well_typed D H env m e t1 ->
-subtype t1 t2 ->
-@well_typed D H env m e t2.
-Proof.
-  intros. induction H0; inv H1; eauto.
-  - inv H0.
-    * assert (H0: t3 = TNat) by (eapply nat_subtype; assumption).
-      rewrite H0 in H3.
-      assert (H1: t2 = TNat) by (eapply nat_subtype; assumption).
-      rewrite H1. eapply TyLit. eapply TyLitInt.
-    * assert (H0 : exists t, t3 = (TPtr Unchecked t)) by (eapply ptr_subtype_equiv'; eauto).
-      destruct H0. rewrite H0 in H3.
-      assert (H1 : exists t, t2 = (TPtr Unchecked t)) by (eapply ptr_subtype_equiv'; eauto).
-      destruct H1. rewrite H1. eapply TyLit. eapply TyLitU.
-    * admit.
-    *admit.
-    * admit.
-  - induction H0.
-Admitted.
-
-Lemma well_type_equiv : forall { D : structdef } { H : heap } env m e t,
-@well_typed D H env m e t <-> @well_typed' D H env m e t.
-Proof.
-  intros. split.
-  - intros. induction H0; try solve [econstructor; eauto using TySubType'].
-    +  eapply TySubType'; eauto.
-       eapply TyVar'; eauto.
-  - intros. induction H0; try solve [econstructor; eauto using SubTyRefl].
-    + inv H1; eauto.
-      * admit.
-      * inv IHwell_typed'.
-        admit.
-        eapply TyVar; eauto. admit.
-        eapply TyLet; eauto.
-
-
-
-
-
- induction H1.
-      * assumption.
-      * remember H0 as Ht1. clear HeqHt1. apply IHsubtype1 in Ht1.
-        apply IHsubtype2 in Ht1. assumption. eapply TySubType'; eauto. assumption.
-      * eauto.
-
-
-
-
-
-
- induction e.
-      * induction H1.
-        {
-          assumption.
-        }
-        {
-          remember H0 as Ht1. clear HeqHt1. apply IHsubtype1 in Ht1.
-          apply IHsubtype2 in Ht1. assumption. eapply TySubType'; eauto. assumption.
-        }
-        {
-          inv H0.
-      * 
-
-
-
-remember IHwell_typed' as well_typed.
-      clear Heqwell_typed. induction well_typed.
-      * 
-
-
-
-induction H1.
-      * assumption.
-      * remember H0 as Ht1. clear HeqHt1. apply IHsubtype1 in Ht1.
-        apply IHsubtype2 in Ht1. assumption. eapply TySubType'; eauto. assumption.
-      * 
-
 
 (** ** Metatheory *)
 
@@ -1181,6 +1025,44 @@ destruct l.
   +simpl in H. inv H.
 Qed.
 *)
+
+Lemma fields_aux : forall fs,
+length (map snd (Fields.elements (elt:=type) fs)) = length (Fields.elements (elt:=type) fs).
+Proof.
+  intros. eapply map_length.
+Qed.
+
+Lemma obvious_list_aux : forall (A : Type) (l : list A),
+(length l) = 0%nat -> 
+l = nil.
+Proof.
+  intros. destruct l.
+  - reflexivity.
+  - inv H.
+Qed.
+
+Lemma fields_implies_length : forall fs,
+Some TNat = Fields.find (elt:=type) 0%nat fs ->
+((length (Fields.elements (elt:=type) fs) > 0))%nat.
+Admitted.
+
+
+Lemma struct_subtype_non_empty : forall m T,
+subtype (TPtr m (TStruct T)) (TPtr m TNat) ->
+exists fs D, StructDef.MapsTo T fs D ->
+Z.of_nat(length (map snd (Fields.elements (elt:=type) fs))) > 0.
+Proof.
+  intros. remember (TPtr m (TStruct T)) as p1.
+  remember (TPtr m TNat) as p2. induction H.
+  - exfalso. rewrite Heqp1 in Heqp2. inv Heqp2.
+  - admit.
+  - exfalso. inv Heqp1.
+  - inv Heqp1. exists fs. exists D.
+    intros. inv Heqp2.
+    eapply fields_implies_length in H0.
+    zify. eauto. rewrite map_length. assumption.
+Admitted.
+
 Lemma progress : forall D H m e t,
     structdef_wf D ->
     heap_wf D H ->
@@ -1201,10 +1083,9 @@ Proof with eauto 20 with Progress.
                      env m w                                                | (* Malloc *)
                      env m e t HTy IH                                       | (* Unchecked *)
                      env m t e t' HChkPtr HTy IH                            | (* Cast *)
-                     env m e m' w l h t HTy IH HPtrType HMode                 | (* Deref *)
+                     env m e m' w l h t t' HTy IH HSubType HPtrType HMode                 | (* Deref *)
                      env m e1 m' l h t e2 WT Twf HTy1 IH1 HTy2 IH2 HMode             | (* Index *)
                      env m e1 m' w l h t e2 HTy1 IH1 HTy2 IH2 HPtrType HMode  | (* Assign *)
-                     env m e t1 t2 WT ST IH                                 | (* SubType *)
                      env m e1 m' l h t e2 e3 WT Twf HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode   (* IndAssign *)
                    ]; clean.
 
@@ -1265,9 +1146,7 @@ Proof with eauto 20 with Progress.
             destruct HWf2...
           }
       }
-      {
-        inv H4.
-        *unfold nth_error in H0. 
+
         
     (* Case: `e` reduces *)
     + (* We can take a step by reducing `e` *)
@@ -1361,7 +1240,7 @@ Proof with eauto 20 with Progress.
     right.
 
     (* If m' is unchecked, then the typing mode `m` is unchecked *)
-    destruct m'; [> | right; eauto 20 with Progress].
+    destruct m'; [> | left; eauto 20 with Progress].
     clear HMode.
 
     (* TODO(ins): find a way to automate everything after case analysis... *)
@@ -1379,7 +1258,12 @@ Proof with eauto 20 with Progress.
       * (* We now proceed by case analysis on 'n > 0' *)
         destruct (Z_gt_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
         (* Case: n > 0 *)
-        { (* We now proceed by case analysis on '|- n0 : ptr_C w' *)
+        { (*Since w is subtype of a ptr it is also a ptr*)
+          assert (H3 : exists t1, w = (TPtr Checked t1)).
+          { eapply ptr_subtype_equiv. eauto.
+          } destruct H3. rewrite H3 in *.
+          clear H3.
+          (* We now proceed by case analysis on '|- n0 : ptr_C w' *)
           inversion H7.
           (* Case: TyLitZero *)
           {
@@ -1393,8 +1277,13 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We can step according to SDeref *)
             subst.
-            destruct H8 with (k := 0) as [ n' [ t' [ Ht'tk [ Hheap Hwtn' ] ] ] ];
-            [ inv H2; subst; inv H3; inv H4; simpl; omega | ].
+            destruct H8 with (k := 0) as [ n' [ t1' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
+            inv H2; subst; inv H3; unfold allocate_meta in *; destruct x;  inv H4; simpl; (try omega).
+            destruct (StructDef.find (elt:=fields) s D); inv H3; (try omega).
+            assert (Z.of_nat (length (map snd (Fields.elements (elt:=type) f))) > 0).
+            {
+              assert
+            }
             rewrite Z.add_0_r in Hheap;
             inv Ht'tk. 
             left.
@@ -2595,7 +2484,7 @@ Proof.
   induction HWT using well_typed_lit_ind'; eauto.
   - (* Replacement, TyRec *)
     intros s' HEq.
-    constructor; apply HEq; auto.
+    econstructor; eauto; eapply HEq; eauto.
   - (* Replacement, TyLitC *)
     intros s' Heq.
     eapply TyLitC; eauto.
