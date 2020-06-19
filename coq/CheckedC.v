@@ -780,7 +780,7 @@ Proof.
       inv Heqp. reflexivity. 
     }
     rewrite H0. reflexivity.
-  - intros. exists t.
+  - intros. exists TNat.
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
@@ -1252,7 +1252,7 @@ Proof with eauto 20 with Progress.
     right.
 
     (* If m' is unchecked, then the typing mode `m` is unchecked *)
-    destruct m'; [> | left; eauto 20 with Progress].
+    destruct m'; [> | right; eauto 20 with Progress].
     clear HMode.
 
     (* TODO(ins): find a way to automate everything after case analysis... *)
@@ -1262,7 +1262,7 @@ Proof with eauto 20 with Progress.
     (* Case: `e` is a value *)
      (* We can take a step... but how? *)
 
-  inv HVal.
+     + inv HVal.
       inv HTy.
       (* We proceed by case analysis on `w`, the type of the pointer *)
       destruct HPtrType.
@@ -1339,7 +1339,7 @@ Proof with eauto 20 with Progress.
                   inv H5. simpl in H3. inv HSubType.
                   assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
                   rewrite H4 in *.
-                  rewrite <- (element_implies_element s fs D TNat H2 H10) in H3.
+                  rewrite <- (element_implies_element s fs D TNat H2 H9) in H3.
                   inv H3. constructor.
                 }
                 {
@@ -1349,18 +1349,7 @@ Proof with eauto 20 with Progress.
             * unfold allocate_meta in H3.
               destruct x;
               inv H3; simpl in H4; inv H4; (try constructor).
-              + destruct (StructDef.find (elt:=fields) s D) eqn:HFind.
-                {
-                  assert (StructDef.MapsTo s f D) by (eapply find_implies_mapsto; eauto).
-                  inv H5. simpl in H3. inv HSubType.
-                  assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
-                  rewrite H4 in *.
-                  rewrite <- (element_implies_element s fs D (TPtr m0 w0) H2 H10) in H3.
-                  inv H3. constructor.
-                }
-                {
-                  inv H5.
-                }
+              + inv HSubType.
               + inv HSubType.
             * unfold allocate_meta in H3.
               destruct x;
@@ -1369,10 +1358,6 @@ Proof with eauto 20 with Progress.
                 {
                   assert (StructDef.MapsTo s f D) by (eapply find_implies_mapsto; eauto).
                   inv H5. simpl in H3. inv HSubType.
-                  assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
-                  rewrite H4 in *.
-                  rewrite <- (element_implies_element s fs D (TPtr m0 w0) H2 H10) in H3.
-                  inv H3. constructor.
                 }
                 {
                   inv H5.
@@ -1432,7 +1417,81 @@ Proof with eauto 20 with Progress.
               exfalso. inv H3.
           }
           {
-           admit.
+           left.
+           inv H2. inv HSubType. assert (expr_wf D (ELit n (TPtr Checked (TArray l h t)))) by (eapply WFELit; eauto).
+           unfold allocate_meta in H3.
+           destruct h; destruct l.
+            * eapply step_implies_reduces. eapply SDerefHighOOB; eauto. omega.
+            * eapply step_implies_reduces. 
+              eapply (SDerefLowOOB D H n (TPtr Checked (TArray (Z.pos p) 0 t)) t (Z.pos p) 0); eauto.
+              zify. omega.
+            * eapply step_implies_reduces. eapply SDerefHighOOB; eauto. omega.
+            * eapply step_implies_reduces. eapply SDeref; eauto.
+              unfold Zreplicate in H3.
+              (*do k = 0 and you'll get it*)
+              admit.
+              intros. inv H5; zify; omega.
+            * eapply step_implies_reduces. 
+              eapply (SDerefLowOOB D H n (TPtr Checked (TArray (Z.pos p0) (Z.pos p) t)) t (Z.pos p0) (Z.pos p)); eauto.
+              zify. omega.
+            * eapply step_implies_reduces. 
+              eapply SDeref; eauto.
+              admit.
+              intros. inv H5; zify; omega.
+            * eapply step_implies_reduces. 
+              eapply (SDerefHighOOB D H n (TPtr Checked (TArray 0 (Z.neg p) t)) t 0 (Z.neg p)); eauto.
+              zify. omega.
+            * eapply step_implies_reduces. 
+              eapply (SDerefHighOOB D H n (TPtr Checked (TArray (Z.pos p0) (Z.neg p) t)) t (Z.pos p0) (Z.neg p)); eauto.
+              zify. omega.
+            * eapply step_implies_reduces. 
+              eapply (SDerefHighOOB D H n (TPtr Checked (TArray (Z.neg p0) (Z.neg p) t)) t (Z.neg p0) (Z.neg p)); eauto.
+              zify. omega.
+            * assert (expr_wf D (ELit n (TPtr Checked (TArray l0 h0 t)))) by (eapply WFELit; eauto).
+              destruct h0; destruct l0.
+              { 
+                eapply step_implies_reduces. eapply SDerefHighOOB; eauto. omega.
+              }
+              { eapply step_implies_reduces. 
+                eapply (SDerefLowOOB D H n (TPtr Checked (TArray (Z.pos p) 0 t)) t (Z.pos p) 0); eauto.
+                zify. omega. 
+              }
+              {
+                eapply step_implies_reduces. eapply SDerefHighOOB; eauto. omega.
+              }
+              {
+                eapply step_implies_reduces. eapply SDeref; eauto.
+                unfold Zreplicate in H3.
+                (*do k = 0 and you'll get it*)
+                admit.
+                intros. inv H7; zify; omega.
+              }
+              {
+                eapply step_implies_reduces. 
+                eapply (SDerefLowOOB D H n (TPtr Checked (TArray (Z.pos p0) (Z.pos p) t)) t (Z.pos p0) (Z.pos p)); eauto.
+                zify. omega.
+              }
+              {
+                eapply step_implies_reduces. 
+                eapply SDeref; eauto.
+                admit.
+                intros. inv H7; zify; omega.
+              }
+              {
+                eapply step_implies_reduces. 
+                eapply (SDerefHighOOB D H n (TPtr Checked (TArray 0 (Z.neg p) t)) t 0 (Z.neg p)); eauto.
+                zify. omega.
+              }
+              {
+                eapply step_implies_reduces. 
+                eapply (SDerefHighOOB D H n (TPtr Checked (TArray (Z.pos p0) (Z.neg p) t)) t (Z.pos p0) (Z.neg p)); eauto.
+                zify. omega.
+              }
+              {
+                eapply step_implies_reduces. 
+                eapply (SDerefHighOOB D H n (TPtr Checked (TArray (Z.neg p0) (Z.neg p) t)) t (Z.neg p0) (Z.neg p)); eauto.
+                zify. omega.
+              }
           }
         } 
         (* Case: n <= 0 *)
@@ -1449,12 +1508,10 @@ Proof with eauto 20 with Progress.
           destruct H3.  
           eapply SDerefNull; eauto.
         }
-          *left. ctx (EDeref e) (in_hole e (CDeref CHole))...
-          *right.
-      ctx (EDeref e) (in_hole e (CDeref CHole)).
-      destruct HUnchk...
-          * ctx (EDeref e) (in_hole e (CDeref CHole))...
-            rewrite HCtx. admit. 
+        + left. ctx (EDeref e) (in_hole e (CDeref CHole))...
+        + right.
+          ctx (EDeref e) (in_hole e (CDeref CHole)).
+          destruct HUnchk...
   -
     right.
     destruct m'; [> | right; eauto 20 with Progress].
@@ -1474,13 +1531,25 @@ Proof with eauto 20 with Progress.
         exists H.
         { destruct (Z_gt_dec n1 0).
           - (* n1 > 0 *)
-            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))).
-            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))
-                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))) (CDeref CHole)).
-            rewrite HCtx.
-            rewrite HCtx0.
-            inv HTy2.
-            eapply RSExp; eauto. admit.
+            inv HSubType.   
+            (*reflexivity case*)
+            * exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t'))))).
+              ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t'))))
+                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t'))) (CDeref CHole)).
+              rewrite HCtx.
+              rewrite HCtx0.
+              eapply RSExp; eauto. 
+              inv HTy2. 
+              eapply SPlusChecked; eauto.
+            (*bounds smaller case*)
+            * exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l0 - n) (h0 - n) t'))))).
+              ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l0 - n) (h0 - n) t'))))
+                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (l0 - n) (h0 - n) t'))) (CDeref CHole)).
+              rewrite HCtx.
+              rewrite HCtx0.
+              eapply RSExp; eauto. 
+              inv HTy2. 
+              eapply SPlusChecked; eauto.
           - (* n1 <= 0 *)
             exists RNull.
             subst.
@@ -1489,7 +1558,6 @@ Proof with eauto 20 with Progress.
             inv HTy2.
             inv HSubType;
             (try eapply SPlusNull; try omega).
-            admit.
         }
       * left.
         ctx (EDeref (EPlus (ELit n1 t1) e2)) (in_hole e2 (CDeref (CPlusR n1 t1 CHole)))...
@@ -1522,9 +1590,9 @@ Proof with eauto 20 with Progress.
             inv HTy1; eauto.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ |- _ ] => inv H
-            end...
-            + inv HSubType.
-            + inv HSubType.
+            end... 
+            + exfalso; inv HSubType.
+            + exfalso; inv HSubType.
             + left.
               inv H0.
               * assert (exists t, w = (TPtr Checked t)).
@@ -1538,14 +1606,13 @@ Proof with eauto 20 with Progress.
               * assert (exists t, w = (TPtr Checked t)).
                 {
                   inv HSubType. exists (TPtr m0 w0); eauto.
-                  exists (TStruct T); eauto.
                 }
                 destruct H0.
                 eapply step_implies_reduces.
                 eapply SAssignNull; eauto. omega. 
             + inv H0; inv H2; inv H1.
-            + admit.
-             
+            + left. eapply step_implies_reduces.
+              
           - inv HSubType. 
             + inv HTy1; eauto.
             match goal with
@@ -1596,14 +1663,15 @@ Proof with eauto 20 with Progress.
                 eapply step_implies_reduces.
                 eapply SAssignHighOOB; eauto... inv HTy2. eauto.
               }
-        
+            +admit.
+            +admit.
         } 
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
       * destruct HUnchk2 as [ e' [ E [ ] ] ]; subst.
         ctx (EAssign (ELit n1' t1') (in_hole e' E)) (in_hole e' (CAssignR n1' t1' E))...
     + (* Case: e1 reduces *)
-      destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ]. admit. + admit.
+      destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ].
       inv HRed1; ctx (EAssign (in_hole e E) e2) (in_hole e (CAssignL E e2))...
     + destruct HUnchk1 as [ e' [ E [ ] ] ]; subst.
       ctx (EAssign (in_hole e' E) e2) (in_hole e' (CAssignL E e2))...
@@ -1631,45 +1699,52 @@ Proof with eauto 20 with Progress.
           inv H11; inv H12; (eauto 20 with Progress); 
             try solve_empty_scope.
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            + inv HVal3.
+            + inv HSubType.
+(*inv HVal3.
               inv HTy3.
               left; eauto...
               destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 3 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
-              * eapply RSHaltNull... eapply SPlusNull. omega.
-            + destruct HRed3 as [H' [? [r HRed3]]].
+              * eapply RSHaltNull... eapply SPlusNull. omega.*)
+            + inv HSubType.
+(*destruct HRed3 as [H' [? [r HRed3]]].
               rewrite HCtx; left; eexists; eexists; eexists.
-              eapply RSHaltNull... eapply SPlusNull. omega. 
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              eapply RSHaltNull... eapply SPlusNull. omega. *)
+            + inv HSubType.
+(*destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSHaltNull... eapply SPlusNull. omega.
+              * eapply RSHaltNull... eapply SPlusNull. omega.*)
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            + inv HVal3.
+            + inv HSubType.
+(*inv HVal3.
               inv HTy3.
               destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
-              * eapply RSHaltNull... eapply SPlusNull. omega.
-            + destruct HRed3 as [H' [? [r HRed3]]].
+              * eapply RSHaltNull... eapply SPlusNull. omega.*)
+            + inv HSubType.
+(*destruct HRed3 as [H' [? [r HRed3]]].
               rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSHaltNull... eapply SPlusNull. omega.
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              * eapply RSHaltNull... eapply SPlusNull. omega.*)
+            + inv HSubType.
+(*destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               rewrite HCtx; left; eexists; eexists; eexists.
-              * eapply RSHaltNull... eapply SPlusNull. omega.
-          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+              * eapply RSHaltNull... eapply SPlusNull. omega.*)
+          - inv HSubType.
+(*destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
               * eapply RSExp. eapply SPlusChecked. omega. eauto.
-              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
-          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.*)
+          -  inv HSubType. (*destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
               * eapply RSExp. eapply SPlusChecked. omega. eauto.
-              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
+              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.*)
         }
       * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
-        inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
-      * destruct HUnchk2 as [ e' [ E [ He2 HEUnchk ] ] ]; subst.
-        ctx (EAssign (EPlus (ELit n t0) (in_hole e' E)) e3) (in_hole e' (CAssignL (CPlusR n t0 E) e3))...
+        inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))... admit. admit. admit.
+      * admit. (* destruct HUnchk2 as [ e' [ E [ He2 HEUnchk ] ] ]; subst.
+        ctx (EAssign (EPlus (ELit n t0) (in_hole e' E)) e3) (in_hole e' (CAssignL (CPlusR n t0 E) e3))... *)
     + destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ].
-      inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))...
-    + destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
-      ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))...
+      inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))... admit. admit. admit.
+    + admit. (* destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
+      ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))... *)
 Qed.
 
 (* ... for Preservation *)
@@ -2610,8 +2685,8 @@ Proof.
   induction HWT using well_typed_lit_ind'; eauto.
   - (* Weakening, TyRec *)
     intros x.
-    constructor.
-    apply set_add_intro1; auto.
+    econstructor.
+    apply set_add_intro1; eauto. assumption.
   - (* Weakening, TyLitC *)
     intros x.
     eapply TyLitC; eauto.
@@ -2655,8 +2730,8 @@ Lemma scope_weakening_cons :
 Proof.
   intros D H n t s HWT.
   induction HWT using well_typed_lit_ind'; eauto; intros x.
-  - constructor.
-    right; auto.
+  - econstructor.
+    right; eauto. assumption.
   - eapply TyLitC; eauto.
     intros k Hk.
     destruct (H1 k Hk) as [n' [t' [HNth [HMap [HWt1 HWeak]]]]].
@@ -2878,13 +2953,14 @@ Proof.
       destruct (type_eq_dec tm (TPtr Checked w)).
       * subst.
         apply scope_weakening'; auto.
-      * constructor.
-        apply set_remove_all_intro; auto.
+      * econstructor.
+        apply set_remove_all_intro; eauto.
         intro Contra; inv Contra.
-        eauto.
-    + constructor.
-      apply set_remove_all_intro; auto.
-      congruence.
+        eauto. admit.
+        assumption.
+    + econstructor.
+      apply set_remove_all_intro; eauto.
+      congruence. admit.
   - eapply TyLitC; eauto.
     intros k Hk.
     destruct (H1 k Hk) as [N [T [HNth [HMap' [Hwt' IH]]]]].
@@ -3020,8 +3096,8 @@ Proof.
   remember HWT' as Backup; clear HeqBackup.
   induction HWT' using well_typed_lit_ind'; eauto;
     intros i k m T HMap.
-  - constructor.
-    apply set_add_intro; auto.
+  - econstructor.
+    apply set_add_intro; eauto. assumption.
   - eapply TyLitC; eauto.
     intros x Hx.
     destruct (H1 x Hx) as [N' [T' [HNth [HMap' [HWT'' IH]]]]].
@@ -3030,10 +3106,10 @@ Proof.
       maps_to_fun.
       exists k; exists (TPtr Checked T); eauto.
       repeat (split; eauto).
-      * apply Heap.add_1; auto.
-      * apply TyLitRec; auto.
+      * apply Heap.add_1; eauto.
+      * eapply TyLitRec; auto.
         apply set_add_intro1;
-        apply set_add_intro2; auto.
+        apply set_add_intro2; auto. eapply SubTyRefl.
     + exists N'; exists T'; eauto.
       repeat (split; eauto).
       * apply Heap.add_2; auto.
@@ -3096,7 +3172,7 @@ Proof.
     repeat (split; eauto).
     + solve_map.
     + eapply TyLitRec; eauto.
-      apply set_add_intro2; auto.
+      apply set_add_intro2; auto. eapply SubTyRefl.
   - exists x'. exists Tx.
     repeat (split; eauto).
     + eapply Heap.add_2; eauto.
@@ -3126,7 +3202,7 @@ Proof.
   - destruct (Hwf 0) as [_ Contra].
     apply Contra in HIn.
     omega.
-  - inv H3.
+  - inv H1.
   - inv Hwt; simpl in *; inv H1.
     + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
       *simpl. omega.
@@ -3154,7 +3230,7 @@ Proof.
   - destruct (Hwf 0) as [_ Contra].
     apply Contra in HIn.
     omega.
-  - inv H3.
+  - inv H1.
   - inv H1.
     destruct l.
     + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
@@ -3221,8 +3297,8 @@ Proof with eauto 20 with Preservation.
                     env m w                                               | (* Malloc *)
                     env m e t HTy IH                                      | (* Unchecked *)
                     env m t e t' HChkPtr HTy IH                           | (* Cast *)
-                    env m e m' w l h t HTy IH HPtrType HMode                | (* Deref *)
-                    env m e1 m' l h t e2 WT Twf HTy1 IH1 HTy2 IH2 HMode            | (* Index *)
+                    env m e m' w l h t t' HTy IH HSubType HPtrType HMode              | (* Deref *)
+                    env m e1 m' l h t e2 t' WT Twf HTy1 IH1 HSubType HTy2 IH2 HMode            | (* Index *)
                     |
                     ]; intros e' H' Hreduces; subst.
   (* T-Lit, impossible because values do not step *)
@@ -3325,27 +3401,31 @@ Proof with eauto 20 with Preservation.
         { idtac... }
     + clear H1. rename e0 into e1_redex. rename e'0 into e1_redex'. edestruct IH; idtac...
       inv HHwf; eauto.
-  (* T-Deref *)
+  (* T-Deref *) 
   - destruct m'; try (specialize (HMode eq_refl); inversion HMode).
     clear HMode.
     inv HHwf.
     specialize (IH H1 eq_refl).
     inv Hreduces.
     destruct E eqn:He; inversion H2; simpl in *; try congruence.
-    + subst.
+    + 
+      subst.
       clear IH.
       inv H5.
       split; eauto.
       destruct HPtrType as [[Hw Eq] | Hw]; subst.
-      * { inv HTy.
+      *   inv HSubType.  
+        { inv HTy.
           remember H7 as Backup; clear HeqBackup.
           inv H7.
           - exfalso.
             eapply heap_wf_maps_nonzero; eauto.
-          - inversion H4.
+          - inv H2.
+            
           - inv Hw; simpl in*; subst; simpl in *.
             + inv H0; simpl in *.
               destruct (H5 0) as [N [T' [HT' [HM' HWT']]]]; [inv H2; simpl; omega | ].
+             
               inv HT'.
               rewrite Z.add_0_r in HM'.
               assert (Hyp: (N, TNat) = (n1, t1)). {
@@ -3375,27 +3455,103 @@ Proof with eauto 20 with Preservation.
               apply scope_strengthening. inv H2. inv H0.
               exact HWT'. exact HEwf. exact Backup.
         }
-      * { inv HTy.
+        { inv HTy.
+          remember H10 as Backup; clear HeqBackup.
+          inv H10.
+          - exfalso.
+            eapply heap_wf_maps_nonzero; eauto.
+          - inv H2.
+            
+          - inv Hw; simpl in*; subst; simpl in *.
+            
+        }
+        { inv HTy.
+          remember H12 as Backup; clear HeqBackup.
+          inv H12.
+          - exfalso.
+            eapply heap_wf_maps_nonzero; eauto.
+          - inv H2.
+            
+          - inv Hw; simpl in*; subst; simpl in *.
+            + inv H0; simpl in *.
+              destruct (H10 0) as [N [T' [HT' [HM' HWT']]]]; [inv H2; simpl; eauto | ].
+              destruct (StructDef.find (elt:=fields) T D) eqn:H.
+              inv H0. rewrite map_length. 
+              assert (StructDef.MapsTo T f D) by (eapply find_implies_mapsto; eauto).
+              assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). rewrite <- H2 in *.
+              assert (((length (Fields.elements (elt:=type) f)) > 0)%nat) by (eapply fields_implies_length; eauto).
+              omega. inv H. inv H0.
+              inv HT'.
+              rewrite Z.add_0_r in HM'.
+              assert (Hb : b = 0). 
+              {
+                destruct (StructDef.find (elt:=fields) T D);
+                inv H2. reflexivity.
+              } rewrite Hb in *.
+              simpl in H0. 
+              assert (Hts : StructDef.find (elt:=fields) T D = Some fs) by (eapply StructDef.find_1; eauto).
+              rewrite Hts in H2. inv H2.
+              assert (Some TNat = match map snd (Fields.elements (elt := type) fs)
+                with 
+                | nil => None
+                | x:: _ => Some x
+                end) by (eapply element_implies_element; eauto).
+              rewrite <- H in H0. inv H0. 
+              assert (Hyp: (N, TNat) = (n1, t1)). {
+              eapply HeapFacts.MapsTo_fun.
+              exact HM'. exact H9. }
+              inv Hyp; subst; eauto.
+          }
+          (*
+            + inv H0; simpl in *.
+              destruct (H5 0) as [N [T' [HT' [HM' HWT']]]]; [inv H2; simpl; omega | ].
+              inv HT'.
+              rewrite Z.add_0_r in HM'.
+              assert (Hyp: (N, TPtr m w) = (n1, t1)). {
+                eapply HeapFacts.MapsTo_fun. inv H2.
+                inv H0. exact HM'. exact H9. }
+              inv Hyp; subst; eauto.
+              apply TyLit.
+
+              assert (Hyp: set_remove_all (n, TPtr Checked (TPtr m w))
+                                     ((n,TPtr Checked (TPtr m w))::nil) = empty_scope).
+              { 
+                destruct (eq_dec_nt (n, TPtr Checked (TPtr m w)) (n, TPtr Checked (TPtr m w))) eqn:EQ; try congruence.
+                unfold set_remove_all.
+                rewrite EQ.
+                auto.
+              }
+
+              rewrite <- Hyp.
+              apply scope_strengthening. inv H2. inv H0.
+              exact HWT'. exact HEwf. exact Backup.
+        }*)
+      *   assert (exists t1, w = (TPtr Checked t1)) by (inv HSubType; eauto).
+          destruct H. rewrite H in *. clear H.
+        { inv HTy.
           clear H8.
           clear H0.
           clear H1.
           remember H7 as Backup; clear HeqBackup.
           inv H7.
-          - exfalso.
+          - exfalso. 
             eapply heap_wf_maps_nonzero; eauto.
-          - inversion H2.
+          - inversion H0.
           - simpl in H0. subst.
             destruct Hw as [? [? ?]]; subst.
             inv H0; simpl in *.
-            destruct l.
-              *destruct h.
+            inv HSubType.
+            -- unfold allocate_meta in H4.
+                destruct l.
+              * destruct h.
                  { exfalso.
                  assert (Hf : 0 > 0). {apply (H11 0 0 t). reflexivity. }
                  omega. }
-                { assert (H4 : exists x, Pos.to_nat p = S x) by apply pos_succ.
+                { assert (Hpos : exists x, Pos.to_nat p = S x) by apply pos_succ.
+                  destruct Hpos.
                   destruct (H3 0) as [N [T' [HT' [HM' HWT']]]]; [ simpl; inv H4; rewrite H; simpl; zify; omega | ].
                   inv HT'.  rewrite Z.add_0_r in HM'.
-                  maps_to_fun. inv H4. rewrite H in H0. inv H0.
+                  maps_to_fun. inv H4. rewrite H in H5. inv H5.
                   constructor.
                   assert (Hyp: set_remove_all (n, TPtr Checked (TArray 0 (Z.pos p) t))
                                         ((n,TPtr Checked (TArray 0 (Z.pos p) t))::nil) = empty_scope).
@@ -3412,31 +3568,31 @@ Proof with eauto 20 with Preservation.
                 { exfalso.
                  assert (Hf : Z.neg p > 0). {apply (H11 0 (Z.neg p) t). reflexivity. }
                  zify. omega. }
-              *exfalso.
+              * exfalso.
                  assert (Hf : Z.pos p <= 0). {apply (H11 (Z.pos p) h t). reflexivity. }
                  zify. omega.
-              *destruct h.
-               { exfalso.
+              * destruct h.
+               ** exfalso.
                  assert (Hf : 0 > 0).
                  { apply (H11 (Z.neg p) 0 t). reflexivity. }
                  omega.
-               }
-               { assert (Hgt : Z.pos p0 - Z.neg p > 0).
-                 { zify. omega. }
-                 assert (Hpos : exists x, Z.pos x = Z.pos p0 - Z.neg p ).
-                 { destruct (Z.pos p0 - Z.neg p). zify. omega.
-                   exists p1. reflexivity. zify. omega.
-                 }
-                 destruct (H3 0) as [N [T' [HT' [HM' HWT']]]]; [ | ].
-                 + destruct Hpos.
-                   assert (exists n, Pos.to_nat x = S n) by apply pos_succ. destruct H0.
-                   rewrite <- H. simpl. rewrite H0. simpl. zify.
-                   rewrite replicate_length.
-                   rewrite Z.pos_sub_gt.
-                   { zify; omega. } 
-                   zify; omega.
-                 + destruct Hpos as [x Hx].
-                   rewrite <- Hx in HT'. simpl in HT'. 
+               ** assert (Hpos : Z.pos p0 - Z.neg p > 0) by (zify; omega).
+                  assert (Hpos' : exists p1, Z.pos p0 - Z.neg p = Z.pos p1).  
+                    { destruct (Z.pos p0 - Z.neg p); inv Hpos. exists p1; reflexivity. }
+                  clear Hpos. destruct Hpos'. assert (Hpos : exists n, (Pos.to_nat x) = S n) by (eapply pos_succ; eauto).
+                  destruct Hpos. rewrite H in H4. simpl in H4. 
+                  rewrite H0 in H4. clear H H0.
+                  inv H4. 
+                  destruct (H3 (Z.neg p)) as [N [T' [HT' [HM' HWT']]]]; [ | ].
+                 + split. zify; omega.
+                   assert (Z.of_nat (length (t:: replicate x0 t)) > 0) by (destruct x0; simpl; zify; omega).
+                   omega.
+                 + assert (Z.neg p - Z.neg p = 0) by (zify; omega). rewrite H in HT'. clear H.
+                   simpl in HT'. inv HT'.
+
+
+
+                   rewrite H in HT'. simpl in HT'. 
 
                    rewrite Z.add_0_r in HM'.
 
@@ -3464,6 +3620,37 @@ Proof with eauto 20 with Preservation.
                  assert (Hf : Z.neg p > 0). {apply (H11 (Z.neg p) (Z.neg p0) t). reflexivity. }
                  zify. omega. }
         }
+        {
+          inv HTy. clear H8 H0.
+          destruct (H11 l0 h0 t2). reflexivity.
+          remember H10 as Backup. inv H10.
+          - exfalso. 
+            eapply heap_wf_maps_nonzero; eauto.
+          - inversion H4.
+          - unfold allocate_meta in H4. inv H4.
+            assert (Hpos : exists p, (h0 - l0) = Z.pos p).
+            {
+              destruct h0; destruct l0; inv H.
+              + exists p. simpl; reflexivity.
+              + exfalso. eapply H0. simpl. reflexivity.
+              + assert (Z.pos p - Z.neg p0 > 0) by (zify; omega).
+                assert (exists p2, Z.pos p - Z.neg p0 = Z.pos p2).
+                {
+                 destruct (Z.pos p - Z.neg p0); inv H. exists p1. reflexivity.
+                } destruct H2. exists x. assumption.
+            }
+            destruct Hpos. rewrite H2 in H8. simpl in H8.
+            destruct (H8 l0).
+            assert (exists n0, Pos.to_nat x = S n0) by eapply pos_succ.
+            destruct H4. rewrite H4.
+            assert ((length (replicate (S x0) t2) > 0)%nat) by (simpl; omega). 
+            inv H5. simpl. rewrite <- H10. simpl. zify; omega.
+            simpl. zify; omega.
+            destruct H4 as  [? [? ?]]; subst. simpl in H4.
+          
+        }
+        { admit. }
+
     + subst.
       destruct (IH (in_hole e'0 c) H') as [HC HWT]; eauto. 
   - inv HHwf.
@@ -3492,7 +3679,7 @@ Proof with eauto 20 with Preservation.
           end; split; eauto...
           - inv HTy1.
             eapply TyDeref; eauto.
-            constructor.
+            econstructor.
 
             Ltac cleanup :=
               repeat (match goal with
@@ -3562,7 +3749,7 @@ Proof with eauto 20 with Preservation.
         split ; eauto...
       * specialize (IH2 H4 eq_refl (in_hole e'0 E) H').
         destruct IH2 as [HC HWT]; eauto.
-        split; eauto...
+        split; eauto... 
   (* T-Assign *)
   - inv Hreduces.
     inv HHwf.
@@ -3596,7 +3783,7 @@ Proof with eauto 20 with Preservation.
     + destruct (IHHwt1 H5 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
       split; eauto...
     + destruct (IHHwt2 H7 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
-      split; eauto...
+      split; eauto... 
   - inv Hreduces.
     inv HHwf.
     inv H6.
