@@ -2991,6 +2991,7 @@ Proof.
   inversion HWT;
   intros i fi ti Hn HS HF Hnth Hhwf HDwf Hfwf Hwt; eauto.
   - exfalso ; eauto.
+  - inv H1.
   - destruct (H4  (Z.of_nat i)) as [N' [T' [HNth [HMap HWT']]]]; subst.
     + simpl in H1.
       destruct (StructDef.find T D) eqn:Find; try congruence.
@@ -3057,6 +3058,7 @@ Proof.
         rewrite <- HEmpty in HWT'.
         apply scope_weakening_cons.
         auto.
+
 Qed.
 
 (*
