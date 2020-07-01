@@ -83,9 +83,7 @@ Inductive type : Set :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-  | TArray : Z -> Z -> type -> type
-  | TVar : var -> type
-  | TVarArray : var -> var -> type -> type.
+  | TArray : Z -> Z -> type -> type.
 
 Inductive kind : Set :=
   | KType : type -> kind
@@ -131,13 +129,7 @@ Inductive type_wf (D : structdef) : type -> Prop :=
   | WFArray : forall l h t,
       word_type t ->
       type_wf D t ->
-      type_wf D (TArray l h t)
-  | WFTVar : forall x,
-      type_wf D (TVar x)
-  | WFTVarArray : forall x y t,
-      word_type t ->
-      type_wf D t ->
-      type_wf D (TArray x y t).
+      type_wf D (TArray l h t).
 
 Definition fields_wf (D : structdef) (fs : fields) : Prop :=
   forall f t,
@@ -710,10 +702,6 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
   | TyVar : forall env m x t,
       Env.MapsTo x t env ->
       well_typed env m (EVar x) t
-  | TyTyVar : forall env m e x t,
-      Env.MapsTo x t env ->
-      well_typed env m e t ->
-      well_typed env m e (TVar x)
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
       well_typed (Env.add x t1 env) m e2 t ->
@@ -3044,7 +3032,7 @@ Proof.
 
 Admitted.
 
-(*
+
 induction H0. 
   - inv H1. eauto.
   - assert (exists t, t' = (TPtr Unchecked t)) by (inv H1; eauto).
@@ -3189,7 +3177,7 @@ induction H0.
                 
 
           
-Admitted.*)
+Admitted.*
 
 Lemma scope_extra :
   forall D H n1 n2 t1 t2 s,
