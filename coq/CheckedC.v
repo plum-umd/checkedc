@@ -49,7 +49,6 @@ Definition var_eq_dec := Nat.eq_dec.
 (** The Mode ([m]) is
 
 The [mode], indicated by metavariable [m], is either [Checked] or [Unchecked]. *)
-
 Inductive mode : Set :=
   | Checked : mode
   | Unchecked : mode.
@@ -77,20 +76,15 @@ Inductive mode : Set :=
 
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
-  
+Inductive bound : Set :=
+  |BVar : var -> bound
+  |BZ : Z -> bound.
 
 Inductive type : Set :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-  | TArray : Z -> Z -> type -> type
-  | TVar : var -> type
-  | TVarArray : var -> var -> type -> type.
-
-Inductive kind : Set :=
-  | KType : type -> kind
-  | KArray : Z -> Z -> type -> type -> kind.
-
+  | TArray : bound -> bound -> type -> type.
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
@@ -132,8 +126,8 @@ Inductive type_wf (D : structdef) : type -> Prop :=
       word_type t ->
       type_wf D t ->
       type_wf D (TArray l h t)
-  | WFTVar : forall x,
-      type_wf D (TVar x)
+(*  | WFTVar : forall x,
+      type_wf D (TVar x) *)
   | WFTVarArray : forall x y t,
       word_type t ->
       type_wf D t ->
@@ -153,9 +147,9 @@ Definition structdef_wf (D : structdef) : Prop :=
 Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t,
     subtype D t t
-  | SubTySubsume : forall l h l' h' t m,
+(*  | SubTySubsume : forall l h l' h' t m,
     l' >= l /\ h' <= h ->
-    subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+    subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t)) *)
   | SubTyStructArrayField : forall (T : struct) (fs : fields) m,
     StructDef.MapsTo T fs D ->
     Some TNat = (Fields.find 0%nat fs) ->
@@ -314,7 +308,10 @@ Definition allocate_meta (D : structdef) (w : type)
     fs <- StructDef.find T D ;;
     ret (0, List.map snd (Fields.elements fs))
   | TArray l h T =>
-    Some (l, Zreplicate (h - l) T)
+    match (l, h) with
+    |(BZ l', BZ h') => Some (l', Zreplicate (h' - l') T)
+    |_ => Some (0, [w])
+    end
   | _ => Some (0, [w])
   end.
 
@@ -524,9 +521,14 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
         H (RExpr (ELit n0 t0))
   | SMalloc : forall H w H' n1,
       allocate D H w = Some (n1, H') ->
+      (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
       step D
         H (EMalloc w)
         H' (RExpr (ELit n1 (TPtr Checked w)))
+  | SMallocNull : forall H w H' n1
+    step D
+      H (EMalloc w)
+      H' RBounds
   | SLet : forall H x n t e,
       step D
         H (ELet x (ELit n t) e)
@@ -710,10 +712,6 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
   | TyVar : forall env m x t,
       Env.MapsTo x t env ->
       well_typed env m (EVar x) t
-  | TyTyVar : forall env m e x t,
-      Env.MapsTo x t env ->
-      well_typed env m e t ->
-      well_typed env m e (TVar x)
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
       well_typed (Env.add x t1 env) m e2 t ->
@@ -729,7 +727,6 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       well_typed env m e2 TNat ->
       well_typed env m (EPlus e1 e2) TNat
   | TyMalloc : forall env m w,
-      (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
       well_typed env m (EMalloc w) (TPtr Checked w)
   | TyUnchecked : forall env m e t,
       well_typed env Unchecked e t ->
@@ -3189,7 +3186,7 @@ induction H0.
                 
 
           
-Admitted.*)
+Admitted.
 
 Lemma scope_extra :
   forall D H n1 n2 t1 t2 s,
@@ -3198,7 +3195,7 @@ Lemma scope_extra :
     @well_typed_lit D H s n2 t2.
 
 
-
+*)
 Lemma scope_strengthening :
   forall D H n tn s,
     @well_typed_lit D H s n tn ->
