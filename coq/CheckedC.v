@@ -116,22 +116,17 @@ Module StructDef := Map.Make Nat_as_OT.
 Definition structdef := StructDef.t fields.
 
 
+
 Inductive type_wf (D : structdef) : type -> Prop :=
   | WFTNat : type_wf D TNat
   | WFTPtr : forall m w, type_wf D (TPtr m w)
   | WFTStruct : forall T,
-      (exists (fs : fields), StructDef.MapsTo T fs D) ->
+      (exists (fs : fields), StructDef.MapsTo T fs D /\ fs <> (Fields.empty type)) ->
       type_wf D (TStruct T)
   | WFArray : forall l h t,
       word_type t ->
       type_wf D t ->
-      type_wf D (TArray l h t)
-(*  | WFTVar : forall x,
-      type_wf D (TVar x) *)
-  | WFTVarArray : forall x y t,
-      word_type t ->
-      type_wf D t ->
-      type_wf D (TArray x y t).
+      type_wf D (TArray l h t).
 
 Definition fields_wf (D : structdef) (fs : fields) : Prop :=
   forall f t,
@@ -147,9 +142,9 @@ Definition structdef_wf (D : structdef) : Prop :=
 Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t,
     subtype D t t
-(*  | SubTySubsume : forall l h l' h' t m,
+  | SubTySubsume : forall l h l' h' t m,
     l' >= l /\ h' <= h ->
-    subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t)) *)
+    subtype D (TPtr m (TArray (BZ l) (BZ h) t)) (TPtr m (TArray (BZ l') (BZ h') t)) 
   | SubTyStructArrayField : forall (T : struct) (fs : fields) m,
     StructDef.MapsTo T fs D ->
     Some TNat = (Fields.find 0%nat fs) ->
@@ -226,19 +221,26 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
    In a let, if the bound variable is the same as the one we're substituting,
    then we don't substitute under the lambda. 
  *)
-Fixpoint subst (x : var) (v : expression) (e : expression) : expression :=
+Fixpoint subst (x : var) (v : Z) (t : type) (e : expression) : expression :=
   match e with
   | ELit _ _ => e
-  | EVar y => if var_eq_dec x y then v else e
+  | EVar y => if var_eq_dec x y then (ELit v t) else e
   | ELet x' e1 e2 =>
-    if var_eq_dec x x' then ELet x' (subst x v e1) e2 else ELet x' (subst x v e1) (subst x v e2)
+    if var_eq_dec x x' then ELet x' (subst x v t e1) e2 else ELet x' (subst x v t e1) (subst x v t e2)
+  | EMalloc (TArray (BVar y) (BVar z) t) =>
+    EMalloc (TArray (if var_eq_dec y x then (BZ v) else BVar y) 
+            (if var_eq_dec z x then (BZ v) else BVar z) t)
+  | EMalloc (TArray (BZ h) (BVar l) t) => 
+    if var_eq_dec x l then EMalloc (TArray (BZ h) (BZ v) t) else e
+  | EMalloc (TArray (BVar h) (BZ l) t) => 
+    if var_eq_dec x h then EMalloc (TArray (BZ v) (BZ v) t) else e
   | EMalloc _ => e
-  | ECast t e' => ECast t (subst x v e')
-  | EPlus e1 e2 => EPlus (subst x v e1) (subst x v e2)
-  | EFieldAddr e' f => EFieldAddr (subst x v e') f
-  | EDeref e' => EDeref (subst x v e')
-  | EAssign e1 e2 => EAssign (subst x v e1) (subst x v e2)
-  | EUnchecked e' => EUnchecked (subst x v e')
+  | ECast t e' => ECast t (subst x v t e')
+  | EPlus e1 e2 => EPlus (subst x v t e1) (subst x v t e2)
+  | EFieldAddr e' f => EFieldAddr (subst x v t e') f
+  | EDeref e' => EDeref (subst x v t e')
+  | EAssign e1 e2 => EAssign (subst x v t e1) (subst x v t e2)
+  | EUnchecked e' => EUnchecked (subst x v t e')
   end.
 
 (** Values, [v], are expressions [e] which are literals. *)
@@ -310,7 +312,7 @@ Definition allocate_meta (D : structdef) (w : type)
   | TArray l h T =>
     match (l, h) with
     |(BZ l', BZ h') => Some (l', Zreplicate (h' - l') T)
-    |_ => Some (0, [w])
+    |_ => None
     end
   | _ => Some (0, [w])
   end.
@@ -334,6 +336,7 @@ Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
   let H_size := Z.of_nat(Heap.cardinal H) in
   let base   := H_size + 1 in
   match allocate_meta D w with
+  | Some (_, []) => None
   | Some (0, am) => 
      let (_, H') := List.fold_left
                   (fun (acc : Z * heap) (t : type) =>
@@ -449,13 +452,18 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
   | SPlusChecked : forall H n1 h l t n2,
       n1 > 0 ->
       step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
+        H (EPlus (ELit n1 (TPtr Checked (TArray (BZ l) (BZ h) t))) (ELit n2 TNat))
+        H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (BZ (l - n2)) (BZ (h - n2)) t))))
   | SPlus : forall H n1 t1 n2 t2,
       (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
         H (EPlus (ELit n1 t1) (ELit n2 t2))
         H (RExpr (ELit (n1 + n2) t1))
+  | SPlusBounds : forall H n1 h l t n2,
+      (exists h', h = (BVar h') \/ exists l', l = (BVar l')) ->
+      step D
+        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        H RBounds
   | SPlusNull : forall H n1 l h t n2,
       n1 <= 0 ->
       step D
@@ -468,25 +476,25 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
   | SDeref : forall H n n1 t1 t,
       (expr_wf D (ELit n1 t1)) ->
       Heap.MapsTo n (n1, t1) H ->
-      (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) ->
+      (forall l h t', t = TPtr Checked (TArray (BZ l) (BZ h) t') -> h > 0 /\ l <= 0) ->
       step D
         H (EDeref (ELit n t))
         H (RExpr (ELit n1 t1))
   | SDerefHighOOB : forall H n t t1 l h,
       h <= 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+      t = TPtr Checked (TArray l (BZ h) t1) ->
       step D
         H (EDeref (ELit n t))
         H RBounds
   | SDerefLowOOB : forall H n t t1 l h,
       l > 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+      t = TPtr Checked (TArray (BZ l) h t1) ->
       step D
         H (EDeref (ELit n t))
         H RBounds
   | SAssign : forall H n t n1 t1 H',
       Heap.In n H ->
-      (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) -> 
+      (forall l h t', t = TPtr Checked (TArray (BZ l) (BZ h) t') -> h > 0 /\ l <= 0) -> 
       H' = Heap.add n (n1, t1) H ->
       step D
         H  (EAssign (ELit n t) (ELit n1 t1))
@@ -521,31 +529,33 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
         H (RExpr (ELit n0 t0))
   | SMalloc : forall H w H' n1,
       allocate D H w = Some (n1, H') ->
-      (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
+      (forall x y t, w = TArray x y t -> exists l h, x = (BZ l) /\ y = BZ h /\ l = 0 /\ h > 0) ->
+      (forall T, w = (TStruct T) -> exists fs, StructDef.MapsTo T fs D /\ fs <> (Fields.empty type)) ->
       step D
         H (EMalloc w)
         H' (RExpr (ELit n1 (TPtr Checked w)))
-  | SMallocNull : forall H w H' n1
+  | SMallocNull : forall H w H',
+    allocate D H w = None ->
     step D
       H (EMalloc w)
       H' RBounds
   | SLet : forall H x n t e,
       step D
         H (ELet x (ELit n t) e)
-        H (RExpr (subst x (ELit n t) e))
+        H (RExpr (subst x n t e))
   | SUnchecked : forall H n t,
       step D
         H (EUnchecked (ELit n t))
         H (RExpr (ELit n t))
   | SAssignHighOOB : forall H n t n1 t1 l h,
       h <= 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+      t = TPtr Checked (TArray l (BZ h) t1) ->
       step D
         H (EAssign (ELit n t) (ELit n1 t1))
         H RBounds
   | SAssignLowOOB : forall H n t n1 t1 l h,
       l > 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+      t = TPtr Checked (TArray (BZ l) h t1) ->
       step D
         H (EAssign (ELit n t) (ELit n1 t1))
         H RBounds
@@ -560,12 +570,12 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       t = TPtr Checked w ->
       step D
         H (EAssign (ELit n1 t) (ELit n t'))
-        H RNull
+        H RNull.
   (*| SPlusHigh : forall H n1 t1 n2 t2 t
     (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
         H (TPtr Checked (TArray l (EPlus (ELit n1 t1) (ELit n2 t2)) t))
-        H (RExpr (ELit (n1 + n2) t1))*).
+        H (RExpr (ELit (n1 + n2) t1))*)
 
 Hint Constructors step.
 
@@ -774,7 +784,7 @@ exists t', w = (TPtr m t').
 Proof.
   intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
-  - intros. exists (TArray l h t).
+  - intros. exists (TArray (BZ l) (BZ h) t).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
@@ -795,7 +805,7 @@ exists t', w = (TPtr m t').
 Proof.
  intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
-  - intros. exists (TArray l' h' t).
+  - intros. exists (TArray (BZ l') (BZ h') t).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
@@ -896,27 +906,50 @@ Require Import Omega.
 (*changed THIS!! REMEMBER*)
 
 Open Scope Z.
+(*This is changed, possibly wrong*)
 Lemma wf_implies_allocate_meta :
   forall (D : structdef) (w : type),
-    (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
+    (forall x y t, w = TArray x y t -> exists l h, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0) ->
     type_wf D w -> exists b allocs, allocate_meta D w = Some (b, allocs).
 Proof.
   intros D w HL HT.
   destruct w; simpl in *; eauto.
   - inv HT. destruct H0.
+    destruct H.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
+  - destruct (HL b b0 w). reflexivity.
+    destruct H as [? [? ?]].
+    rewrite H. destruct H0 as [? [? ?]].
+    rewrite H0. eauto.
 Qed.
+
+Lemma obvious_list_aux : forall (A : Type) (l : list A),
+(length l) = 0%nat -> 
+l = nil.
+Proof.
+  intros. destruct l.
+  - reflexivity.
+  - inv H.
+Qed.
+
+(*This is obvious*)
+Lemma fields_implies_length : forall fs x t,
+Some t = Fields.find (elt:=type) x fs ->
+exists h t, (Fields.elements (elt:=type) fs) = h::t.
+Admitted.
 
 Lemma wf_implies_allocate :
   forall (D : structdef) (w : type) (H : heap),
-    (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
+    (forall x y t, w = TArray x y t -> exists l h, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0) ->
+    (forall T fs, w = (TStruct T) /\ StructDef.MapsTo T fs D -> exists h t, (Fields.elements (elt:=type) fs) = h::t) ->
     type_wf D w -> exists n H', allocate D H w = Some (n, H').
 Proof.
-  intros D w H HL HT.
+  intros D w H HB HL HT.
   eapply wf_implies_allocate_meta in HT; eauto.
   destruct HT as [l [ts HT]]. 
+
   unfold allocate. unfold allocate_meta in *.
   rewrite HT.
 
@@ -929,8 +962,34 @@ Proof.
   destruct w eqn:Hw; inv HT; simpl in *; eauto.
 
   - destruct (StructDef.find s D) eqn:HFind; inv H1; eauto.
-  - edestruct HL; eauto.
-    subst; eauto.
+    exists (Z.of_nat (Heap.cardinal (elt:=Z * type) H) + 1).
+    exists h. 
+    assert (StructDef.MapsTo s f D) by (eapply StructDef.find_2; eauto).
+    destruct (HL s f). split; eauto.
+    destruct H1. rewrite H1. eauto.
+  - destruct b; destruct b0; inv H1.
+    destruct (HB (BZ l) (BZ z1) t); eauto.
+    destruct H0.
+    destruct H0 as [? [? [? ?]]].
+    subst; eauto. inv H0. inv H1.
+    assert (Hpos : exists p, x0 = Z.pos p).
+    {
+      destruct x0; inv H3.
+      exists p; reflexivity.
+    }
+    destruct Hpos as [p Hpos].
+    assert (Hnat : exists n, (Pos.to_nat p) = S n).
+    {
+      destruct (Pos.to_nat p) eqn:N.
+      + zify. omega.
+      + exists n. reflexivity.
+    }
+    destruct Hnat as [n Hnat].
+    assert (Hz : x0 - 0 = x0) by omega.
+    rewrite Hz. rewrite Hpos. simpl.
+    rewrite Hnat. simpl.
+    exists (Z.of_nat (Heap.cardinal (elt:=Z * type) H) + 1).
+    exists h; reflexivity.
 Qed.
 
 Definition unchecked (m : mode) (e : expression) : Prop :=
@@ -1041,22 +1100,7 @@ Proof.
   intros. eapply map_length.
 Qed.
 
-Lemma obvious_list_aux : forall (A : Type) (l : list A),
-(length l) = 0%nat -> 
-l = nil.
-Proof.
-  intros. destruct l.
-  - reflexivity.
-  - inv H.
-Qed.
-
-(*These are obvious*)
-Lemma fields_implies_length : forall fs t,
-Some t = Fields.find (elt:=type) 0%nat fs ->
-((length (Fields.elements (elt:=type) fs) > 0))%nat.
-Admitted.
-
-
+(*obvious*)
 Lemma element_implies_element : forall T f D x,
 (StructDef.MapsTo T f D) ->
 Some x = Fields.find (elt:=type) 0%nat f ->
@@ -1090,10 +1134,26 @@ Proof.
   - inv Heqp1. inv Heqp2. 
     assert (fs = fs0) by (eapply StructDefFacts.MapsTo_fun; eauto). 
     eapply fields_implies_length in H1. rewrite H2.
-    zify. eauto. rewrite map_length. assumption.
+    zify. eauto. rewrite map_length.
+    destruct H1 as [h [t H1]]. rewrite H1 in *.
+    simpl. zify; omega.
 Qed.
 
+Lemma fields_full : forall x,
+ x <> Fields.empty type ->
+ exists h t, (Fields.elements (elt:=type) x) = h::t.
+Admitted. 
 
+Lemma valid_bounds : forall b ts D l h t,
+Some (b, ts) = allocate_meta D (TArray l h t) ->
+exists l' h', l = (BZ l') /\ h = (BZ h').
+Proof.
+  intros. inv H.
+  destruct l; inv H1.
+  destruct h; inv H0.
+  exists z. exists z0.
+  eauto.
+Qed.
 
 Lemma progress : forall D H m e t,
     structdef_wf D ->
@@ -1228,10 +1288,98 @@ Proof with eauto 20 with Progress.
   (* Case: TyMalloc *)
   - (* `EMalloc w` isn't a value *)
     right.
-    (* Allocation always succeeds, according to SMalloc *)
+    (* we can reduce*)
     left.
-    (* LEO: Where is H1 created from? Match goal style for maintainability *)
-    destruct (wf_implies_allocate D w H H0 H2) as [ n [ H' HAlloc]]...
+    destruct w.
+      + eapply step_implies_reduces; eapply SMalloc; unfold allocate;
+        simpl; eauto; intros; eauto; inv H0.
+      + eapply step_implies_reduces; eapply SMalloc; unfold allocate;
+        simpl; eauto; intros; eauto; inv H0.
+      + assert (HL : forall (x y : bound) (t : type),
+TStruct s = TArray x y t ->
+exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
+        {
+         intros. inv H0.
+        }
+        assert (HS : forall T fs, (TStruct s) = (TStruct T) /\ StructDef.MapsTo T fs D -> exists h t, (Fields.elements (elt:=type) fs) = h::t).
+        {
+          intros. inv H1. destruct H3 as [x [Hmap Hf]].
+          destruct H0. inv H0. Search StructDef.MapsTo.
+          assert (fs = x) by eapply (StructDefFacts.MapsTo_fun H1 Hmap).
+          rewrite H0 in *.
+          eapply (fields_full x Hf).
+        } 
+        destruct (wf_implies_allocate D (TStruct s) H HL HS H1) as [ n [ H' HAlloc]]...
+        eapply step_implies_reduces; eapply SMalloc; eauto.
+        intros. inv H0. inv H1.
+        destruct H2 as [fs [? ?]]. exists fs. eauto.
+      + destruct b; destruct b0.
+        ++ eapply step_implies_reduces; eapply SMallocNull.
+           unfold allocate. unfold allocate_meta. reflexivity.  
+        ++ eapply step_implies_reduces; eapply SMallocNull.
+           unfold allocate. unfold allocate_meta. reflexivity. 
+        ++ eapply step_implies_reduces; eapply SMallocNull.
+           unfold allocate. unfold allocate_meta. reflexivity. 
+        ++ destruct z; destruct z0.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta. eauto.
+           -- assert (HL : forall (x y : bound) (t : type),
+              (TArray (BZ 0) (BZ (Z.pos p)) w) = TArray x y t -> exists l h, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
+              {
+               intros. exists 0. exists (Z.pos p). inv H0. (repeat split; (try reflexivity)); zify; omega.
+              }
+              assert (HS : forall T fs, ((TArray (BZ 0) (BZ (Z.pos p)) w)) = (TStruct T) /\ StructDef.MapsTo T fs D -> exists h t, (Fields.elements (elt:=type) fs) = h::t).
+              {
+                intros. destruct H0. inv H0.
+              } 
+              destruct (wf_implies_allocate D (TArray (BZ 0) (BZ (Z.pos p)) w) H HL HS H1) as [ n [ H' HAlloc]]...
+              eapply step_implies_reduces; eapply SMalloc; eauto.
+              intros. inv H0.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta. eauto.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta. eauto.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta.
+              (destruct (Z.pos p0 - Z.pos p)).
+                ** simpl. eauto.
+                ** simpl. assert (exists n, Pos.to_nat p1 = S n) by eapply pos_succ.
+                   destruct H0 as [n H0]. rewrite H0. simpl. reflexivity.
+                ** simpl. eauto.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta. eauto.
+           -- eapply step_implies_reduces. eapply SMallocNull.
+              unfold allocate. unfold allocate_meta. eauto.
+              assert (exists p0, 0 - Z.neg p = Z.pos p0).
+              { 
+                destruct (0 - Z.neg p)eqn:H0.
+                ** inv H0. 
+                ** exists p0; reflexivity.
+                ** inv H0.
+              }
+              destruct H0. rewrite H0.
+              simpl. assert (exists n, Pos.to_nat x = S n) by eapply pos_succ.
+              destruct H2. rewrite H2. simpl. reflexivity.
+            -- eapply step_implies_reduces. eapply SMallocNull.
+               unfold allocate. unfold allocate_meta. eauto.
+               assert (exists p1, Z.pos p0 - Z.neg p = Z.pos p1).
+              { 
+                destruct (Z.pos p0 - Z.neg p)eqn:H0.
+                ** inv H0. 
+                ** exists p1; reflexivity.
+                ** inv H0.
+              }
+              destruct H0. rewrite H0.
+              simpl. assert (exists n, Pos.to_nat x = S n) by eapply pos_succ.
+              destruct H2. rewrite H2. simpl. reflexivity.
+            -- eapply step_implies_reduces. eapply SMallocNull.
+               unfold allocate. unfold allocate_meta. eauto.
+               destruct (Z.neg p0 - Z.neg p)eqn:H0.
+               ** simpl. eauto.
+               ** simpl. 
+                  assert (exists n, Pos.to_nat p1 = S n) by eapply pos_succ.
+                  destruct H2. rewrite H2. simpl. eauto.
+               ** simpl. eauto.
   (* Case: TyUnchecked *)
   - (* `EUnchecked e` isn't a value *)
     right.
@@ -1409,7 +1557,7 @@ Proof with eauto 20 with Progress.
         {
           rewrite Ht in HSubType. inv HSubType.
           exists l; exists h; reflexivity.
-          exists l0; exists h0; reflexivity.
+          exists (BZ l0); exists (BZ h0); reflexivity.
         }
         clear Ht HSubType l h t'.
         destruct HArr as [l [h HArr]].
@@ -1432,6 +1580,10 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We proceed by case analysis on 'h > 0' -- the size of the array *)
             destruct H2 as [Hyp2 Hyp3]; subst.
+            destruct (valid_bounds b ts D l h t H4) as [l' [h' [Hl' Hh']]].
+            rewrite Hl' in *. rewrite Hh' in *.
+            clear Hl' Hh' l h. remember l' as l. remember h' as h.
+            clear Heql Heqh l' h'.
             (* should this also be on ' h > 0' instead? DP*)
             destruct (Z_gt_dec h 0) as [ Hneq0 | Hnneq0 ].
             (* Case: h > 0 *)
@@ -1504,7 +1656,7 @@ Proof with eauto 20 with Progress.
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
       inv HSubType. exists l; exists h; eauto.
-      exists l0; exists h0; eauto.
+      exists (BZ l0); exists (BZ h0); eauto.
     }
     destruct H0 as [l0 [h0 H0]].
     rewrite H0 in *.
@@ -1525,6 +1677,14 @@ Proof with eauto 20 with Progress.
         exists H.
         { destruct (Z_gt_dec n1 0).
           - (* n1 > 0 *)
+            destruct l; destruct h.
+              ++ exists RBounds. 
+                 subst.
+                 rewrite HCtx.
+                 eapply RSHaltBounds; eauto.
+                 inv HTy2. eapply SPlusBounds.
+                 left.
+
             exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))).
             ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))
                 (in_hole (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))) (CDeref CHole)).
