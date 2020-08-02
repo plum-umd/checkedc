@@ -1977,12 +1977,20 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
               rewrite HCtx; left; eexists; eexists; eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
-          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
-              * eapply RSExp. eapply SPlusChecked. omega. eauto.
-              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
-          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
-              * eapply RSExp. eapply SPlusChecked. omega. eauto.
-              * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
+          - destruct (Z_gt_dec n 0).
+              * destruct l; destruct h; rewrite HCtx; left; do 3 eexists.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSExp. eapply SPlusChecked. omega. eauto.
+              * rewrite HCtx; left; do 3 eexists. eapply RSHaltNull. eapply SPlusNull. omega. eauto.
+          -  destruct (Z_gt_dec n 0).
+              * destruct l; destruct h; rewrite HCtx; left; do 3 eexists.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSExp. eapply SPlusChecked. omega. eauto.
+              * rewrite HCtx; left; do 3 eexists. eapply RSHaltNull. eapply SPlusNull. omega. eauto.
         }
       * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -1991,8 +1999,8 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
     + destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ].
       inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))...
     + destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
-      ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))...
-Qed.
+      ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))... 
+Admitted.
 
 
 (* ... for Preservation *)
