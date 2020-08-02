@@ -559,6 +559,12 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       step D
         H (EAssign (ELit n t) (ELit n1 t1))
         H RBounds
+  | SAssignBounds : forall H t t1 n n1 t' l h,
+      t = TPtr Checked (TArray l h t1) ->
+      (exists h', h = (BVar h') \/ exists l', l = (BVar l')) ->
+      step D
+        H (EAssign (ELit n1 t) (ELit n t'))
+        H RBounds
   | SDerefNull : forall H t n w,
       n <= 0 ->
       t = TPtr Checked w ->
@@ -1683,15 +1689,26 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
                  rewrite HCtx.
                  eapply RSHaltBounds; eauto.
                  inv HTy2. eapply SPlusBounds.
-                 left.
-
-            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))).
-            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))))
-                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (l - n) (h - n) t))) (CDeref CHole)).
-            rewrite HCtx.
-            rewrite HCtx0.
-            inv HTy2.
-            eapply RSExp; eauto.
+                 exists v0. left; eauto.
+              ++ exists RBounds. 
+                 subst.
+                 rewrite HCtx.
+                 eapply RSHaltBounds; eauto.
+                 inv HTy2. eapply SPlusBounds.
+                 exists v. right; eauto.
+              ++ exists RBounds. 
+                 subst.
+                 rewrite HCtx.
+                 eapply RSHaltBounds; eauto.
+                 inv HTy2. eapply SPlusBounds.
+                 exists v. left; eauto.
+              ++ exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (BZ (z - n)) (BZ (z0 - n)) t))))).
+                 ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (BZ (z - n)) (BZ (z0 - n)) t))))
+                     (in_hole (ELit (n1 + n) (TPtr Checked (TArray (BZ (z - n)) (BZ (z0 - n)) t))) (CDeref CHole)).
+                 rewrite HCtx.
+                 rewrite HCtx0.
+                 inv HTy2.
+                 eapply RSExp; eauto.
           - (* n1 <= 0 *)
             exists RNull.
             subst.
@@ -1784,7 +1801,9 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
                    rewrite map_length. apply find_implies_mapsto in Hmap.
                    assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
                    rewrite H1 in *.
-                   assert (((length (Fields.elements (elt:=type) fs)) > 0)%nat) by (eapply fields_implies_length; eauto).
+                   assert (exists h t, (Fields.elements (elt:=type) fs) = h::t) by (eapply fields_implies_length; eauto).
+                   destruct H3 as [h1 [t H3]]. rewrite H3.
+                   simpl.
                    zify; omega.
               ++ inv HSubType; inv H0.
           - inv HTy1; eauto.
@@ -1798,40 +1817,50 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               assert (exists l0 h0, w = (TPtr Checked (TArray l0 h0 t))).
               {
                 inv HSubType. exists l; exists h; eauto.
-                exists l0; exists h0; eauto.
+                exists (BZ l0); exists (BZ h0); eauto.
               }
               clear HSubType l h. 
               destruct H0 as [l [h H0]].
               rewrite H0 in *.
-              clear H0. 
-              destruct (Z_gt_dec h 0).
-              * (* h > 0 - Assign  *)
-                destruct (Z_gt_dec l 0).
-                { (* l > 0 *)
-                eapply step_implies_reduces.
-                eapply SAssignLowOOB; eauto... inv HTy2. eauto. }
-                { (* l <= 0 *)
-                  eapply step_implies_reduces.
-                  eapply SAssignNull; eauto. omega.
-                  
-                }
-              * (* h <= 0 *)
-                eapply step_implies_reduces.
-                eapply SAssignHighOOB; eauto... inv HTy2. eauto.
+              clear H0.
+              destruct l; destruct h.
+              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
+              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
+              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
+              ++ remember z as l. remember z0 as h. clear Heqh Heql z z0.
+                 destruct (Z_gt_dec h 0).
+                 * (* h > 0 - Assign  *)
+                   destruct (Z_gt_dec l 0).
+                   { (* l > 0 *)
+                   eapply step_implies_reduces.
+                   eapply SAssignLowOOB; eauto... inv HTy2. eauto. }
+                   { (* l <= 0 *)
+                     eapply step_implies_reduces.
+                     eapply SAssignNull; eauto. omega.
+                    
+                   }
+                 * (* h <= 0 *)
+                   eapply step_implies_reduces.
+                   eapply SAssignHighOOB; eauto... inv HTy2. eauto.
             + solve_empty_scope.
             + left.
               destruct Hw as [? [? ?]]; subst.
               assert (exists l0 h0, w0 = (TArray l0 h0 t)).
               {
                 inv HSubType. exists l; exists h; eauto.
-                exists l0; exists h0; eauto.
+                exists (BZ l0); exists (BZ h0); eauto.
               }
               clear HSubType l h. 
               destruct H2 as [l [h H2]].
               rewrite H2 in *.
               clear H2.
               destruct (Z_gt_dec n1' 0).
-                ++ destruct (Z_gt_dec h 0).
+              ++ destruct h; destruct l.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** remember z0 as l; remember z as h; clear Heql Heqh z z0.
+                    destruct (Z_gt_dec h 0).
                     * (* h > 0 - Assign  *)
                       destruct (Z_gt_dec l 0).
                       { (* l > 0 *)
@@ -1862,19 +1891,24 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
                     * (* h <= 0 *)
                       eapply step_implies_reduces.
                       eapply SAssignHighOOB; eauto... inv HTy2. eauto.
-              ++ destruct (Z_gt_dec h 0).
-                 * (* h > 0 - Assign  *)
-                   destruct (Z_gt_dec l 0).
-                   { (* l > 0 *)
-                   eapply step_implies_reduces.
-                   eapply SAssignLowOOB; eauto... inv HTy2. eauto. }
-                   { (* l <= 0 *)
-                     eapply step_implies_reduces.   
-                     eapply SAssignNull; eauto.
-                   }
-                 * (* h <= 0 *)
-                   eapply step_implies_reduces.
-                   eapply SAssignHighOOB; eauto... inv HTy2. eauto.
+              ++ destruct h; destruct l.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** remember z0 as l; remember z as h; clear Heql Heqh z z0.
+                    destruct (Z_gt_dec h 0).
+                    * (* h > 0 - Assign  *)
+                      destruct (Z_gt_dec l 0).
+                      { (* l > 0 *)
+                      eapply step_implies_reduces.
+                      eapply SAssignLowOOB; eauto... inv HTy2. eauto. }
+                      { (* l <= 0 *)
+                        eapply step_implies_reduces.   
+                        eapply SAssignNull; eauto.
+                      }
+                    * (* h <= 0 *)
+                      eapply step_implies_reduces.
+                      eapply SAssignHighOOB; eauto... inv HTy2. eauto.
         } 
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -1897,7 +1931,7 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
       inv HSubType. exists l; exists h; eauto.
-      exists l0; exists h0; eauto.
+      exists (BZ l0); exists (BZ h0); eauto.
     }
     destruct H0 as [l0 [h0 H0]].
     rewrite H0 in *.
