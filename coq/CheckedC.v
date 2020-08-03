@@ -10,12 +10,9 @@ From CHKC Require Import Tactics ListUtil Map.
     and <<z>> are often used to represent the syntactic class of program variables. It is
     understood that wherever these metavariables appear they indicate an implicit universal
     quantification over all members of the syntactic class they represent. In Coq, however,
-
-
     we have no such issue -- all quantification must be made explicit. However, we must still
     grapple with the hardest problem in computer science: naming our quantified variables.
     To ameliorate this problem, we maintain two stylistic invariants.
-
     - (1) Whenever a new piece of syntax is introduced we we will include, in parentheses,
           its associated metavariable. We will then use this as the naming convention for
           naming universally quantified variables in the future.
@@ -47,7 +44,6 @@ Definition struct := nat.
 Definition var_eq_dec := Nat.eq_dec.
 
 (** The Mode ([m]) is
-
 The [mode], indicated by metavariable [m], is either [Checked] or [Unchecked]. *)
 Inductive mode : Set :=
   | Checked : mode
@@ -56,24 +52,17 @@ Inductive mode : Set :=
 (** Types, <<w>>, are either a word type, [TNat, TPtr], a struct type, [TStruct],
     or an array type, [TArray]. Struct types must be annotated with a struct identifier.
     Array types are annotated with their lower-bound, upper-bound, and the (word) type of their elements.
-
     The metavariable, [w], was chosen to abbreviate "wide" or compound types.
-
     Notice that struct types can be self-referential. Furthermore, they are the only type
     which may be self-referential.
-
     Example:
-
     In
-
       struct foo {
         self^struct foo
       }
-
       let my_foo = malloc@struct foo in
       let my_foo_self = &my_foo->self in
       *my_foo_self = my_foo
-
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
 Inductive bound : Set :=
@@ -107,7 +96,6 @@ Module Fields := FMapList.Make Nat_as_OT.
 Definition fields := Fields.t type.
 
 (** Structdefs, [D], are a map of structures to fields.
-
     Structdefs also have a well-formedness predicate. This says that a structdef
     cannot reference structures that it does not define. *)
 
@@ -158,11 +146,9 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     from the type. Unchecked regions, [EUnchecked], are used to delimit code which may
     perform unsafe (as defined by the type system) operations. The rest of the language
     is standard.
-
     Expressions also have a well-formedness predicate, parameterized by a structdef. This
     says that any (word or compound) types cannot reference structures that are not defined
     by the structdef.
-
     Finally, we define a function [subst] over expressions which takes a variable, [x], an
     expression, [v], and an expression, [e], and returns [e] with [v] substituted for [x].
     Even though [v] can be an arbitrary expression, it is expected that callers will only
@@ -269,11 +255,9 @@ Hint Constructors literal.
     numbers paired with their type (same as [ELit] constructor).
     Addresses are offset by 1 -- looking up address 7 will translate
     to index 6 in the list.
-
     Heaps also have a well-formedness predicate, which says that
     all memory locations must be annotated with a well-formed word
     type.
-
     Finally, the only operation we can perform on a heap is allocation.
     This operation is defined by the partial function [allocate]. This
     function takes [D] a structdef, [H] a heap, and [w] a (compound) type.
@@ -363,7 +347,6 @@ Inductive result : Set :=
 
 (** Contexts, [E], are expressions with a hole in them. They are used in the standard way,
     for lifting a small-step reduction relation to compound expressions.
-
     We define two functions on contexts: [in_hole] and [mode_of]. The [in_hole] function takes a context,
     [E] and an expression [e] and produces an expression [e'] which is [E] with its hole filled by [e].
     The [mode_of] function takes a context, [E], and returns [m] (a mode) indicating whether the context has a
@@ -587,7 +570,6 @@ Hint Constructors step.
 
 (* TODO: say more *)
 (** The compatible closure of [H; e ~> H'; r], [H; e ->m H'; r].
-
     We also define a convenience predicate, [reduces H e], which holds
     when there's some [m], [H'], and [r] such that [H; e ->m H'; r]. *)
 
@@ -662,7 +644,6 @@ Hint Constructors well_typed_lit.
 (** In particular, the TyLitC case does not have an induction hypothesis.
     So, we prove an alternative induction principle which is almost identical but includes
     an induction hypothesis for the TyLitC case.
-
     TODO: write blog post about this *)
 
 Lemma well_typed_lit_ind' :
@@ -1320,14 +1301,14 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
         intros. inv H0. inv H1.
         destruct H2 as [fs [? ?]]. exists fs. eauto.
       + destruct b; destruct b0.
-        ++ eapply step_implies_reduces; eapply SMallocNull.
+        ++ eapply (step_implies_reduces D H (EMalloc (TArray (BVar v) (BVar v0) w)) H RBounds). eapply SMallocNull.
            unfold allocate. unfold allocate_meta. reflexivity.  
-        ++ eapply step_implies_reduces; eapply SMallocNull.
+        ++  eapply (step_implies_reduces D H (EMalloc (TArray (BVar v) (BZ z) w)) H RBounds); eapply SMallocNull.
            unfold allocate. unfold allocate_meta. reflexivity. 
-        ++ eapply step_implies_reduces; eapply SMallocNull.
+        ++  eapply (step_implies_reduces D H (EMalloc (TArray (BZ z) (BVar v) w)) H RBounds).  eapply SMallocNull.
            unfold allocate. unfold allocate_meta. reflexivity. 
         ++ destruct z; destruct z0.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ 0) (BZ 0) w)) H RBounds). eapply SMallocNull.
               unfold allocate. unfold allocate_meta. eauto.
            -- assert (HL : forall (x y : bound) (t : type),
               (TArray (BZ 0) (BZ (Z.pos p)) w) = TArray x y t -> exists l h, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
@@ -1341,20 +1322,20 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               destruct (wf_implies_allocate D (TArray (BZ 0) (BZ (Z.pos p)) w) H HL HS H1) as [ n [ H' HAlloc]]...
               eapply step_implies_reduces; eapply SMalloc; eauto.
               intros. inv H0.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ 0) (BZ (Z.neg p)) w)) H RBounds). eapply SMallocNull.
               unfold allocate. unfold allocate_meta. eauto.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.pos p)) (BZ 0) w)) H RBounds).  eapply SMallocNull.
               unfold allocate. unfold allocate_meta. eauto.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.pos p)) (BZ (Z.pos p0)) w)) H RBounds). eapply SMallocNull.
               unfold allocate. unfold allocate_meta.
               (destruct (Z.pos p0 - Z.pos p)).
                 ** simpl. eauto.
                 ** simpl. assert (exists n, Pos.to_nat p1 = S n) by eapply pos_succ.
                    destruct H0 as [n H0]. rewrite H0. simpl. reflexivity.
                 ** simpl. eauto.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.pos p)) (BZ (Z.neg p0)) w)) H RBounds). eapply SMallocNull.
               unfold allocate. unfold allocate_meta. eauto.
-           -- eapply step_implies_reduces. eapply SMallocNull.
+           -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.neg p)) (BZ 0) w)) H RBounds). eapply SMallocNull.
               unfold allocate. unfold allocate_meta. eauto.
               assert (exists p0, 0 - Z.neg p = Z.pos p0).
               { 
@@ -1366,7 +1347,7 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               destruct H0. rewrite H0.
               simpl. assert (exists n, Pos.to_nat x = S n) by eapply pos_succ.
               destruct H2. rewrite H2. simpl. reflexivity.
-            -- eapply step_implies_reduces. eapply SMallocNull.
+            -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.neg p)) (BZ (Z.pos p0)) w)) H RBounds). eapply SMallocNull.
                unfold allocate. unfold allocate_meta. eauto.
                assert (exists p1, Z.pos p0 - Z.neg p = Z.pos p1).
               { 
@@ -1378,7 +1359,7 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               destruct H0. rewrite H0.
               simpl. assert (exists n, Pos.to_nat x = S n) by eapply pos_succ.
               destruct H2. rewrite H2. simpl. reflexivity.
-            -- eapply step_implies_reduces. eapply SMallocNull.
+            -- eapply (step_implies_reduces D H (EMalloc (TArray (BZ (Z.neg p)) (BZ (Z.neg p0)) w)) H RBounds). eapply SMallocNull.
                unfold allocate. unfold allocate_meta. eauto.
                destruct (Z.neg p0 - Z.neg p)eqn:H0.
                ** simpl. eauto.
@@ -1824,9 +1805,9 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               rewrite H0 in *.
               clear H0.
               destruct l; destruct h.
-              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
-              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
-              ++ eapply step_implies_reduces; eapply SAssignBounds; eauto.
+              ++ eapply (step_implies_reduces D H (EAssign (ELit 0 (TPtr Checked (TArray (BVar v) (BVar v0) t))) (ELit n2' t2')) H RBounds). eapply SAssignBounds. eauto. exists v0. left. reflexivity.
+              ++ eapply (step_implies_reduces D H (EAssign (ELit 0 (TPtr Checked (TArray (BVar v) (BZ z) t))) (ELit n2' t2')) H RBounds).  eapply SAssignBounds. eauto. exists v. right. exists v; reflexivity.
+              ++  eapply (step_implies_reduces D H (EAssign (ELit 0 (TPtr Checked (TArray (BZ z) (BVar v) t))) (ELit n2' t2')) H RBounds). eapply SAssignBounds; eauto.
               ++ remember z as l. remember z0 as h. clear Heqh Heql z z0.
                  destruct (Z_gt_dec h 0).
                  * (* h > 0 - Assign  *)
@@ -1856,9 +1837,9 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               clear H2.
               destruct (Z_gt_dec n1' 0).
               ++ destruct h; destruct l.
-                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
-                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
-                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds. eauto. exists v. left; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds. eauto. exists v. left; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds. eauto. exists v. right; exists v; eauto.
                  ** remember z0 as l; remember z as h; clear Heql Heqh z z0.
                     destruct (Z_gt_dec h 0).
                     * (* h > 0 - Assign  *)
@@ -1892,9 +1873,9 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
                       eapply step_implies_reduces.
                       eapply SAssignHighOOB; eauto... inv HTy2. eauto.
               ++ destruct h; destruct l.
+                 ** eapply step_implies_reduces; eapply SAssignBounds. eauto. exists v. left. eauto.
                  ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
-                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
-                 ** eapply step_implies_reduces; eapply SAssignBounds; eauto.
+                 ** eapply step_implies_reduces; eapply SAssignBounds. eauto. exists v. right. exists v. eauto.
                  ** remember z0 as l; remember z as h; clear Heql Heqh z z0.
                     destruct (Z_gt_dec h 0).
                     * (* h > 0 - Assign  *)
@@ -1979,16 +1960,16 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
               * eapply RSHaltNull... eapply SPlusNull. omega.
           - destruct (Z_gt_dec n 0).
               * destruct l; destruct h; rewrite HCtx; left; do 3 eexists.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds.  eapply SPlusBounds. exists v0. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. exists v. right. exists v. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. exists v. eauto. eauto.
                 + eapply RSExp. eapply SPlusChecked. omega. eauto.
               * rewrite HCtx; left; do 3 eexists. eapply RSHaltNull. eapply SPlusNull. omega. eauto.
           -  destruct (Z_gt_dec n 0).
               * destruct l; destruct h; rewrite HCtx; left; do 3 eexists.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
-                + eapply RSHaltBounds. eapply SPlusBounds. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. exists v0. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. exists v. right. exists v. eauto. eauto.
+                + eapply RSHaltBounds. eapply SPlusBounds. exists v. eauto. eauto.
                 + eapply RSExp. eapply SPlusChecked. omega. eauto.
               * rewrite HCtx; left; do 3 eexists. eapply RSHaltNull. eapply SPlusNull. omega. eauto.
         }
@@ -2000,7 +1981,7 @@ exists l h : Z, x = BZ l /\ y = BZ h /\ l = 0 /\ h > 0).
       inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))...
     + destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
       ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))... 
-Admitted.
+Qed.
 
 
 (* ... for Preservation *)
@@ -2032,21 +2013,16 @@ Qed.
 
 
 (* This theorem will be useful for substitution.
-
    In particular, we can automate a lot of reasoning about environments by:
    (1) proving that equivalent environments preserve typing (this lemma)
    (2) registering environment equivalence in the Setoid framework (this makes proofs in (3) easier)
    (3) proving a number of lemmas about which environments are equivalent (such as shadowing above)
    (4) registering these lemmas in the proof automation (e.g. Hint Resolve env_shadow)
-
    Then when we have a typing context that looks like:
-
    H : (Env.add x0 t0 (Env.add x0 t1 env)) |- e : t
    ================================================
    (Env.add x0 t0 env) |- e : t
-
    we can solve it simply by eauto.
-
    during proof search, eauto should invoke equiv_env_wt which will leave a goal of
    (Env.add x0 t0 (Env.add x0 t1 env)) == (Env.add x0 t0) and then subsequently apply the
    shadowing lemma.
@@ -2198,12 +2174,11 @@ Create HintDb Preservation.
 
 Lemma substitution :
   forall D H env m x v e t1 t2,
-    literal v ->
-  @well_typed D H env m v t1 ->
+  @well_typed D H env m (ELit v t1) t1 ->
   @well_typed D H (Env.add x t1 env) m e t2 ->
-  @well_typed D H env m (subst x v e) t2.
+  @well_typed D H env m (subst x v t1 e) t2.
 Proof.
-  intros D H env m x v e t1 t2 Hvalue HWTv HWTe.
+  intros D H env m x v e t1 t2 HWTv HWTe.
   generalize dependent v.
   remember (Env.add x t1 env) as env'.
   assert (Eq: Env.Equal env' (Env.add x t1 env))
@@ -2227,8 +2202,7 @@ Proof.
       * {
           apply IHHWTe2; eauto.
           - apply env_neq_commute_eq; eauto.
-          - inv Hvalue as [n' t'].
-            inv HWTv. eapply TyLit; eauto.
+          - inv HWTv. eapply TyLit; eauto.
         } 
   - intros. subst. apply TyUnchecked. apply IHHWTe; eauto.
     inv Hvalue as [n' t'].
@@ -2260,7 +2234,6 @@ Proof.
   intros D H x T Contra.
   inversion Contra.
 Qed.
-
 Hint Resolve wf_empty_scope.
 Hint Resolve wf_empty_scope : Preservation.
  *)
@@ -2324,7 +2297,6 @@ Proof.
   apply HNotIn.
   eexists; eauto.
 Qed.
-
 Hint Resolve scope_wf_heap_weakening.
 *)
 Lemma cardinal_not_in :
@@ -3023,7 +2995,6 @@ Proof.
   - exists x0.
     eapply Heap.add_2; eauto.
 Qed.
-
 Hint Resolve scope_wf_heap_consistent_weakening.
  *)
      
@@ -3364,7 +3335,6 @@ induction H0.
                 }
                 admit.
              ++ split; eauto.
-
              (*++ split; eauto. 
                 assert (well_typed_lit D H
                (set_add eq_dec_nt (n, TPtr Checked (TArray l' h' w))
@@ -3386,17 +3356,13 @@ induction H0.
                 s)) x w). 
                { eapply scope_replacement; eauto. }*)
                 
-
           
 Admitted.
-
 Lemma scope_extra :
   forall D H n1 n2 t1 t2 s,
     @well_typed_lit D H (set_add eq_dec_nt (n1, t1) s) n2 t2  ->
      (n1, t1) <> (n2, t2) ->
     @well_typed_lit D H s n2 t2.
-
-
 *)
 Lemma scope_strengthening :
   forall D H n tn s,
@@ -3523,11 +3489,9 @@ Proof.
 Qed.
 
 (*
-
 Def: H' |- H iff for all i
   H(i) = n^T such that . |- n^T : T under H implies
   H'(i) = n'^T such that . |- n'^T : T under H'.
-
 Lemma PtrUpdA:
   Suppose H(i) = n^T and G |- n'^T' : T' under heap H.
   Then H' = H[i |--> k^T] implies that G,k^T |- n'^T' under heap H'
@@ -3594,9 +3558,6 @@ derivation of this, and let k^T' = H(n).
    k^T' = n^T: In this case we can simply reuse the derivation we were
    given, i.e., G |- n^T : T.
  H-PtrC: Holds by induction.
-
-
-
 Corollary PtrUpd:
   Suppose H(i) = n^T and G |- n'^T : T under heap H.
   Then H' = H[i |--> n'^T] implies that G |- n'^T under heap H'
@@ -3613,7 +3574,6 @@ Proof.
       n'+k != i. Then H'(n'+k) = H(n'+k) = n''^Tk.
         By Lemma A we have G |-m H(n'+k) : Tk for 0 <= k < j under H
         By PtrUpdA we have G, n'^(ptr^c W) |-m H'(n'+k) : Tk for 0 <= k < j under H'
-
  *)
 
 
