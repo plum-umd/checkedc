@@ -4,6 +4,7 @@ Require Import ExtLib.Structures.Monads.
 From CHKC Require Import Tactics ListUtil Map.
 
 (** * Document Conventions *)
+(*Test*)
 
 (** It is common when defining syntax for a language on paper to associate one or many
     _metavariables_ with each syntactic class. For example, the metavariables <<x>>, <<y>>,
@@ -85,6 +86,22 @@ Inductive type : Set :=
   | TArray : Z -> Z -> type -> type.
 
 
+Inductive stack :=
+ | Empty : stack
+ | Stack : type -> stack -> stack.
+
+Definition pop (s : stack) :=
+  match s with
+  | Empty => None
+  | Stack t s0 => Some t
+  end.
+
+
+Fixpoint lookup (v : var) (s : stack) :=
+  match v with
+  | O => pop s
+  | S n => lookup n s
+  end.
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
@@ -147,7 +164,6 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     StructDef.MapsTo T fs D ->
     Some TNat = (Fields.find 0%nat fs) ->
     subtype D (TPtr m (TStruct T)) (TPtr m TNat).
-
 
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
@@ -435,53 +451,53 @@ Qed.
 (* TODO: say more *)
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 
-Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
-  | SPlusChecked : forall H n1 h l t n2,
+Inductive step (D : structdef) : stack -> heap -> expression -> heap -> result -> Prop :=
+  | SPlusChecked : forall s  H n1 h l t n2,
       n1 > 0 ->
       step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
-  | SPlus : forall H n1 t1 n2 t2,
+        s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        s H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
+  | SPlus : forall s  H n1 t1 n2 t2,
       (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
-        H (EPlus (ELit n1 t1) (ELit n2 t2))
-        H (RExpr (ELit (n1 + n2) t1))
-  | SPlusNull : forall H n1 l h t n2,
+        s H (EPlus (ELit n1 t1) (ELit n2 t2))
+        s H (RExpr (ELit (n1 + n2) t1))
+  | SPlusNull : forall s H n1 l h t n2,
       n1 <= 0 ->
       step D
-        H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        H RNull
-  | SCast : forall H t n t',
+        s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+        s H RNull
+  | SCast : forall s H t n t',
       step D
-        H (ECast t (ELit n t'))
-        H (RExpr (ELit n t))
-  | SDeref : forall H n n1 t1 t,
+        s H (ECast t (ELit n t'))
+        s H (RExpr (ELit n t))
+  | SDeref : forall s H n n1 t1 t,
       (expr_wf D (ELit n1 t1)) ->
       Heap.MapsTo n (n1, t1) H ->
       (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) ->
       step D
-        H (EDeref (ELit n t))
-        H (RExpr (ELit n1 t1))
-  | SDerefHighOOB : forall H n t t1 l h,
+        s H (EDeref (ELit n t))
+        s H (RExpr (ELit n1 t1))
+  | SDerefHighOOB : forall s H n t t1 l h,
       h <= 0 ->
       t = TPtr Checked (TArray l h t1) ->
       step D
-        H (EDeref (ELit n t))
-        H RBounds
-  | SDerefLowOOB : forall H n t t1 l h,
+        s H (EDeref (ELit n t))
+        s H RBounds
+  | SDerefLowOOB : forall s H n t t1 l h,
       l > 0 ->
       t = TPtr Checked (TArray l h t1) ->
       step D
-        H (EDeref (ELit n t))
-        H RBounds
-  | SAssign : forall H n t n1 t1 H',
+        s H (EDeref (ELit n t))
+        s H RBounds
+  | SAssign : forall s H n t n1 t1 H',
       Heap.In n H ->
       (forall l h t', t = TPtr Checked (TArray l h t') -> h > 0 /\ l <= 0) -> 
       H' = Heap.add n (n1, t1) H ->
       step D
-        H  (EAssign (ELit n t) (ELit n1 t1))
-        H' (RExpr (ELit n1 t1))
-  | SFieldAddrChecked : forall H n t (fi : field) n0 t0 T fs i fi ti,
+        s H  (EAssign (ELit n t) (ELit n1 t1))
+        s H' (RExpr (ELit n1 t1))
+  | SFieldAddrChecked : forall s H n t (fi : field) n0 t0 T fs i fi ti,
       n > 0 ->
       t = TPtr Checked (TStruct T) ->
       StructDef.MapsTo T fs D ->
@@ -491,14 +507,14 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       t0 = TPtr Checked ti ->
       word_type ti ->
       step D
-        H (EFieldAddr (ELit n t) fi)
-        H (RExpr (ELit n0 t0))
-  | SFieldAddrNull : forall H (fi : field) n T,
+        s H (EFieldAddr (ELit n t) fi)
+        s H (RExpr (ELit n0 t0))
+  | SFieldAddrNull : forall s H (fi : field) n T,
       n <= 0 ->
       step D
-        H (EFieldAddr (ELit n (TPtr Checked (TStruct T))) fi)
-        H RNull
-  | SFieldAddr : forall H n t (fi : field) n0 t0 T fs i fi ti,
+        s H (EFieldAddr (ELit n (TPtr Checked (TStruct T))) fi)
+        s H RNull
+  | SFieldAddr : forall s H n t (fi : field) n0 t0 T fs i fi ti,
       t = TPtr Unchecked (TStruct T) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
@@ -507,45 +523,45 @@ Inductive step (D : structdef) : heap -> expression -> heap -> result -> Prop :=
       t0 = TPtr Unchecked ti ->
       word_type ti ->
       step D
-        H (EFieldAddr (ELit n t) fi)
-        H (RExpr (ELit n0 t0))
-  | SMalloc : forall H w H' n1,
+        s H (EFieldAddr (ELit n t) fi)
+        s H (RExpr (ELit n0 t0))
+  | SMalloc : forall s H w H' n1,
       allocate D H w = Some (n1, H') ->
       step D
-        H (EMalloc w)
-        H' (RExpr (ELit n1 (TPtr Checked w)))
-  | SLet : forall H x n t e,
+        s H (EMalloc w)
+        s H' (RExpr (ELit n1 (TPtr Checked w)))
+  | SLet : forall s H x n t e,
       step D
-        H (ELet x (ELit n t) e)
-        H (RExpr (subst x (ELit n t) e))
-  | SUnchecked : forall H n t,
+        s H (ELet x (ELit n t) e)
+        (Stack t s) H (RExpr  e)
+  | SUnchecked : forall s H n t,
       step D
-        H (EUnchecked (ELit n t))
-        H (RExpr (ELit n t))
-  | SAssignHighOOB : forall H n t n1 t1 l h,
+        s H (EUnchecked (ELit n t))
+        s H (RExpr (ELit n t))
+  | SAssignHighOOB : forall s H n t n1 t1 l h,
       h <= 0 ->
       t = TPtr Checked (TArray l h t1) ->
       step D
-        H (EAssign (ELit n t) (ELit n1 t1))
-        H RBounds
-  | SAssignLowOOB : forall H n t n1 t1 l h,
+        s H (EAssign (ELit n t) (ELit n1 t1))
+        s H RBounds
+  | SAssignLowOOB : forall s H n t n1 t1 l h,
       l > 0 ->
       t = TPtr Checked (TArray l h t1) ->
       step D
-        H (EAssign (ELit n t) (ELit n1 t1))
-        H RBounds
-  | SDerefNull : forall H t n w,
+        s H (EAssign (ELit n t) (ELit n1 t1))
+        s H RBounds
+  | SDerefNull : forall s H t n w,
       n <= 0 ->
       t = TPtr Checked w ->
       step D
-        H (EDeref (ELit n t))
-        H RNull
-  | SAssignNull : forall H t w n n1 t',
+        s H (EDeref (ELit n t))
+        s H RNull
+  | SAssignNull : forall s H t w n n1 t',
       n1 <= 0 ->
       t = TPtr Checked w ->
       step D
-        H (EAssign (ELit n1 t) (ELit n t'))
-        H RNull.
+        s H (EAssign (ELit n1 t) (ELit n t'))
+        s H RNull.
 
 Hint Constructors step.
 
