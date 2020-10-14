@@ -4,7 +4,7 @@ Require Import ExtLib.Structures.Monads.
 From CHKC Require Import Tactics ListUtil Map.
 
 (** * Document Conventions *)
-(*Test*)
+
 
 (** It is common when defining syntax for a language on paper to associate one or many
     _metavariables_ with each syntactic class. For example, the metavariables <<x>>, <<y>>,
@@ -51,7 +51,7 @@ Definition var_eq_dec := Nat.eq_dec.
 
 The [mode], indicated by metavariable [m], is either [Checked] or [Unchecked]. *)
 
-Inductive mode : Set :=
+Inductive mode : Type :=
   | Checked : mode
   | Unchecked : mode.
 
@@ -79,29 +79,14 @@ Inductive mode : Set :=
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
 
-Inductive type : Set :=
+Inductive type : Type :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
   | TArray : Z -> Z -> type -> type.
 
 
-Inductive stack :=
- | Empty : stack
- | Stack : type -> stack -> stack.
 
-Definition pop (s : stack) :=
-  match s with
-  | Empty => None
-  | Stack t s0 => Some t
-  end.
-
-
-Fixpoint lookup (v : var) (s : stack) :=
-  match v with
-  | O => pop s
-  | S n => lookup n s
-  end.
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
@@ -182,7 +167,7 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     Even though [v] can be an arbitrary expression, it is expected that callers will only
     ever provide a value (defined below). *)
 
-Inductive expression : Set :=
+Inductive expression : Type :=
   | ELit : Z -> type -> expression
   | EVar : var -> expression
   | ELet : var -> expression -> expression -> expression
@@ -193,6 +178,26 @@ Inductive expression : Set :=
   | EDeref : expression -> expression
   | EAssign : expression -> expression -> expression
   | EUnchecked : expression -> expression.
+
+
+Inductive stack :=
+ | Empty : stack
+ | Stack : expression -> stack -> stack.
+
+Definition pop (s : stack) :=
+  match s with
+  | Empty => None
+  | Stack v s0 => Some v
+  end.
+
+Fixpoint lookup (x : var) (s : stack) :=
+  match s with
+  | Empty  => None
+  | Stack v s0 => match x with
+                  | O => Some v
+                  | S n => lookup n s0
+                  end
+  end.
 
 Inductive expr_wf (D : structdef) : expression -> Prop :=
   | WFELit : forall n t,
@@ -451,12 +456,17 @@ Qed.
 (* TODO: say more *)
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 
-Inductive step (D : structdef) : stack -> heap -> expression -> heap -> result -> Prop :=
-  | SPlusChecked : forall s  H n1 h l t n2,
+Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap -> result -> Prop :=
+  | SVar : forall s H x v,
+      (lookup x s) = Some v ->
+      step D
+           s H (EVar x)
+           s H (RExpr v)
+  | SPlusChecked : forall s H n1 h l t n2,
       n1 > 0 ->
       step D
-        s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
-        s H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
+         s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 TNat))
+         s H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (l - n2) (h - n2) t))))
   | SPlus : forall s  H n1 t1 n2 t2,
       (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
       step D
@@ -533,7 +543,7 @@ Inductive step (D : structdef) : stack -> heap -> expression -> heap -> result -
   | SLet : forall s H x n t e,
       step D
         s H (ELet x (ELit n t) e)
-        (Stack t s) H (RExpr  e)
+        (Stack (ELit n t) s) H (RExpr e)
   | SUnchecked : forall s H n t,
       step D
         s H (EUnchecked (ELit n t))
@@ -571,33 +581,33 @@ Hint Constructors step.
     We also define a convenience predicate, [reduces H e], which holds
     when there's some [m], [H'], and [r] such that [H; e ->m H'; r]. *)
 
-Inductive reduce (D : structdef) : heap -> expression -> mode -> heap -> result -> Prop :=
-  | RSExp : forall H e m H' e' E,
-      step D H e H' (RExpr e') ->
+Inductive reduce (D : structdef) : stack -> heap -> expression -> mode -> stack -> heap -> result -> Prop :=
+  | RSExp : forall H s e m H' s' e' E,
+      step D s H e s' H' (RExpr e') ->
       m = mode_of(E) ->
-      reduce D
+      reduce D s
         H (in_hole e E)
-        m
+        m s'
         H' (RExpr (in_hole e' E))
-  | RSHaltNull : forall H e m H' E,
-      step D H e H' RNull ->
+  | RSHaltNull : forall H s e m H' s' E,
+      step D s H e s' H' RNull ->
       m = mode_of(E) ->
-      reduce D
+      reduce D s
         H (in_hole e E)
-        m
+        m s'
         H' RNull
-  | RSHaltBounds : forall H e m H' E,
-      step D H e H' RBounds ->
+  | RSHaltBounds : forall H s e m H' s'  E,
+      step D s H e s' H' RBounds ->
       m = mode_of(E) ->
-      reduce D
+      reduce D s
         H (in_hole e E)
-        m
+        m s'
         H' RBounds.
 
 Hint Constructors reduce.
 
-Definition reduces (D : structdef) (H : heap) (e : expression) : Prop :=
-  exists (m : mode) (H' : heap) (r : result), reduce D H e m H' r.
+Definition reduces (D : structdef) (s : stack) (H : heap) (e : expression) : Prop :=
+  exists (m : mode) (s' : stack) (H' : heap) (r : result), reduce D s H e m s' H' r.
 
 Hint Unfold reduces.
 
@@ -844,9 +854,9 @@ Hint Unfold heap_consistent.
 
 Create HintDb Progress.
 
-Lemma step_implies_reduces : forall D H e H' r,
-    @step D H e H' r ->
-    reduces D H e.
+Lemma step_implies_reduces : forall D H s e H' s' r,
+    @step D s H e s' H' r ->
+    reduces D s H e.
 Proof.
   intros.
   assert (e = in_hole e CHole); try reflexivity.
@@ -856,14 +866,14 @@ Qed.
 
 Hint Resolve step_implies_reduces : Progress.
 
-Lemma reduces_congruence : forall D H e0 e,
+Lemma reduces_congruence : forall D H s e0 e,
     (exists E, in_hole e0 E = e) ->
-    reduces D H e0 ->
-    reduces D H e.
+    reduces D s H e0 ->
+    reduces D s H e.
 Proof.
   intros.
   destruct H0 as [ E Hhole ].
-  destruct H1 as [ H' [ m' [ r HRed ] ] ].
+  destruct H1 as [ H' [ m' [ s' [r  HRed ]] ] ].
   inv HRed as [ ? e0' ? ? e0'' E' | ? e0' ? ? E' | ? e0' ? ? E' ]; rewrite compose_correct; eauto 20.
 Qed.
 
@@ -1091,16 +1101,16 @@ Qed.
 
 
 
-Lemma progress : forall D H m e t,
+Lemma progress : forall D H s m e t,
     structdef_wf D ->
     heap_wf D H ->
     expr_wf D e ->
     @well_typed D H empty_env m e t ->
     value D e \/
-    reduces D H e \/
+    reduces D s H e \/
     unchecked m e.
 Proof with eauto 20 with Progress.
-  intros D H m e t HDwf HHwf Hewf Hwt.
+  intros D H st m e t HDwf HHwf Hewf Hwt.
   remember empty_env as env.
   induction Hwt as [
                      env m n t HTyLit                                       | (* Literals *)
@@ -1130,8 +1140,8 @@ Proof with eauto 20 with Progress.
     destruct IH1 as [ HVal1 | [ HRed1 | HUnchk1 ] ].
     (* Case: `e1` is a value *)
     + (* We can take a step according to SLet *)
-      left.
-      inv HVal1...
+      left.  
+      inv HVal1... 
     (* Case: `e1` reduces *)
     + (* We can take a step by reducing `e1` *)
       left.
@@ -1518,6 +1528,7 @@ Proof with eauto 20 with Progress.
         ctx (EDeref (EPlus (ELit n1 t1) (ELit n t0))) (in_hole (EPlus (ELit n1 t1) (ELit n t0)) (CDeref CHole)).
         inv HTy1.
         exists Checked.
+        exists st.
         exists H.
         { destruct (Z_gt_dec n1 0).
           - (* n1 > 0 *)
@@ -1530,11 +1541,10 @@ Proof with eauto 20 with Progress.
             eapply RSExp; eauto.
           - (* n1 <= 0 *)
             exists RNull.
-            subst.
-            rewrite HCtx.
-            eapply RSHaltNull; eauto.
+            subst. 
+            rewrite HCtx. 
             inv HTy2.
-            eapply SPlusNull. omega.
+            eapply RSHaltNull; eauto.
         }
       * left.
         ctx (EDeref (EPlus (ELit n1 t1) e2)) (in_hole e2 (CDeref (CPlusR n1 t1 CHole)))...
@@ -1712,12 +1722,12 @@ Proof with eauto 20 with Progress.
                    eapply step_implies_reduces.
                    eapply SAssignHighOOB; eauto... inv HTy2. eauto.
         } 
-      * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
+      * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ ? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
       * destruct HUnchk2 as [ e' [ E [ ] ] ]; subst.
         ctx (EAssign (ELit n1' t1') (in_hole e' E)) (in_hole e' (CAssignR n1' t1' E))...
     + (* Case: e1 reduces *)
-      destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ].
+      destruct HRed1 as [ H' [ ? [? [ r HRed1 ] ] ] ].
       inv HRed1; ctx (EAssign (in_hole e E) e2) (in_hole e (CAssignL E e2))...
     + destruct HUnchk1 as [ e' [ E [ ] ] ]; subst.
       ctx (EAssign (in_hole e' E) e2) (in_hole e' (CAssignL E e2))...
@@ -1758,39 +1768,39 @@ Proof with eauto 20 with Progress.
             + inv HVal3.
               inv HTy3.
               left; eauto...
-              destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 3 eexists.
+              destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 4 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
               * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              rewrite HCtx; left; eexists; eexists; eexists.
+              rewrite HCtx; left; do 4 eexists.
               eapply RSHaltNull... eapply SPlusNull. omega. 
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; eexists; eexists; eexists.
+              rewrite HCtx; left; do 4 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
           - destruct IH3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
             + inv HVal3.
               inv HTy3.
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; eexists; eexists; eexists.
+              destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
               * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HRed3 as [H' [? [r HRed3]]].
-              rewrite HCtx; left; eexists; eexists; eexists.
+              rewrite HCtx; left; do 4 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; eexists; eexists; eexists.
+              rewrite HCtx; left; do 4 eexists.
               * eapply RSHaltNull... eapply SPlusNull. omega.
-          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. omega. eauto.
               * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
-          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 3 eexists.
+          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. omega. eauto.
               * eapply RSHaltNull. eapply SPlusNull. omega. eauto.
         }
-      * destruct HRed2 as [ H' [ ? [ r HRed2 ] ] ].
+      * destruct HRed2 as [ H' [ ? [? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
       * destruct HUnchk2 as [ e' [ E [ He2 HEUnchk ] ] ]; subst.
         ctx (EAssign (EPlus (ELit n t0) (in_hole e' E)) e3) (in_hole e' (CAssignL (CPlusR n t0 E) e3))...
-    + destruct HRed1 as [ H' [ ? [ r HRed1 ] ] ].
+    + destruct HRed1 as [ H' [? [ ? [ r HRed1 ] ] ] ].
       inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))...
     + destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
       ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))...
@@ -1992,12 +2002,11 @@ Create HintDb Preservation.
 
 Lemma substitution :
   forall D H env m x v e t1 t2,
-    literal v ->
-  @well_typed D H env m v t1 ->
+  @well_typed D H env m (ELit v t1) t1 ->
   @well_typed D H (Env.add x t1 env) m e t2 ->
-  @well_typed D H env m (subst x v e) t2.
+  @well_typed D H env m (subst x (ELit v t1) e) t2.
 Proof.
-  intros D H env m x v e t1 t2 Hvalue HWTv HWTe.
+  intros D H env m x v e t1 t2 HWTv HWTe.
   generalize dependent v.
   remember (Env.add x t1 env) as env'.
   assert (Eq: Env.Equal env' (Env.add x t1 env))
@@ -2021,17 +2030,17 @@ Proof.
       * {
           apply IHHWTe2; eauto.
           - apply env_neq_commute_eq; eauto.
-          - inv Hvalue as [n' t'].
-            inv HWTv. eapply TyLit; eauto.
+          - inv HWTv. eapply TyLit; eauto.
         } 
   - intros. subst. apply TyUnchecked. apply IHHWTe; eauto.
-    inv Hvalue as [n' t'].
-    destruct m.
-      * inv HWTv.
+    inv HWTv.
+   (* inv Hvalue as [n' t'].
+    destruct m. *)
+      *
         apply TyLit.
         assumption.
-      * assumption.
 Qed.
+    
 
 Hint Resolve substitution : Preservation.
 
@@ -2596,32 +2605,32 @@ Proof.
       split; auto.
 Qed.
 
-Lemma values_are_nf : forall D H e,
+Lemma values_are_nf : forall D H s e,
     value D e ->
-    ~ exists H' m r, @reduce D H e m H' r.
+    ~ exists H' s' m r, @reduce D s H e m H' s' r.
 Proof.
-  intros D H e Hv contra.
+  intros D H s e Hv contra.
   inv Hv.
-  destruct contra as [H' [ m [ r contra ] ] ].
+  destruct contra as [H' [ m [ s' [ r contra ] ] ] ].
   inv contra; destruct E; inversion H4; simpl in *; subst; try congruence.
 Qed.
 
-Lemma lit_are_nf : forall D H n t,
-    ~ exists H' m r, @reduce D H (ELit n t) m H' r.
+Lemma lit_are_nf : forall D H s n t,
+    ~ exists H'  s' m r, @reduce D s H (ELit n t) m s' H' r.
 Proof.
-  intros D H n t contra.
-  destruct contra as [H' [ m [ r contra ] ] ].
+  intros D s H n t contra.
+  destruct contra as [H' [ s' [ m [ r contra ] ] ] ].
   inv contra; destruct E; inversion H2; simpl in *; subst; try congruence.
 Qed.
 
-Lemma var_is_nf : forall D H x,
-    ~ exists H' m r, @reduce D H (EVar x) m H' r.
+Lemma var_is_nf : forall D s H x,
+    ~ exists H' s' m r, @reduce D s H (EVar x) m s' H' r.
 Proof.
   intros.
   intros contra.
-  destruct contra as [H' [ m [ r contra ] ] ].
+  destruct contra as [H' [ m [s' [ r contra ] ] ] ].
   inv contra; destruct E; inversion H1; simpl in *; subst; inv H2.
-Qed.
+Admitted.
 
 
 Ltac maps_to_fun :=
@@ -3098,7 +3107,7 @@ Proof.
                 assert (exists n, Pos.to_nat p = S n) by (eapply pos_succ; eauto).
                 destruct H5. rewrite H5. simpl.
                 destruct (k - l')eqn:Hk; simpl; eauto.
-                -- Search nth_error.
+   (*             -- Search nth_error.
              ++ destruct H4.
                 destruct H4 as [? [? ?]].
                 assert (x0 = w) by admit. 
@@ -3122,7 +3131,7 @@ Proof.
                (set_add eq_dec_nt
                (n, TPtr Checked (TArray l' h' w))
                 s)) x w). 
-               { eapply scope_replacement; eauto. }
+               { eapply scope_replacement; eauto. } *)
                 
 
           
@@ -3471,17 +3480,39 @@ Proof.
           exists n'. assumption.
 Qed.
 
+  Inductive stack_wf D H : env -> stack -> Prop :=
+ | WFS_Stack : forall env s,
+     (forall x t v m,
+         Env.MapsTo x t env ->
+         lookup x s = Some v ->
+         @well_typed D H env m v t) ->
+     stack_wf D H env s.
 
+  (*
+  Lemma new_sub : forall D H env s v t1 t2 m x e,
+      stack_wf D H env s ->
+      @well_typed D H env m (ELit v t1) ->
+      @well_typed D H (Env.add x t1 env) m e t2 ->
+      @well_typed D H *)
 
-Lemma preservation : forall D H env e t H' e',
+  Lemma mt : forall D H env,
+      stack_wf D H env Empty.
+  Proof.
+    intros D H env. constructor.
+    intros x t v m H1 H2.
+    induction x; simpl in H2; inv H2.
+  Qed.
+  
+Lemma preservation : forall D s H env e t s' H' e' env',
     @structdef_wf D ->
     heap_wf D H ->
     expr_wf D e ->
+    stack_wf D H env s ->
     @well_typed D H env Checked e t ->
-    @reduce D H e Checked H' (RExpr e') ->
-    @heap_consistent D H' H /\ @well_typed D H' env Checked e' t.
+    @reduce D s H env e Checked s' H' env' (RExpr e') ->
+    stack_wf D H' env' s' /\ @heap_consistent D H' H /\ @well_typed D H' env' Checked e' t.
 Proof with eauto 20 with Preservation.
-  intros D H env e t H' e' HDwf HEwf HHwf Hwt.
+  intros D s H env e t s' H' e' HDwf HHwf HEwf HSwf Hwt.
   generalize dependent H'. generalize dependent e'.
   remember Checked as m.
   induction Hwt as [
@@ -3493,8 +3524,8 @@ Proof with eauto 20 with Preservation.
                     env m w                                               | (* Malloc *)
                     env m e t HTy IH                                      | (* Unchecked *)
                     env m t e t' HChkPtr HTy IH                           | (* Cast *)
-                    env m e m' w l h t t' HTy IH HSubType HPtrType HMode              | (* Deref *)
-                    env m e1 m' l h t e2 t' WT Twf HTy1 IH1 HSubType HTy2 IH2 HMode            | (* Index *)
+                    env m e m' w l h t t' HTy IH HSubType HPtrType HMode  | (* Deref *)
+                    env m e1 m' l h t e2 t' WT Twf HTy1 IH1 HSubType HTy2 IH2 HMode | (* Index *)
                     |
                     ]; intros e' H' Hreduces; subst.
   (* T-Lit, impossible because values do not step *)
@@ -3504,8 +3535,10 @@ Proof with eauto 20 with Preservation.
   (* T-Let *)
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst.
-    + clear H0. clear H7. rename e'0 into e'.
-      inv H4... (* Uses substitution lemma *)
+    + clear H0. clear H9. rename e'0 into e'.
+     inv H5.
+      * eauto.
+      *  (* Uses substitution lemma *)
     + clear H1. edestruct IH1... (* Uses heap_wf *)
       inv HHwf; eauto.
   (* T-FieldAddr *)
