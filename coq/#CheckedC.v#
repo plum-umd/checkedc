@@ -3603,7 +3603,9 @@ Proof with eauto 20 with Preservation.
       assert (stack_wf D H' (Env.add x t1 env) (Stack (x, (n, t1)) s)) by
           apply (new_sub D H' env s n t1 x HSwf HTy1).
       split; (try assumption); eauto. 
-    + admit. (*clear H1. edestruct IH1... (* Uses heap_wf *)
+    + exists env. clear H1.
+      split. inv H5. assumption.
+      edestruct IH1... (* Uses heap_wf *)
       inv HHwf; eauto. *)
   (* T-FieldAddr *)
   - inv Hreduces.
