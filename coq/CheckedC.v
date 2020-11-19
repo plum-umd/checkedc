@@ -3558,9 +3558,26 @@ Qed.
   Proof.
     intros s x t1 D H n t0 env' Hswf Hwt.
     apply WFS_Stack. intros x0 t v m H1 H2.
-    inv Hswf.
+    inv Hswf. *)
 
- *)   
+   
+  Inductive env_consistent : env -> env -> Prop :=
+  |Env_refl : forall e,
+      env_consistent e e
+  |Env_add : forall e x t,
+      env_consistent (Env.add x t e) e.
+
+
+  Lemma consistent_typing : forall env env' x t1 e t D H H',
+      env_consistent env' env ->
+      @heap_consistent D H H' ->
+      Env.find x env = None ->
+      @well_typed D H (Env.add x t1 env) Checked e t ->
+      @well_typed D H' env' Checked e t.
+  Proof.
+    intros env env' x t' e t D H H' Henv Hheap Hfind Hwt.
+    
+             
 Lemma preservation : forall D s H env e t s' H' e',
     @structdef_wf D ->
     heap_wf D H ->
@@ -3569,7 +3586,7 @@ Lemma preservation : forall D s H env e t s' H' e',
     @well_typed D H env Checked e t ->
     @reduce D s H e Checked s' H' (RExpr e') ->
     exists env',
-      stack_wf D H env' s' /\
+      env_consistent env' env /\ stack_wf D H env' s' /\
       @heap_consistent D H' H /\ @well_typed D H' env' Checked e' t.
 Proof with eauto 20 with Preservation.
   intros D s H env e t s' H' e' HDwf HHwf HEwf HSwf Hwt.
@@ -3602,9 +3619,11 @@ Proof with eauto 20 with Preservation.
       } rewrite Ht in *. clear Ht.
       assert (stack_wf D H' (Env.add x t1 env) (Stack (x, (n, t1)) s)) by
           apply (new_sub D H' env s n t1 x HSwf HTy1).
-      split; (try assumption); eauto. 
-    + admit. (*clear H1. edestruct IH1... (* Uses heap_wf *)
-      inv HHwf; eauto. *)
+      split; (try assumption); eauto. econstructor. 
+    + clear H1. edestruct IH1... inv HEwf; eauto. (* Uses heap_wf *)
+      exists x0. destruct H0 as [He [Hs' [Hh Hwt]]]. split. eauto. split.
+      eauto. split. eauto. inv HEwf. econstructor. inv He.
+      * econstructor; eauto. apply HTy2.
   (* T-FieldAddr *)
   - inv Hreduces.
     destruct E; inversion H2; simpl in *; subst. exists env. 
