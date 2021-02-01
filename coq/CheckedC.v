@@ -38,7 +38,7 @@ Require Export BinNums.
 Require Import BinPos BinNat.
 
 Local Open Scope Z_scope.
-Require Import OrderedTypeEx.
+
 
 Definition var    := nat.
 Definition field  := nat.
@@ -79,35 +79,15 @@ Inductive mode : Type :=
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
 
-
-Record varBound : Set := mkBound
-{ Blt : option (option Z * list (var * Z));
-  Bgt : option (option Z * list (var * Z));
-  Bneq : option (list Z * list (var * Z))
-}.
-
-Module BEnv := FMapList.Make Nat_as_OT.
-
-Definition benv := BEnv.t varBound.
-
-Definition benv_empty := @BEnv.empty varBound.
-
-Inductive bound : Type :=
-   | BZ : Z -> bound
-   | BVar : var -> benv -> bound.
-
-Inductive range : Type :=
-  | RB : bound -> range
-  | Full.
-
-Definition BVarInit x := BVar x benv_empty.
-
+Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
 
 Inductive type : Type :=
-  | TNat : range -> type
+  | TNat : option bound -> type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-  | TArray : bound -> bound -> type -> type.
+  | TArray : bound -> bound -> type -> type
+  | TNtArray : bound -> bound -> type -> type.
+
 
 
 
@@ -115,7 +95,7 @@ Inductive type : Type :=
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
 
 Inductive word_type : type -> Prop :=
-  | WTNat : forall x, word_type (TNat x)
+  | WTNat : forall n, word_type (TNat n)
   | WTPtr : forall m w, word_type (TPtr m w).
 
 Hint Constructors word_type.
@@ -125,12 +105,7 @@ Hint Constructors word_type.
     values are its (word) type.
  *)
 
-
-
-(* set up type environment. *)
-Module Env := FMapList.Make Nat_as_OT.
-
-Definition tenv := Env.t type.
+Require Import OrderedTypeEx.
 
 Module Fields := FMapList.Make Nat_as_OT.
 
@@ -145,60 +120,17 @@ Module StructDef := Map.Make Nat_as_OT.
 
 Definition structdef := StructDef.t fields.
 
-
-(*
-Check True.
-
-
-Fixpoint genLtPre (x:Type) (l : list (var * Z)) :=
-   match l with nil => True
-             | (y,n)::l' => (x < y + n) /\ genLtPre x l'
-   end.
-
-
-
-  Blt : option (option Z * list (var * Z));
-  Bgt : option (option Z * list (var * Z));
-  Bneq : option (list Z * list (var * Z))
-
-Check fun x => ((x= x) /\ (1 < x)).
-*)
-
-(* GenP geneartes a predicate based on the input benv and a variable, so that it generates a predicate as:
-   P x, *)
-Parameter genP : benv -> var -> Prop. 
-
-(* is valid function checks the validity of a function. It checks the validity of the following formula:
-       isValid P x Q y = forall x y. P x /\ Q y -> x <= y *)
-Parameter isValid : benv -> var -> benv -> var -> Prop. 
-
-(*
-We need to have a way of inserting list varBound and then treat it as a predicate. like having a function
-genP, and genP function will take a list varBound (l) and generate a predicate P like
- if l and l' are two different list varbound, we have P = genP l. and Q = genP l',
- so that we then can determine the validity of the formula forall x, P x => Q x
-  and also the validity of the formula forall x y, P x /\ Q y => x >= y
-OR we can implement a SMT solver algorithm by ourselves. 
-
-*)
-
-Inductive input_bound_wf : bound -> Prop :=
-  | WFBZ : forall n, input_bound_wf (BZ n)
-  | WFBVar : forall n, input_bound_wf (BVarInit n).
-
-Inductive input_range_wf : range -> Prop :=
-  | WFRB : forall n, input_bound_wf n -> input_range_wf (RB n)
-  | WFFull : input_range_wf Full.
-
 Inductive type_wf (D : structdef) : type -> Prop :=
-  | WFTNat : forall x, input_range_wf x -> type_wf D (TNat x)
+  | WFTNat : forall n , type_wf D (TNat n)
   | WFTPtr : forall m w, type_wf D (TPtr m w)
   | WFTStruct : forall T,
       (exists (fs : fields), StructDef.MapsTo T fs D) ->
       type_wf D (TStruct T)
   | WFArray : forall l h t,
-      input_bound_wf l ->
-      input_bound_wf h ->
+      word_type t ->
+      type_wf D t ->
+      type_wf D (TArray l h t)
+  | WFNTArry : forall l h t,       
       word_type t ->
       type_wf D t ->
       type_wf D (TArray l h t).
@@ -212,76 +144,28 @@ Definition structdef_wf (D : structdef) : Prop :=
   forall (T : struct) (fs : fields),
     StructDef.MapsTo T fs D ->
     fields_wf D fs.
-
-(* Define the type env lookup function for lookup a more specific type 
-   in the dependent type system. 
-   connecting bounds in Array Type with ranges in TNat. *)
-
-(*
-Definition typeBound (Tv:tenv) b :=
-   match b with BZ x => Some (BZ x)
-              | BVar x => (match Env.find x Tv with 
-                                              | Some (TNat Full) => Some (BVar x)
-                                              | Some (TNat (RZ a)) => Some (BZ a)
-                                              | Some (TNat (RVar y)) => Some (BVar y)
-                                              | _ => None
-                           end)
-   end.
    
-*)
 
-
-
-(* subtyping rule in a dependent type system depends on the type environment that genereates during the 
-   type checking step. *)
+(* This defines the subtyping relation. *)
+Inductive nat_less : bound -> bound -> Prop :=
+  | nat_less_num : forall l h, l <= h -> nat_less (Num l) (Num h)
+  | nat_less_var : forall x l h, l <= h -> nat_less (Var x l) (Var x h).
 
 Inductive subtype (D : structdef) : type -> type -> Prop :=
-  | SubTyRefl : forall t,
-    subtype D t t
-  | SubTyInt1 : forall x, subtype D (TNat (RB (BZ x))) (TNat Full)
-  | SubTyInt2 : forall x env, subtype D (TNat (RB (BVar x env))) (TNat Full)
-  | SubTySubsume1 : forall l l' h h' t m,
-    l' >= l /\ h' <= h ->
-    subtype D (TPtr m (TArray (BZ l) (BZ h) t)) (TPtr m (TArray (BZ l') (BZ h') t))
-  | SubTySubsumeR : forall l lenv h henv l' lenv' h' henv' t m,
-     (isValid lenv' l' lenv l) -> 
-     (isValid henv h henv' h') -> 
-    subtype D (TPtr m (TArray (BVar l lenv) (BVar h henv) t))
-               (TPtr m (TArray (BVar l' lenv') (BVar h' henv') t))
-  | SubTyStructArrayField : forall (T : struct) (fs : fields) m x,
+  | SubTyRefl : forall t, subtype D t t
+  | SubtypeInt1 : forall l, subtype D (TNat (Some (Num l))) (TNat None)
+  | SubtypeInt2 : forall x l, subtype D (TNat (Some (Var x l))) (TNat None)
+  | SubtypeInt3 : forall l h, nat_less l h -> subtype D (TNat (Some l)) (TNat (Some h))
+  | SubTySubsume : forall l h l' h' t m,
+    nat_less l l' -> nat_less h' h -> 
+    subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtSubsume : forall l h l' h' t m,
+    nat_less l l' -> nat_less h' h -> 
+    subtype D (TPtr m (TNtArray l h t)) (TPtr m (TNtArray l' h' t))
+  | SubTyStructArrayField : forall (T : struct) (fs : fields) m n,
     StructDef.MapsTo T fs D ->
-    Some (TNat x) = (Fields.find 0%nat fs) ->
-    subtype D (TPtr m (TStruct T)) (TPtr m (TNat x)).
-(*  | SubTySubsume1 : forall l lv h hv l' lv' h' hv' t m,
-     typeBound Tv l = Some (BZ lv) ->
-     typeBound Tv h = Some (BZ hv) ->
-     typeBound Tv l' = Some (BZ lv') ->
-     typeBound Tv h' = Some (BZ hv') ->
-    lv' >= lv /\ hv' <= hv ->
-    subtype D Tv (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
-
-  | SubTySubsumeR : forall l l' lv h hv h' hv' t m,
-     typeBound Tv l = Some (BVar lv) ->
-     typeBound Tv h = Some (BZ hv) ->
-     typeBound Tv l' = Some (BVar lv) ->
-     typeBound Tv h' = Some (BZ hv') ->
-        hv' <= hv ->
-    subtype D Tv (TPtr m (TArray l h t))
-               (TPtr m (TArray l' h' t))
-  | SubTySubsumeL : forall l l' lv lv' h h' hv t m,
-     typeBound Tv l = Some (BZ lv) ->
-     typeBound Tv h = Some (BVar hv) ->
-     typeBound Tv l' = Some (BZ lv') ->
-     typeBound Tv h' = Some (BVar hv) ->
-        lv' >= lv ->
-    subtype D Tv (TPtr m (TArray l h t))
-               (TPtr m (TArray l' h' t))
-  | SubTyStructArrayField : forall (T : struct) (fs : fields) m x,
-    StructDef.MapsTo T fs D ->
-    Some (TNat x) = (Fields.find 0%nat fs) ->
-    subtype D Tv (TPtr m (TStruct T)) (TPtr m (TNat x)).
-*)
-
+    Some (TNat n) = (Fields.find 0%nat fs) ->
+    subtype D (TPtr m (TStruct T)) (TPtr m (TNat n)).
 
 (** Expressions, [e], compose to form programs in Checked C. It is a core, imperative
     calculus of explicit memory management based on C. Literals, [ELit], are annotated
@@ -300,29 +184,25 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     Even though [v] can be an arbitrary expression, it is expected that callers will only
     ever provide a value (defined below). *)
 
-Inductive bexpFact : Type :=
-  | BasicZ : Z -> bexpFact
-  | BasicVar : var -> bexpFact.
-
-Inductive bexp : Type := 
-  | EqExp : bexpFact -> bexpFact -> bexp
-  | LtExp : bexpFact -> bexpFact -> bexp
-  | GtExp : bexpFact -> bexpFact -> bexp.
-
 Inductive expression : Type :=
   | ELit : Z -> type -> expression
   | EVar : var -> expression
   | ELet : var -> expression -> expression -> expression
-  | EIf : bexp -> expression -> expression -> expression
   | EMalloc : type -> expression
   | ECast : type -> expression -> expression
   | EPlus : expression -> expression -> expression
   | EFieldAddr : expression -> field -> expression
-  | EDeref : expression -> expression
-  | EAssign : expression -> expression -> expression
+  | EDeref : expression -> expression (*  * e *)
+  | EAssign : expression -> expression -> expression (* *e = e *)
+  | EIf : var -> expression -> expression -> expression (* if * x then e1 else e2. *)
   | EUnchecked : expression -> expression.
 
+(* Defining stack. *)
+Module Stack := Map.Make Nat_as_OT.
 
+Definition stack := Stack.t (Z * type).
+
+(*
 Inductive stack :=
  | Empty : stack
  | Stack : var * (Z * type) -> stack -> stack.
@@ -338,6 +218,7 @@ Fixpoint lookup (x : var) (s : stack) :=
   | Empty  => None
   | Stack (x0, v) s0 => if (var_eq_dec x x0) then Some v else (lookup x s0)
   end.
+*)
 
 Inductive expr_wf (D : structdef) : expression -> Prop :=
   | WFELit : forall n t,
@@ -350,10 +231,10 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       expr_wf D e1 ->
       expr_wf D e2 ->
       expr_wf D (ELet x e1 e2)
-  | WFEif : forall b e1 e2,
+  | WFEIF : forall x e1 e2,
       expr_wf D e1 ->
-      expr_wf D e2 -> 
-      expr_wf D (EIf b e1 e2)
+      expr_wf D e2 ->
+      expr_wf D (EIf x e1 e2)
   | WFEMalloc : forall w,
       type_wf D w ->
       expr_wf D (EMalloc w)
@@ -390,7 +271,8 @@ Fixpoint subst (x : var) (v : expression) (e : expression) : expression :=
   | EVar y => if var_eq_dec x y then v else e
   | ELet x' e1 e2 =>
     if var_eq_dec x x' then ELet x' (subst x v e1) e2 else ELet x' (subst x v e1) (subst x v e2)
-  | EIf b e1 e2 => EIf b (subst x v e1) (subst x v e2)
+  | EIf x' e1 e2 =>
+        EIf x' (subst x v e1) (subst x v e2)
   | EMalloc _ => e
   | ECast t e' => ECast t (subst x v e')
   | EPlus e1 e2 => EPlus (subst x v e1) (subst x v e2)
@@ -459,8 +341,6 @@ match z with
   |_ => []
 end.
 
-
-
 (* Changed this, to return the lower bound *)
 Definition allocate_meta (D : structdef) (w : type)
   : option (Z * list type) :=
@@ -468,7 +348,9 @@ Definition allocate_meta (D : structdef) (w : type)
   | TStruct T =>
     fs <- StructDef.find T D ;;
     ret (0, List.map snd (Fields.elements fs))
-  | TArray (BZ l) (BZ h) T =>
+  | TArray (Num l) (Num h) T =>
+    Some (l, Zreplicate (h - l) T)
+  | TNtArray (Num l) (Num h) T =>
     Some (l, Zreplicate (h - l) T)
   | _ => Some (0, [w])
   end.
@@ -511,7 +393,7 @@ End allocation.
 (** Results, [r], are an expression ([RExpr]), null dereference error ([RNull]), or
     array out-of-bounds error ([RBounds]). *)
 
-Inductive result : Type :=
+Inductive result : Set :=
   | RExpr : expression -> result
   | RNull : result
   | RBounds : result.
@@ -524,7 +406,7 @@ Inductive result : Type :=
     The [mode_of] function takes a context, [E], and returns [m] (a mode) indicating whether the context has a
     subcontext which is unchecked. *)
 
-Inductive context : Type :=
+Inductive context : Set :=
   | CHole : context
   | CLet : var -> context -> expression -> context
   | CPlusL : context -> expression -> context
@@ -549,6 +431,7 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
   | CUnchecked E' => EUnchecked (in_hole e E')
   end.
+
 
 Fixpoint mode_of (E : context) : mode :=
   match E with
@@ -600,95 +483,110 @@ Proof.
   induction E_outer; try reflexivity; try (simpl; rewrite IHE_outer; reflexivity); try assumption.
 Qed.
 
-Definition evalBound stack bound := 
-   match bound with | BZ v => Some v
-                    | BVar x env => match lookup x stack with Some (v,_) => Some v | None => None end
-   end.
-
-Fixpoint evalType stack t :=
-  match t with | TNat (RB x) => (match evalBound stack x with None => None
-                                                 | Some v => Some (TNat (RB (BZ v)))
-                                 end)
-               | TNat Full => Some (TNat Full)
-               | TPtr m t => (match evalType stack t with None => None
-                                                       | Some t' => Some (TPtr m t')
-                             end)
-               | TStruct s => Some (TStruct s)
-               | TArray l h t => match evalBound stack l
-                          with None => None
-                             | Some v1 => (match evalBound stack h
-                                             with None => None
-                                                | Some v2 => 
-                                            (match evalType stack t with 
-                                                  None => None
-                                               | Some t' => Some ((TArray (BZ v1) (BZ v2) t'))
-                                             end)
-                                         end)
-                            end
-   end.
-
 (* TODO: say more *)
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
+Definition eval_bound (s:stack) (b:bound) : bound :=
+   match b with Num n => Num n
+             | Var x n => (match (Stack.find x s) with Some (v,t) => Num (v + n) | None => Var x n end)
+   end.
+
+Fixpoint eval_type (s : stack) (t : type) : type := 
+  match t with TNat None => TNat None
+             | TNat (Some x) => TNat (Some (eval_bound s x))
+             | TPtr c t => TPtr c (eval_type s t)
+             | TStruct x => TStruct x
+             | TArray l h t => TArray (eval_bound s l) (eval_bound s h) (eval_type s t)
+             | TNtArray l h t => TNtArray (eval_bound s l) (eval_bound s h) (eval_type s t)
+  end.
+
+Definition add_type (s: stack) (t : type) (nt : option bound) : type :=
+   match nt with Some (Num n) =>
+    
+      (match t with TNat None => TNat None
+             | TNat (Some (Num m)) => TNat (Some (Num (n + m)))
+             | TNat (Some (Var x m)) => TNat (Some (Var x (n+m)))
+             | _ => t
+       end)
+             | _ => t
+   end.
+
+Definition NtHit (s : stack) (x : var) : Prop :=
+   match Stack.find x s with | Some (v, TPtr m (TNtArray (Num l) (Num 0) t)) => True
+                          | _ => False
+   end.
+
+Definition add_nt_one (s : stack) (x:var) : stack :=
+   match Stack.find x s with | Some (v, TPtr m (TNtArray (Num l) (Num h) t)) => Stack.add x (v, TPtr m (TNtArray (Num l) (Num (h+1)) t)) s
+                             | _ => s
+   end.
 
 Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap -> result -> Prop :=
+  | SConst : forall s H n t, step D s H (ELit n t) s H (RExpr (ELit n (eval_type s t)))
   | SVar : forall s H x v t,
-      (lookup x s) = Some (v, t) ->
+      (Stack.find x s) = Some (v, t) ->
       step D
            s H (EVar x)
            s H (RExpr (ELit v t))
-  | SPlusChecked : forall s H n1 h hv l lv t n2 x,
-      n1 > 0
-       -> evalBound s l = Some lv
-       -> evalBound s h = Some hv
-     ->
+  | SPlusChecked1 : forall s H n1 h l t t1 t2 n2 nt,
+      n1 > 0 ->
+         eval_type s (t1) = (TPtr Checked (TArray (Num l) (Num h) t)) ->
+         eval_type s (t2) = TNat nt ->
       step D
-         s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 (TNat x)))
-         s H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (BZ (lv - n2)) (BZ (hv - n2)) t))))
-  | SPlus : forall s  H n1 t1 n2 t2,
+         s H (EPlus (ELit n1 (TPtr Checked (TArray (Num l) (Num h) t))) (ELit n2 t2))
+         s H (RExpr (ELit (n1 + n2) (TPtr Checked (TArray (Num (l - n2)) (Num (h - n2)) (add_type s t nt)))))
+  | SPlusChecked2 : forall s H n1 h l t t1 t2 n2 nt,
+      n1 > 0 ->
+         eval_type s (t1) = (TPtr Checked (TNtArray (Num l) (Num h) t)) ->
+         eval_type s (t2) = TNat nt ->
+      step D
+         s H (EPlus (ELit n1 (TPtr Checked (TNtArray (Num l) (Num h) t))) (ELit n2 t2))
+         s H (RExpr (ELit (n1 + n2) (TPtr Checked (TNtArray (Num (l - n2)) (Num (h - n2)) (add_type s t nt)))))
+  | SPlus : forall s  H n1 t1 t1' nt n2 t2,
       (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
+       eval_type s t1 = t1' -> eval_type s t2 = (TNat nt) ->
       step D
         s H (EPlus (ELit n1 t1) (ELit n2 t2))
-        s H (RExpr (ELit (n1 + n2) t1))
-  | SPlusNull : forall s H n1 l h t n2 x,
+        s H (RExpr (ELit (n1 + n2) (add_type s t1' nt)))
+  | SPlusNull : forall s H n1 l h t n2 nt,
       n1 <= 0 ->
       step D
-        s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 (TNat x)))
+        s H (EPlus (ELit n1 (TPtr Checked (TArray l h t))) (ELit n2 (TNat nt)))
         s H RNull
-  | SCast : forall s H t n t',
+  | SCast : forall s H t n t' t1,
+      eval_type s t = t1 ->
       step D
         s H (ECast t (ELit n t'))
-        s H (RExpr (ELit n t))
-  | SDeref : forall s H n n1 t1 t,
+        s H (RExpr (ELit n t1))
+  | SDeref : forall s H n n1 t1 t t2,
       (expr_wf D (ELit n1 t1)) ->
+      eval_type s t = t2 ->
       Heap.MapsTo n (n1, t1) H ->
-      (forall l lv h hv t', t = TPtr Checked (TArray l h t') -> 
-           evalBound s l = Some lv ->  evalBound s h = Some hv ->  hv > 0 /\ lv <= 0) ->
+      (forall l h t', t2 = TPtr Checked (TArray (Num l) (Num h) t') -> h > 0 /\ l <= 0) ->
       step D
         s H (EDeref (ELit n t))
         s H (RExpr (ELit n1 t1))
-
-  | SDerefHighOOB : forall s H n t t1 l h hv,
-      evalBound s h = Some hv ->
-      hv <= 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+  | SDerefHighOOB : forall s H n t t' t1 l h,
+      h <= 0 ->
+      eval_type s t = t' ->
+      t' = TPtr Checked (TArray (Num l) (Num h) t1) ->
       step D
         s H (EDeref (ELit n t))
         s H RBounds
-  | SDerefLowOOB : forall s H n t t1 l lv h,
-      evalBound s l = Some lv ->
-      lv > 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+  | SDerefLowOOB : forall s H n t t' t1 l h,
+      l > 0 ->
+      eval_type s t = t' ->
+      t' = TPtr Checked (TArray (Num l) (Num h) t1) ->
       step D
         s H (EDeref (ELit n t))
         s H RBounds
-  | SAssign : forall s H n t n1 t1 H',
+  | SAssign : forall s H n t tv n1 t1 tv1 H',
       Heap.In n H ->
-      (forall l lv h hv t', t = TPtr Checked (TArray l h t') ->
-           evalBound s l = Some lv ->  evalBound s h = Some hv -> hv > 0 /\ lv <= 0) ->
-      H' = Heap.add n (n1, t1) H ->
+      eval_type s t = tv -> eval_type s t1 = tv1 ->
+      (forall l h t', tv = TPtr Checked (TArray (Num l) (Num h) t') -> h > 0 /\ l <= 0) -> 
+      H' = Heap.add n (n1, tv1) H ->
       step D
         s H  (EAssign (ELit n t) (ELit n1 t1))
-        s H' (RExpr (ELit n1 t1))
+        s H' (RExpr (ELit n1 tv1))
   | SFieldAddrChecked : forall s H n t (fi : field) n0 t0 T fs i fi ti,
       n > 0 ->
       t = TPtr Checked (TStruct T) ->
@@ -706,7 +604,7 @@ Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap ->
       step D
         s H (EFieldAddr (ELit n (TPtr Checked (TStruct T))) fi)
         s H RNull
-  | SFieldAddr : forall s H n t (fi : field) n0 t0 T fs i fi ti,
+  | SFieldAddr : forall s H n t (fi : field) n0 t0 tv0 T fs i fi ti,
       t = TPtr Unchecked (TStruct T) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
@@ -714,52 +612,67 @@ Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap ->
       n0 = n + Z.of_nat(i) ->
       t0 = TPtr Unchecked ti ->
       word_type ti ->
+      eval_type s t0 = tv0 ->
       step D
         s H (EFieldAddr (ELit n t) fi)
-        s H (RExpr (ELit n0 t0))
-(* no type variable anymore, substitution of all stack  variables in type to values. *)
+        s H (RExpr (ELit n0 tv0))
   | SMalloc : forall s H w w' H' n1,
-      evalType s w = Some w' ->
+      eval_type s w = w' ->
       allocate D H w' = Some (n1, H') ->
       step D
         s H (EMalloc w)
         s H' (RExpr (ELit n1 (TPtr Checked w')))
   | SLet : forall s H x n t t' e,
-      evalType s t = Some t' ->
+      eval_type s t = t' ->
       step D
         s H (ELet x (ELit n t) e)
-        (Stack (x, (n, t')) s) H (RExpr e)
-  | SUnchecked : forall s H n t,
+        (Stack.add x (n, t') s) H (RExpr e)
+  | SUnchecked : forall s H n t t',
+      eval_type s t = t' ->
       step D
         s H (EUnchecked (ELit n t))
-        s H (RExpr (ELit n t))
-  | SAssignHighOOB : forall s H n t n1 t1 l h hv,
-      evalBound s h = Some hv ->
-      hv <= 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+        s H (RExpr (ELit n t'))
+  | SAssignHighOOB : forall s H n t t' n1 t1 l h,
+      h <= 0 ->
+      eval_type s t = t' ->
+      t' = TPtr Checked (TArray (Num l) (Num h) t1) ->
       step D
         s H (EAssign (ELit n t) (ELit n1 t1))
         s H RBounds
-  | SAssignLowOOB : forall s H n t n1 t1 l lv h,
-      evalBound s l = Some lv ->
-      lv > 0 ->
-      t = TPtr Checked (TArray l h t1) ->
+  | SAssignLowOOB : forall s H n t t' n1 t1 l h,
+      l > 0 ->
+      eval_type s t = t' ->
+      t' = TPtr Checked (TArray (Num l) (Num h) t1) ->
       step D
         s H (EAssign (ELit n t) (ELit n1 t1))
         s H RBounds
-  | SDerefNull : forall s H t n w,
+  | SDerefNull : forall s H t t' n w,
       n <= 0 ->
-      t = TPtr Checked w ->
+      eval_type s t = t' ->
+      t' = TPtr Checked w ->
       step D
         s H (EDeref (ELit n t))
         s H RNull
-  | SAssignNull : forall s H t w n n1 t',
+  | SAssignNull : forall s H t tv w n n1 t',
       n1 <= 0 ->
-      t = TPtr Checked w ->
+      eval_type s t = tv ->
+      tv = TPtr Checked w ->
       step D
         s H (EAssign (ELit n1 t) (ELit n t'))
-        s H RNull.
-
+        s H RNull
+   | SIfOOB : forall s H x e1 e2, step D s H (EDeref (EVar x)) s H RBounds -> step D s H (EIf x e1 e2) s H RBounds
+   | SIfNull : forall s H x e1 e2, step D s H (EDeref (EVar x)) s H RNull -> step D s H (EIf x e1 e2) s H RNull
+   | SIfTrue : forall s H x e1 e2 n1 t1, 
+           step D s H (EDeref (EVar x)) s H (RExpr (ELit n1 t1)) ->
+           n1 <> 0 -> step D s H (EIf x e1 e2) s H (RExpr e1)
+   | SIfFalseNoNtHit : forall s H x e1 e2 t1, 
+           not (NtHit s x) ->
+           step D s H (EDeref (EVar x)) s H (RExpr (ELit 0 t1)) ->
+              step D s H (EIf x e1 e2) s H (RExpr e2)
+   | SIfFalseNtHit : forall s H x e1 e2 t1, 
+           (NtHit s x) ->
+           step D s H (EDeref (EVar x)) s H (RExpr (ELit 0 t1)) ->
+              step D s H (EIf x e1 e2) (add_nt_one s x) H (RExpr e2).
 
 Hint Constructors step.
 
@@ -805,35 +718,66 @@ Require Import Lists.ListSet.
 
 Definition eq_dec_nt (x y : Z * type) : {x = y} + { x <> y}.
 repeat decide equality.
-Admitted. 
+Defined. 
 
 Definition scope := set (Z *type)%type. 
 Definition empty_scope := empty_set (Z * type).
 
+Module Env := Map.Make Nat_as_OT.
 
-(* type system for lits with subtyping *) 
-Inductive well_typed_lit (D : structdef) (H : heap): scope -> Z -> type -> Prop :=
-  | TyLitInt1 : forall s n t,
-      subtype D (TNat (RB (BZ n))) t ->
-      well_typed_lit D H s n t
+Definition env := Env.t type.
+
+Definition empty_env := @Env.empty type.
+
+Definition simp_bound (T:env) (b:bound) : bound :=
+   match b with Num n => Num n
+              | Var x n => (match Env.find x T with Some (TNat (Some (Num m))) => Num (n + m)
+                                                  | Some (TNat (Some (Var y m))) => Var y (n + m)
+                                                  | _ => Var x n
+                            end)
+   end. 
+
+Fixpoint simp_type (T: env) (t:type) : type :=
+  match t with TNat None => TNat None
+             | TNat (Some b) => TNat (Some (simp_bound T b))
+             | TPtr c t' => TPtr c (simp_type T t')
+             | TStruct x => TStruct x
+             | TArray l h t' => TArray (simp_bound T l) (simp_bound T h) (simp_type T t')
+             | TNtArray l h t' => TArray (simp_bound T l) (simp_bound T h) (simp_type T t')
+  end.
+
+(* Type check for a literal + simplifying the type. *)
+Inductive well_typed_lit (D : structdef) (H : heap) (T: env): scope -> Z -> type -> type -> Prop :=
+  | TyLitInt1 : forall s n,
+      well_typed_lit D H T s n (TNat None) (TNat (Some (Num n)))
   | TyLitInt2 : forall s n,
-      well_typed_lit D H s n (TNat Full)
+      well_typed_lit D H T s n (TNat (Some (Num n))) (TNat (Some (Num n)))
+  | TyLitInt3 : forall s n x m,
+      Env.MapsTo x (TNat None) T ->
+      well_typed_lit D H T s n (TNat (Some (Var x m))) (TNat (Some (Var x m)))
+  | TyLitInt4 : forall s n x i m,
+      Env.MapsTo x (TNat (Some (Num i))) T ->
+      n = i + m ->
+      well_typed_lit D H T s n (TNat (Some (Var x m))) (TNat (Some (Num n)))
+  | TyLitInt5 : forall s n x m y i,
+      Env.MapsTo x (TNat (Some (Var y i))) T ->
+      well_typed_lit D H T s n (TNat (Some (Var x m))) (TNat (Some (Var y (i + m))))
   | TyLitU : forall s n w,
-      well_typed_lit D H s n (TPtr Unchecked w)
+      well_typed_lit D H T s n (TPtr Unchecked w) (TPtr Unchecked (simp_type T w))
   | TyLitZero : forall s t,
-      well_typed_lit D H s 0 t
+      well_typed_lit D H T s 0 t (simp_type T t)
   | TyLitRec : forall s n w t,
       set_In (n, t) s ->
       subtype D t (TPtr Checked w) ->
-      well_typed_lit D H s n (TPtr Checked w)
+      well_typed_lit D H T s n (TPtr Checked w) (TPtr Checked (simp_type T w))
   | TyLitC : forall s n w b ts,
       Some (b, ts) = allocate_meta D w ->
       (forall k, b <= k < b + Z.of_nat(List.length ts) ->
-                 exists n' t',
+                 exists n' t' t'',
                    Some t' = List.nth_error ts (Z.to_nat (k - b)) /\
                    Heap.MapsTo (n + k) (n', t') H /\
-                   well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
-      well_typed_lit D H s n (TPtr Checked w).
+                   well_typed_lit D H T (set_add eq_dec_nt (n, TPtr Checked w) s) n' t' t'') ->
+      well_typed_lit D H T s n (TPtr Checked w) (TPtr Checked (simp_type T w)).
 
 
 Hint Constructors well_typed_lit.
@@ -846,14 +790,12 @@ Hint Constructors well_typed_lit.
 
     TODO: write blog post about this *)
 
-(*
 Lemma well_typed_lit_ind' :
-  forall (D : structdef) (H : heap) (P : scope -> Z -> type -> Prop),
-    (forall (s : scope) (n : Z), P s n TNat) ->
+  forall (D : structdef) (H : heap) (T: env) (P : scope -> Z -> type -> Prop),
+    (forall (s : scope) (n : Z), P s n (TNat None)) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s : scope) (n : Z) (w : type) (t : type), set_In (n, t) s
-             -> subtype D t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
+       (forall (s : scope) (n : Z) (w : type) (t : type), set_In (n, t) s -> subtype D t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
        (forall (s : scope) (n : Z) (w : type) (ts : list type) (b : Z),
         Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
@@ -861,11 +803,13 @@ Lemma well_typed_lit_ind' :
          exists (n' : Z) (t' : type),
            Some t' = nth_error ts (Z.to_nat (k - b)) /\
            Heap.MapsTo (n + k) (n', t') H /\
-           well_typed_lit D H (set_add eq_dec_nt (n, TPtr Checked w) s) n' t' /\
+           well_typed_lit D H T (set_add eq_dec_nt (n, TPtr Checked w) s) n' t' t' /\
            P (set_add eq_dec_nt (n, TPtr Checked w) s) n' t') ->
-        P s n (TPtr Checked w)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D H s n w -> P s n w.
+        P s n (TPtr Checked w)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D H T s n w w -> P s n w.
 Proof.
   intros D H P.
+Admitted.
+(*
   intros HTyLitInt
          HTyLitU
          HTyLitZero
@@ -887,8 +831,7 @@ Proof.
                                              | conj Ht' Hrest1 =>
                                                match Hrest1 with
                                                | conj Hheap Hwt =>
-                                                 ex_intro _ n' 
-             (ex_intro _ t' (conj Ht' (conj Hheap (conj Hwt (F (set_add eq_dec_nt (_ , TPtr Checked w') s') n' t' Hwt)))))
+                                                 ex_intro _ n' (ex_intro _ t' (conj Ht' (conj Hheap (conj Hwt (F (set_add eq_dec_nt (_ , TPtr Checked w') s') n' t' Hwt)))))
                                                end
                                              end
                                            end
@@ -896,226 +839,60 @@ Proof.
             end).
 Qed.
 *)
+
 (** Expression Typing *)
-(*
-Module Env := Map.Make Nat_as_OT.
-
-
-
-Definition env := Env.t type.
-*)
-
-Definition empty_env := @Env.empty type.
-
-Definition up_bneq r x := {| Blt := (Blt r) ; Bgt := (Bgt r) ; Bneq := x |}.
-Definition up_blt r x := {| Blt := x ; Bgt := (Bgt r) ; Bneq := (Bneq r) |}.
-Definition up_bgt r x := {| Blt := (Blt r) ; Bgt := x ; Bneq := (Bneq r) |}.
-
-Fixpoint add_to_list n (l: list (var * Z)) : list (var * Z) :=
-    match l with nil => nil
-             | ((x,m)::l') => ((x,m+n)::(add_to_list n l'))
+Definition add_bound (b1 b2: option bound) : option bound :=
+   match b1 with None => None
+               | Some (Num n) => (match b2 with None => None
+                                              | Some (Num m) => Some (Num (n + m))
+                                              | Some (Var x m) => Some (Var x (n + m))
+                                  end)
+               | Some (Var x n) => (match b2 with None => None
+                                                | Some (Num m) => Some (Var x (n + m))
+                                                | Some (Var y m) => None
+                                     end)
     end.
 
-Definition add_to_bneq n (r:varBound) : varBound :=
-   match Bneq r with None => r
-                | Some (nl, l) => up_bneq r (Some (map (fun m => m + n) nl, add_to_list n l))
-   end.
-
-Definition add_to_blt n (r:varBound) : varBound :=
-   match Blt r with None => r
-                | Some (None, l) => up_blt r (Some (None, add_to_list n l))
-                | Some (Some m,l) => up_blt r (Some (Some (m+n),add_to_list n l))
-   end.
-
-Definition add_to_bgt n (r:varBound) : varBound :=
-   match Bgt r with None => r
-                | Some (None, l) => up_bgt r (Some (None, add_to_list n l))
-                | Some (Some m,l) => up_bgt r (Some (Some (m+n),add_to_list n l))
-   end.
-
-Definition add_rec n (r:varBound) : varBound :=
-   add_to_bneq n (add_to_blt n (add_to_bgt n r)).
-
-Definition add_recs n (env:benv) := BEnv.map (fun r => add_rec n r) env.
-
-
-Definition add_meet (x y : range) : range :=
-   match x with Full => y
-             | RB (BZ n) => (match y with RB (BZ n') => RB (BZ (n+n'))
-                                       | RB (BVar u r) => RB (BVar u (add_recs n r))
-                                       | Full => Full
-                             end)
-             | RB (BVar u r) => (match y with RB (BZ n') => RB (BVar u (add_recs n' r))
-                                           | RB (BVar u' r') => Full
-                                           | Full => Full
-                                end)
-  end.
-
-Definition typeBound (Tv:tenv) b :=
-   match b with BZ x => Some (BZ x)
-              | BVar x benv' => (match Env.find x Tv with 
-                                              | Some (TNat Full) => Some (BVar x benv_empty)
-                                              | Some (TNat (RB (BZ a))) => Some (BZ a)
-                                              | Some (TNat (RB (BVar y benv))) => Some (BVar y benv)
-                                              | _ => None
-                           end)
-   end.
-
-Definition validTrue (Tv:tenv) b :=
-  match b with EqExp (BasicZ n) (BasicZ m) => if n =? m then True else False
-             | LtExp (BasicZ n) (BasicZ m) => if n <? m then True else False
-             | GtExp (BasicZ n) (BasicZ m) => if m <? n then True else False
-             | EqExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a =? n then True else False
-                                       | _ => False
-                              end)
-             | LtExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if n <? a then True else False
-                                       | _ => False
-                              end)
-             | GtExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a <? n then True else False
-                                       | _ => False
-                              end)
-             | EqExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a =? n then True else False
-                                       | _ => False
-                              end)
-             | LtExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a <? n then True else False
-                                       | _ => False
-                              end)
-             | GtExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if n <? a then True else False
-                                       | _ => False
-                              end)
-             | EqExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if a =? n then True else False
-                                       | _ => False
-                              end)
-             | LtExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if a <? n then True else False
-                                       | _ => False
-                              end)
-             | GtExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if n <? a then True else False
-                                       | _ => False
-                              end)
-   end.
-
-Definition validFalse (Tv:tenv) b :=
-  match b with EqExp (BasicZ n) (BasicZ m) => if n =? m then False else True
-             | LtExp (BasicZ n) (BasicZ m) => if n <? m then False else True
-             | GtExp (BasicZ n) (BasicZ m) => if m <? n then False else True
-             | EqExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a =? n then False else True
-                                       | _ => False
-                              end)
-             | LtExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if n <? a then False else True
-                                       | _ => False
-                              end)
-             | GtExp (BasicZ n) (BasicVar x) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a <? n then False else True
-                                       | _ => False
-                              end)
-             | EqExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a =? n then False else True
-                                       | _ => False
-                              end)
-             | LtExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if a <? n then False else True
-                                       | _ => False
-                              end)
-             | GtExp (BasicVar x) (BasicZ n) => 
-                             (match Env.find x Tv with 
-                                       | Some (TNat (RB (BZ a))) => if n <? a then False else True
-                                       | _ => False
-                              end)
-             | EqExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if a =? n then False else True
-                                       | _ => False
-                              end)
-             | LtExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if a <? n then False else True
-                                       | _ => False
-                              end)
-             | GtExp (BasicVar x) (BasicVar y) => 
-                             (match (Env.find x Tv,Env.find y Tv) with 
-                                       | (Some (TNat (RB (BZ a))),Some (TNat (RB (BZ n)))) => if n <? a then False else True
-                                       | _ => False
-                              end)
-   end.
-
-Check Env.add.
-
-(* TODO: add other cases. *)
-Definition up_env_b (Tv:tenv) b : tenv :=
-   match b with 
-             | EqExp (BasicZ n) (BasicVar x) => Env.add x (TNat (RB (BZ n))) Tv
-             | LtExp (BasicZ n) (BasicVar x) => 
-                (match Env.find x Tv with 
-                     (Some (TNat Full)) => Env.add x (TNat
-                             (RB (BVar x (BEnv.add x (mkBound None (Some (Some n,nil)) None) benv_empty)))) Tv
-                    | _ => Tv
-                 end)
-             | _ => Tv
+Definition is_ptr (t : type) : Prop :=
+    match t with TPtr m x => True 
+              | _ => False
     end.
 
-(* TODO: re-estiminate some of the rules and make it better. *)
-Inductive well_typed { D : structdef } { H : heap } : tenv -> mode -> expression -> type -> Prop :=
+Definition is_nt_ptr (t : type) : Prop :=
+    match t with TPtr m (TNtArray l h t') => True 
+              | _ => False
+    end.
+
+Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression -> type -> Prop :=
   | TyLit : forall env m n t t',
-      @well_typed_lit D H empty_scope n t' ->
+      @well_typed_lit D H env empty_scope n t t' ->
       well_typed env m (ELit n t) t'
-  | TyVar : forall env m x t t',
+  | TyVar1 : forall env m x t,
+      t <> TNat None ->
       Env.MapsTo x t env ->
-      subtype D t t' ->
-      well_typed env m (EVar x) t'
-  | TyLetConst : forall env m x e1 n e2 t,
-      well_typed env m e1 (TNat (RB (BZ n))) ->
-      well_typed (Env.add x (TNat (RB (BZ n))) env) m e2 t ->
-      well_typed env m (ELet x e1 e2) t
-  | TyLetVar : forall env m x y e1 e2 t benv,
-      well_typed env m e1 (TNat (RB (BVar y benv))) ->
-      well_typed (Env.add x (TNat (RB (BVar y benv))) env) m e2 t ->
-      well_typed env m (ELet x e1 e2) t
+      well_typed env m (EVar x) t
+  | TyVar2 : forall env m x,
+      Env.MapsTo x (TNat None) env ->
+      well_typed env m (EVar x) (TNat (Some (Var x 0)))
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
-      (forall n,  t1 <> (TNat (RB (BZ n)))) ->
-      (forall y benv,  t1 <> (TNat (RB (BVar y benv)))) ->
       well_typed (Env.add x t1 env) m e2 t ->
       well_typed env m (ELet x e1 e2) t
+  | TyPlus : forall env m e1 e2 nt1 nt2,
+      well_typed env m e1 (TNat nt1) ->
+      well_typed env m e2 (TNat nt2) ->
+      well_typed env m (EPlus e1 e2) (TNat (add_bound nt1 nt2))
   | TyFieldAddr : forall env m e m' T fs i fi ti,
       well_typed env m e (TPtr m' (TStruct T)) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
       well_typed env m (EFieldAddr e fi) (TPtr m' ti)
-  | TyPlus : forall env m e1 e2 r r1,
-      well_typed env m e1 (TNat r) ->
-      well_typed env m e2 (TNat r1) ->
-      well_typed env m (EPlus e1 e2) (TNat (add_meet r r1))
   | TyMalloc : forall env m w,
-      (forall l lv h hv t, w = TArray l h t ->
-           typeBound env l = Some (BZ lv) /\
-           typeBound env h = Some (BZ hv) /\
-           lv = 0 /\ hv > 0) ->
+      (forall l l' h' h t, w = TArray l h t
+              /\ simp_bound env l = Num l' /\ simp_bound env h = Num h' -> l' = 0 /\ h' > 0) ->
+      (forall l l' h' h t, w = TNtArray l h t
+              /\ simp_bound env l = Num l' /\ simp_bound env h = Num h' -> l' = 0 /\ h' > 0) ->
       well_typed env m (EMalloc w) (TPtr Checked w)
   | TyUnchecked : forall env m e t,
       well_typed env Unchecked e t ->
@@ -1124,31 +901,17 @@ Inductive well_typed { D : structdef } { H : heap } : tenv -> mode -> expression
       (m = Checked -> forall w, t <> TPtr Checked w) ->
       well_typed env m e t' ->
       well_typed env m (ECast t e) t
-  | TyIfTrue : forall env m t b e1 e2,
-        validTrue env b ->
-        well_typed (up_env_b env b) m e1 t ->
-      well_typed env m (EIf b e1 e2) t
-  | TyIfFalse : forall env m t b e1 e2,
-        validFalse env b ->
-        well_typed (up_env_b env b) m e1 t ->
-      well_typed env m (EIf b e1 e2) t
-  | TyIfAll : forall env m t b e1 e2,
-        not (validFalse env b) ->
-        not (validTrue env b) ->
-        well_typed (up_env_b env b) m e1 t ->
-        well_typed (up_env_b env b) m e2 t ->
-      well_typed env m (EIf b e1 e2) t
   | TyDeref : forall env m e m' t l h t' t'',
       well_typed env m e t ->
       subtype D t (TPtr m' t'') ->
       ((word_type t'' /\ t'' = t') \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref e) t'
-  | TyIndex : forall env m e1 m' l h t e2 t' r,
+  | TyIndex : forall env m e1 m' l h t e2 t' nt,
       word_type t' -> type_wf D t' ->
       well_typed env m e1 t ->
       subtype D t (TPtr m' (TArray l h t')) ->
-      well_typed env m e2 (TNat r) ->
+      well_typed env m e2 (TNat nt) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref (EPlus e1 e2)) t'
   | TyAssign : forall env m e1 m' t l h t' t'' e2,
@@ -1158,47 +921,79 @@ Inductive well_typed { D : structdef } { H : heap } : tenv -> mode -> expression
       ((word_type t'' /\ t'' = t') \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EAssign e1 e2) t'
-  | TyIndexAssign : forall env m e1 m' l h t e2 e3 t' r,
+  | TyIndexAssign : forall env m e1 m' l h t e2 e3 t' nt,
       word_type t' -> type_wf D t' ->
       well_typed env m e1 t ->
       subtype D t (TPtr m' (TArray l h t')) ->
-      well_typed env m e2 (TNat r) ->
+      well_typed env m e2 (TNat nt) ->
       well_typed env m e3 t' ->
       (m' = Unchecked -> m = Unchecked) ->
-      well_typed env m (EAssign (EPlus e1 e2) e3) t'.
-
+      well_typed env m (EAssign (EPlus e1 e2) e3) t'
+  | TyIfNoNt1 : forall env m m' x t t' e1 e2 t1 t2,
+      Env.MapsTo x t env ->
+      subtype D t (TPtr m' t') ->
+      (m' = Unchecked -> m = Unchecked) ->
+      not (is_nt_ptr t) ->
+      well_typed env m e1 t1 ->
+      well_typed env m e2 t2 ->
+      subtype D t1 t2 ->
+      (m' = Unchecked -> m = Unchecked) ->
+      well_typed env m (EIf x e1 e2) t1
+  | TyIfNoNt2 : forall env m m' x t t' e1 e2 t1 t2,
+      Env.MapsTo x t env ->
+      subtype D t (TPtr m' t') ->
+      (m' = Unchecked -> m = Unchecked) ->
+      not (is_nt_ptr t) ->
+      well_typed env m e1 t1 ->
+      well_typed env m e2 t2 ->
+      subtype D t2 t1 ->
+      well_typed env m (EIf x e1 e2) t2
+  | TyIfNt1 : forall env m m' x t e1 e2 t1 t2 l h h',
+      Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
+      (m' = Unchecked -> m = Unchecked) ->
+      simp_bound env h = Num h' -> h' = 0 ->
+      well_typed env m e1 t1 ->
+      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e2 t2 ->
+      subtype D t1 t2 ->
+      well_typed env m (EIf x e1 e2) t1
+  | TyIfNt2 : forall env m m' x t e1 e2 t1 t2 l h h',
+      Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
+      (m' = Unchecked -> m = Unchecked) ->
+      simp_bound env h = Num h' -> h' = 0 ->
+      well_typed env m e1 t1 ->
+      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e2 t2 ->
+      subtype D t2 t1 ->
+      well_typed env m (EIf x e1 e2) t2
+  | TyIfNt3 : forall env m m' x t e1 e2 t1 t2 l h h',
+      Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
+      (m' = Unchecked -> m = Unchecked) ->
+      simp_bound env h = Num h' -> h' <> 0 ->
+      well_typed env m e1 t1 ->
+      well_typed env m e2 t2 ->
+      subtype D t1 t2 ->
+      well_typed env m (EIf x e1 e2) t1
+  | TyIfNt4 : forall env m m' x t e1 e2 t1 t2 l h h',
+      Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
+      (m' = Unchecked -> m = Unchecked) ->
+      simp_bound env h = Num h' -> h' <> 0 ->
+      well_typed env m e1 t1 ->
+      well_typed env m e2 t2 ->
+      subtype D t2 t1 ->
+      well_typed env m (EIf x e1 e2) t2.
 
 Hint Constructors well_typed.
 
-Lemma ptr_subtype_equiv : forall D env m w t,
-subtype D env w (TPtr m t) ->
+Lemma ptr_subtype_equiv : forall D m w t,
+subtype D w (TPtr m t) ->
 exists t', w = (TPtr m t').
 Proof.
   intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
-  - intros. easy.
-  - intros. easy. 
-  - intros.
+  - intros. exists (TArray l h t).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
-    rewrite H4.
-    exists (TArray l h t).
-    reflexivity.
-  - intros.
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H4.
-    exists (TArray l h t).
-    reflexivity.
-  - intros.
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H4.
-    exists (TArray l h t).
-    reflexivity.
+    rewrite H0. reflexivity.
   - intros. exists (TStruct T).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
@@ -1209,43 +1004,29 @@ Qed.
 (* this might be an issue if we want to make checked pointers
 a subtype of unchecked pointers. This will need to
 be changed to generalize m*)
-Lemma ptr_subtype_equiv' : forall D env m w t,
-subtype D env (TPtr m t) w ->
+Lemma ptr_subtype_equiv' : forall D m w t,
+subtype D (TPtr m t) w ->
 exists t', w = (TPtr m t').
 Proof.
  intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
-  - intros. easy.
-  - intros. easy.
   - intros. exists (TArray l' h' t).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
-    rewrite H4. reflexivity.
-  - intros. exists (TArray l' h' t).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H4. reflexivity.
-  - intros. exists (TArray l' h' t).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H4. reflexivity.
-  - intros. exists (TNat x).
+    rewrite H0. reflexivity.
+  - intros. exists TNat.
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
     rewrite H1. reflexivity.
 Qed.
 
-Lemma nat_subtype : forall D env t,
-subtype D env (TNat Full) t ->
-t = (TNat Full).
+Lemma nat_subtype : forall D t,
+subtype D TNat t ->
+t = TNat.
 Proof.
-  intros. remember (TNat Full) as t'. induction H; eauto.
-  - exfalso. inv Heqt'.
-  - exfalso. inv Heqt'.
+  intros. remember TNat as t'. induction H; eauto.
   - exfalso. inv Heqt'.
   - exfalso. inv Heqt'.
 Qed.
@@ -1268,10 +1049,10 @@ Ltac clean :=
           | [ H : ?T = ?T -> _ |- _ ] => specialize (H eq_refl)
           end).
 
-Definition heap_consistent { D : structdef } (H' : heap) (H : heap) (Tv:tenv) : Prop :=
+Definition heap_consistent { D : structdef } (H' : heap) (H : heap) : Prop :=
   forall n t,
-    @well_typed_lit D H Tv empty_scope n t->
-    @well_typed_lit D H' Tv empty_scope n t.
+    @well_typed_lit D H empty_scope n t->
+    @well_typed_lit D H' empty_scope n t.
 
 Hint Unfold heap_consistent.
 
@@ -1330,9 +1111,9 @@ Require Import Omega.
 (*changed THIS!! REMEMBER*)
 
 Open Scope Z.
-Lemma wf_implies_allocate_meta_non_array :
+Lemma wf_implies_allocate_meta :
   forall (D : structdef) (w : type),
-    ((forall l h t, w <> TArray l h t)) ->
+    (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
     type_wf D w -> exists b allocs, allocate_meta D w = Some (b, allocs).
 Proof.
   intros D w HL HT.
@@ -1341,37 +1122,15 @@ Proof.
     apply StructDef.find_1 in H.
     rewrite -> H.
     eauto.
-  - inv HT.
-    destruct b.
-    eauto.
-    destruct b0.
-    eauto.
-    eauto.
 Qed.
 
-Lemma wf_implies_allocate_meta_array :
-  forall (D : structdef) (s:stack) l lv h hv t,
-     evalBound s l = Some lv -> evalBound s h = Some hv ->
-     lv = 0 -> hv > 0 ->
-    type_wf D (TArray l h t) -> exists b allocs, allocate_meta D (TArray l h t) = Some (b, allocs).
-Proof.
-  intros D s l lv h hv t H1 H2 H3 HL HT.
-  simpl in *; eauto.
-  - inv HT.
-    destruct l.
-    eauto.
-    destruct h.
-    eauto.
-    eauto.
-Qed.
-
-Lemma wf_implies_allocate_non_array :
+Lemma wf_implies_allocate :
   forall (D : structdef) (w : type) (H : heap),
-    ((forall l h t, w <> TArray l h t)) ->
+    (forall l h t, w = TArray l h t -> l = 0 /\ h > 0) ->
     type_wf D w -> exists n H', allocate D H w = Some (n, H').
 Proof.
   intros D w H HL HT.
-  eapply wf_implies_allocate_meta_non_array in HT; eauto.
+  eapply wf_implies_allocate_meta in HT; eauto.
   destruct HT as [l [ts HT]]. 
   unfold allocate. unfold allocate_meta in *.
   rewrite HT.
@@ -1386,41 +1145,7 @@ Proof.
 
   - destruct (StructDef.find s D) eqn:HFind; inv H1; eauto.
   - edestruct HL; eauto.
-Qed.
-
-Lemma wf_implies_allocate_array :
-  forall (D : structdef) (H : heap) (s:stack) l lv h hv t,
-     evalBound s l = Some lv -> evalBound s h = Some hv ->
-     lv = 0 -> hv > 0 ->
-    type_wf D (TArray l h t) -> exists n H', allocate D H (TArray l h t) = Some (n, H').
-Proof.
-  intros D H s l lv h hv t H1 H2 H3 HL HT.
-  eapply wf_implies_allocate_meta_array in HT; eauto.
-  destruct HT.   destruct H0.
-  unfold allocate. unfold allocate_meta in *.
-  unfold evalBound in H1.
-  destruct l eqn:eq.
-  edestruct (fold_left
-               (fun (acc : Z * heap) (t : type) =>
-                  let (sizeAcc, heapAcc) := acc in
-                  (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) (TArray (BVar v) h t :: nil)
-               ((Z.of_nat (Heap.cardinal H)), H)) as (z1, h1).
-  eauto.
-  unfold evalBound in H2.
-  destruct h eqn:eq1.
-  edestruct (fold_left
-               (fun (acc : Z * heap) (t : type) =>
-                  let (sizeAcc, heapAcc) := acc in
-                  (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) (TArray (BZ z) (BVar v) t :: nil)
-               ((Z.of_nat (Heap.cardinal H)), H)) as (z1, h1).
-  eauto.
-  inv H1.
-  edestruct (fold_left
-               (fun (acc : Z * heap) (t : type) =>
-                  let (sizeAcc, heapAcc) := acc in
-                  (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) (Zreplicate (z0 - 0) t)
-               ((Z.of_nat (Heap.cardinal H)), H)) as (z1, h1).
-  eauto.
+    subst; eauto.
 Qed.
 
 Definition unchecked (m : mode) (e : expression) : Prop :=
@@ -1568,18 +1293,14 @@ Proof.
 Qed.
 
 
-Lemma struct_subtype_non_empty : forall m T fs D tv,
-subtype D tv (TPtr m (TStruct T)) (TPtr m (TNat Full)) ->
+Lemma struct_subtype_non_empty : forall m T fs D,
+subtype D (TPtr m (TStruct T)) (TPtr m TNat) ->
 (StructDef.MapsTo T fs D) ->
 Z.of_nat(length (map snd (Fields.elements (elt:=type) fs))) > 0.
 Proof.
   intros. remember (TPtr m (TStruct T)) as p1.
-  remember (TPtr m (TNat Full)) as p2. induction H.
+  remember (TPtr m TNat) as p2. induction H.
   - exfalso. rewrite Heqp1 in Heqp2. inv Heqp2.
-  - exfalso. inv Heqp1.
-  - exfalso. inv Heqp1.
-  - exfalso. inv Heqp1.
-  - exfalso. inv Heqp1.
   - exfalso. inv Heqp1.
   - inv Heqp1. inv Heqp2. 
     assert (fs = fs0) by (eapply StructDefFacts.MapsTo_fun; eauto). 
@@ -1602,14 +1323,11 @@ Proof with eauto 20 with Progress.
   remember empty_env as env.
   induction Hwt as [
                      env m n t HTyLit                                       | (* Literals *)
-                     env m x t t' HVarInEnv Hsubs                           | (* Variables *)
-                     env m x e1 n e2 t HTy1 IH1 HTy2 IH2                    | (* Let-Expr-Const *)
-                     env m x y e1 e2 t HTy1 IH1 HTy2 IH2                    | (* Let-Expr-Var *)
-                     env m x e1 t1 e2 t HTy1 IH1 HnNat HnVar HTy2 IH2       | (* Let-Expr *)
+                     env m x t HVarInEnv                                    | (* Variables *)
+                     env m x e1 t1 e2 t HTy1 IH1 HTy2 IH2                   | (* Let-Expr *)
                      env m e m' T fs i fi ti HTy IH HWf1 HWf2               | (* Field Addr *)
-                     env m e1 e2 r r1 HTy1 IH1 HTy2 IH2                          | (* Addition *)
-                     env m w                                                | (* Malloc normal *)
-                     env m l lv h hv t                                                | (* Malloc array *)
+                     env m e1 e2 HTy1 IH1 HTy2 IH2                          | (* Addition *)
+                     env m w                                                | (* Malloc *)
                      env m e t HTy IH                                       | (* Unchecked *)
                      env m t e t' HChkPtr HTy IH                            | (* Cast *)
                      env m e m' w l h t t' HTy IH HSubType HPtrType HMode   | (* Deref *)
@@ -1625,40 +1343,6 @@ Proof with eauto 20 with Progress.
   - (* Impossible, since environment is empty *)
     inversion HVarInEnv.
   (* Case: TyLet *)
-  - (* `ELet x e1 e2` is not a value *)
-    right.
-    (* Invoke the IH on `e1` *)
-    destruct IH1 as [ HVal1 | [ HRed1 | HUnchk1 ] ].
-    (* Case: `e1` is a value *)
-    + (* We can take a step according to SLet *)
-      left.  
-      inv HVal1... 
-    (* Case: `e1` reduces *)
-    + (* We can take a step by reducing `e1` *)
-      left.
-      ctx (ELet x e1 e2) (in_hole e1 (CLet x CHole e2))...
-    (* Case: `e1` is unchecked *)
-    + (* `ELet x e1 e2` must be unchecked, since `e1` is *)
-      right.
-      ctx (ELet x e1 e2) (in_hole e1 (CLet x CHole e2)).
-      destruct HUnchk1...
-  - (* `ELet x e1 e2` is not a value *)
-    right.
-    (* Invoke the IH on `e1` *)
-    destruct IH1 as [ HVal1 | [ HRed1 | HUnchk1 ] ].
-    (* Case: `e1` is a value *)
-    + (* We can take a step according to SLet *)
-      left.  
-      inv HVal1... 
-    (* Case: `e1` reduces *)
-    + (* We can take a step by reducing `e1` *)
-      left.
-      ctx (ELet x e1 e2) (in_hole e1 (CLet x CHole e2))...
-    (* Case: `e1` is unchecked *)
-    + (* `ELet x e1 e2` must be unchecked, since `e1` is *)
-      right.
-      ctx (ELet x e1 e2) (in_hole e1 (CLet x CHole e2)).
-      destruct HUnchk1...
   - (* `ELet x e1 e2` is not a value *)
     right.
     (* Invoke the IH on `e1` *)
@@ -1756,44 +1440,13 @@ Proof with eauto 20 with Progress.
       right.
       ctx (EPlus e1 e2) (in_hole e1 (CPlusL CHole e2)).
       destruct HUnchk1...
-  (* Case: TyMalloc-normal *)
+  (* Case: TyMalloc *)
   - (* `EMalloc w` isn't a value *)
     right.
     (* Allocation always succeeds, according to SMalloc *)
     left.
     (* LEO: Where is H1 created from? Match goal style for maintainability *)
-    destruct (wf_implies_allocate_non_array D w H H0 H2) as [ n [ H' HAlloc]]...
-  (* Case: TyMalloc-array *)
-  - (* `EMalloc w` isn't a value *)
-    right.
-    (* Allocation always succeeds, according to SMalloc *)
-    left.
-    (* LEO: Where is H1 created from? Match goal style for maintainability *)
-    assert (evalBound st l = Some 0).
-    unfold typeBound in H0.
-    unfold evalBound.
-    destruct l eqn:eq.
-    destruct (Env.find (elt:=type) v empty_env) eqn:eq1.
-    unfold empty_env in eq1.
-    apply Env.find_2 in eq1.
-    assert (~ Env.MapsTo v t0 (Env.empty type)).
-    apply Env.empty_1.
-    contradiction.
-    inversion H0.
-    inv H0. reflexivity.
-    assert (evalBound st h = Some hv).
-    unfold typeBound in H1. unfold evalBound.
-    destruct h eqn:eq.
-    destruct (Env.find (elt:=type) v empty_env) eqn:eq1.
-    unfold empty_env in eq1.
-    apply Env.find_2 in eq1.
-    assert (~ Env.MapsTo v t0 (Env.empty type)).
-    apply Env.empty_1.
-    contradiction.
-    inversion H1.
-    inv H1. reflexivity.
-    assert (0 = 0). easy.
-    destruct (wf_implies_allocate_array D H st l 0 h hv t H2 H4 H6 H3 H5) as [ n [ H' HAlloc]]...
+    destruct (wf_implies_allocate D w H H0 H2) as [ n [ H' HAlloc]]...
   (* Case: TyUnchecked *)
   - (* `EUnchecked e` isn't a value *)
     right.
@@ -1832,8 +1485,7 @@ Proof with eauto 20 with Progress.
   (* Case: TyDeref *)
   - (* `EDeref e` isn't a value *)
     right.
-    admit.
-(*
+
     (* If m' is unchecked, then the typing mode `m` is unchecked *)
     destruct m'; [> | right; eauto 20 with Progress].
     clear HMode.
@@ -1863,7 +1515,7 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitZero *)
           {
            (* Impossible, since n > 0 *)
-           exfalso.  admit. (* lia. *)
+           exfalso. omega.
             (*subst. inv H2. inv H3.*)
           }
           (* Case: TyLitRec *)
@@ -2288,18 +1940,10 @@ Proof with eauto 20 with Progress.
       inv HRed1; ctx (EAssign (in_hole e E) e2) (in_hole e (CAssignL E e2))...
     + destruct HUnchk1 as [ e' [ E [ ] ] ]; subst.
       ctx (EAssign (in_hole e' E) e2) (in_hole e' (CAssignL E e2))...
-*)
-  - (* `EDerefPlus e` isn't a value *)
-    right.
-    admit.
   (* T-IndAssign *)
   - (* This isn't a value, so it must reduce *)
     right.
-    admit.
-  - (* This isn't a value, so it must reduce *)
-    right.
-    admit.
-(*
+
     (* If m' is unchecked, then we are typing mode is unchecked *)
     destruct m'; [> | right; eauto 20 with Progress].
     clear HMode.
@@ -2369,8 +2013,7 @@ Proof with eauto 20 with Progress.
       inv HRed1; ctx (EAssign (EPlus (in_hole e E) e2) e3) (in_hole e (CAssignL (CPlusL E e2) e3))...
     + destruct HUnchk1 as [ e' [ E [ He1 HEUnchk ] ] ]; subst.
       ctx (EAssign (EPlus (in_hole e' E) e2) e3) (in_hole e' (CAssignL (CPlusL E e2) e3))...
-*)
-Admitted.
+Qed.
 
 
 (* ... for Preservation *)
@@ -4379,7 +4022,7 @@ Proof with eauto 20 with Preservation.
                           end) by (eapply element_implies_element; eauto).
                     rewrite <- H in H0. inv H0. 
                     assert (Hyp: (N, TNat) = (n1, t1)). {
-                    eapply HeapFacts._fun.
+                    eapply HeapFacts.MapsTo_fun.
                     exact HM'. exact H9. }
                     inv Hyp; subst; eauto.
                 }
