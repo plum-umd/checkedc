@@ -952,16 +952,16 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
       (m' = Unchecked -> m = Unchecked) ->
       simp_bound env h = Num h' -> h' = 0 ->
-      well_typed env m e1 t1 ->
-      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e2 t2 ->
+      well_typed env m e2 t2 ->
+      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e1 t1 ->
       subtype D t1 t2 ->
       well_typed env m (EIf x e1 e2) t1
   | TyIfNt2 : forall env m m' x t e1 e2 t1 t2 l h h',
       Env.MapsTo x (TPtr m' (TNtArray l h t)) env ->
       (m' = Unchecked -> m = Unchecked) ->
       simp_bound env h = Num h' -> h' = 0 ->
-      well_typed env m e1 t1 ->
-      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e2 t2 ->
+      well_typed env m e2 t2 ->
+      well_typed (Env.add x (TPtr m' (TNtArray l (Num (h'+1)) t)) env) m e1 t1 ->
       subtype D t2 t1 ->
       well_typed env m (EIf x e1 e2) t2
   | TyIfNt3 : forall env m m' x t e1 e2 t1 t2 l h h',
