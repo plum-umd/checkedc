@@ -26,6 +26,19 @@ Module Make (X : OrderedType) <: MapS.S X.
       reflexivity.
     Qed.
 
+    Lemma mapsto_always_same : forall k v1 v2 s,
+           MapsTo (elt := elt) k v1 s ->
+            MapsTo (elt := elt) k v2 s -> 
+                       v1 = v2.
+    Proof.
+     intros.
+     apply find_1 in H.
+     apply find_1 in H0.
+     rewrite H in H0.
+     injection H0.
+     easy.
+    Qed.
+
     Lemma mapsto_add2 : forall k1 k2 v1 v2 s,
         MapsTo (elt := elt) k1 v1 (add k2 v2 s) ->
         ~ E.eq k1 k2 ->
