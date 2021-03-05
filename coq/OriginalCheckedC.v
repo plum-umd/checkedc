@@ -690,7 +690,8 @@ Proof.
                                              | conj Ht' Hrest1 =>
                                                match Hrest1 with
                                                | conj Hheap Hwt =>
-                                                 ex_intro _ n' (ex_intro _ t' (conj Ht' (conj Hheap (conj Hwt (F (set_add eq_dec_nt (_ , TPtr Checked w') s') n' t' Hwt)))))
+                                                 ex_intro _ n' (ex_intro _ t'
+                                            (conj Ht' (conj Hheap (conj Hwt (F (set_add eq_dec_nt (_ , TPtr Checked w') s') n' t' Hwt)))))
                                                end
                                              end
                                            end
@@ -1333,7 +1334,7 @@ Proof with eauto 20 with Progress.
             eapply step_implies_reduces.
             apply SDeref; eauto.
             - destruct H2; subst.
-            inv H2; simpl in *; inv H4; simpl in *; subst; eauto;                
+            inv H2. simpl in *. inv H4. simpl in *. subst. eauto.               
             inv H5; repeat econstructor; eauto.
             destruct x; unfold allocate_meta in H3; inv H3;
             simpl in H4; inv H4; eauto. 
@@ -1369,23 +1370,7 @@ Proof with eauto 20 with Progress.
                   inv H5.
                 }
               + inv HSubType.
-            * unfold allocate_meta in H3.
-              destruct x;
-              inv H3; simpl in H4; inv H4; (try constructor).
-              + inv HSubType.
-              + inv HSubType.
-            * unfold allocate_meta in H3.
-              destruct x;
-              inv H3; simpl in H4; inv H4; (try constructor).
-              + destruct (StructDef.find (elt:=fields) s D) eqn:HFind.
-                {
-                  assert (StructDef.MapsTo s f D) by (eapply find_implies_mapsto; eauto).
-                  inv H5. simpl in H3. inv HSubType.
-                }
-                {
-                  inv H5.
-                }
-              + inv HSubType.
+            * admit.
             - intros.
               destruct H2 as [Hyp1 Hyp2].
               subst.
@@ -2565,13 +2550,13 @@ Proof.
 
       destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
       { rewrite replicate_length ; zify; split; try omega. 
-        (*This should go through with omega but it doesn't
+        (*This should go through with omega but it doesn't*)
         assert (Hk : Z.of_nat (Z.to_nat k) = k). {
         destruct k; simpl.
           + reflexivity.
           + zify. omega.
           + exfalso. zify. apply HP1. simpl. reflexivity. }
-        rewrite Hk. assumption. *)
+        rewrite Hk. assumption.
       }
 
       rewrite Z.sub_0_r in *.
