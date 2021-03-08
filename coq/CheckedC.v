@@ -744,6 +744,11 @@ Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap ->
       -> Heap.MapsTo (n+n') (0,t1) H ->
             step D s H (EStrlen x) 
               (@Stack.add (Z*type) x (n,TPtr m (TNTArray (Num l) (Num (h + (n' - (h - l)))) t)) s) H (RExpr (ELit n' TNat))
+  | Strlen2 : forall s H x n n' m l h t t1, 
+     (Stack.find x s) = Some (n,TPtr m (TArray l h t)) ->
+     (forall i , n <= i < n' -> (exists n1 t1, Heap.MapsTo n (n1,t1) H /\ n1 <> 0))
+      -> Heap.MapsTo (n+n') (0,t1) H ->
+            step D s H (EStrlen x) s H (RExpr (ELit n' TNat))
   | SPlusChecked : forall s H n1 t1 t1' n2,
       n1 > 0 -> is_array_ptr t1 -> cast_type_bound s t1 t1' ->
       step D
@@ -1180,6 +1185,12 @@ Inductive meet_type (D : structdef) (S : stack) : type -> type -> type -> Prop :
   | meet_type_end_2 : forall a a' b b', cast_type_bound S a a' ->
                cast_type_bound S b b' -> subtype D b' a' -> meet_type D S a b b.
 
+Definition any_array_ptr (t:type) : Prop :=
+  match t with (TPtr m (TArray l h t')) => True
+             | (TPtr m (TNTArray l h t')) => True
+             | _ => False
+  end.
+
 Inductive well_typed { D : structdef } {S : stack} { H : heap } : env -> mode -> expression -> type -> Prop :=
   | TyLit : forall env m n t,
       well_type_bound_in env t ->
@@ -1189,6 +1200,11 @@ Inductive well_typed { D : structdef } {S : stack} { H : heap } : env -> mode ->
       well_type_bound_in env t ->
       Env.MapsTo x t env ->
       well_typed env m (EVar x) t
+  | TyStrlen : forall env m x t, 
+      well_type_bound_in env t ->
+      Env.MapsTo x t env ->
+      any_array_ptr t ->
+      well_typed env m (EStrlen x) t
   | TyLet : forall env m x e1 t1 e2 t,
       well_typed env m e1 t1 ->
       well_typed (Env.add x t1 env) m e2 t ->
