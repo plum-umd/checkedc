@@ -745,6 +745,7 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       ((word_type t'' /\ t'' = t') \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D t')) ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref e) t'
+
   | TyIndex : forall env m e1 m' l h t e2 t',
       word_type t' -> type_wf D t' ->
       well_typed env m e1 t ->
@@ -752,6 +753,7 @@ Inductive well_typed { D : structdef } { H : heap } : env -> mode -> expression 
       well_typed env m e2 TNat ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EDeref (EPlus e1 e2)) t'
+
   | TyAssign : forall env m e1 m' t l h t' t'' e2,
       well_typed env m e1 t ->
       well_typed env m e2 t' ->

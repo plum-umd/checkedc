@@ -259,6 +259,7 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
 Inductive expression : Type :=
   | ELit : Z -> type -> expression
   | EVar : var -> expression
+  | EStrlen : var -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : type -> expression
   | ECast : type -> expression -> expression
@@ -342,6 +343,7 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
 Fixpoint subst (x : var) (v : expression) (e : expression) : expression :=
   match e with
   | ELit _ _ => e
+  | EStrlen y => EStrlen y
   | EVar y => if var_eq_dec x y then v else e
   | ELet x' e1 e2 =>
     if var_eq_dec x x' then ELet x' (subst x v e1) e2 else ELet x' (subst x v e1) (subst x v e2)
@@ -736,6 +738,12 @@ Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap ->
       step D
            s H (EVar x)
            s H (RExpr (ELit v t))
+  | Strlen1 : forall s H x n n' m l h t t1, 
+     (Stack.find x s) = Some (n,TPtr m (TNTArray (Num l) (Num h) t)) ->
+     (forall i , n <= i < n' -> (exists n1 t1, Heap.MapsTo n (n1,t1) H /\ n1 <> 0))
+      -> Heap.MapsTo (n+n') (0,t1) H ->
+            step D s H (EStrlen x) 
+              (@Stack.add (Z*type) x (n,TPtr m (TNTArray (Num l) (Num (h + (n' - (h - l)))) t)) s) H (RExpr (ELit n' TNat))
   | SPlusChecked : forall s H n1 t1 t1' n2,
       n1 > 0 -> is_array_ptr t1 -> cast_type_bound s t1 t1' ->
       step D
