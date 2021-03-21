@@ -756,7 +756,7 @@ Definition malloc_bound (t:type) : Prop :=
    end.
 
 Definition change_strlen_stack (s:stack) (x : var) (m:mode) (t:type) (l:bound) (n n' h:Z) :=
-     if (n' - n) <=? h then s else @Stack.add (Z*type) x (n,TPtr m (TNTArray l (Num (n-n')) t)) s. 
+     if (n' - n) <=? h then s else @Stack.add (Z*type) x (n,TPtr m (TNTArray l (Num (n'-n)) t)) s. 
 
 Fixpoint gen_stack (vl:list var)  (es:list expression) (e:expression) : option expression := 
    match vl with [] => Some e
@@ -1044,14 +1044,16 @@ Inductive step (D : structdef) : stack -> heap -> expression -> stack -> heap ->
       step D
         s H (EUnchecked (ELit n t))
         s H (RExpr (ELit n t))
-   | SIfTrueNotNTHit : forall s H x e1 e2 n1 t1, 
-           step D s H (EDeref (EVar x)) s H (RExpr (ELit n1 t1)) ->
+   | SIfTrueNotNTHit : forall s H x n t e1 e2 n1 t1, 
+           Stack.MapsTo x (n,t) s ->
+           step D s H (EDeref (ELit n t)) s H (RExpr (ELit n1 t1)) ->
            n1 <> 0 -> ~ (NTHit s x) -> step D s H (EIf x e1 e2) s H (RExpr e1)
    | SIfTrueNTHit : forall s H x e1 e2 n1 t1, 
            step D s H (EDeref (EVar x)) s H (RExpr (ELit n1 t1)) ->
            n1 <> 0 -> (NTHit s x) -> step D (add_nt_one s x) H (EIf x e1 e2) s H (RExpr e1)
-   | SIfFalse : forall s H x e1 e2 t1, 
-           step D s H (EDeref (EVar x)) s H (RExpr (ELit 0 t1)) ->
+   | SIfFalse : forall s H x n t e1 e2 t1, 
+           Stack.MapsTo x (n,t) s ->
+           step D s H (EDeref (ELit n t)) s H (RExpr (ELit 0 t1)) ->
               step D s H (EIf x e1 e2) s H (RExpr e2)
    | SIfFail : forall s H x e1 e2 r, ~ is_rexpr r 
               -> step D s H (EDeref (EVar x)) s H r -> step D s H (EIf x e1 e2) s H r.
@@ -1088,6 +1090,8 @@ Definition reduces (D : structdef) (s : stack) (H : heap) (e : expression) : Pro
 
 Hint Unfold reduces.
 
+
+(* Defining function calls. *)
 Local Close Scope Z_scope.
 
 Local Open Scope nat_scope.
@@ -1121,23 +1125,33 @@ Fixpoint subst_var (e:expression) (x y :var) : expression :=
       | EUnchecked e => EUnchecked (subst_var e x y)
     end.
 
-Inductive gen_var : list var -> var -> Prop :=
-    gen_var_rule : forall s v, ~ In v s -> gen_var s v.
+Definition gen_var (l:list var) := (list_max l) + 1.
 
-Inductive gen_exp : list var -> list var -> list expression -> expression -> expression -> Prop :=
-     gen_exp_empty : forall S e, gen_exp S [] [] e e
-   | gen_exp_many : forall S x v vl e e' e1 es, gen_var S x -> gen_exp S vl es e e1 ->
-            gen_exp (x::S) (v::vl) (e'::es) e (subst_var e1 v x).
+Fixpoint gen_exp (state vl late:list var) (e:expression) :=
+    match vl with [] => (late,e)
+               | (x::xl) => let new_var := gen_var state in
+                             match gen_exp (new_var::state) xl late e
+                                with (late',e') => (new_var::late',subst_var e' x new_var)
+                             end
+    end.
 
-Inductive gen_let : list var -> list expression -> expression -> expression -> Prop :=
-   gen_let_empty : forall e, gen_let [] []  e e
-   | gen_let_many : forall v vl e' es e e1, gen_let vl es e e1 ->
-                       gen_let (v::vl) (e'::es) e (ELet v e' e1).
+Fixpoint gen_let (xl:list var) (el:list expression) (e:expression) :=
+    match xl with [] => Some e
+               | (y::yl) => match el with [] => None
+                              | (ye::yel) => 
+                                 match gen_let yl yel e with None => None
+                                     | Some e' => Some (ELet y ye e')
+                                 end
+                            end
+    end.
 
-Inductive ECall (F:fenv) (S:list var) : var -> list expression -> expression -> Prop := 
-    ecall : forall x es tl t vl e new_e new_e', FEnv.MapsTo x (tl, t, vl, e) F ->
-                gen_exp S vl es e new_e -> gen_let vl es new_e new_e' ->
-                      ECall F S x es new_e'.
+Definition ECall (F:fenv) (S:list var) (x:var) (el:list expression) := 
+      match FEnv.find x F with None => None
+                | Some (tl,t,vl,e) => 
+                match gen_exp S vl [] e with (late',e') => gen_let late' el e'
+                end
+       end.
+
 
 
 Local Close Scope nat_scope.
@@ -1447,6 +1461,7 @@ Definition fun_typed (D : structdef) (F:fenv) (S : stack) (H : heap) : Prop :=
 Inductive ty_ssa : list var -> expression -> list var -> Prop :=
    | ty_ssa_lit : forall S n t, ty_ssa S (ELit n t) S
    | ty_ssa_var : forall S x, ty_ssa S (EVar x) S
+   | ty_ssa_strlen : forall S x, ty_ssa S (EStrlen x) S
    | ty_ssa_let : forall S S' S'' x e1 e2, ~ In x S -> ty_ssa (x::S) e1 S'
                              -> ty_ssa S' e2 S'' -> ty_ssa S (ELet x e1 e2) S''
    | ty_ssa_if : forall S S' S'' x e1 e2, ty_ssa S e1 S' -> ty_ssa S' e2 S'' -> ty_ssa S (EIf x e1 e2) S''
@@ -4775,7 +4790,7 @@ Proof.
   - split.
     * destruct b. destruct b0.
 
-      remember (Zreplicate (z0 - z) w) as l.
+      remember (Zreplicate (z0 - z + 1) w) as l.
       pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
 
       remember (fold_left
@@ -4792,7 +4807,7 @@ Proof.
       inv Wb. inv Wb.
     * destruct b. destruct b0.
 
-      remember (Zreplicate (z0 - z) w) as l.
+      remember (Zreplicate (z0 - z + 1) w) as l.
 
       pose proof (fold_summary l D H ptr HWf) as Hyp.
       remember
@@ -4832,7 +4847,7 @@ Proof.
 
       destruct HK as [HP1 HP2].
 
-      destruct z0 as [ | p | ?]; simpl in *; [ lia | | lia].
+      destruct (z0+1) as [ | p | ?]; simpl in *; [ lia | | lia].
       rewrite replicate_length in *.
 
       destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
@@ -5329,7 +5344,7 @@ Proof.
         rewrite H1 in *.
         assert (((length (Fields.elements (elt:=type) fs)) >= 1)%nat) by (eapply fields_implies_length; eauto).
         intros. simpl in H5.
-        destruct (H2 k). zify. omega.
+        destruct (H2 k). zify. lia.
         exists x. exists TNat.
         assert (k = 0) by (destruct k; inv H5; eauto; exfalso; zify; lia).
         rewrite H9 in *. simpl. split; eauto.
@@ -5539,10 +5554,8 @@ Proof.
         exists N'. exists TNat.
         repeat (split; eauto).
         rewrite Z.add_0_r; eauto.
-      * assert (simple_type (TPtr m w)).
-        unfold fields_wf in Hfwf.
+      * unfold fields_wf in Hfwf.
         apply Hfwf in HF. destruct HF. destruct H1.
-        apply (well_typed_means_simple D). assumption. assumption.
         eapply TyLitC; simpl in *; eauto.
         intros k Hk; simpl in *.
         assert (k = 0) by lia; subst.
@@ -5868,6 +5881,7 @@ Proof.
   1 - 4 : assumption.
 Qed.
 
+(*
 Lemma simple_type_step : forall D H s e s' H' r, (forall x v t, Stack.MapsTo x (v,t) s -> simple_type t)
                                     -> step D s H e s' H' r -> (forall x v t, Stack.MapsTo x (v,t) s' -> simple_type t).
 Proof.
@@ -5883,7 +5897,7 @@ Proof.
   specialize (add_one_not_change x0 s H0 x v t) as eq1.
   apply eq1. assumption.
 Qed.
-
+*)
 
 Lemma well_bound_grow_env :
     forall env x v b, well_bound_in env b -> well_bound_in (Env.add x v env) b.
@@ -5892,7 +5906,6 @@ Proof.
    apply well_bound_in_num.
    apply well_bound_in_var.
    inv H. inv H2.
-   Check Env.add_2.
    destruct (var_eq_dec x v0).
    unfold Env.In,Env.Raw.PX.In.
    exists v. apply Env.add_1. assumption.
@@ -5975,6 +5988,7 @@ Inductive env_consistent : env -> env -> Prop :=
 Definition ty_ssa_stack (S:stack) (e:expression) 
             := exists l, (forall x,  Stack.In x S -> In x l) /\ (exists l', ty_ssa l e l').
 
+(* Defining stack. *)
 Lemma ty_ssa_preserve' : forall D S H S' H' e e', 
            ty_ssa_stack S e
           -> step D S H e S' H' (RExpr e') -> ty_ssa_stack S' e'.
@@ -5982,60 +5996,160 @@ Proof.
  unfold ty_ssa_stack in *.
  intros.
  induction e;eauto; destruct H0;destruct H0.
- inv H1. inv H1.
- exists x. split. easy.
- exists x.
- apply ty_ssa_lit. 
- inv H1. inv H2.
- exists (v::x).
- split.
- intros.  
- destruct (Nat.eq_dec x1 v).
- subst. apply in_eq.
- apply in_cons. apply H0.
- unfold Stack.In,Stack.Raw.PX.In in *.
- destruct H1.
- apply Stack.add_3 in H1.
- exists x2. assumption. lia.
- inv H. exists x0. inv H7. assumption.
- inv H1. exists x.
- split.  easy. exists x. easy.
- inv H1. exists x.
- split.  easy. exists x. easy.
- exists x.
- split.  easy. exists x. easy.
- exists x.
- split.  easy. exists x. easy.
- inv H1. exists x.
- split.  easy. exists x. easy.
- exists x.
- split.  easy. exists x. easy.
- inv H1. exists x.
- split.  easy. exists x. easy.
- exists x.
- split.  easy. exists x. easy.
- inv H1. exists x.
- split.  easy. exists x. easy.
- inv H1. exists x.
- split.  easy. exists x. easy.
- inv H1. inv H12. inv H12. inv H11. inv H13.
- inv H1. exists x.
- split.  easy. exists x. easy.
+ - inv H1. 
+ - inv H1.
+   exists x. split. easy.
+   exists x.
+   apply ty_ssa_lit.
+ - inv H1. unfold change_strlen_stack.
+   destruct (n' - n <=? h) eqn:eq1.
+   exists x.
+   intros. split. apply H0.
+   exists x. apply ty_ssa_lit.
+   exists x. split. 
+   intros.
+   apply H0.
+   unfold Stack.In,Stack.Raw.PX.In in *.
+   destruct H.
+   destruct (Nat.eq_dec x0 v). subst.
+   exists ((n, TPtr m (TNTArray l (Num h) t))).
+   apply Stack.find_2. assumption.
+   apply Stack.add_3 in H. exists x1. assumption. lia.
+   exists x. apply ty_ssa_lit.
+ - inv H1. inv H2.
+   exists (v::x).
+   split.
+   intros.  
+   destruct (Nat.eq_dec x1 v).
+   subst. apply in_eq.
+   apply in_cons. apply H0.
+   unfold Stack.In,Stack.Raw.PX.In in *.
+   destruct H1.
+   apply Stack.add_3 in H1.
+   exists x2. assumption. lia.
+   inv H. exists x0. inv H7. assumption.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+     exists x.
+     split.  easy. exists x. easy.
+     exists x.
+     split.  easy. exists x. easy.
+     exists x.
+     split.  easy. exists x. easy.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+     exists x.
+     split.  easy. exists x. easy.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+     exists x.
+     split.  easy. exists x. easy.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
+   - inv H1. 
+     exists x. split.  easy.
+     destruct H2. inv H. exists S'0. easy.
+     exists x. split. intros.
+     apply H0.
+     unfold Stack.In, Stack.Raw.PX.In in *.
+     destruct H.
+     destruct (Nat.eq_dec x0 v).
+     subst.
+     unfold add_nt_one.
+     specialize (@Stack.find_1 (Z * type) S' v x1 H) as eq1.
+     destruct (Stack.find (elt:=Z * type) v S').
+     inv eq1.
+     destruct x1. destruct t.
+     exists (z, TNat). easy.
+     destruct t. exists (z, TPtr m TNat). easy.
+     exists (z, TPtr m (TPtr m0 t)). easy.
+     exists (z, TPtr m (TStruct s)). easy.
+     exists (z, TPtr m (TArray b b0 t)). easy.
+     destruct b0.
+     exists (z, TPtr m (TNTArray b (Num (z0 + 1)) t)).
+     apply Stack.add_1. easy.
+     exists ((z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t))).
+     apply Stack.add_1. easy.
+     exists ((z, TStruct s)). easy.
+     exists (z, TArray b b0 t). easy.
+     exists (z, TNTArray b b0 t). easy.
+     exists x1. easy.
+     exists x1.
+     unfold add_nt_one.
+     destruct (Stack.find (elt:=Z * type) v S').
+     destruct p. destruct t.
+     assumption.
+     destruct t. assumption. assumption.
+     assumption. assumption.
+     destruct b0.
+     apply Stack.add_2. lia. assumption.
+     apply Stack.add_2. lia. assumption.
+     assumption. assumption. assumption. assumption.
+     destruct H2. inv H.
+     exists S'0. assumption.
+     destruct H2. inv H.
+     exists S'0. split.
+     intros.
+     apply ty_ssa_grow in H6.
+     apply H0 in H.
+     unfold list_subset in H6.
+     apply H6. assumption.
+     exists x0. assumption.
+     unfold is_rexpr in H12. contradiction.
+   - inv H1. exists x.
+     split.  easy. exists x. easy.
 Qed.
 
-Definition stack_grow (S S' : stack) :=
-     (forall x v, Stack.MapsTo x v S -> Stack.MapsTo x v S').
+Definition stack_grow (D: structdef) (S S' : stack) :=
+     (forall x v t, Stack.MapsTo x (v,t) S
+              -> (exists t', (subtype D t' t) /\ Stack.MapsTo x (v,t') S')).
 
 
 Lemma stack_grow_prop : forall D S H S' H' e e', 
            ty_ssa_stack S e
-          -> step D S H e S' H' (RExpr e') -> stack_grow S S'.
+          -> step D S H e S' H' (RExpr e') -> stack_grow D S S'.
 Proof.
  intros.
  specialize (ty_ssa_preserve' D S H S' H' e e' H0 H1) as eq1.
  remember (RExpr e') as e1.
  unfold stack_grow. intros.
- induction H1;subst;eauto.
+ induction H1.
+ exists t. split. constructor. easy.
+ unfold change_strlen_stack in *.
+ destruct ( n' - n <=? h) eqn:eq2.
+ exists t. split. constructor. easy.
+ assert (~ (n' - n <= h)).
+ specialize (Z.leb_le (n' - n) h) as eq3.
+ apply not_true_iff_false in eq2.
+ intros R.
+ apply eq3 in R. rewrite R in eq2. contradiction.
+ assert (h < n' - n) by lia.
+ destruct (Nat.eq_dec x x0).
+ subst.
+ apply Stack.find_1 in H2. rewrite H1 in H2. inv H2.
+ exists (TPtr m (TNTArray l (Num (n' - v)) t0)).
+ split. 
+ apply SubTyNtSubsume.
+ destruct l.
+ constructor. lia. constructor. lia.
+ constructor. lia.
+ apply Stack.add_1. lia.
+ exists t.
+ split. constructor.
+ apply Stack.add_2. lia. assumption.
+ 1 - 36 : exists t; split; try constructor; try easy.
+ apply eq3 in eq2.
+ Check Z.leb_iff.
+ apply leb_iff_conv in eq2.
+ inv H0. unfold change_strlen_stack in *.
+ destruct (n' - n <=? h). assumption.
+ destruct H5. destruct H5.
+
+ admit.
  inv H0.
  destruct H3. destruct H3. inv H3.
  destruct (Nat.eq_dec x x0).

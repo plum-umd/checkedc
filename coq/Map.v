@@ -39,6 +39,8 @@ Module Make (X : OrderedType) <: MapS.S X.
      easy.
     Qed.
 
+    Definition eq := E.eq.
+
     Lemma mapsto_add2 : forall k1 k2 v1 v2 s,
         MapsTo (elt := elt) k1 v1 (add k2 v2 s) ->
         ~ E.eq k1 k2 ->
