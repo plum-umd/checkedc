@@ -237,8 +237,9 @@ Inductive nat_leq : bound -> bound -> Prop :=
 
 Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D t t
-  | SubTyBot : forall m l h t, subtype D (TPtr m t) (TPtr m (TArray l h t))
-  | SubTyOne : forall m t, subtype D (TPtr m (TArray (Num 0) (Num 1) t)) (TPtr m t)
+  | SubTyTrans : forall t1 t2 t3, subtype D t1 t2 -> subtype D t2 t3 -> subtype D t1 t3
+  | SubTyBot : forall m t, subtype D (TPtr m t) (TPtr m (TArray (Num 0) (Num 1) t))
+  | SubTyOne : forall m t, word_type t -> subtype D (TPtr m (TArray (Num 0) (Num 1) t)) (TPtr m t)
   | SubTySubsume : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h -> 
     subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
@@ -1596,7 +1597,7 @@ exists t', w = (TPtr m t').
 Proof.
  intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
-  - intros. inv Heqp. exists (TArray l h t0). easy.
+  - intros. inv Heqp. exists (TArray (Num 0) (Num 1) t0). easy.
   - intros. inv Heqp. exists t. easy.
   - intros. exists (TArray l' h' t).
     assert (m0 = m). {
@@ -3037,8 +3038,9 @@ Proof with eauto 20 with Progress.
           { (* We can step according to SDeref *)
             destruct H11 with (k := 0) as [ n' [ t1' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
             inv H2; subst. inv H4; inv HSub; inv H3; inv H4; unfold allocate_meta in *; inv H10; simpl; (try lia).
-            unfold cast_bound in H7. unfold cast_bound in H12.
-            inv H7. inv H12.
+            inv H5.
+            unfold cast_bound in H9. unfold cast_bound in H12.
+            inv H9. inv H12.
             inv H3. simpl. lia.
             destruct (StructDef.find T D) eqn:HFind.
             assert (Hmap : StructDef.MapsTo T f D). 
@@ -3053,8 +3055,9 @@ Proof with eauto 20 with Progress.
             }
             inv H3; zify; (try lia).
             inv H3.
-            unfold cast_bound in H7. unfold cast_bound in H12.
-            inv H7. inv H12. inv H3. simpl. lia.
+            inv H5.
+            unfold cast_bound in H9. unfold cast_bound in H12.
+            inv H9. inv H12. inv H3. simpl. lia.
             rewrite Z.add_0_r in Hheap;
             inv Ht'tk.
             left.
@@ -3065,8 +3068,9 @@ Proof with eauto 20 with Progress.
               unfold allocate_meta in H10; inv H10;
               inv H5; simpl in *.
               apply WFELit; eauto. apply WFTNat.
-              unfold cast_bound in H9. unfold cast_bound in H13.
-              inv H9. inv H13.
+              inv H7.
+              unfold cast_bound in H10. unfold cast_bound in H13.
+              inv H10. inv H13.
               inv H3. inv H14. inv H4.
               apply WFELit; eauto. apply WFTNat.
             destruct (StructDef.find (elt:=fields) T D) eqn:HFind.
@@ -3088,8 +3092,9 @@ Proof with eauto 20 with Progress.
               constructor.
               constructor. eapply cast_type_wf.
               apply H9.  inv H1. inv H0. inv H3. assumption.
-            * unfold cast_bound in H9. unfold cast_bound in H13.
-              inv H9. inv H13.
+            * inv H7.
+              unfold cast_bound in H10. unfold cast_bound in H13.
+              inv H10. inv H13.
               inv H3. inv H14. inv H4.
               apply WFELit; eauto. apply WFTPtr.
               eapply cast_type_wf.
@@ -3131,16 +3136,18 @@ Proof with eauto 20 with Progress.
       * destruct H2.
         destruct H2 as [Ht H2].
         subst.
-        assert (HArr : exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
+
+        assert (HArr : (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))) \/ (t = TPtr Checked t')).
         {
           inv HSub.
-          exists l; exists h; reflexivity.
-          exists l0; exists h0; reflexivity.
+          left. exists l; exists h; reflexivity.
+          right. easy. inv H5.
+          left. exists l0; exists h0; reflexivity.
         }
 
-        rewrite Ht in *. clear Ht.
-        destruct HArr as [l1 [h1 HArr]].
-        rewrite HArr in *. clear HArr.
+        destruct HArr.
+        destruct H3 as [l1 [h1 HArr]].
+        subst.
         (* We now perform case analysis on 'n > 0' *)
         destruct (Z_gt_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
         (* Case: n > 0 *)
@@ -3160,7 +3167,7 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We proceed by case analysis on 'h > 0' -- the size of the array *)
             destruct H2 as [Hyp2 Hyp3]; subst.
-            apply (well_typed_means_simple D (TPtr Checked (TArray l1 h1 t)) H1) in H6.
+            apply (well_typed_means_simple D (TPtr Checked (TArray l1 h1 t')) H1) in H6.
             inv H6. inv H3. inv H8. inv H11.
             (* should this also be on ' h > 0' instead? DP*)
             destruct (Z_gt_dec h0 0) as [ Hneq0 | Hnneq0 ].
@@ -3168,17 +3175,17 @@ Proof with eauto 20 with Progress.
             { left. (* We can step according to SDeref *)
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               inv H5.
-              specialize (simple_type_means_cast_same st t H4) as eq1.
-              apply (cast_type_bound_same st t t t'0) in eq1. subst.
+              specialize (simple_type_means_cast_same st t' H4) as eq1.
+              apply (cast_type_bound_same st t' t' t'0) in eq1. subst.
               destruct (Z_gt_dec l0 0).
 
               (* if l > 0 we have a bounds error*)
               {
                 eapply step_implies_reduces. 
-                eapply (SDerefLowOOB1 D st H n (TPtr Checked (TArray (Num l0) (Num h0) t'0))
-                           (TPtr Checked (TArray (Num l0) (Num h0) t'0)) t'0 l0 h0). eapply g.
+                apply (SDerefLowOOB D F st H n (TPtr Checked (TArray (Num l0) (Num h0) t'0))
+                           (TPtr Checked (TArray (Num l0) (Num h0) t'0)) l0). eapply g.
                 unfold eval_type_bound. eauto.
-                reflexivity.
+                unfold get_low_ptr. easy.
               }
               
               (* if l <= 0 we can step according to SDeref. *)
@@ -3209,7 +3216,7 @@ Proof with eauto 20 with Progress.
               }
               subst t''.
               eapply step_implies_reduces.
-              apply (SDeref D st H n n' t'0 (TPtr Checked (TArray (Num l0) (Num h0) t'0))
+              apply (SDeref D F st H n n' t'0 (TPtr Checked (TArray (Num l0) (Num h0) t'0))
                           (TPtr Checked (TArray (Num l0) (Num h0) t'0))); eauto.
               - repeat constructor; eauto.
               - intros l' h' t'' HT.
@@ -3221,9 +3228,9 @@ Proof with eauto 20 with Progress.
             (* Case: h <= 0 *)
             { (* We can step according to SDerefOOB *)
               subst. left. eapply step_implies_reduces. 
-              eapply (SDerefHighOOB1 D st H n (TPtr Checked (TArray (Num l0) (Num h0) t))
-                           (TPtr Checked (TArray (Num l0) (Num h0) t)) t l0 h0). eauto.
-              unfold eval_type_bound; eauto. reflexivity.
+              eapply (SDerefHighOOB D F st H n (TPtr Checked (TArray (Num l0) (Num h0) t'))
+                           (TPtr Checked (TArray (Num l0) (Num h0) t')) h0). eauto.
+              unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
             } 
           }
         } 
@@ -3231,6 +3238,61 @@ Proof with eauto 20 with Progress.
         { (* We can step according to SDerefNull *)
           subst... }
         destruct H2 as [Ht H2].
+        subst.
+
+        destruct (Z_gt_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
+        (* Case: n > 0 *)
+        { (*Since w is subtype of a ptr it is also a ptr*)
+          (* We now proceed by case analysis on '|- n0 : ptr_C w' *)
+          inversion H8.
+          inv H4. inv H3. inv H3. 
+          (* Case: TyLitZero *)
+          {
+           (* Impossible, since n > 0 *)
+           exfalso. lia.
+            (*subst. inv H2. inv H3.*)
+          }
+          (* Case: TyLitRec *)
+          { (* Impossible, since scope is empty *)
+            solve_empty_scope. }
+          (* Case: TyLitC *)
+          { (* We can step according to SDeref *)
+            destruct H11 with (k := 0) as [ n' [ t1' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
+            inv H3. specialize (cast_word_type st t' w H5 Ht) as eq1.
+            unfold allocate_meta in *. destruct w.
+            inv H10. simpl. lia. inv H10. simpl. lia.
+            inv eq1. inv eq1. inv eq1.
+
+            rewrite Z.add_0_r in Hheap;
+            inv Ht'tk.
+            left.
+            eapply step_implies_reduces.
+            eapply SDeref; eauto.
+            - unfold allocate_meta in H10. inv H3.
+              specialize (cast_word_type st t' w H7 Ht) as eq1.
+              destruct w. inv H10.
+              inv H5. apply WFELit; eauto. apply WFTNat.
+              inv H10. inv H5.
+              apply WFELit; eauto. apply WFTPtr.
+              inv H7.
+              apply (cast_type_wf D st t). assumption.
+              inv H2. assumption.
+              1-3:inv eq1.
+            - unfold eval_type_bound,eval_bound.
+              destruct t'.
+              reflexivity. reflexivity.
+              inv Ht. inv Ht. inv Ht.
+            - intros. inv H4. inv Ht.
+            - intros. inv H4. inv Ht.
+          }
+        }
+        (* Case: n <= 0 *)
+        { (* We can step according to SDerefNull *)
+          left. eapply step_implies_reduces.
+         
+          eapply SDerefNull; eauto. 
+        }
+
         (*
         assert (HArr : exists l0 h0, w = (TPtr Checked (TArray l0 h0 t))).
         {
@@ -3239,9 +3301,10 @@ Proof with eauto 20 with Progress.
           exists l0; exists h0; reflexivity.
         }
          *)
-        assert (HArr : exists l0 h0, w = (TPtr Checked (TNTArray l0 h0 t))).
+        destruct H2 as [Ht H2]. subst.
+        assert (HArr : exists l0 h0, t = (TPtr Checked (TNTArray l0 h0 t'))).
         {
-          rewrite Ht in HSubType. inv HSubType.
+          inv HSub.
           exists l; exists h; reflexivity.
           exists l0; exists h0; reflexivity.
         }
