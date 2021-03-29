@@ -1627,15 +1627,33 @@ Proof.
   - assert (exists t, t' = (TPtr Unchecked t)) by (inv H1; eauto).
     destruct H0. rewrite H0. eauto.
   - eauto.
-  - 
+  - specialize (subtype_trans D t t' Checked w H2 H1) as eq1.
 
     assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
-    destruct H4. rewrite H4 in *.
+    destruct H3. rewrite H3 in *.
     eapply TyLitRec; eauto.
   - assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
     unfold allocate_meta in H0.
     induction w.
-    * inv H1. eapply TyLitC; eauto.
+    * inv H1. eapply TyLitC; eauto. 
+      inv H7. inv H9. eapply TyLitC; eauto.
+      unfold allocate_meta. eauto.
+      intros.
+      assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
+      destruct H5.
+      assert ((Zreplicate (l - h0) TNat) = []).
+      unfold Zreplicate. 
+      destruct (l - h0). easy.
+      specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
+      rewrite H8 in H1. simpl in H1. lia.
+      rewrite H5 in *.
+      unfold Zreplicate in *. simpl in *.
+      assert (k = h0) by lia. subst. simpl.
+      inv H0. simpl in *.
+      destruct (H2 0). lia.
+      destruct H0. 
+      destruct H0. destruct H8.
+      admit.
     * inv H1. eapply TyLitC; eauto.
     * inv H1. eapply TyLitC; eauto.
       eapply TyLitC; eauto.
