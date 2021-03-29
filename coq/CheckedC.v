@@ -253,8 +253,8 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D t t
   | SubTyBot : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
                            -> subtype D (TPtr m t) (TPtr m (TArray l h t))
-  | SubTyBotNT : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
-                             -> subtype D (TPtr m t) (TPtr m (TNTArray l h t))
+  (*| SubTyBotNT : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
+                             -> subtype D (TPtr m t) (TPtr m (TNTArray l h t)) *)
   | SubTyOne : forall m l h t, word_type t -> nat_leq l (Num 0) -> nat_leq (Num 1) h
                              -> subtype D (TPtr m (TArray l h t)) (TPtr m t)
   | SubTySubsume : forall l h l' h' t m,
@@ -262,7 +262,7 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
   | SubTyNtArray : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h ->
-                subtype D (TPtr m (TArray l h t)) (TPtr m (TNTArray l' h' t))
+                subtype D (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
   | SubTyNtSubsume : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h -> 
     subtype D (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
@@ -274,63 +274,43 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
     StructDef.MapsTo T fs D ->
     Some (TNat) = (Fields.find 0%nat fs) -> nat_leq (Num 0) l -> nat_leq h (Num 1) ->
     subtype D (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat)))
-  | SubTyStructArrayField_3 : forall (T : struct) (fs : fields) m l h,
+ (* | SubTyStructArrayField_3 : forall (T : struct) (fs : fields) m l h,
     StructDef.MapsTo T fs D ->
     Some (TNat) = (Fields.find 0%nat fs) -> nat_leq (Num 0) l -> nat_leq h (Num 1) ->
-    subtype D (TPtr m (TStruct T)) (TPtr m (TNTArray l h (TNat))).
+    subtype D (TPtr m (TStruct T)) (TPtr m (TNTArray l h (TNat))) *).
 
 Lemma subtype_trans : forall D t t' m w, subtype D t (TPtr m w) -> subtype D (TPtr m w) t' -> subtype D t t'.
 Proof.
  intros. inv H; inv H0.
       * eapply SubTyRefl.
       * eapply SubTyBot;eauto.
-      * eapply SubTyBotNT;eauto.
       * eapply SubTyOne; eauto.
       * eapply SubTySubsume; eauto.
       * eapply SubTyNtArray; eauto.
       * eapply SubTyNtSubsume; eauto.
       * eapply SubTyStructArrayField_1; eauto.
       * eapply SubTyStructArrayField_2; eauto.
-      * eapply SubTyStructArrayField_3; eauto.
       * eapply SubTyBot; eauto.
-      * inv H2.
       * inv H2.
       * eapply SubTyRefl.
       * eapply SubTyBot;eauto. eapply nat_leq_trans. apply H5. assumption.
          eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyBotNT; eauto.
-        eapply nat_leq_trans. apply H5. assumption.
-         eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyBotNT; eauto.
-      * inv H2.
-      * inv H2.
-      * eapply SubTyBotNT;eauto.
-        eapply nat_leq_trans. apply H5. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
       * eapply SubTyOne; eauto.
-      * eapply SubTySubsume; eauto.
+      * eapply SubTySubsume;eauto.
         eapply nat_leq_trans. apply H5. assumption.
-         eapply nat_leq_trans. apply H8. assumption.
-      * eapply SubTyNtArray; eauto.
-        eapply nat_leq_trans. apply H5. assumption.
-         eapply nat_leq_trans. apply H8. assumption.
-      * inv H3.
-      * inv H3.
-      * inv H3.
-      * inv H3.
-      * inv H3.
-      * inv H3.
-      * inv H3.
-      * eapply SubTySubsume; eauto.
-      * inv H2.
-      * inv H2.
-      * eapply SubTyOne; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTySubsume; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
-      * eapply SubTyNtArray; eauto.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * eapply SubTySubsume; eauto.
+      * inv H2.
+      * eapply SubTyOne; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTySubsume; eauto.
         eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyNtArray; eauto.
@@ -1635,8 +1615,9 @@ Proof.
   - assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
     unfold allocate_meta in H0.
     induction w.
-    * inv H1. eapply TyLitC; eauto. 
-      inv H7. inv H9. eapply TyLitC; eauto.
+    * inv H1.
+      ++ eapply TyLitC; eauto. 
+      ++ inv H7. inv H9. eapply TyLitC; eauto.
       unfold allocate_meta. eauto.
       intros.
       assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
@@ -1653,9 +1634,41 @@ Proof.
       destruct (H2 0). lia.
       destruct H0. 
       destruct H0. destruct H8.
+      assert (l = 1) by lia.
+      assert (h0 = 0) by lia.
+      subst.
+      exists x. exists x0.
+      split. easy. split. easy.
+      inv H0. apply TyLitInt.
+      ++ inv H7. inv H9. eapply TyLitC; eauto.
+      unfold allocate_meta. eauto.
       admit.
+(*
+      assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
+      destruct H5.
+      assert ((Zreplicate (l - h0) TNat) = []).
+      unfold Zreplicate. 
+      destruct (l - h0). easy.
+      specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
+      rewrite H8 in H1. simpl in H1. lia.
+      rewrite H5 in *.
+      unfold Zreplicate in *. simpl in *.
+      assert (k = h0) by lia. subst. simpl.
+      inv H0. simpl in *.
+      destruct (H2 0). lia.
+      destruct H0. 
+      destruct H0. destruct H8.
+      assert (l = 1) by lia.
+      assert (h0 = 0) by lia.
+      subst.
+      exists x. exists x0.
+      split. easy. split. easy.
+      inv H0. apply TyLitInt.
+*)
     * inv H1. eapply TyLitC; eauto.
-    * inv H1. eapply TyLitC; eauto.
+      admit. admit.
+    * admit. (* inv H1. eapply TyLitC; eauto.
+     
       eapply TyLitC; eauto.
       unfold allocate_meta; eauto.
       simpl in H0. destruct (StructDef.find (elt:=fields) s D) eqn:Hf.
@@ -1674,8 +1687,10 @@ Proof.
         rewrite <- (element_implies_element s fs D TNat H0 H8) in H7.
         inv H7. destruct H10.
         split. assumption. eauto.
-      + inv H0.
+      + inv H0. *)
     * clear IHw. inv H0.
+      admit.
+    * 
       inv H1. clear H3. 
         + eapply TyLitC; eauto.
         + clear H3.
