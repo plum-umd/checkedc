@@ -237,8 +237,7 @@ Inductive nat_leq : bound -> bound -> Prop :=
 
 Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D t t
-  | SubTyTrans : forall t1 t2 t3, subtype D t1 t2 -> subtype D t2 t3 -> subtype D t1 t3
-  | SubTyBot : forall m t, subtype D (TPtr m t) (TPtr m (TArray (Num 0) (Num 1) t))
+  | SubTyBot : forall m t, word_type t -> subtype D (TPtr m t) (TPtr m (TArray (Num 0) (Num 1) t))
   | SubTyOne : forall m t, word_type t -> subtype D (TPtr m (TArray (Num 0) (Num 1) t)) (TPtr m t)
   | SubTySubsume : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h -> 
@@ -1457,7 +1456,7 @@ Inductive well_typed { D : structdef } {F : fenv} {S : stack} { H : heap }
       well_typed env m (EDeref (EPlus e1 e2)) t'
   | TyAssign1 : forall env m e1 e2 m' t t1 t2,
       subtype D (TPtr m' t1) (TPtr m' t2) ->
-      word_type t1 -> type_eq S t t2 ->
+      word_type t -> type_eq S t t2 ->
       well_typed env m e1 (TPtr m' t) ->
       well_typed env m e2 t1 ->
       (m' = Unchecked -> m = Unchecked) ->
@@ -2273,7 +2272,7 @@ Lemma subtype_simple_left : forall D t t', subtype D t t'
 Proof.
   intros. 
   induction H. assumption.
-  inv H0. inv H1.
+  inv H0. inv H2.
   constructor. easy.
   constructor.
   apply SPTArray. inv H0. easy.
@@ -2384,6 +2383,13 @@ Proof.
   subst. inv H0. easy.
 Qed.
 
+Lemma type_eq_struct : forall s T t, type_eq s (TStruct T) t -> t = TStruct T.
+Proof.
+  intros. remember (TStruct T) as t'. induction H. easy.
+  subst. inv H0. easy.
+  subst. inv H0. easy.
+Qed.
+
 Lemma sub_domain_grow : forall env S x v t t', sub_domain env S 
                  -> sub_domain (Env.add x t env) (Stack.add x (v,t') S).
 Proof.
@@ -2473,6 +2479,15 @@ Proof.
   exists (ELet x (ELit v t') x0).
   apply gen_e_many.
   assumption.
+Qed.
+
+Lemma subtype_word_type : forall D m t1 t2, word_type t1 -> 
+        subtype D (TPtr m t1) (TPtr m t2) -> t2 = t1 \/ t2 = TArray (Num 0) (Num 1) t1.
+Proof.
+  intros. 
+  inv H0. left. easy.
+  right. easy.
+  inv H. inv H. inv H. inv H. inv H.
 Qed.
 
 Lemma progress : forall D F H s m e t,
@@ -3302,15 +3317,16 @@ Proof with eauto 20 with Progress.
         }
          *)
         destruct H2 as [Ht H2]. subst.
-        assert (HArr : exists l0 h0, t = (TPtr Checked (TNTArray l0 h0 t'))).
+        assert (HArr : (exists l0 h0, t = (TPtr Checked (TNTArray l0 h0 t'))) \/ t = (TPtr Checked (TArray l h t'))).
         {
           inv HSub.
-          exists l; exists h; reflexivity.
-          exists l0; exists h0; reflexivity.
+          left. exists l; exists h; easy.
+          inv H5. right. easy.
+          left. exists l0; exists h0; reflexivity.
         }
 
-        rewrite Ht in *. clear Ht.
-        destruct HArr as [l1 [h1 HArr]].
+        destruct HArr.
+        destruct H3 as [l1 [h1 HArr]].
         rewrite HArr in *. clear HArr.
         (* We now perform case analysis on 'n > 0' *)
         destruct (Z_gt_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
@@ -3331,7 +3347,7 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We proceed by case analysis on 'h > 0' -- the size of the array *)
             destruct H2 as [Hyp2 Hyp3]; subst.
-            apply (well_typed_means_simple D (TPtr Checked (TNTArray l1 h1 t)) H1) in H6.
+            apply (well_typed_means_simple D (TPtr Checked (TNTArray l1 h1 t')) H1) in H6.
             inv H6. inv H3.
             (* should this also be on ' h > 0' instead? DP*)
             destruct (Z_gt_dec h0 0) as [ Hneq0 | Hnneq0 ].
@@ -3343,9 +3359,10 @@ Proof with eauto 20 with Progress.
               (* if l > 0 we have a bounds error*)
               {
                 eapply step_implies_reduces. 
-                eapply (SDerefLowOOB2 D st H n (TPtr Checked (TNTArray (Num l0) (Num h0) t))
-                           (TPtr Checked (TNTArray (Num l0) (Num h0) t)) t l0 h0). eapply g.
+                eapply (SDerefLowOOB D F st H n (TPtr Checked (TNTArray (Num l0) (Num h0) t'))
+                           (TPtr Checked (TNTArray (Num l0) (Num h0) t')) l0). eapply g.
                 unfold eval_type_bound. eauto.
+                unfold get_low_ptr.
                 reflexivity.
               }
               
@@ -3378,23 +3395,114 @@ Proof with eauto 20 with Progress.
               }
               subst t''.
               apply (simple_type_means_cast_same st) in H4.
-              apply (cast_type_bound_same st t t t'0) in H4. rewrite H4 in *.
+              apply (cast_type_bound_same st t' t' t'0) in H4. rewrite H4 in *.
               eapply step_implies_reduces.
-              apply (SDeref D st H n n' t'0 (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))
+              apply (SDeref D F st H n n' t'0 (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))
                           (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))); eauto.
               - repeat constructor; eauto.
               - intros. inv H2.
               - intros l' h' t'' HT.
-                injection HT; intros ? ? ?; subst h0 l0 t.
+                injection HT. intros. subst.
                 split; zify; lia.
               - assumption.
             }
             (* Case: h <= 0 *)
             { (* We can step according to SDerefOOB *)
               subst. left. eapply step_implies_reduces. 
-              eapply (SDerefHighOOB2 D st H n (TPtr Checked (TNTArray (Num l0) (Num h0) t))
-                           (TPtr Checked (TNTArray (Num l0) (Num h0) t)) t l0 h0). eauto.
-              unfold eval_type_bound; eauto. reflexivity.
+              eapply (SDerefHighOOB D F st H n (TPtr Checked (TNTArray (Num l0) (Num h0) t'))
+                           (TPtr Checked (TNTArray (Num l0) (Num h0) t')) h0). eauto.
+              unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
+            } 
+          }
+        } 
+        (* Case: n <= 0 *)
+        { (* We can step according to SDerefNull *)
+          subst... }
+     (* when t is a TArray ptr. *)
+     (* We now perform case analysis on 'n > 0' *)
+        subst.
+        destruct (Z_gt_dec n 0) as [ Hn0eq0 | Hn0neq0 ].
+        (* Case: n > 0 *)
+        { (* We now proceed by case analysis on '|- n0 : ptr_C (array n t)' *)
+          inv H8. inv H3. inv H9.
+          match goal with
+          | [ H : well_typed_lit _ _ _ _ _ |- _ ] => inv H
+          end.
+          (* Case: TyLitZero *)
+          { (* Impossible, since n0 <> 0 *)
+            exfalso. inv Hn0eq0.
+          } 
+          (* Case: TyLitRec *)
+          { (* Impossible, since scope is empty *)
+            solve_empty_scope.
+          } 
+          (* Case: TyLitC *)
+          { (* We proceed by case analysis on 'h > 0' -- the size of the array *)
+            destruct H2 as [Hyp2 Hyp3]; subst.
+            apply (well_typed_means_simple D (TPtr Checked (TArray l h t')) H1) in H6.
+            inv H6. inv H3. inv H8. inv H11.
+            (* should this also be on ' h > 0' instead? DP*)
+            destruct (Z_gt_dec h0 0) as [ Hneq0 | Hnneq0 ].
+            (* Case: h > 0 *)
+            { left. (* We can step according to SDeref *)
+              (* LEO: This looks exactly like the previous one. Abstract ? *)
+              inv H5.
+              specialize (simple_type_means_cast_same st t' H4) as eq1.
+              apply (cast_type_bound_same st t' t' t'0) in eq1. subst.
+              destruct (Z_gt_dec l0 0).
+
+              (* if l > 0 we have a bounds error*)
+              {
+                eapply step_implies_reduces. 
+                apply (SDerefLowOOB D F st H n (TPtr Checked (TArray (Num l0) (Num h0) t'0))
+                           (TPtr Checked (TArray (Num l0) (Num h0) t'0)) l0). eapply g.
+                unfold eval_type_bound. eauto.
+                unfold get_low_ptr. easy.
+              }
+              
+              (* if l <= 0 we can step according to SDeref. *)
+
+              assert (Hhl : h0 - l0 > 0). {
+                destruct h0. inv Hneq0. lia. inv Hneq0.
+              }
+              destruct (h0 - l0) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+              simpl in *.
+              rewrite replicate_length in *.
+              assert (HL: l0 + Z.of_nat (Pos.to_nat p) = h0) by (zify; lia).
+              rewrite HL in *; try lia.
+
+              destruct H10 with (k := 0) as [ n' [ t'' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
+              { (split;  lia). }
+
+              rewrite Z.add_0_r in Hheap.
+              simpl in *.
+
+              assert (Hp': Z.of_nat (Pos.to_nat p) = Z.pos p) by lia.
+              rewrite Hp' in *; clear Hp'.
+              assert (Hp': Pos.to_nat p = Z.to_nat (Z.pos p)) by (simpl; reflexivity).
+              rewrite Hp' in *; clear Hp'. 
+
+              assert (t'0 = t'').
+              {
+                eapply replicate_nth; eauto.
+              }
+              subst t''.
+              eapply step_implies_reduces.
+              apply (SDeref D F st H n n' t'0 (TPtr Checked (TArray (Num l0) (Num h0) t'0))
+                          (TPtr Checked (TArray (Num l0) (Num h0) t'0))); eauto.
+              - repeat constructor; eauto.
+              - intros l' h' t'' HT.
+                injection HT; intros ? ? ?; subst h0 l0 t'0.
+                split; zify; lia.
+              - intros. inv H2.
+              - assumption.
+            }
+            (* Case: h <= 0 *)
+            { (* We can step according to SDerefOOB *)
+              subst. left. eapply step_implies_reduces. 
+              eapply (SDerefHighOOB D F st H n (TPtr Checked (TArray (Num l0) (Num h0) t'))
+                           (TPtr Checked (TArray (Num l0) (Num h0) t')) h0). eauto.
+              unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
             } 
           }
         } 
@@ -3578,18 +3686,17 @@ Proof with eauto 20 with Progress.
             + exfalso; inv H0; inv HSubType.
             + exfalso; inv H0; inv HSubType.
             + left.
+              eapply step_implies_reduces.
+              eapply SAssignNull; eauto. lia.
+              apply subtype_word_type in HSubType.
+              destruct HSubType. subst.
               apply (well_typed_means_simple D) in H4.
-              apply meet_type_word_type in HTy.
-              inv HTy.
-              * inv HTy2.
-                eapply step_implies_reduces.
-                eapply SAssignNull; eauto. lia.
-                apply eval_simple_type_same. assumption.
-              * eapply step_implies_reduces.
-                eapply SAssignNull; eauto. lia.
-                apply eval_simple_type_same. assumption.
-              * assumption.
-              * assumption.
+              apply eval_simple_type_same. assumption.
+              assumption.
+              apply eval_simple_type_same.
+              apply (well_typed_means_simple D) in H4. assumption.
+              assumption. 
+              inv HTy2. assumption.
             + solve_empty_scope.
             + left. unfold allocate_meta in H2.
               destruct w; inv H2; simpl in *. inv H0. inv H2. inv HSubType.
@@ -3601,10 +3708,16 @@ Proof with eauto 20 with Progress.
                    eapply SAssign; eauto);
               try (eexists; eauto);
               intros; try congruence...
-              apply meet_type_tnat in HTy. subst.
+              apply type_eq_tnat in HTy. subst.
               inv HTy2.
               apply cast_type_bound_nat.
-              ++ inv H0. inv H2. inv HSubType. 
+              ++ inv HTy. inv H2. inv H2.
+              ++ inv HTy2. inv Wtt2'.
+              ++ apply type_eq_tnat in HTy. inv HTy.
+              ++ apply type_eq_tnat in HTy. inv HTy.
+              ++ apply type_eq_tnat in HTy. inv HTy.
+              ++ inv HTy2. inv Wtt2'.
+              ++ inv H0. inv H2.
                 destruct (H3 0) as [x [xT [HNth [HMap HWT]]]]; simpl in*;
                 try (zify; lia);
                 try rewrite Z.add_0_r in *;
@@ -3617,25 +3730,11 @@ Proof with eauto 20 with Progress.
               apply empty_means_cast_type_bound_same.
               assumption.
               ++ destruct (StructDef.find (elt:=fields) s D)eqn:Hmap; inv H5.
-                 inv H0. inv H2. inv HSubType.
+                 inv H0. inv H2. apply type_eq_struct in HTy. subst. inv HSubType.
                 -- inv WT.
-                -- apply meet_type_tnat in HTy. subst.
-                   destruct (H3 0) as [x [xT [HNth [HMap HWT]]]]; simpl in*;
-                   try (zify; lia);
-                   try rewrite Z.add_0_r in *;
-                   eauto;
-                   try (eapply step_implies_reduces;
-                   eapply SAssign; eauto);
-                   try (eexists; eauto);
-                   intros; try congruence... lia.
-                   rewrite map_length. apply find_implies_mapsto in Hmap.
-                   assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
-                   rewrite H0 in *.
-                   assert (((length (Fields.elements (elt:=type) fs)) > 0)%nat) by (eapply fields_implies_length; eauto).
-                   zify; lia.
-                   inv HTy2. constructor.
-              ++ inv H0. inv H2. inv HSubType. inv WT. inv WT.
-              ++ inv H0. inv H2. inv HSubType. inv WT. inv WT.
+                -- inv WT. 
+              ++ inv H0. inv H2. inv WT.
+              ++ inv H0. inv H2. inv WT.
          }
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ ? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -3680,13 +3779,10 @@ Proof with eauto 20 with Progress.
                 destruct (Z_gt_dec l0 0).
                 { (* l > 0 *)
                 eapply step_implies_reduces.
-                eapply SAssignLowOOB1; eauto... inv HTy2.
-               
-                apply type_eq_simple_same in Teq.
-                subst.
-                unfold eval_type_bound,eval_bound. eauto.
-                assumption.
-                apply (well_typed_means_simple D); assumption. }
+                eapply SAssignLowOOB; eauto... inv HTy2.
+                unfold eval_type_bound,eval_bound. reflexivity.
+                unfold get_low_ptr. easy.
+                }
                 { (* l <= 0 *)
                   eapply step_implies_reduces.
                   eapply SAssignNull; eauto. lia.
@@ -3694,12 +3790,9 @@ Proof with eauto 20 with Progress.
                 }
               * (* h <= 0 *)
                 eapply step_implies_reduces.
-                eapply SAssignHighOOB1; eauto... inv HTy2.
-                apply type_eq_simple_same in Teq.
-                subst.
-                unfold eval_type_bound,eval_bound. eauto.
-                assumption.
-                apply (well_typed_means_simple D); assumption.
+                eapply SAssignHighOOB; eauto... 
+                unfold eval_type_bound, eval_bound. reflexivity.
+                unfold get_high_ptr. easy.
             + solve_empty_scope.
             + left.
               specialize (well_typed_means_simple D (TPtr Checked (TArray l h t)) Ht1' H4) as eq1.
@@ -3711,12 +3804,9 @@ Proof with eauto 20 with Progress.
                       destruct (Z_gt_dec l0 0).
                       { (* l > 0 *)
                       eapply step_implies_reduces.
-                      eapply SAssignLowOOB1; eauto... inv HTy2.
-                      apply type_eq_simple_same in Teq.
-                      subst.
-                      unfold eval_type_bound,eval_bound. eauto.
-                      assumption.
-                      apply (well_typed_means_simple D); assumption. }
+                      eapply SAssignLowOOB; eauto... 
+                      unfold eval_type_bound, eval_bound. reflexivity.
+                      unfold get_low_ptr. easy. }
                       { (* l <= 0 *)
                         eapply step_implies_reduces.
                         eapply SAssign; eauto.
@@ -3741,7 +3831,7 @@ Proof with eauto 20 with Progress.
                         assert (Heap.find n1' H = Some (x, x0)) by (eapply Heap.find_1; assumption).
                         eapply HeapProp.F.in_find_iff. 
                         rewrite H6. easy. assumption.
-                        unfold eval_type_bound,eval_bound. eauto.
+                        unfold eval_type_bound, eval_bound. reflexivity.
                         intros l1 h1 t1 Heq; inv Heq; zify; lia.
                         intros. inv H1.
                         inv HTy2. inv H11.
@@ -3750,24 +3840,17 @@ Proof with eauto 20 with Progress.
                       }
                     * (* h <= 0 *)
                       eapply step_implies_reduces.
-                      eapply SAssignHighOOB1; eauto...
-                      unfold eval_type_bound,eval_bound. inv HTy2.
-                      apply type_eq_simple_same in Teq.
-                      subst.
-                      unfold eval_type_bound,eval_bound. eauto.
-                      assumption.
-                      apply (well_typed_means_simple D); assumption.
+                      eapply SAssignHighOOB; eauto...
+                      unfold eval_type_bound,eval_bound. reflexivity. 
+                      unfold get_high_ptr. easy.
               ++ destruct (Z_gt_dec h0 0).
                  * (* h > 0 - Assign  *)
                    destruct (Z_gt_dec l0 0).
                    { (* l > 0 *)
                    eapply step_implies_reduces.
-                   eapply SAssignLowOOB1; eauto... inv HTy2. 
-                   apply type_eq_simple_same in Teq.
-                   subst.
-                   unfold eval_type_bound,eval_bound. eauto.
-                   assumption.
-                   apply (well_typed_means_simple D); assumption. }
+                   eapply SAssignLowOOB; eauto...
+                   unfold eval_type_bound,eval_bound. reflexivity. 
+                   unfold get_low_ptr. easy. }
                    { (* l <= 0 *)
                      eapply step_implies_reduces.   
                      eapply SAssignNull; eauto.
@@ -3775,13 +3858,9 @@ Proof with eauto 20 with Progress.
                    }
                  * (* h <= 0 *)
                    eapply step_implies_reduces.
-                   eapply SAssignHighOOB1; eauto... inv HTy2.
-                   unfold eval_type_bound,eval_bound.
-                   apply type_eq_simple_same in Teq.
-                   subst.
-                   unfold eval_type_bound,eval_bound. eauto.
-                   assumption.
-                   apply (well_typed_means_simple D); assumption. 
+                   eapply SAssignHighOOB; eauto... inv HTy2.
+                   unfold eval_type_bound,eval_bound. reflexivity.
+                   unfold get_high_ptr. easy.
          }
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ ? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -3793,7 +3872,7 @@ Proof with eauto 20 with Progress.
     + destruct HUnchk1 as [ e' [ E [ ] ] ]; subst.
       ctx (EAssign (in_hole e' E) e2) (in_hole e' (CAssignL E e2))...
 
-  - (* Assign2 rule for nt-array. *)
+  - (* Assign3 rule for nt-array. *)
     right.
 
     (* If m' is unchecked, then we are typing mode is unchecked *)
@@ -3827,12 +3906,9 @@ Proof with eauto 20 with Progress.
                 destruct (Z_gt_dec l0 0).
                 { (* l > 0 *)
                 eapply step_implies_reduces.
-                eapply SAssignLowOOB2; eauto... inv HTy2.
-                apply type_eq_simple_same in Teq.
-                subst.
-                unfold eval_type_bound,eval_bound. eauto.
-                assumption.
-                apply (well_typed_means_simple D); assumption. }
+                eapply SAssignLowOOB; eauto...
+                unfold eval_type_bound,eval_bound. reflexivity. 
+                unfold get_low_ptr. easy. }
                 { (* l <= 0 *)
                   eapply step_implies_reduces.
                   eapply SAssignNull; eauto. lia.
@@ -3840,12 +3916,9 @@ Proof with eauto 20 with Progress.
                 }
               * (* h <= 0 *)
                 eapply step_implies_reduces.
-                eapply SAssignHighOOB2; eauto... inv HTy2.
-                apply type_eq_simple_same in Teq.
-                subst.
-                unfold eval_type_bound,eval_bound. eauto.
-                assumption.
-                apply (well_typed_means_simple D); assumption.
+                eapply SAssignHighOOB; eauto...                
+                unfold eval_type_bound,eval_bound. reflexivity. 
+                unfold get_high_ptr. easy. 
             + solve_empty_scope.
             + left.
               specialize (well_typed_means_simple D (TPtr Checked (TNTArray l h t)) Ht1' H4) as eq1.
@@ -3857,12 +3930,9 @@ Proof with eauto 20 with Progress.
                       destruct (Z_gt_dec l0 0).
                       { (* l > 0 *)
                       eapply step_implies_reduces.
-                      eapply SAssignLowOOB2; eauto... inv HTy2.
-                      apply type_eq_simple_same in Teq.
-                      subst.
-                      unfold eval_type_bound,eval_bound. eauto.
-                      assumption.
-                      apply (well_typed_means_simple D); assumption. }
+                      eapply SAssignLowOOB; eauto...                
+                      unfold eval_type_bound,eval_bound. reflexivity. 
+                      unfold get_low_ptr. easy. }
                       { (* l <= 0 *)
                         eapply step_implies_reduces.
                         eapply SAssign; eauto.
@@ -3896,24 +3966,18 @@ Proof with eauto 20 with Progress.
                       }
                     * (* h <= 0 *)
                       eapply step_implies_reduces.
-                      eapply SAssignHighOOB2; eauto...
-                      unfold eval_type_bound,eval_bound. inv HTy2.
-                      apply type_eq_simple_same in Teq.
-                      subst.
-                      unfold eval_type_bound,eval_bound. eauto.
-                      assumption.
-                      apply (well_typed_means_simple D); assumption.
+                      eapply SAssignHighOOB; eauto...
+                      unfold eval_type_bound,eval_bound. reflexivity.
+                      unfold get_high_ptr. easy.
               ++ destruct (Z_gt_dec h0 0).
                  * (* h > 0 - Assign  *)
                    destruct (Z_gt_dec l0 0).
                    { (* l > 0 *)
                    eapply step_implies_reduces.
-                   eapply SAssignLowOOB2; eauto... inv HTy2. 
-                   apply type_eq_simple_same in Teq.
-                   subst.
-                   unfold eval_type_bound,eval_bound. eauto.
-                   assumption.
-                   apply (well_typed_means_simple D); assumption. }
+                   eapply SAssignLowOOB; eauto...
+                   unfold eval_type_bound,eval_bound. reflexivity.
+                   unfold get_low_ptr. easy.
+                   }
                    { (* l <= 0 *)
                      eapply step_implies_reduces.   
                      eapply SAssignNull; eauto.
@@ -3921,13 +3985,9 @@ Proof with eauto 20 with Progress.
                    }
                  * (* h <= 0 *)
                    eapply step_implies_reduces.
-                   eapply SAssignHighOOB2; eauto... inv HTy2.
-                   unfold eval_type_bound,eval_bound.
-                   apply type_eq_simple_same in Teq.
-                   subst.
-                   unfold eval_type_bound,eval_bound. eauto.
-                   assumption.
-                   apply (well_typed_means_simple D); assumption. 
+                   eapply SAssignHighOOB; eauto...
+                   unfold eval_type_bound,eval_bound. reflexivity.
+                   unfold get_high_ptr. easy.
          }
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ ? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -4178,11 +4238,11 @@ Proof.
 Qed.
 
 
-Lemma weakening : forall D S H env m n t,
-    @well_typed D S H env m (ELit n t) t ->
-    forall x t', @well_typed D S H (Env.add x t' env) m (ELit n t) t.
+Lemma weakening : forall D F S H env m n t,
+    @well_typed D F S H env m (ELit n t) t ->
+    forall x t', @well_typed D F S H (Env.add x t' env) m (ELit n t) t.
 Proof.
-  intros D S H env m e t HWT.
+  intros D F S H env m e t HWT.
   inv HWT.
   inv H6; eauto.
   intros. apply TyLit.
