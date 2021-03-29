@@ -252,9 +252,11 @@ Qed.
 Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D t t
   | SubTyBot : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
-                           -> subtype D (TPtr m t) (TPtr m (TNTArray l h t))
+                           -> subtype D (TPtr m t) (TPtr m (TArray l h t))
   | SubTyBotNT : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
                              -> subtype D (TPtr m t) (TPtr m (TNTArray l h t))
+  | SubTyOne : forall m l h t, word_type t -> nat_leq l (Num 0) -> nat_leq (Num 1) h
+                             -> subtype D (TPtr m (TArray l h t)) (TPtr m t)
   | SubTySubsume : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h -> 
     subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
@@ -283,6 +285,7 @@ Proof.
       * eapply SubTyRefl.
       * eapply SubTyBot;eauto.
       * eapply SubTyBotNT;eauto.
+      * eapply SubTyOne; eauto.
       * eapply SubTySubsume; eauto.
       * eapply SubTyNtArray; eauto.
       * eapply SubTyNtSubsume; eauto.
@@ -292,17 +295,38 @@ Proof.
       * eapply SubTyBot; eauto.
       * inv H2.
       * inv H2.
-      * eapply SubTyBotNT;eauto. eapply nat_leq_trans. apply H5. assumption.
+      * eapply SubTyRefl.
+      * eapply SubTyBot;eauto. eapply nat_leq_trans. apply H5. assumption.
          eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyBot; eauto.
+      * eapply SubTyBotNT; eauto.
+        eapply nat_leq_trans. apply H5. assumption.
+         eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTyBotNT; eauto.
       * inv H2.
       * inv H2.
       * eapply SubTyBotNT;eauto.
         eapply nat_leq_trans. apply H5. assumption.
         eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTyOne; eauto.
+      * eapply SubTySubsume; eauto.
+        eapply nat_leq_trans. apply H5. assumption.
+         eapply nat_leq_trans. apply H8. assumption.
+      * eapply SubTyNtArray; eauto.
+        eapply nat_leq_trans. apply H5. assumption.
+         eapply nat_leq_trans. apply H8. assumption.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
       * eapply SubTySubsume; eauto.
       * inv H2.
       * inv H2.
+      * eapply SubTyOne; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
       * eapply SubTySubsume; eauto.
         eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
@@ -322,11 +346,12 @@ Proof.
         eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyStructArrayField_1; eauto.
-      * eapply SubTyStructArrayField_3; eauto.
+      * eapply SubTyStructArrayField_2; eauto.
       * eapply SubTyStructArrayField_3; eauto.
       * eapply SubTyStructArrayField_2; eauto.
       * inv H2.
       * inv H2.
+      * eapply SubTyStructArrayField_1; eauto.
       * eapply SubTyStructArrayField_2; eauto.
         eapply nat_leq_trans. apply H6. assumption.
         eapply nat_leq_trans. apply H10. assumption.
