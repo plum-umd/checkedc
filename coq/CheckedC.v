@@ -253,10 +253,10 @@ Inductive subtype (D : structdef) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D t t
   | SubTyBot : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
                            -> subtype D (TPtr m t) (TPtr m (TArray l h t))
-  (*| SubTyBotNT : forall m l h t, word_type t -> nat_leq (Num 0) l -> nat_leq h (Num 1)
-                             -> subtype D (TPtr m t) (TPtr m (TNTArray l h t)) *)
   | SubTyOne : forall m l h t, word_type t -> nat_leq l (Num 0) -> nat_leq (Num 1) h
                              -> subtype D (TPtr m (TArray l h t)) (TPtr m t)
+  | SubTyOneNT : forall m l h t, word_type t -> nat_leq l (Num 0) ->nat_leq (Num 1) h
+                             -> subtype D (TPtr m (TNTArray l h t)) (TPtr m t)
   | SubTySubsume : forall l h l' h' t m,
     nat_leq l l' -> nat_leq h' h -> 
     subtype D (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
@@ -285,6 +285,7 @@ Proof.
       * eapply SubTyRefl.
       * eapply SubTyBot;eauto.
       * eapply SubTyOne; eauto.
+      * eapply SubTyOneNT; eauto.
       * eapply SubTySubsume; eauto.
       * eapply SubTyNtArray; eauto.
       * eapply SubTyNtSubsume; eauto.
@@ -305,6 +306,18 @@ Proof.
       * inv H3.
       * inv H3.
       * inv H3.
+      * inv H3.
+      * eapply SubTyOneNT; eauto.
+      * eapply SubTyNtArray; eauto.
+        eapply nat_leq_trans. apply H5. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
       * eapply SubTySubsume; eauto.
       * inv H2.
       * eapply SubTyOne; eauto.
@@ -315,33 +328,29 @@ Proof.
         eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyNtArray; eauto.
       * inv H2.
-      * inv H2.
+      * eapply SubTyOneNT; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
       * eapply SubTyNtArray; eauto.
         eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyNtSubsume; eauto.
       * inv H2.
-      * inv H2.
+      * eapply SubTyOneNT; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTyNtArray; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyNtSubsume; eauto.
         eapply nat_leq_trans. apply H4. assumption.
         eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyStructArrayField_1; eauto.
       * eapply SubTyStructArrayField_2; eauto.
-      * eapply SubTyStructArrayField_3; eauto.
       * eapply SubTyStructArrayField_2; eauto.
-      * inv H2.
       * inv H2.
       * eapply SubTyStructArrayField_1; eauto.
       * eapply SubTyStructArrayField_2; eauto.
-        eapply nat_leq_trans. apply H6. assumption.
-        eapply nat_leq_trans. apply H10. assumption.
-      * eapply SubTyStructArrayField_3; eauto.
-        eapply nat_leq_trans. apply H6. assumption.
-        eapply nat_leq_trans. apply H10. assumption.
-      * eapply SubTyStructArrayField_3; eauto.
-      * inv H2.
-      * inv H2.
-      * eapply SubTyStructArrayField_3; eauto.
         eapply nat_leq_trans. apply H6. assumption.
         eapply nat_leq_trans. apply H10. assumption.
 Qed.
@@ -1508,11 +1517,17 @@ Inductive well_typed { D : structdef } {F : fenv} {S : stack} { H : heap }
   | TyUnchecked : forall env m e t,
       well_typed env Unchecked e t ->
       well_typed env m (EUnchecked e) t
-  | TyCast : forall env m t e t',
+  | TyCast1 : forall env m t e t',
       well_type_bound_in env t ->
       (m = Checked -> forall w, t <> TPtr Checked w) ->
       well_typed env m e t' ->
       well_typed env m (ECast t e) t
+  | TyCast2 : forall env m t e t',
+      well_type_bound_in env t ->
+      well_typed env m e t' ->
+      subtype D t' (TPtr Checked t) ->
+      well_typed env m (ECast (TPtr Checked t) e) t
+
   | TyDynCast1 : forall env m e x y u v t t',
       type_eq S t t' ->
       well_type_bound_in env (TPtr Checked (TArray x y t)) ->
