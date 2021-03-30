@@ -1317,9 +1317,8 @@ Inductive well_typed_lit (D : structdef) (H : heap) : scope -> Z -> type -> Prop
       well_typed_lit D H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
       well_typed_lit D H s 0 t
-  | TyLitRec : forall s n w t,
-      set_In (n, t) s ->
-      subtype D t (TPtr Checked w) ->
+  | TyLitRec : forall s n w,
+      set_In (n, (TPtr Checked w)) s ->
       well_typed_lit D H s n (TPtr Checked w)
   | TyLitC : forall sc n w b ts,
       Some (b, ts) = allocate_meta D w ->
@@ -1346,7 +1345,7 @@ Lemma well_typed_lit_ind' :
     (forall (s : scope) (n : Z), P s n TNat) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s : scope) (n : Z) (w : type) (t : type), set_In (n, t) s -> subtype D t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
+       (forall (s : scope) (n : Z) (w : type), set_In (n, (TPtr Checked w)) s -> P s n (TPtr Checked w)) ->
        (forall (s : scope) (n : Z) (w : type) (ts : list type) (b : Z),
         Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
@@ -1369,7 +1368,7 @@ Proof.
             | TyLitInt _ _ s' n' => HTyLitInt s' n'
             | TyLitU _ _ s' n' w' => HTyLitU s' n' w'
             | TyLitZero _ _ s' t' => HTyLitZero s' t'
-            | TyLitRec _ _ s' n' w' t' Hscope Hsub => HTyLitRec s' n' w' t' Hscope Hsub
+            | TyLitRec _ _ s' n' w'  Hscope => HTyLitRec s' n' w' Hscope
             | TyLitC _ _ s' n' w' b ts Hts IH =>
               HTyLitC s' n' w' ts b Hts (fun k Hk =>
                                          match IH k Hk with
@@ -1612,11 +1611,13 @@ Inductive well_typed { D : structdef } {F : fenv} {S : stack} { H : heap }
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env m (EIf x e1 e2) t4.
 
+
 Lemma subtype_well_type : forall D H env t t' n,
 @well_typed_lit D H env n t ->
 subtype D t t' ->
 @well_typed_lit D H env n t'.
 Proof.
+(*
   intros. induction H0. 
   - inv H1. eauto.
   - assert (exists t, t' = (TPtr Unchecked t)) by (inv H1; eauto).
@@ -1655,13 +1656,14 @@ Proof.
       exists x. exists x0.
       split. easy. split. easy.
       inv H0. apply TyLitInt.
-      ++ inv H7. inv H9. eapply TyLitC; eauto.
+    * inv H1. 
+      ++ eapply TyLitC; eauto.
+      ++ inv H7. inv H9. eapply TyLitC; eauto. 
       unfold allocate_meta. eauto.
-      admit.
-(*
+      intros.
       assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
       destruct H5.
-      assert ((Zreplicate (l - h0) TNat) = []).
+      assert ((Zreplicate (l - h0) (TPtr m w)) = []).
       unfold Zreplicate. 
       destruct (l - h0). easy.
       specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
@@ -1678,10 +1680,23 @@ Proof.
       subst.
       exists x. exists x0.
       split. easy. split. easy.
-      inv H0. apply TyLitInt.
-*)
-    * inv H1. eapply TyLitC; eauto.
-      admit. admit.
+      inv H0.
+      destruct (Z.eq_dec x n).
+      subst.
+      destruct m.
+      eapply TyLitRec.
+      apply set_add_intro2. reflexivity.
+      apply SubTyOne.
+ inv H9. apply TyLitU.
+      apply TyLitZero.
+      eapply (TyLitRec).
+
+  | TyLitRec : forall s n w t,
+      set_In (n, t) s ->
+      subtype D t (TPtr Checked w) ->
+      well_typed_lit D H s n (TPtr Checked w)
+
+
     * admit. (* inv H1. eapply TyLitC; eauto.
      
       eapply TyLitC; eauto.
@@ -1795,8 +1810,7 @@ Proof.
                (n, TPtr Checked (TArray l' h' w))
                 s)) x w). 
                { eapply scope_replacement; eauto. } *)
-                
-
+              
           
 Admitted.
 
@@ -1866,33 +1880,18 @@ Proof.
   intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
   - intros. inv Heqp. exists t. easy.
-  - intros. inv Heqp. exists t. easy.
-  - intros. exists (TArray l h t).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H1. reflexivity.
+  - intros. inv Heqp. exists (TArray l h t0). easy.
+  - intros. inv Heqp. exists (TNTArray l h t0). easy.
   - intros. inv Heqp. exists (TArray l h t). easy.
-  - intros. exists (TNTArray l h t).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H1. reflexivity.
+  - intros. inv Heqp. exists (TNTArray l h t). easy.
+  - intros. inv Heqp. exists (TNTArray l h t). easy.
   - intros. exists (TStruct T).
     assert (m0 = m). {
       inv Heqp. reflexivity. 
     }
     rewrite H1. reflexivity.
-  - intros. exists (TStruct T).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H1. reflexivity.
-  - intros. exists (TStruct T).
-    assert (m0 = m). {
-      inv Heqp. reflexivity. 
-    }
-    rewrite H1. reflexivity.
+  - intros. inv Heqp. exists (TStruct T).
+    reflexivity.
 Qed.
 
 (* this might be an issue if we want to make checked pointers
