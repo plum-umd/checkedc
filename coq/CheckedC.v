@@ -949,12 +949,12 @@ Inductive get_root : type -> type -> Prop :=
   | get_root_ntarray : forall m l h t, get_root (TPtr m (TNTArray l h t)) t.
 
 
-Inductive step (D : structdef) (F:fenv) : stack -> heap -> expression -> stack -> heap -> result -> Prop :=
-  | SVar : forall s H x v t,
+Inductive step (D : structdef) (F:fenv) : var -> stack -> heap -> expression -> var -> stack -> heap -> result -> Prop :=
+  | SVar : forall cx s H x v t,
       (Stack.find x s) = Some (v, t) ->
       step D F
-           s H (EVar x)
-           s H (RExpr (ELit v t))
+           cx s H (EVar x)
+           cx s H (RExpr (ELit v t)).
   | Strlen : forall s H x n n' m l h t t1, 
      (Stack.find x s) = Some (n,TPtr m (TNTArray l (Num h) t)) ->
      (forall i , n <= i < n' -> (exists n1 t1, Heap.MapsTo n (n1,t1) H /\ n1 <> 0))
