@@ -1857,8 +1857,502 @@ Definition fun_typed (D : structdef) (F:fenv) (S : stack) (H : heap) : Prop :=
     word_type t /\ type_wf D t /\ simple_type t /\
      (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D t') /\ dis_all (get_vars tvl) /\
    (exists m env, gen_env D S tvl env /\ @well_typed D F S H env m e t).
-            
 
+
+Local Close Scope Z_scope.
+
+Local Open Scope nat_scope.
+
+Inductive var_fresh_bound : var -> bound -> Prop :=
+    | var_fresh_bnum : forall x n, var_fresh_bound x (Num n)
+    | var_fresh_bvar : forall x y n, y < x -> var_fresh_bound x (Var y n).
+
+Inductive var_fresh_type : var -> type -> Prop :=
+    | var_fresh_nat : forall x, var_fresh_type x TNat
+    | var_fresh_struct : forall x t, var_fresh_type x (TStruct t)
+    | var_fresh_ptr : forall x m p, var_fresh_type x p -> var_fresh_type x (TPtr m p)
+    | var_fresh_array : forall x b1 b2 t, var_fresh_bound x b1 -> var_fresh_bound x b2 -> 
+                                    var_fresh_type x t -> var_fresh_type x (TArray b1 b2 t)
+    | var_fresh_ntarray : forall x b1 b2 t, var_fresh_bound x b1 -> var_fresh_bound x b2 -> 
+                                    var_fresh_type x t -> var_fresh_type x (TNTArray b1 b2 t).
+
+Inductive var_fresh_arg : var -> expression -> Prop :=
+     | var_fresh_alit :  forall x n t, var_fresh_type x t -> var_fresh_arg x (ELit n t)
+     | var_fresh_var :  forall x y, y < x -> var_fresh_arg x (EVar y).
+
+Inductive var_fresh_args : var -> list expression -> Prop :=
+    | var_fresh_empty : forall x, var_fresh_args x []
+    | var_fresh_many : forall x e el, var_fresh_arg x e -> var_fresh_args x el -> var_fresh_args x (e::el).
+
+Inductive var_fresh : var -> expression -> Prop :=
+   | var_fresh_elit : forall x n t, var_fresh_type x t -> var_fresh x (ELit n t)
+   | var_fresh_evar : forall x y, y < x -> var_fresh x (EVar y)
+   | var_fresh_estrlen : forall x y, y < x -> var_fresh x (EStrlen y)
+   | var_fresh_ecall : forall x y el, var_fresh_args x el -> var_fresh x (ECall y el)
+   | var_fresh_elet : forall x y e1 e2, y < x -> var_fresh x e1 -> var_fresh x e2 -> var_fresh x (ELet y e1 e2)
+   | var_fresh_edyncast : forall x t e, var_fresh_type x t -> var_fresh x e -> var_fresh x (EDynCast t e)
+   | var_fresh_emalloc : forall x t, var_fresh_type x t -> var_fresh x (EMalloc t)
+   | var_fresh_ecast : forall x t e, var_fresh_type x t -> var_fresh x e -> var_fresh x (ECast t e)
+   | var_fresh_eplus : forall x e1 e2, var_fresh x e1 -> var_fresh x e2 -> var_fresh x (EPlus e1 e2)
+   | var_fresh_efield : forall x e f, var_fresh x e -> var_fresh x (EFieldAddr e f)
+   | var_fresh_ederef : forall x e, var_fresh x e -> var_fresh x (EDeref e)
+   | var_fresh_eassign: forall x e1 e2, var_fresh x e1 -> var_fresh x e2 -> var_fresh x (EAssign e1 e2)
+   | var_fresh_eif : forall x y e1 e2, y < x -> var_fresh x e1 -> var_fresh x e2 -> var_fresh x (EIf y e1 e2)
+   | var_fresh_eunchecked : forall x e, var_fresh x e -> var_fresh x (EUnchecked e).
+
+
+Definition var_fresh_stack (x:nat) (S:stack) := forall y, Stack.In y S -> (y < x)%nat.
+
+
+Local Close Scope nat_scope.
+
+Local Open Scope Z_scope.
+
+Lemma step_stack_fresh : forall D F cx S H e cx' S' H' r,
+        step D F cx S H e cx' S' H' r -> var_fresh_stack cx S -> var_fresh_stack cx' S'.
+Proof.
+intros.
+induction H0;eauto.
+unfold change_strlen_stack.
+destruct (n' - n <=? h).
+assumption.
+unfold var_fresh_stack in *.
+intros.
+destruct (Nat.eq_dec x y).
+subst.
+assert (Stack.In y s).
+unfold Stack.In,Stack.Raw.PX.In.
+apply Stack.find_2 in H0.
+exists (n, TPtr m (TNTArray l (Num h) t)). easy.
+apply H1. assumption.
+unfold Stack.In,Stack.Raw.PX.In in H4.
+destruct H4.
+apply Stack.add_3 in H4.
+apply H1.
+unfold Stack.In,Stack.Raw.PX.In.
+exists x0. easy. assumption.
+unfold fresh_up.
+unfold var_fresh_stack in *.
+intros.
+unfold Stack.In,Stack.Raw.PX.In in H2.
+destruct H2.
+destruct (Nat.eq_dec y cx).
+subst. lia.
+apply Stack.add_3 in H2.
+assert (y < cx)%nat.
+apply H1.
+unfold Stack.In,Stack.Raw.PX.In.
+exists x0. easy.
+lia. lia.
+unfold add_nt_one in H1.
+destruct (Stack.find (elt:=Z * type) x s) eqn:eq1.
+destruct p.
+destruct t0. assumption.
+destruct t0. assumption.
+assumption.
+assumption.
+assumption.
+destruct b0.
+unfold var_fresh_stack in *.
+intros.
+apply H1.
+unfold Stack.In,Stack.Raw.PX.In.
+destruct (Nat.eq_dec y x).
+exists (z, TPtr m (TNTArray b (Num (z0 + 1)) t0)).
+apply Stack.add_1. easy.
+unfold Stack.In,Stack.Raw.PX.In in H5.
+destruct H5.
+exists x0.
+apply Stack.add_2.
+lia. easy.
+unfold var_fresh_stack in *.
+intros.
+apply H1.
+unfold Stack.In,Stack.Raw.PX.In.
+destruct (Nat.eq_dec y x).
+exists (z, TPtr m (TNTArray b (Var v (z0 + 1)) t0)).
+apply Stack.add_1. easy.
+unfold Stack.In,Stack.Raw.PX.In in H5.
+destruct H5.
+exists x0.
+apply Stack.add_2.
+lia. easy.
+easy. easy. easy. easy.
+Qed.
+
+
+(* Define the property of a stack. *)
+Definition stack_simple (S:stack) := forall x v t, Stack.MapsTo x (v,t) S -> simple_type t.
+
+Lemma stack_simple_aux : forall S x, stack_simple (add_nt_one S x) -> stack_simple S.
+Proof.
+  unfold stack_simple in *.
+  unfold add_nt_one.
+  intros. 
+  destruct (Stack.find (elt:=Z * type) x S) eqn:eq1.
+  destruct p. destruct t0.
+  apply (H x0 v t). assumption.
+  destruct t0.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+  destruct b0.
+  destruct (Nat.eq_dec x0 x).
+  specialize (H x z (TPtr m (TNTArray b (Num (z0 + 1)) t0))).
+  assert (Stack.MapsTo x
+      (z, TPtr m (TNTArray b (Num (z0 + 1)) t0))
+      (Stack.add x
+         (z, TPtr m (TNTArray b (Num (z0 + 1)) t0)) S)).
+  apply Stack.add_1. reflexivity.
+  apply H in H1.
+  apply Stack.find_2 in eq1.
+  subst.
+  apply (Stack.mapsto_always_same (Z * type) x (z, TPtr m (TNTArray b (Num z0) t0)) (v, t)) in eq1.
+  inv eq1.
+  inv H1. inv H3.
+  apply SPTPtr.
+  apply SPTNTArray. assumption. assumption.
+  specialize (H x0 v t).
+  assert (Stack.MapsTo x0 (v, t)
+      (Stack.add x
+         (z, TPtr m (TNTArray b (Num (z0 + 1)) t0)) S)).
+  apply Stack.add_2. lia. assumption.
+  apply H in H1.
+  assumption.
+  destruct (Nat.eq_dec x0 x).
+  specialize (H x z (TPtr m (TNTArray b (Var v0 (z0 + 1)) t0))).
+  assert (Stack.MapsTo x
+      (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0))
+      (Stack.add x
+         (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0)) S)).
+  apply Stack.add_1. reflexivity.
+  apply H in H1. inv H1. inv H3.
+  specialize (H x0 v t).
+  assert (Stack.MapsTo x0 (v, t)
+      (Stack.add x
+         (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0)) S)).
+  apply Stack.add_2.
+  lia. assumption.
+  apply H in H1. assumption.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+  apply (H x0 v t). assumption.
+Qed.
+
+Lemma cast_type_bound_same : forall s t t' t'',
+              cast_type_bound s t t' -> cast_type_bound s t t'' -> t' = t''.
+Proof.
+ intros s t.
+ induction t.
+ intros. inv H0. inv H. reflexivity.
+ intros.
+ inv H. inv H0.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ intros. inv H. inv H0. reflexivity.
+ intros. inv H. inv H0.
+ unfold cast_bound in *.
+ destruct b. destruct b0. inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H6. destruct b0. 
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H3.
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H6. inv H3. 
+ intros. inv H. inv H0.
+ unfold cast_bound in *.
+ destruct b. destruct b0. inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H6. destruct b0. 
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H3.
+ destruct (Stack.find (elt:=Z * type) v s). destruct p.
+ destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
+ inv H4. inv H6. inv H3. inv H8.
+ assert (t' = t'0).
+ apply IHt. assumption. assumption. rewrite H. reflexivity.
+ inv H6. inv H3. 
+Qed.
+
+
+(* Some lemmas related to cast/well_bound_in *)
+Lemma not_in_empty : forall x, Env.In x empty_env -> False.
+Proof.
+ intros.
+  unfold empty_env in H.
+ specialize (@Env.empty_1 type) as H1.
+ unfold Env.In,Env.Raw.PX.In in H.
+ destruct H.
+ unfold Env.Empty,Env.Raw.Empty in H1.
+ inv H.
+Qed.
+
+Lemma simple_type_well_bound : forall (env: env) (w:type),
+                simple_type w -> well_type_bound_in env w.
+Proof.
+   intros. induction w.
+   apply well_type_bound_in_nat.
+   apply well_type_bound_in_ptr.
+   apply IHw. inv H. assumption.
+   apply well_type_bound_in_struct.
+   inv H.
+   apply well_type_bound_in_array.
+   apply well_bound_in_num.
+   apply well_bound_in_num.
+   apply IHw. assumption.
+   inv H.
+   apply well_type_bound_in_ntarray.
+   apply well_bound_in_num.
+   apply well_bound_in_num.
+   apply IHw. assumption.
+Qed.
+
+Lemma well_bound_means_no_var :
+     forall b, well_bound_in empty_env b -> (exists n, b = (Num n)).
+Proof.
+ intros. remember empty_env as env.
+ induction H. eauto.
+ subst. 
+ unfold empty_env in H.
+ specialize (@Env.empty_1 type) as H1.
+ unfold Env.In,Env.Raw.PX.In in H.
+ destruct H.
+ unfold Env.Empty,Env.Raw.Empty in H1.
+ inv H.
+Qed.
+
+Lemma empty_means_cast_bound_same :
+   forall s b, well_bound_in empty_env b -> cast_bound s b = Some b.
+Proof.
+ intros. apply well_bound_means_no_var in H.
+ unfold cast_bound. destruct b. reflexivity.
+ destruct H. inv H.
+Qed.
+
+Lemma empty_means_cast_type_bound_same :
+   forall s t, well_type_bound_in empty_env t -> cast_type_bound s t t.
+Proof.
+ intros. 
+ remember empty_env as env.
+ induction H.
+ apply cast_type_bound_nat.
+ apply cast_type_bound_ptr.
+ apply IHwell_type_bound_in.
+ assumption.
+ apply cast_type_bound_struct.
+ apply cast_type_bound_array.
+ subst.
+ apply (empty_means_cast_bound_same s) in H.
+ assumption.
+ subst.
+ apply (empty_means_cast_bound_same s) in H0.
+ assumption.
+ apply IHwell_type_bound_in.
+ assumption.
+ apply cast_type_bound_ntarray.
+ subst.
+ apply (empty_means_cast_bound_same s) in H.
+ assumption.
+ subst.
+ apply (empty_means_cast_bound_same s) in H0.
+ assumption.
+ apply IHwell_type_bound_in.
+ assumption.
+Qed.
+
+Lemma well_typed_means_simple : forall (w : type), well_type_bound_in empty_env w -> simple_type w.
+Proof.
+ intros. remember empty_env as env0.
+ induction H.
+ apply SPTNat.
+ apply SPTPtr.
+ apply IHwell_type_bound_in.
+ subst. easy.
+ constructor.
+ subst.
+ inv H0.
+ inv H.
+ constructor.
+ apply IHwell_type_bound_in.
+ easy.
+ inv H0. inv H.
+ inv H2. inv H0.
+ inv H0. inv H.
+ constructor.
+ apply IHwell_type_bound_in.
+ easy.
+ inv H0. inv H.
+ inv H2. inv H0.
+ Qed.
+
+Lemma lit_empty_means_cast_type_bound_same :
+  forall D F S H m n t t1, @well_typed D F S H empty_env m (ELit n t) t1 ->  cast_type_bound S t t.
+Proof.
+ intros. remember empty_env as env.
+ remember (ELit n t) as e.
+ induction H0.
+ subst.
+ injection Heqe.
+ intros.
+ rewrite <- H2.
+ apply (empty_means_cast_type_bound_same S) in H0.
+ assumption.
+ 1 - 22 : inv Heqe.
+Qed.
+
+Lemma lit_nat_type : forall D F S H env m n t, @well_typed D F S H env m (ELit n t) TNat -> t = TNat.
+Proof.
+ intros. remember (ELit n t) as e. remember TNat as t1.
+ induction H0; subst; inv Heqe.
+ reflexivity.
+Qed.
+
+Lemma simple_type_means_cast_same: forall s t, simple_type t -> cast_type_bound s t t.
+Proof.
+  intros. induction H.
+  apply cast_type_bound_nat.
+  apply cast_type_bound_ptr.
+  assumption.
+  apply cast_type_bound_struct.
+  apply cast_type_bound_array.
+  unfold cast_bound. reflexivity.
+  unfold cast_bound. reflexivity.
+  assumption.
+  apply cast_type_bound_ntarray.
+  unfold cast_bound. reflexivity.
+  unfold cast_bound. reflexivity.
+  assumption.
+Qed.
+
+
+Lemma cast_means_simple_type : forall s t t', cast_type_bound s t t' -> simple_type t'.
+Proof.
+  intros. induction H. 
+  apply SPTNat. apply SPTPtr. assumption.
+  unfold cast_bound in *.
+  destruct l. destruct h.
+  injection H as eq1. injection H0 as eq2.
+  subst. 
+  apply SPTArray. assumption.
+  destruct (Stack.find (elt:=Z * type) v s).
+  destruct p.
+  injection H0 as eq1. injection H as eq2. subst.
+  apply SPTArray. assumption.
+  inv H0.
+  destruct (Stack.find (elt:=Z * type) v s). destruct p.
+  destruct h.
+  inv H. inv H0.
+  apply SPTArray. assumption.
+  destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
+  inv H. inv H0.
+  apply SPTArray. assumption.
+  inv H0. inv H.
+  unfold cast_bound in *.
+  destruct l. destruct h.
+  injection H as eq1. injection H0 as eq2.
+  subst. 
+  apply SPTNTArray. assumption.
+  destruct (Stack.find (elt:=Z * type) v s).
+  destruct p.
+  inv H. inv H0.
+  apply SPTNTArray. assumption.
+  inv H0.
+  destruct (Stack.find (elt:=Z * type) v s). destruct p.
+  destruct h.
+  inv H. inv H0.
+  apply SPTNTArray. assumption.
+  destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
+  inv H. inv H0.
+  apply SPTNTArray. assumption.
+  inv H0. inv H.
+  apply SPTStruct.
+Qed.
+
+Lemma stack_simple_prop : forall D F cx S H cx' S' H' e e',
+         stack_simple S ->
+            step D F cx S H e cx' S' H' (RExpr e') -> stack_simple S'.
+Proof.
+  intros.
+  induction H1;eauto.
+  unfold stack_simple in *.
+  intros.
+  unfold change_strlen_stack in *.
+  destruct (n' - n <=? h).
+  apply (H0 x0 v t0). assumption.
+  apply Stack.find_2 in H1.
+  apply H0 in H1.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  apply Stack.mapsto_add1 in H4.
+  inv H4.
+  inv H1. inv H5.
+  apply SPTPtr. apply SPTNTArray. assumption.
+  apply Stack.add_3 in H4.
+  apply H0 in H4. assumption. lia.
+  unfold stack_simple.
+  intros.
+  apply (cast_means_simple_type) in H1.
+  destruct (Nat.eq_dec x0 cx).
+  subst. apply Stack.mapsto_add1 in H2.
+  inv H2. assumption.
+  apply Stack.add_3 in H2. unfold stack_simple in H0.
+  eapply H0. apply H2. lia.
+  eapply stack_simple_aux. apply H0.
+Qed.
+
+Lemma simple_type_var_fresh : forall x t, simple_type t -> var_fresh_type x t.
+Proof.
+  intros. 
+  induction t.
+  constructor.
+  constructor.
+  apply IHt. inv H. assumption.
+  constructor.
+  inv H. constructor. constructor. constructor.
+  apply IHt. assumption.
+  inv H. constructor. constructor. constructor.
+  apply IHt. assumption.
+Qed.
+
+Lemma step_exp_fresh : forall D F cx S H e cx' S' H' e',
+        stack_simple S ->
+        step D F cx S H e cx' S' H' (RExpr e') -> var_fresh cx e -> var_fresh cx' e'.
+Proof.
+intros.
+remember (RExpr e') as ea.
+induction H1; eauto.
+inv Heqea.
+constructor.
+apply Stack.find_2 in H1.
+apply H0 in H1.
+apply simple_type_var_fresh. assumption.
+inv Heqea. constructor. constructor.
+inv Heqea.
+Admitted.
+
+(*
 Inductive ty_ssa : list var -> expression -> list var -> Prop :=
    | ty_ssa_lit : forall S n t, ty_ssa S (ELit n t) S
    | ty_ssa_var : forall S x, ty_ssa S (EVar x) S
@@ -1884,6 +2378,7 @@ Proof.
  apply IHty_ssa1.
  apply in_cons. assumption.
 Qed.
+*)
 
 Hint Constructors well_typed.
 
@@ -2091,114 +2586,6 @@ Proof.
     easy. rewrite H0 in H1. inversion H1.
 Qed.
 
-Lemma not_in_empty : forall x, Env.In x empty_env -> False.
-Proof.
- intros.
-  unfold empty_env in H.
- specialize (@Env.empty_1 type) as H1.
- unfold Env.In,Env.Raw.PX.In in H.
- destruct H.
- unfold Env.Empty,Env.Raw.Empty in H1.
- inv H.
-Qed.
-
-Lemma simple_type_well_bound : forall (env: env) (w:type),
-                simple_type w -> well_type_bound_in env w.
-Proof.
-   intros. induction w.
-   apply well_type_bound_in_nat.
-   apply well_type_bound_in_ptr.
-   apply IHw. inv H. assumption.
-   apply well_type_bound_in_struct.
-   inv H.
-   apply well_type_bound_in_array.
-   apply well_bound_in_num.
-   apply well_bound_in_num.
-   apply IHw. assumption.
-   inv H.
-   apply well_type_bound_in_ntarray.
-   apply well_bound_in_num.
-   apply well_bound_in_num.
-   apply IHw. assumption.
-Qed.
-
-Lemma well_bound_means_no_var :
-     forall b, well_bound_in empty_env b -> (exists n, b = (Num n)).
-Proof.
- intros. remember empty_env as env.
- induction H. eauto.
- subst. 
- unfold empty_env in H.
- specialize (@Env.empty_1 type) as H1.
- unfold Env.In,Env.Raw.PX.In in H.
- destruct H.
- unfold Env.Empty,Env.Raw.Empty in H1.
- inv H.
-Qed.
-
-Lemma empty_means_cast_bound_same :
-   forall s b, well_bound_in empty_env b -> cast_bound s b = Some b.
-Proof.
- intros. apply well_bound_means_no_var in H.
- unfold cast_bound. destruct b. reflexivity.
- destruct H. inv H.
-Qed.
-
-Lemma empty_means_cast_type_bound_same :
-   forall s t, well_type_bound_in empty_env t -> cast_type_bound s t t.
-Proof.
- intros. 
- remember empty_env as env.
- induction H.
- apply cast_type_bound_nat.
- apply cast_type_bound_ptr.
- apply IHwell_type_bound_in.
- assumption.
- apply cast_type_bound_struct.
- apply cast_type_bound_array.
- subst.
- apply (empty_means_cast_bound_same s) in H.
- assumption.
- subst.
- apply (empty_means_cast_bound_same s) in H0.
- assumption.
- apply IHwell_type_bound_in.
- assumption.
- apply cast_type_bound_ntarray.
- subst.
- apply (empty_means_cast_bound_same s) in H.
- assumption.
- subst.
- apply (empty_means_cast_bound_same s) in H0.
- assumption.
- apply IHwell_type_bound_in.
- assumption.
-Qed.
-
-Lemma well_typed_means_simple : forall (w : type), well_type_bound_in empty_env w -> simple_type w.
-Proof.
- intros. remember empty_env as env0.
- induction H.
- apply SPTNat.
- apply SPTPtr.
- apply IHwell_type_bound_in.
- subst. easy.
- constructor.
- subst.
- inv H0.
- inv H.
- constructor.
- apply IHwell_type_bound_in.
- easy.
- inv H0. inv H.
- inv H2. inv H0.
- inv H0. inv H.
- constructor.
- apply IHwell_type_bound_in.
- easy.
- inv H0. inv H.
- inv H2. inv H0.
- Qed.
 
 Definition unchecked (m : mode) (e : expression) : Prop :=
   m = Unchecked \/ exists e' E, e = in_hole e' E /\ mode_of(E) = Unchecked.
@@ -2474,145 +2861,6 @@ Proof.
   1 - 5: assumption.
 Qed.
 
-
-
-Lemma cast_type_bound_same : forall s t t' t'',
-              cast_type_bound s t t' -> cast_type_bound s t t'' -> t' = t''.
-Proof.
- intros s t.
- induction t.
- intros. inv H0. inv H. reflexivity.
- intros.
- inv H. inv H0.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- intros. inv H. inv H0. reflexivity.
- intros. inv H. inv H0.
- unfold cast_bound in *.
- destruct b. destruct b0. inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H6. destruct b0. 
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H3.
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H6. inv H3. 
- intros. inv H. inv H0.
- unfold cast_bound in *.
- destruct b. destruct b0. inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H6. destruct b0. 
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H3.
- destruct (Stack.find (elt:=Z * type) v s). destruct p.
- destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
- inv H4. inv H6. inv H3. inv H8.
- assert (t' = t'0).
- apply IHt. assumption. assumption. rewrite H. reflexivity.
- inv H6. inv H3. 
-Qed.
-
-Lemma lit_empty_means_cast_type_bound_same :
-  forall D F S H m n t t1, @well_typed D F S H empty_env m (ELit n t) t1 ->  cast_type_bound S t t.
-Proof.
- intros. remember empty_env as env.
- remember (ELit n t) as e.
- induction H0.
- subst.
- injection Heqe.
- intros.
- rewrite <- H2.
- apply (empty_means_cast_type_bound_same S) in H0.
- assumption.
- 1 - 22 : inv Heqe.
-Qed.
-
-Lemma lit_nat_type : forall D F S H env m n t, @well_typed D F S H env m (ELit n t) TNat -> t = TNat.
-Proof.
- intros. remember (ELit n t) as e. remember TNat as t1.
- induction H0; subst; inv Heqe.
- reflexivity.
-Qed.
-
-Lemma simple_type_means_cast_same: forall s t, simple_type t -> cast_type_bound s t t.
-Proof.
-  intros. induction H.
-  apply cast_type_bound_nat.
-  apply cast_type_bound_ptr.
-  assumption.
-  apply cast_type_bound_struct.
-  apply cast_type_bound_array.
-  unfold cast_bound. reflexivity.
-  unfold cast_bound. reflexivity.
-  assumption.
-  apply cast_type_bound_ntarray.
-  unfold cast_bound. reflexivity.
-  unfold cast_bound. reflexivity.
-  assumption.
-Qed.
-
-
-Lemma cast_means_simple_type : forall s t t', cast_type_bound s t t' -> simple_type t'.
-Proof.
-  intros. induction H. 
-  apply SPTNat. apply SPTPtr. assumption.
-  unfold cast_bound in *.
-  destruct l. destruct h.
-  injection H as eq1. injection H0 as eq2.
-  subst. 
-  apply SPTArray. assumption.
-  destruct (Stack.find (elt:=Z * type) v s).
-  destruct p.
-  injection H0 as eq1. injection H as eq2. subst.
-  apply SPTArray. assumption.
-  inv H0.
-  destruct (Stack.find (elt:=Z * type) v s). destruct p.
-  destruct h.
-  inv H. inv H0.
-  apply SPTArray. assumption.
-  destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
-  inv H. inv H0.
-  apply SPTArray. assumption.
-  inv H0. inv H.
-  unfold cast_bound in *.
-  destruct l. destruct h.
-  injection H as eq1. injection H0 as eq2.
-  subst. 
-  apply SPTNTArray. assumption.
-  destruct (Stack.find (elt:=Z * type) v s).
-  destruct p.
-  inv H. inv H0.
-  apply SPTNTArray. assumption.
-  inv H0.
-  destruct (Stack.find (elt:=Z * type) v s). destruct p.
-  destruct h.
-  inv H. inv H0.
-  apply SPTNTArray. assumption.
-  destruct (Stack.find (elt:=Z * type) v0 s). destruct p.
-  inv H. inv H0.
-  apply SPTNTArray. assumption.
-  inv H0. inv H.
-  apply SPTStruct.
-Qed.
 
 Lemma cast_word_type : forall s t t', cast_type_bound s t t' -> word_type t -> word_type t'.
 Proof.
@@ -7693,98 +7941,6 @@ Proof.
  assumption.
 *)
 Admitted.
-
-Definition stack_simple (S:stack) := forall x v t, Stack.MapsTo x (v,t) S -> simple_type t.
-
-Lemma stack_simple_aux : forall S x, stack_simple (add_nt_one S x) -> stack_simple S.
-Proof.
-  unfold stack_simple in *.
-  unfold add_nt_one.
-  intros. 
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq1.
-  destruct p. destruct t0.
-  apply (H x0 v t). assumption.
-  destruct t0.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-  destruct b0.
-  destruct (Nat.eq_dec x0 x).
-  specialize (H x z (TPtr m (TNTArray b (Num (z0 + 1)) t0))).
-  assert (Stack.MapsTo x
-      (z, TPtr m (TNTArray b (Num (z0 + 1)) t0))
-      (Stack.add x
-         (z, TPtr m (TNTArray b (Num (z0 + 1)) t0)) S)).
-  apply Stack.add_1. reflexivity.
-  apply H in H1.
-  apply Stack.find_2 in eq1.
-  subst.
-  apply (Stack.mapsto_always_same (Z * type) x (z, TPtr m (TNTArray b (Num z0) t0)) (v, t)) in eq1.
-  inv eq1.
-  inv H1. inv H3.
-  apply SPTPtr.
-  apply SPTNTArray. assumption. assumption.
-  specialize (H x0 v t).
-  assert (Stack.MapsTo x0 (v, t)
-      (Stack.add x
-         (z, TPtr m (TNTArray b (Num (z0 + 1)) t0)) S)).
-  apply Stack.add_2. lia. assumption.
-  apply H in H1.
-  assumption.
-  destruct (Nat.eq_dec x0 x).
-  specialize (H x z (TPtr m (TNTArray b (Var v0 (z0 + 1)) t0))).
-  assert (Stack.MapsTo x
-      (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0))
-      (Stack.add x
-         (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0)) S)).
-  apply Stack.add_1. reflexivity.
-  apply H in H1. inv H1. inv H3.
-  specialize (H x0 v t).
-  assert (Stack.MapsTo x0 (v, t)
-      (Stack.add x
-         (z, TPtr m (TNTArray b (Var v0 (z0 + 1)) t0)) S)).
-  apply Stack.add_2.
-  lia. assumption.
-  apply H in H1. assumption.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-  apply (H x0 v t). assumption.
-Qed.
-
-Lemma stack_simple_prop : forall D F S H S' H' e e',
-         stack_simple S ->
-            step D F S H e S' H' (RExpr e') -> stack_simple S'.
-Proof.
-  intros.
-  induction H1;eauto.
-  unfold stack_simple in *.
-  intros.
-  unfold change_strlen_stack in *.
-  destruct (n' - n <=? h).
-  apply (H0 x0 v t0). assumption.
-  apply Stack.find_2 in H1.
-  apply H0 in H1.
-  destruct (Nat.eq_dec x0 x).
-  subst.
-  apply Stack.mapsto_add1 in H4.
-  inv H4.
-  inv H1. inv H5.
-  apply SPTPtr. apply SPTNTArray. assumption.
-  apply Stack.add_3 in H4.
-  apply H0 in H4. assumption. lia.
-  apply (cast_means_simple_type) in H1.
-  unfold stack_simple in *.
-  intros.
-  destruct (Nat.eq_dec x0 x).
-  subst. 
-  apply Stack.mapsto_add1 in H2. inv H2.
-  assumption.
-  apply Stack.add_3 in H2.
-  apply H0 in H2. assumption. lia.
-  eapply stack_simple_aux. apply H0.
-Qed.
 
 Lemma subtype_simple : forall D t t', subtype D t t'
                  -> simple_type t' -> simple_type t.
