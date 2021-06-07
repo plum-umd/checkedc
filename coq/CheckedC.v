@@ -1611,18 +1611,75 @@ Inductive well_typed_arg (D: structdef) (S:stack) (H:heap) (env:env):
       Env.MapsTo x t env -> subtype_stack D S t' t ->
       well_typed_arg D S H env (EVar x) t'.
 
-Inductive well_typed_args (D: structdef) (H:heap) : 
-              stack -> env -> list expression -> list (var * type) -> stack -> env -> Prop :=
-     | args_empty : forall S env, well_typed_args D H S env [] [] S env
-     | args_many_1 : forall S S' env env' es n t1 v t t' vl, 
-                 well_type_bound_in env t -> 
-                 well_typed_arg D S H env (ELit n t1) t ->
-                 type_eq S t t' -> well_typed_args D H (Stack.add v n S) (Env.add v t' env) es vl S' env'
-                        -> well_typed_args D H S env ((ELit n t1)::es) ((v,t)::vl) S' env'
-     | args_many_2 : forall S S' env env' es x v t vl, 
-                 well_type_bound_in env t -> 
-                 well_typed_arg D S H env (EVar x) t -> well_typed_args D H S (Env.add v t env) es vl S' env'
-                        -> well_typed_args D H S env ((EVar x)::es) ((v,t)::vl) S' env'.
+(*
+Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound | ExVar : var -> Z -> bound.
+
+Inductive type : Type :=
+  | TNat : type
+  | TPtr : mode -> type -> type
+  | TStruct : struct -> type
+  | TArray : bound -> bound -> type -> type
+  | TNTArray : bound -> bound -> type -> type
+  | TExt : var -> type -> type.
+
+Definition type_eq_dec (t1 t2 : type): {t1 = t2} + {~ t1 = t2}.
+  repeat decide equality.
+Defined.
+
+Definition dyn_env := Stack.t type.
+
+Definition empty_dyn_env := @Stack.empty type.
+*)
+
+Inductive arg_val := NumVal (n:Z) | VarVal (v:var).
+
+Definition arg_stack := Stack.t arg_val.
+
+Definition empty_arg_stack := @Stack.empty arg_val.
+
+Definition subst_bound (b:bound) (x:var) (s: arg_stack) := 
+   match b with Num n => Some (Num n)
+           | Var x n => 
+           match Stack.find x s with None => None
+                       | Some (NumVal m) => Some (Num (n+m))
+                       | Some (VarVal y) => Some (Var y n)
+           end
+        | ExVar x n => Some (ExVar x n)
+   end.
+
+Inductive subst_type (s:arg_stack): var -> type -> type -> Prop :=
+     subst_type_nat : forall x, subst_type s x TNat TNat
+   | subst_type_ptr : forall x m t t', subst_type s x t t' -> subst_type s x (TPtr m t) (TPtr m t')
+   | subst_type_struct : forall x T, subst_type s x (TStruct T) (TStruct T)
+   | subst_type_array : forall x b1 b1' b2 b2' t t', subst_bound b1 x s = Some b1' -> subst_bound b2 x s = Some b2'
+                 -> subst_type s x t t' -> subst_type s x (TArray b1 b2 t) (TArray b1' b2' t')
+   | subst_type_ntarray : forall x b1 b1' b2 b2' t t', subst_bound b1 x s = Some b1' -> subst_bound b2 x s = Some b2'
+                 -> subst_type s x t t' -> subst_type s x (TNTArray b1 b2 t) (TNTArray b1' b2' t').
+         
+Inductive subst_types (s:arg_stack): list var -> type -> type -> Prop :=
+   subst_types_empty : forall t, subst_types s [] t t
+ | subst_types_many : forall x l t t' t'', subst_type s x t t' -> subst_types s l t' t'' -> subst_types s (x::l) t t''.
+
+
+Inductive well_typed_args (D: structdef) (S:stack) (H:heap) : 
+                   env -> list var -> arg_stack -> list expression -> list (var * type) -> Prop :=
+     | args_empty : forall env l s, well_typed_args D S H env l s [] []
+     | args_many_1 : forall env l s es n t1 v vl, 
+                 well_typed_arg D S H env (ELit n t1) TNat ->
+                        well_typed_args D S H env (v::l) (Stack.add v (NumVal n) s) es vl
+                        -> well_typed_args D S H env l s ((ELit n t1)::es) ((v,TNat)::vl)
+     | args_many_2 : forall env l s es x v vl, 
+                 well_typed_arg D S H env (EVar x) TNat ->
+                        well_typed_args D S H env (v::l) (Stack.add v (VarVal x) s) es vl
+                        -> well_typed_args D S H env l s ((EVar x)::es) ((v,TNat)::vl)
+     | args_many_3 : forall env l s es e v t t' vl,
+                 t <> TNat -> subst_types s l t t' -> well_type_bound_in env t' -> 
+                 well_typed_arg D S H env e t' -> well_typed_args D S H env l s es vl
+                        -> well_typed_args D S H env l s (e::es) ((v,t)::vl).
+
+Inductive gen_env : env -> list (var * type) -> env -> Prop :=
+     | gen_env_empty : forall env, gen_env env [] env
+     | gen_env_many : forall x t l env, gen_env env ((x,t)::l) (Env.add x t env).
 
 (*
 Definition subst_bound_val (x:var) (n:Z) (b:bound) : bound :=
@@ -1739,6 +1796,26 @@ Inductive vars_to_ext : list var -> type -> type -> Prop :=
   | vars_to_ext_many : forall x l t t' t'', to_ext_type x t t' 
              -> vars_to_ext l (TExt x t') t'' -> vars_to_ext (x::l) t t''.
 
+Inductive well_bound_vars : list var -> bound -> Prop :=
+  | well_bound_vars_num : forall l n, well_bound_vars l (Num n)
+  | well_bound_vars_var : forall l y n, In y l -> well_bound_vars l (Var y n)
+  | well_bound_vars_exvar : forall l x n, well_bound_vars l (ExVar x n).
+
+Inductive well_bound_vars_type : list var -> type -> Prop :=
+  | well_bound_vars_nat : forall l, well_bound_vars_type l (TNat)
+  | well_bound_vars_ptr : forall l c t, well_bound_vars_type l t -> well_bound_vars_type l (TPtr c t)
+  | well_bound_vars_struct : forall l t, well_bound_vars_type l (TStruct t)
+  | well_bound_vars_array : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
+                        -> well_bound_vars_type l t -> well_bound_vars_type l (TArray b1 b2 t)
+  | well_bound_vars_ntarray : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
+                        -> well_bound_vars_type l t -> well_bound_vars_type l (TNTArray b1 b2 t)
+  | well_bound_vars_ext : forall l x t, well_bound_vars_type l t -> well_bound_vars_type l (TExt x t).
+
+
+Inductive well_bound_args : list (var * type) -> list var -> type -> Prop := 
+    well_bound_args_empty : forall l t, well_bound_vars_type l t -> well_bound_args [] l t
+  | well_bound_args_many : forall x t1 tvl l t, well_bound_vars_type l t1
+                           -> well_bound_args tvl (x::l) t -> well_bound_args ((x,t1)::tvl) l t.
 
 Inductive well_typed { D : structdef } {F : fenv} {S : stack} { H : heap }
                         : env -> mode -> expression -> type -> Prop :=
@@ -1751,11 +1828,12 @@ Inductive well_typed { D : structdef } {F : fenv} {S : stack} { H : heap }
       subtype_stack D S t' t ->
       well_typed env m (EVar x) t'
 
-  | TyCall : forall env m es x tvl t e e' t', 
+  | TyCall : forall env env' m es x tvl e t t', 
         FEnv.MapsTo x (tvl,t,e) F ->
-        gen_e tvl es e e' ->
-        vars_to_ext (get_tvars t) t t'  ->
-        well_typed env m e' t' -> 
+        well_typed_args D S H env [] empty_arg_stack es tvl ->
+        gen_env empty_env tvl env' ->
+        well_typed env' m e t -> 
+        vars_to_ext (get_tvars t) t t' ->
            well_typed env m (ECall x es) t'
 
   | TyStrlen : forall env m x h l t, 
@@ -1917,6 +1995,7 @@ Proof.
       destruct (l - h0). easy.
       specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
       rewrite H8 in H1. simpl in H1. lia.
+
       rewrite H5 in *.
       unfold Zreplicate in *. simpl in *.
       assert (k = h0) by lia. subst. simpl.
@@ -2817,26 +2896,49 @@ Proof.
   constructor. easy.
 Qed.
 
-Inductive well_bound_vars : list var -> bound -> Prop :=
-  | well_bound_vars_num : forall l n, well_bound_vars l (Num n)
-  | well_bound_vars_var : forall l y n, In y l -> well_bound_vars l (Var y n)
-  | well_bound_vars_exvar : forall l x n, well_bound_vars l (ExVar x n).
+Definition sub_domain_bound (env: list var) (S:stack) := forall x, In x env -> Stack.In x S.
 
-Inductive well_bound_vars_type : list var -> type -> Prop :=
-  | well_bound_vars_nat : forall l, well_bound_vars_type l (TNat)
-  | well_bound_vars_ptr : forall l c t, well_bound_vars_type l t -> well_bound_vars_type l (TPtr c t)
-  | well_bound_vars_struct : forall l t, well_bound_vars_type l (TStruct t)
-  | well_bound_vars_array : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
-                        -> well_bound_vars_type l t -> well_bound_vars_type l (TArray b1 b2 t)
-  | well_bound_vars_ntarray : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
-                        -> well_bound_vars_type l t -> well_bound_vars_type l (TNTArray b1 b2 t)
-  | well_bound_vars_ext : forall l x t, well_bound_vars_type l t -> well_bound_vars_type l (TExt x t).
+Lemma gen_well_bound_cast_bound :
+   forall env s b, well_bound_vars env b -> sub_domain_bound env s -> 
+                no_ebound b -> (exists b', cast_bound s b = Some b').
+Proof.
+  intros. induction b.
+  exists (Num z). unfold cast_bound. reflexivity.
+  inv H. unfold sub_domain_bound in *.
+  apply H0 in H4.
+  unfold Stack.In,Stack.Raw.PX.In in *.
+  destruct H4.
+  exists (Num (z + x)). unfold cast_bound.
+  apply Stack.find_1 in H. rewrite H. easy.
+  inv H1.
+Qed.
 
-
-Inductive well_bound_args : list (var * type) -> list var -> type -> Prop := 
-    well_bound_args_empty : forall l t, well_bound_vars_type l t -> well_bound_args [] l t
-  | well_bound_args_many : forall x t1 tvl l t, well_bound_vars_type l t
-                           -> well_bound_args tvl (x::l) t -> well_bound_args ((x,t1)::tvl) l t.
+Lemma gen_well_type_cast_bound :
+   forall env s t, well_bound_vars_type env t -> sub_domain_bound env s
+           -> no_etype t -> (exists t', cast_type_bound s t t').
+Proof.
+  intros. induction t.
+  exists TNat. apply cast_type_bound_nat.
+  inv H. apply IHt in H4. destruct H4.
+  exists (TPtr m x). apply cast_type_bound_ptr. assumption.
+  inv H1. easy.
+  exists (TStruct s0). apply cast_type_bound_struct.
+  inv H. inv H1. apply IHt in H8. destruct H8.
+  apply (gen_well_bound_cast_bound env0 s) in H6.
+  apply (gen_well_bound_cast_bound env0 s) in H7.
+  destruct H6. destruct H7.
+  exists (TArray x0 x1 x).
+  apply cast_type_bound_array.
+  1 - 8: assumption.
+  inv H. inv H1. apply IHt in H8. destruct H8.
+  apply (gen_well_bound_cast_bound env0 s) in H6.
+  apply (gen_well_bound_cast_bound env0 s) in H7.
+  destruct H6. destruct H7.
+  exists (TNTArray x0 x1 x).
+  apply cast_type_bound_ntarray.
+  1 - 8: assumption.
+  inv H1.
+Qed.
 
 Lemma empty_means_cast_bound_same :
    forall s b, well_bound_vars [] b  -> cast_bound s b = Some b.
@@ -2868,11 +2970,13 @@ Proof.
 Qed.
 
 Lemma typed_args_values :
-    forall tvl es D F H s env t m e e' rt, 
+    forall tvl l es D F H s env t m e e' rt, 
         sub_domain env s ->
+        sub_domain_bound l s ->
         gen_e tvl es e e' ->
         @well_typed D F s H env m e' t -> 
-        well_bound_args tvl [] rt ->
+        well_bound_args tvl l rt ->
+        no_etype rt ->
       (forall ea, In ea es -> (exists n t, ea = ELit n t
                  /\ word_type t /\ type_wf D t /\ no_etype t) \/ (exists y, ea = EVar y)) ->
        (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D t' /\ no_etype t') ->
@@ -2880,12 +2984,15 @@ Lemma typed_args_values :
 Proof.
   induction tvl; intros.
   remember ([]) as tvl.
-  induction H1. inv H3.
-  apply empty_means_cast_type_bound_same with (s := s) in H1.
-  exists []. exists rt. constructor. easy.
+  induction H2. inv H4.
+  specialize (gen_well_type_cast_bound l s rt H2 H1 H5) as eq1.
+  destruct eq1.
+  exists []. exists x. constructor. easy.
+  inv Heqtvl.
+  inv H2. inv H3. inv H4.
 Admitted.
 
-Lemma progress : forall D F H denv s m e t,
+Lemma progress : forall D F s H denv m e t,
     structdef_wf D ->
     heap_wf D H ->
     expr_wf D F e ->
@@ -2895,35 +3002,35 @@ Lemma progress : forall D F H denv s m e t,
     reduces D F denv s H e \/
     unchecked m e.
 Proof with eauto 20 with Progress.
-  intros D F H denv st m e t HDwf HHwf Hewf Hfun Hwt.
+  intros D F st H denv m e t HDwf HHwf Hewf Hfun Hwt.
   remember empty_env as env.
   induction Hwt as [
-                     st env m n t Wb HTyLit                                      | (* Literals *)
-                     st env m x t Wb                                             | (* Variables *)
-                     st st' env env' m es x tvl t t' e HMap HArg HTy HVars       | (* Call *)
-                     st env m x h l t Wb                                         | (* Strlen *)
-                     st env m x e1 e2 t t' HTy1 IH1 HTy2 IH2 Hx Hext             | (* Let-Nat-Expr *)
-                     st env m x e1 t1 e2 t HTy1 IH1 HTy2 IH2 Hx                  | (* Let-Expr *)
-                     st env m x a ta e t HTy1 IH1                                | (* Ret *)
-                     st env m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
-                     st env m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
-                     st env m w Wb                                               | (* Malloc *)
-                     st env m e t HTy IH                                         | (* Unchecked *)
-                     st env m t e t' t'' Wb Teq HChkPtr HTy IH Noe               | (* Cast - nat *)
-                     st env m t e t' t'' Wb Teq HTy IH HSub Noe                  | (* Cast - subtype *)
-                     st env m e x y t x' y' t' Hptr Teq Wb HTy IH                | (* DynCast - ptr array *)
-                     st env m e x y t t' Teq HNot Wb HTy IH                      | (* DynCast - ptr array from ptr *)
-                     st env m e x y u v t x' y' t' Wb Teq HTy IH                 | (* DynCast - ptr nt-array *)
-                     st env m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
-                     st env m e1 m' l h e2 t WT Twf Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
-                     st env m e1 m' l h e2 t WT Twf Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
-                     st env m e1 e2 m' t t1 HSub WT Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
-                     st env m e1 e2 m' l h t t' WT Twf Noe HSub HTy1 IH1 HTy2 IH2 HMode                | (* Assign array *)
-                     st env m e1 e2 m' l h t t' WT Twf Noe HSub HTy1 IH1 HTy2 IH2 HMode                | (* Assign nt-array *)
+                     env m n t Wb HTyLit                                      | (* Literals *)
+                     env m x t t' Wb HSub                                     | (* Variables *)
+                     env m es x tvl t e e' t' HMap HArg Wb HVars HTy          | (* Call *)
+                     env m x h l t Wb                                         | (* Strlen *)
+                     env m x e1 e2 t t' HTy1 IH1 HTy2 IH2 Hx Hext             | (* Let-Nat-Expr *)
+                     env m x e1 t1 e2 t HTy1 IH1 HTy2 IH2 Hx                  | (* Let-Expr *)
+                     env m x a ta e t HTy1 IH1                                | (* Ret *)
+                     env m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
+                     env m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
+                     env m w Wb                                               | (* Malloc *)
+                     env m e t HTy IH                                         | (* Unchecked *)
+                     env m t e t' t'' Wb Teq HChkPtr HTy IH Noe               | (* Cast - nat *)
+                     env m t e t' t'' Wb Teq HTy IH HSub Noe                  | (* Cast - subtype *)
+                     env m e x y t x' y' t' Hptr Teq Wb HTy IH                | (* DynCast - ptr array *)
+                     env m e x y t t' Teq HNot Wb HTy IH                      | (* DynCast - ptr array from ptr *)
+                     env m e x y u v t x' y' t' Wb Teq HTy IH                 | (* DynCast - ptr nt-array *)
+                     env m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
+                     env m e1 m' l h e2 t WT Twf Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
+                     env m e1 m' l h e2 t WT Twf Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
+                     env m e1 e2 m' t t1 HSub WT Noe HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
+                     env m e1 e2 m' l h t t' WT Twf Noe HSub HTy1 IH1 HTy2 IH2 HMode                | (* Assign array *)
+                     env m e1 e2 m' l h t t' WT Twf Noe HSub HTy1 IH1 HTy2 IH2 HMode                | (* Assign nt-array *)
 
-                     st env m e1 e2 e3 m' l h t t' WT Twf Noe TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for array pointers *)
-                     st env m e1 e2 e3 m' l h t t' WT Twf Noe TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
-                     st env m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode (* If *)
+                     env m e1 e2 e3 m' l h t t' WT Twf Noe TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for array pointers *)
+                     env m e1 e2 e3 m' l h t t' WT Twf Noe TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
+                     env m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode (* If *)
                    ]; clean.
   (* Case: TyLit *)
   - (* Holds trivially, since literals are values *)
@@ -2933,7 +3040,7 @@ Proof with eauto 20 with Progress.
   - (* Impossible, since environment is empty *)
     inversion Wb.
   - (* Call Case *)
-    right. left.
+    right. left. inv Hewf.
     specialize (typed_args_empty_values D H st es tvl HArg) as eq1.
     destruct eq1.
     specialize (eval_el_gen_e st tvl es e x0 H0) as eq2.
