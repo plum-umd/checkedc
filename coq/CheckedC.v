@@ -1048,11 +1048,12 @@ Definition is_nor_array_ptr (t:type) : Prop :=
               | _ => False
    end.
 
-Inductive get_root : type -> type -> Prop :=
+Inductive get_root {D:structdef} : type -> type -> Prop :=
     get_root_word : forall m t, word_type t -> get_root (TPtr m t) t
   | get_root_array : forall m l h t, get_root (TPtr m (TArray l h t)) t
-  | get_root_ntarray : forall m l h t, get_root (TPtr m (TNTArray l h t)) t.
-
+  | get_root_ntarray : forall m l h t, get_root (TPtr m (TNTArray l h t)) t
+  | get_root_struct : forall m T f, StructDef.MapsTo T f D ->
+    Some (TNat) = (Fields.find 0%nat f) -> @get_root D (TPtr m (TStruct T)) TNat.
 
 Inductive step (D : structdef) (F:fenv) : stack -> heap 
                      -> expression -> stack -> heap -> result -> Prop :=
@@ -1156,7 +1157,7 @@ Inductive step (D : structdef) (F:fenv) : stack -> heap
       Heap.MapsTo n (n1, t1) H ->
       (forall l h t', t2 = TPtr Checked (TArray (Num l) (Num h) t') -> h > 0 /\ l <= 0) ->
       (forall l h t', t2 = TPtr Checked (TNTArray (Num l) (Num h) t') -> h >= 0 /\ l <= 0) ->
-      get_root t2 tv ->
+      @get_root D t2 tv ->
       step D F s H (EDeref (ELit n t)) s H (RExpr (ELit n1 tv))
   | SDerefHighOOB : forall s H n t t' h,
       h <= 0 ->
@@ -1172,13 +1173,12 @@ Inductive step (D : structdef) (F:fenv) : stack -> heap
       n <= 0 -> 
       step D F s H (EDeref (ELit n (TPtr Checked t))) s H RNull
 
-  | SAssign : forall s H n t tv n1 n2 t1 tv' tv2 H',
+  | SAssign : forall s H n t tv n1 t1 tv' H',
       Heap.In n H ->
       cast_type_bound s t tv ->
       (forall l h t', tv = TPtr Checked (TArray (Num l) (Num h) t') -> h > 0 /\ l <= 0) -> 
       (forall l h t', tv = TPtr Checked (TNTArray (Num l) (Num h) t') -> h > 0 /\ l <= 0) -> 
-      get_root tv tv' ->
-      Heap.MapsTo n (n2,tv2) H ->
+      @get_root D tv tv' ->
       H' = Heap.add n (n1, tv') H ->
       step D F
          s H  (EAssign (ELit n t) (ELit n1 t1))
@@ -1482,9 +1482,9 @@ Proof.
             end).
 Qed.
 
-Inductive well_type_lit_stack (D : structdef) (S:stack) (H : heap) :  scope -> Z -> type -> Prop :=
+Inductive well_typed_lit_stack (D : structdef) (S:stack) (H : heap) :  scope -> Z -> type -> Prop :=
       | WTStack : forall sc n t t', cast_type_bound S t t' 
-             -> well_typed_lit D H sc n t' -> well_type_lit_stack D S H sc n t.
+             -> well_typed_lit D H sc n t' -> well_typed_lit_stack D S H sc n t.
 
 (** Expression Typing *)
 (*
@@ -1596,15 +1596,16 @@ Definition is_ok_up (s:stack) (e:expression) : Prop :=
    end.
 *)
 
-Inductive well_typed_arg (D: structdef) (S:stack) (env:env): 
+Inductive well_typed_arg (D: structdef) (S:stack) (H:heap) (env:env): 
                  expression -> type -> Prop :=
      | ArgLit : forall n t t',
       well_type_bound_in env t ->
       subtype_stack D S t' t ->
-      well_typed_arg D S env (ELit n t) t'
+      well_typed_lit_stack D S H empty_scope n t' ->
+      well_typed_arg D S H env (ELit n t) t'
      | ArgVar : forall x t t',
       Env.MapsTo x t env -> subtype_stack D S t' t ->
-      well_typed_arg D S env (EVar x) t'.
+      well_typed_arg D S H env (EVar x) t'.
 
 Inductive well_bound_vars : list var -> bound -> Prop :=
   | well_bound_vars_num : forall l n, well_bound_vars l (Num n)
@@ -1645,21 +1646,21 @@ Inductive subst_types (s:arg_stack): list var -> type -> type -> Prop :=
  | subst_types_many : forall x l t t' t'', subst_type s x t t' -> subst_types s l t' t'' -> subst_types s (x::l) t t''.
 
 
-Inductive well_typed_args (D: structdef) (S:stack) : 
+Inductive well_typed_args {D: structdef} {S:stack} {H : heap} : 
                    env -> list var -> arg_stack -> list expression -> list (var * type) -> Prop :=
-     | args_empty : forall env l s, well_typed_args D S env l s [] []
+     | args_empty : forall env l s, well_typed_args env l s [] []
      | args_many_1 : forall env l s es n t1 v vl, 
-                 well_typed_arg D S env (ELit n t1) TNat ->
-                        well_typed_args D S env (v::l) (Stack.add v (NumVal n) s) es vl
-                        -> well_typed_args D S env l s ((ELit n t1)::es) ((v,TNat)::vl)
+                 well_typed_arg D S H env (ELit n t1) TNat ->
+                        well_typed_args env (v::l) (Stack.add v (NumVal n) s) es vl
+                        -> well_typed_args env l s ((ELit n t1)::es) ((v,TNat)::vl)
      | args_many_2 : forall env l s es x v vl, 
-                 well_typed_arg D S env (EVar x) TNat ->
-                        well_typed_args D S env (v::l) (Stack.add v (VarVal x) s) es vl
-                        -> well_typed_args D S env l s ((EVar x)::es) ((v,TNat)::vl)
+                 well_typed_arg D S H env (EVar x) TNat ->
+                        well_typed_args env (v::l) (Stack.add v (VarVal x) s) es vl
+                        -> well_typed_args env l s ((EVar x)::es) ((v,TNat)::vl)
      | args_many_3 : forall env l s es e v t t' vl,
                  t <> TNat -> subst_types s l t t' -> well_bound_vars_type l t ->
-                 well_typed_arg D S env e t' -> well_typed_args D S env l s es vl
-                        -> well_typed_args D S env l s (e::es) ((v,t)::vl).
+                 well_typed_arg D S H env e t' -> well_typed_args env l s es vl
+                        -> well_typed_args env l s (e::es) ((v,t)::vl).
 
 Inductive gen_env : env -> list (var * type) -> env -> Prop :=
      | gen_env_empty : forall env, gen_env env [] env
@@ -1846,9 +1847,10 @@ Definition fun_wf (D : structdef) (F:fenv) (H : heap) : Prop :=
     word_type t /\ type_wf D t /\ no_etype t /\ (well_bound_vars_type (get_nat_vars tvl) t) 
      /\ expr_wf D F e /\ well_expr_bound_in (fst (List.split tvl)) e.
 
-Inductive well_typed { D : structdef } {F : fenv} {S : stack} : env -> mode -> expression -> type -> Prop :=
+Inductive well_typed { D : structdef } {F : fenv} {S : stack} {H : heap} : env -> mode -> expression -> type -> Prop :=
   | TyLit : forall env m n t,
       well_type_bound_in env t ->
+      well_typed_lit_stack D S H empty_scope n t ->
       well_typed env m (ELit n t) t
   | TyVar : forall env m x t,
       Env.MapsTo x t env ->
@@ -1856,7 +1858,7 @@ Inductive well_typed { D : structdef } {F : fenv} {S : stack} : env -> mode -> e
 
   | TyCall : forall env env' m es x tvl e t t', 
         FEnv.MapsTo x (tvl,t,e) F ->
-        well_typed_args D S env [] empty_arg_stack es tvl ->
+        @well_typed_args D S H env [] empty_arg_stack es tvl ->
         gen_env empty_env tvl env' ->
         well_typed env' m e t -> 
         vars_to_ext (get_tvars t) t t' ->
@@ -3054,23 +3056,21 @@ Proof.
 Qed.
 
 Lemma lit_empty_means_cast_type_bound_same :
-  forall D F S m n t t1, @well_typed D F S empty_env m (ELit n t) t1 ->  cast_type_bound S t t.
+  forall D F S H m n t t1, @well_typed D F S H empty_env m (ELit n t) t1 ->  cast_type_bound S t t.
 Proof.
  intros. remember empty_env as env.
  remember (ELit n t) as e.
  induction H.
  subst.
- injection Heqe.
- intros.
- apply (empty_env_means_cast_type_bound_same S) in H.
- subst. easy.
- 1 - 24 : inv Heqe.
+ inv H0.
+ apply (empty_env_means_cast_type_bound_same S) in H4.
+ easy.
 Qed.
 
-Lemma lit_nat_type : forall D F S env m n t, @well_typed D F S env m (ELit n t) TNat -> t = TNat.
+Lemma lit_nat_type : forall D F S H env m n t, @well_typed D F S H env m (ELit n t) TNat -> t = TNat.
 Proof.
  intros. remember (ELit n t) as e. remember TNat as t1.
- induction H; subst; inv Heqe.
+ induction H0; subst; inv Heqe.
  reflexivity.
 Qed.
 
@@ -3127,158 +3127,158 @@ Proof.
 Qed.
 
 Lemma typed_args_values :
-    forall tvl es D s env l arg_env arg_s e, 
+    forall tvl es D s H env l arg_env arg_s e, 
         sub_domain env s ->
         sub_stack_nat arg_env s arg_s ->
         sub_list_arg_s l arg_s ->
-        well_typed_args D s env l arg_env es tvl ->
+        @well_typed_args D s H env l arg_env es tvl ->
       (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D t' /\ no_etype t') ->
       (forall ea, In ea es -> (exists n t, ea = ELit n t
                  /\ word_type t /\ type_wf D t /\ no_etype t) \/ (exists y, ea = EVar y)) ->
           (exists e', eval_el s arg_s tvl es e e').
 Proof.
   induction tvl; intros;simpl.
-  inv H2. exists e. constructor.
-  inv H2. inv H11. apply subtype_stack_nat in H8. subst. 
+  inv H3. exists e. constructor.
+  inv H3. inv H12. apply subtype_stack_nat in H8. subst. 
   assert ((forall ea : expression,
          In ea es0 ->
          (exists (n : Z) (t : type),
             ea = ELit n t /\ word_type t /\ type_wf D t /\ no_etype t) \/
          (exists y : var, ea = EVar y))).
-  intros. apply H4.
+  intros. apply H5.
   simpl. right. easy.
   assert ((forall (x : var) (t' : type),
          In (x, t') tvl ->
          word_type t' /\ type_wf D t' /\ no_etype t')).
   intros.
-  specialize (H3 x t').
+  specialize (H4 x t').
   assert (In (x, t') ((v, TNat) :: tvl)). simpl. right. easy.
-  apply H3 in H7. easy.
+  apply H4 in H8. easy.
   assert (sub_stack_nat (Stack.add v (NumVal n) arg_env)  s (Stack.add v (n,TNat) arg_s)).
   unfold sub_stack_nat in *. split. intros.
   destruct (Nat.eq_dec x v). subst.
-  apply Stack.mapsto_add1 in H7. inv H7.
+  apply Stack.mapsto_add1 in H8. inv H8.
   apply Stack.add_1. easy.
   apply Stack.add_2. lia.
-  apply Stack.add_3 in H7.
-  destruct H0. apply H0. easy. lia.
-  destruct H0.
+  apply Stack.add_3 in H8.
+  destruct H1. apply H1. easy. lia.
+  destruct H1.
   intros.
   destruct (Nat.eq_dec x v). subst.
-  apply Stack.mapsto_add1 in H8. inv H8.
-  apply Stack.add_3 in H8.
-  apply H7 with (x := x) in H9; try easy.
+  apply Stack.mapsto_add1 in H9. inv H9.
+  apply Stack.add_3 in H9.
+  apply H8 with (x := x) in H11; try easy.
   apply Stack.add_2. lia. easy. lia.
   assert (sub_list_arg_s (v::l) (Stack.add v (n, TNat) arg_s)).
   unfold sub_list_arg_s in *. intros.
   destruct (Nat.eq_dec x v). subst.
   unfold Stack.In,Stack.Raw.PX.In. exists (n,TNat). apply Stack.add_1. easy.
-  simpl in H8. destruct H8. lia. apply H1 in H8.
+  simpl in H9. destruct H9. lia. apply H2 in H9.
   unfold Stack.In,Stack.Raw.PX.In in *.
-  destruct H8. exists x0. apply Stack.add_2. lia. easy.
-  specialize (IHtvl es0 D s env0 (v :: l) (Stack.add v (NumVal n) arg_env) 
-           (Stack.add v (n, TNat) arg_s) e H H7 H8 H12 H5 H2).
+  destruct H9. exists x0. apply Stack.add_2. lia. easy.
+  specialize (IHtvl es0 D s H env0 (v :: l) (Stack.add v (NumVal n) arg_env) 
+           (Stack.add v (n, TNat) arg_s) e H0 H8 H9 H13 H6 H3).
   destruct IHtvl.
   exists ((ELet v (ELit n TNat) x)).
   constructor. constructor. constructor. easy.
-  inv H11. apply subtype_stack_nat in H6. subst.
+  inv H12. apply subtype_stack_nat in H7. subst.
   assert ((forall ea : expression,
          In ea es0 ->
          (exists (n : Z) (t : type),
             ea = ELit n t /\ word_type t /\ type_wf D t /\ no_etype t) \/
          (exists y : var, ea = EVar y))).
-  intros. apply H4.
+  intros. apply H5.
   simpl. right. easy.
   assert ((forall (x : var) (t' : type),
          In (x, t') tvl ->
          word_type t' /\ type_wf D t' /\ no_etype t')).
   intros.
-  specialize (H3 x0 t').
+  specialize (H4 x0 t').
   assert (In (x0, t') ((v, TNat) :: tvl)). simpl. right. easy.
-  apply H3 in H7. easy.
+  apply H4 in H8. easy.
   destruct (Stack.find x s) eqn:eq1.
   apply Stack.find_2 in eq1. destruct p.
   assert (sub_stack_nat (Stack.add v (VarVal x) arg_env) s (Stack.add v (z, TNat) arg_s)).
   unfold sub_stack_nat in *. split. intros.
   destruct (Nat.eq_dec x0 v). subst.
-  apply Stack.mapsto_add1 in H7. inv H7.
-  apply Stack.add_3 in H7.
-  apply Stack.add_2. lia. destruct H0. apply H0. easy. lia.
+  apply Stack.mapsto_add1 in H8. inv H8.
+  apply Stack.add_3 in H8.
+  apply Stack.add_2. lia. destruct H1. apply H1. easy. lia.
   intros. 
   destruct (Nat.eq_dec x0 v). subst.
-  apply Stack.mapsto_add1 in H7. inv H7.
+  apply Stack.mapsto_add1 in H8. inv H8.
   apply Stack.mapsto_always_same with (v1 := (v',t0)) in eq1. inv eq1. apply Stack.add_1. easy. easy.
-  apply Stack.add_3 in H7; try lia.
+  apply Stack.add_3 in H8; try lia.
   apply Stack.add_2 ; try lia.
-  destruct H0. apply H9 with (v := v0) (t := t0); try easy.
+  destruct H1. apply H10 with (v := v0) (t := t0); try easy.
   assert (sub_list_arg_s (v::l) (Stack.add v (z, TNat) arg_s)).
   unfold sub_list_arg_s in *. intros.
   destruct (Nat.eq_dec x0 v). subst.
   unfold Stack.In,Stack.Raw.PX.In. exists (z,TNat). apply Stack.add_1. easy.
-  simpl in H8. destruct H8. lia. apply H1 in H8.
+  simpl in H9. destruct H9. lia. apply H2 in H9.
   unfold Stack.In,Stack.Raw.PX.In in *.
-  destruct H8. exists x1. apply Stack.add_2. lia. easy.
-  specialize (IHtvl es0 D s env0 (v::l) (@Stack.add (arg_val) v (VarVal x) arg_env)
-               (Stack.add v (z, TNat) arg_s) e H H7 H8 H12 H6 H2).
+  destruct H9. exists x1. apply Stack.add_2. lia. easy.
+  specialize (IHtvl es0 D s H env0 (v::l) (@Stack.add (arg_val) v (VarVal x) arg_env)
+               (Stack.add v (z, TNat) arg_s) e H0 H8 H9 H13 H7 H3).
   destruct IHtvl.
   exists (ELet v (ELit z TNat) x0).
   constructor. apply eval_var with (t' := t). easy. constructor. easy.
-  unfold sub_domain in H.
-  specialize (H x).
+  unfold sub_domain in H0.
+  specialize (H0 x).
   assert (Env.In (elt:=type) x env0 ).
-  unfold Env.In,Env.Raw.PX.In. exists TNat. easy. apply H in H7.
-  unfold Stack.In,Stack.Raw.PX.In in H7.
-  destruct H7. apply Stack.find_1 in H7. rewrite H7 in eq1. inv eq1.
+  unfold Env.In,Env.Raw.PX.In. exists TNat. easy. apply H0 in H8.
+  unfold Stack.In,Stack.Raw.PX.In in H8.
+  destruct H8. apply Stack.find_1 in H8. rewrite H8 in eq1. inv eq1.
   assert ((forall ea : expression,
          In ea es0 ->
          (exists (n : Z) (t : type),
             ea = ELit n t /\ word_type t /\ type_wf D t /\ no_etype t) \/
          (exists y : var, ea = EVar y))).
-  intros. apply H4.
+  intros. apply H5.
   simpl. right. easy.
   assert ((forall (x : var) (t' : type),
          In (x, t') tvl ->
          word_type t' /\ type_wf D t' /\ no_etype t')).
   intros.
-  specialize (H3 x t'0).
+  specialize (H4 x t'0).
   assert (In (x, t'0) ((v, t) :: tvl)). simpl. right. easy.
-  apply H3 in H6. easy.
-  specialize (IHtvl es0 D s env0 l arg_env arg_s e H H0 H1 H15 H5 H2).
+  apply H4 in H7. easy.
+  specialize (IHtvl es0 D s H env0 l arg_env arg_s e H0 H1 H2 H16 H6 H3).
   destruct IHtvl.
-  specialize (H4 e0).
+  specialize (H5 e0).
   assert (In e0 (e0::es0)). simpl. left. easy.
-  apply H4 in H10. destruct H10. destruct H10. destruct H10.
-  destruct H10 as [X1 [X2 [X3 X4]]]. subst.
-  specialize (H3 v t).
+  apply H5 in H11. destruct H11. destruct H11. destruct H11.
+  destruct H11 as [X1 [X2 [X3 X4]]]. subst.
+  specialize (H4 v t).
   assert (In (v, t) ((v, t) :: tvl)). simpl. left. easy.
-  apply H3 in H10.
-  destruct H10 as [X5 [X6 X7]].
-  specialize (well_type_bound_vars_cast t l arg_s H1 H9 X7) as eq1.
-  destruct eq1. destruct H10.
-  specialize (eval_lit s arg_s x0 t x1 x2 H10) as eq1.
+  apply H4 in H11.
+  destruct H11 as [X5 [X6 X7]].
+  specialize (well_type_bound_vars_cast t l arg_s H2 H10 X7) as eq1.
+  destruct eq1. destruct H11.
+  specialize (eval_lit s arg_s x0 t x1 x2 H11) as eq1.
   exists ((ELet v (ELit x0 x2) x)).
   constructor; try easy.
-  destruct H10. subst.
+  destruct H11. subst.
   destruct (Stack.find x0 s) eqn:eq1. destruct p.
-  specialize (H3 v t).
+  specialize (H4 v t).
   assert (In (v, t) ((v, t) :: tvl)). simpl. left. easy.
-  apply H3 in H10.
-  destruct H10 as [X5 [X6 X7]].
-  specialize (well_type_bound_vars_cast t l arg_s H1 H9 X7) as eq2.
-  destruct eq2. destruct H10.
+  apply H4 in H11.
+  destruct H11 as [X5 [X6 X7]].
+  specialize (well_type_bound_vars_cast t l arg_s H2 H10 X7) as eq2.
+  destruct eq2. destruct H11.
   apply Stack.find_2 in eq1.
-  specialize (eval_var s arg_s x0 z t t0 x1 eq1 H10) as eq2.
+  specialize (eval_var s arg_s x0 z t t0 x1 eq1 H11) as eq2.
   exists ((ELet v (ELit z x1) x)).
   constructor; try easy.
   unfold sub_domain in *.
-  inv H14.
+  inv H15.
   unfold Env.In,Env.Raw.PX.In in *.
   assert ((exists e : type, Env.Raw.PX.MapsTo x0 e (Env.this env0))).
-  exists t0. easy. apply (H x0) in H10.
+  exists t0. easy. apply (H0 x0) in H11.
   unfold Stack.In,Stack.Raw.PX.In in *.
-  destruct H10. 
-  apply Stack.find_1 in H10.
-  rewrite H10 in eq1. inv eq1.
+  destruct H11. 
+  apply Stack.find_1 in H11.
+  rewrite H11 in eq1. inv eq1.
 Qed.
 
 Lemma subtype_no_etype : forall t D t', subtype D t t' -> no_etype t -> no_etype t'.
@@ -3377,6 +3377,11 @@ Proof.
   intros. induction b. constructor. constructor. inv H.
 Qed.
 
+Lemma no_ebound_ext_bound_anti : forall b, ext_bound_in [] b -> no_ebound b.
+Proof.
+  intros. induction b. constructor. constructor. inv H. simpl in H2. inv H2.
+Qed.
+
 Lemma no_etype_ext_type : forall t, no_etype t -> ext_type_in [] t.
 Proof.
   intros. induction H; try constructor. easy.
@@ -3437,7 +3442,7 @@ Proof.
 Qed.
 
 Lemma ext_type_well_bound : forall e D F st H env m t, expr_wf D F e -> fun_wf D F H -> structdef_wf D ->
-          bound_env env -> @well_typed D F st env m e t -> ext_type_in [] t.
+          bound_env env -> @well_typed D F st H env m e t -> ext_type_in [] t.
 Proof.
   intros. induction H4; simpl.
   inv H0. apply no_etype_ext_type. easy.
@@ -3478,12 +3483,34 @@ Proof.
   apply IHwell_typed in H9.
 Admitted.
 
+
+Lemma subtype_word_type : forall D m t1 t2, word_type t1 -> 
+        subtype D (TPtr m t1) (TPtr m t2) -> t2 = t1 \/ (exists l h, nat_leq (Num 0) l
+                                   /\ nat_leq h (Num 1) /\ t2 = TArray l h t1).
+Proof.
+  intros. 
+  inv H0. left. easy.
+  right. exists l. exists h. easy.
+  inv H. inv H. inv H. inv H. inv H.
+  inv H. inv H.
+Qed.
+
+Lemma replicate_gt_eq : forall x t, 0 < x -> Z.of_nat (length (Zreplicate (x) t)) = x.
+Proof.
+  intros.
+  unfold Zreplicate.
+  destruct x eqn:eq1. lia.
+  simpl. 
+  rewrite replicate_length. lia.
+  lia.
+Qed.
+
 Lemma progress : forall D F s H m e t,
     structdef_wf D ->
     heap_wf D H ->
     expr_wf D F e ->
     fun_wf D F H ->
-    @well_typed D F s empty_env m e t ->
+    @well_typed D F s H empty_env m e t ->
     value D e \/
     reduces D F s H e \/
     unchecked m e.
@@ -3491,7 +3518,7 @@ Proof with eauto 20 with Progress.
   intros D F st H m e t HDwf HHwf Hewf Hfun Hwt.
   remember empty_env as env.
   induction Hwt as [
-                     env m n t Wb                                             | (* Literals *)
+                     env m n t Wb WTL                                         | (* Literals *)
                      env m x t Wb                                             | (* Variables *)
                      env env' m es x tvl e t t' HMap HArg HGen HTy IH HVars   | (* Call *)
                      env m x h l t Wb                                         | (* Strlen *)
@@ -3543,7 +3570,7 @@ Proof with eauto 20 with Progress.
     Check typed_args_values.
     unfold fun_wf in Hfun.
     specialize (Hfun x tvl t e HMap). destruct Hfun.
-    specialize (typed_args_values tvl es D st
+    specialize (typed_args_values tvl es D st H
                 empty_env [] empty_arg_stack empty_stack (ECast t e) H0 H1 H4 HArg H5 H3) as eq2.
     destruct eq2.
     eapply step_implies_reduces.
@@ -3897,7 +3924,7 @@ Proof with eauto 20 with Progress.
       inv HTy.
       specialize (well_typed_means_simple (TPtr Checked (TArray x y t)) Wb H4) as eq2.
       inv eq2. inv H7.
-      inv eq1. inv H9. inv H11. inv H9. inv H12. inv H16.
+      inv eq1. inv H9. inv H10. inv H9. inv H14. inv H15.
       destruct (Z_le_dec n0 l).
       destruct (Z_lt_dec l h).
       destruct (Z_le_dec h n1).
@@ -3926,9 +3953,11 @@ Proof with eauto 20 with Progress.
                   l h t n0 n1 t').
       unfold eval_type_bound,eval_bound. reflexivity.
       unfold eval_type_bound,eval_bound. reflexivity. lia.
-      apply EnvFacts.empty_mapsto_iff in H6. inv H6.
-      inv H14. simpl in *. easy.
-      apply EnvFacts.empty_mapsto_iff in H6. inv H6.
+      inv H13. inv H17.
+      apply EnvFacts.empty_mapsto_iff in H9. inv H9.
+      inv H17. simpl in *. easy.
+      inv H13.
+      apply EnvFacts.empty_mapsto_iff in H9. inv H9.
       inv H13. simpl in *. easy.
     (* Case: `e` reduces *)
     + (* `ECast t e` can take a step by reducing `e` *)
@@ -3986,7 +4015,7 @@ Proof with eauto 20 with Progress.
       inv HTy.
       specialize (well_typed_means_simple (TPtr Checked (TNTArray x y t)) Wb H4) as eq2.
       inv eq2. inv H7.
-      inv eq1. inv H9. inv H11. inv H9. inv H12. inv H16.
+      inv eq1. inv H10. inv H11. inv H9. inv H13. inv H17.
       destruct (Z_le_dec n0 l).
       destruct (Z_lt_dec l h).
       destruct (Z_le_dec h n1).
@@ -4015,10 +4044,12 @@ Proof with eauto 20 with Progress.
                   l h t n0 n1 t').
       unfold eval_type_bound,eval_bound. reflexivity.
       unfold eval_type_bound,eval_bound. reflexivity. lia.
-      apply EnvFacts.empty_mapsto_iff in H6. inv H6.
+      inv H15.
+      apply EnvFacts.empty_mapsto_iff in H9. inv H9.
+      inv H15. simpl in *. easy.
+      inv H14.
+      apply EnvFacts.empty_mapsto_iff in H9. inv H9.
       inv H14. simpl in *. easy.
-      apply EnvFacts.empty_mapsto_iff in H6. inv H6.
-      inv H13. simpl in *. easy.
     (* Case: `e` reduces *)
     + (* `ECast t e` can take a step by reducing `e` *)
       left.
@@ -4037,7 +4068,13 @@ Proof with eauto 20 with Progress.
     clear HMode.
 
     (* TODO(ins): find a way to automate everything after case analysis... *)
-    inv Hewf. apply IH in H1. 2 : { easy. }
+    inv Hewf.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e D F st H empty_env m t H1 Hfun HDwf eq1 HTy) as Hx.
+    clear eq1.
+    apply IH in H1. 2 : { easy. }
     (* Invoke the IH on `e` *)
     destruct H1 as [ HVal | [ HRed | HUnchk ] ].
     (* Case: `e` is a value *)
@@ -4071,68 +4108,53 @@ Proof with eauto 20 with Progress.
           (* Case: TyLitC *)
           { (* We can step according to SDeref *)
             destruct H11 with (k := 0) as [ n' [ t1' [ Ht'tk [ Hheap Hwtn' ] ] ] ].
-            inv H2; subst. inv H4; inv HSub; inv H3; inv H4; unfold allocate_meta in *; inv H10; simpl; (try lia).
-            inv H16. inv H9. inv H12. inv H13. inv H15.
-            assert (1 <= h1 - l1) by lia.
-            inv H3.
-            rewrite replicate_gt_eq. lia. lia.
-            inv H16. inv H9. inv H12. inv H13. inv H15.
-            assert (1 <= h1 - l1) by lia.
-            inv H3.
-            rewrite replicate_gt_eq. lia. lia.
-            destruct (StructDef.find T D) eqn:HFind.
-            assert (Hmap : StructDef.MapsTo T f D). 
-            {
-             eapply find_implies_mapsto. assumption.
-            }
-            assert ( Z.of_nat (length (map snd (Fields.elements (elt:=type) f))) > 0). 
+            inv H2; inv H5; subst. unfold allocate_meta in *; inv H10; simpl; (try lia).
+            inv H4. inv HSub. inv H3. inv H5. inv H7. split. lia. simpl. lia.
+            inv H12. inv H13. inv H3. inv H12. inv H14. inv H16. inv H17. inv H7.
+            split. lia. simpl. rewrite replicate_gt_eq. lia. lia.
+            inv H12. inv H13. inv H3. inv H12. inv H14. inv H16. inv H17. inv H7.
+            split. lia. rewrite replicate_gt_eq. lia. lia.
+            inv H3. inv H5.
+            apply StructDef.find_1 in H9. rewrite H9 in H7. inv H7.
+            split. lia.
+            assert ( Z.of_nat (length (map snd (Fields.elements (elt:=type) fs))) > 0). 
             {
               eapply struct_subtype_non_empty; eauto.
               apply (SubTyStructArrayField_1 D T fs m).
+              apply StructDef.find_2. assumption.
               assumption.
-              assumption.
-            }
+              apply StructDef.find_2.  easy.
+            } lia.
             inv H3; zify; (try lia).
-            inv H3.
-            inv H16. inv H9. inv H12. inv H13. inv H15.
-            assert (1 <= h1 - l1) by lia.
-            inv H3.
-            rewrite replicate_gt_eq. lia. lia.
-            inv H16. inv H9. inv H12. inv H13. inv H15.
-            assert (1 <= h1 - l1) by lia.
-            inv H3.
-            rewrite replicate_gt_eq. lia. lia.
-
+            inv HSub. inv H5. inv H7. split. lia. simpl. lia.
+            inv H5. inv H12. inv H13. inv H17. inv H14. inv H16. inv H7.
+            split. lia. rewrite replicate_gt_eq.  lia. lia.
+            inv H5. inv H12. inv H13. inv H14. inv H16. inv H17. inv H7.
+            split. lia. rewrite replicate_gt_eq.  lia. lia. 
             rewrite Z.add_0_r in Hheap;
             inv Ht'tk.
             left.
+            assert (exists tv, @get_root D (TPtr Checked w) tv).
+            inv H3. destruct H2. inv HSub.
+            exists w. constructor.
+            apply cast_word_type with (s := st) (t := t''); try easy.
+            inv H2. inv H7. 
+            exists t'0. apply get_root_array. 
+            inv H7. 
+            exists t'0. apply get_root_ntarray.
+            inv H2. inv H2. inv H2. inv H2.
+            exists TNat. inv H7. apply get_root_struct with (f := fs); try easy.
+            exists TNat. inv H7. apply get_root_struct with (f := fs); try easy.
+            destruct H4.  
             eapply step_implies_reduces.
             eapply SDeref; eauto.
-            - destruct H2. inv w0. inv HSub.
-              unfold eval_type_bound,eval_bound.
-              reflexivity.
-              inv H12. inv H13. 
-              unfold eval_type_bound,eval_bound. reflexivity.
-              inv H12. inv H13.
-              unfold eval_type_bound,eval_bound. reflexivity.
-              unfold eval_type_bound,eval_bound. reflexivity.
-              inv HSub.
-              unfold eval_type_bound,eval_bound. reflexivity.
-              inv H12. inv H13.
-              unfold eval_type_bound,eval_bound. reflexivity.
-              inv H12. inv H13.
-              unfold eval_type_bound,eval_bound. reflexivity.
-            - intros. inv H4. inv HSub.
+            - intros. destruct H2. inv H9. inv H3. inv H7. inv H13.
+              inv HSub. inv H2. inv H2. inv H19. inv H20. inv H15. inv H16. split. lia. lia.
+              inv H2.
+            - intros. inv H7. inv H3. inv H9. inv HSub.
               destruct H2. inv H2.
               destruct H2. inv H2.
-              inv H15. inv H16. split. lia. easy.
-              destruct H2. inv H2.
-            - intros. inv H4. inv HSub.
-              destruct H2. inv H2.
-              destruct H2. inv H2.
-              destruct H2. inv H2.
-              inv H15. inv H16. split. lia. easy.
-              inv H15. inv H16. split. lia. easy.
+              inv H18. inv H19. inv H14. inv H15. split. lia. easy.
               destruct H2. inv H2.
               destruct H2. inv H2.
           }
@@ -4200,7 +4222,7 @@ Proof with eauto 20 with Progress.
             { left. (* We can step according to SDeref *)
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               inv H5.
-              specialize (simple_type_means_cast_same st t' H4) as eq1.
+              specialize (simple_type_means_cast_same t' st H4) as eq1.
               apply (cast_type_bound_same st t' t' t'0) in eq1. subst.
               destruct (Z_gt_dec l0 0).
 
@@ -4243,10 +4265,12 @@ Proof with eauto 20 with Progress.
               eapply step_implies_reduces.
               apply (SDeref D F st H n n' t'0 (TPtr Checked (TArray (Num l0) (Num h0) t'0))
                           (TPtr Checked (TArray (Num l0) (Num h0) t'0))); eauto.
+              - apply simple_type_means_cast_same. constructor. constructor.  easy.
               - intros l' h' t'' HT.
                 injection HT; intros ? ? ?; subst h0 l0 t'0.
                 split; zify; lia.
               - intros. inv H2.
+              - apply get_root_array.
               - assumption.
             }
             (* Case: h <= 0 *)
@@ -4255,7 +4279,9 @@ Proof with eauto 20 with Progress.
               eapply (SDerefHighOOB D F st H n (TPtr Checked (TArray (Num l0) (Num h0) t'))
                            (TPtr Checked (TArray (Num l0) (Num h0) t')) h0). eauto.
               unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
-            } 
+            }
+            inv Hx. inv H4. constructor. constructor. easy. apply no_ebound_ext_bound_anti. easy.
+            apply no_ebound_ext_bound_anti. easy.
           }
         } 
         (* Case: n <= 0 *)
@@ -4293,7 +4319,7 @@ Proof with eauto 20 with Progress.
             { left. (* We can step according to SDeref *)
               (* LEO: This looks exactly like the previous one. Abstract ? *)
               inv H5.
-              specialize (simple_type_means_cast_same st t' H4) as eq1.
+              specialize (simple_type_means_cast_same t' st H4) as eq1.
               apply (cast_type_bound_same st t' t' t'0) in eq1. subst.
               destruct (Z_gt_dec l0 0).
 
@@ -4336,10 +4362,12 @@ Proof with eauto 20 with Progress.
               eapply step_implies_reduces.
               apply (SDeref D F st H n n' t'0 (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))
                           (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))); eauto.
+              - apply simple_type_means_cast_same. constructor. constructor. easy.
               - intros. inv H2.
               - intros l' h' t'' HT.
                 injection HT; intros ? ? ?; subst h0 l0 t'0.
                 split; zify; lia.
+              - apply get_root_ntarray.
               - assumption.
             }
             (* Case: h <= 0 *)
@@ -4348,7 +4376,9 @@ Proof with eauto 20 with Progress.
               eapply (SDerefHighOOB D F st H n (TPtr Checked (TNTArray (Num l0) (Num h0) t'))
                            (TPtr Checked (TNTArray (Num l0) (Num h0) t')) h0). eauto.
               unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
-            } 
+            }
+            inv Hx. inv H4. constructor. constructor. easy. apply no_ebound_ext_bound_anti. easy.
+            apply no_ebound_ext_bound_anti. easy.
           }
         } 
         (* Case: n <= 0 *)
@@ -4380,19 +4410,16 @@ Proof with eauto 20 with Progress.
             inv H3. specialize (cast_word_type st t' w H5 Ht) as eq1.
             unfold allocate_meta in *. destruct w.
             inv H10. simpl. lia. inv H10. simpl. lia.
-            inv eq1. inv eq1. inv eq1.
+            inv eq1. inv eq1. inv eq1. inv eq1.
 
             rewrite Z.add_0_r in Hheap;
             inv Ht'tk.
             left.
             eapply step_implies_reduces.
             eapply SDeref; eauto.
-            - unfold eval_type_bound,eval_bound.
-              destruct t'.
-              reflexivity. reflexivity.
-              inv Ht. inv Ht. inv Ht.
-            - intros. inv H4. inv Ht.
-            - intros. inv H4. inv Ht.
+            - intros. inv H4. inv H3. inv H7. inv Ht.
+            - intros. inv H4. inv H3. inv H7. inv Ht.
+            - constructor. inv H3. apply cast_word_type  with(s := st) (t := t'). easy. easy.
           }
         }
         (* Case: n <= 0 *)
@@ -4448,9 +4475,9 @@ Proof with eauto 20 with Progress.
             left.
             eapply step_implies_reduces.
             eapply SDeref; eauto.
-            - unfold eval_type_bound,eval_bound. reflexivity.
-            - intros. inv H4.
-            - intros. inv H4.
+            - intros. inv H4. inv H3. inv H7. 
+            - intros. inv H4. inv H3. inv H7.
+            - inv H3. inv H7. apply get_root_struct with (f := fs); try easy. 
           }
         }
         (* Case: n <= 0 *)
@@ -4538,15 +4565,17 @@ Proof with eauto 20 with Progress.
                 eapply replicate_nth; eauto.
               }
               subst t''.
-              apply (simple_type_means_cast_same st) in H4.
-              apply (cast_type_bound_same st t' t' t'0) in H4. rewrite H4 in *.
+              apply (simple_type_means_cast_same) with (s := st) in H4 as eq1.
+              apply (cast_type_bound_same st t' t' t'0) in eq1. rewrite eq1 in *.
               eapply step_implies_reduces.
               apply (SDeref D F st H n n' t'0 (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))
                           (TPtr Checked (TNTArray (Num l0) (Num h0) t'0))); eauto.
+              - apply simple_type_means_cast_same. constructor. constructor. easy. 
               - intros. inv H2.
               - intros l' h' t'' HT.
                 injection HT. intros. subst.
                 split; zify; lia.
+              - apply get_root_ntarray.
               - assumption.
             }
             (* Case: h <= 0 *)
@@ -4556,6 +4585,8 @@ Proof with eauto 20 with Progress.
                            (TPtr Checked (TNTArray (Num l0) (Num h0) t')) h0). eauto.
               unfold eval_type_bound; eauto. unfold get_high_ptr. reflexivity.
             } 
+            inv Hx. inv H4. constructor. constructor. easy. apply no_ebound_ext_bound_anti. easy.
+            apply no_ebound_ext_bound_anti. easy.
           }
         } 
         (* Case: n <= 0 *)
@@ -4572,6 +4603,15 @@ Proof with eauto 20 with Progress.
     clear HMode.
     (* Leo: This is becoming hacky *)
     inv Hewf. inv H1.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                    (TPtr Checked (TArray l h t)) H3 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TArray l h t))) as Hx'.
+    constructor. inv Hx. inv H2. constructor. easy. apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
     (*
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
@@ -4592,33 +4632,28 @@ Proof with eauto 20 with Progress.
       destruct IH2 as [ HVal2 | [ HRed2 | HUnchk2 ] ]; eauto.
       * left.
         inv HVal2.
-        ctx (EDeref (EPlus (ELit n1 t1) (ELit n t))) (in_hole (EPlus (ELit n1 t1) (ELit n t)) (CDeref CHole)).
+        ctx (EDeref (EPlus (ELit n1 t1) (ELit n t0))) (in_hole (EPlus (ELit n1 t1) (ELit n t0)) (CDeref CHole)).
         inv HTy1.
-        specialize (well_typed_means_simple (TPtr Checked (TArray l h t')) H10) as eq1.
+        specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H10 Hx') as eq1.
         inv eq1. inv H7.
         exists Checked.
         exists st.
         exists H.
         { destruct (Z_gt_dec n1 0).
           - (* n1 > 0 *)
-            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t'))))).
-            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t'))))
-                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t'))) (CDeref CHole)).
+            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t))))).
+            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t))))
+                (in_hole (ELit (n1 + n) (TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t))) (CDeref CHole)).
             rewrite HCtx.
             rewrite HCtx0.
             inv HTy2.
             eapply RSExp; eauto.
-            assert ((TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t')) 
-             = sub_type_bound (TPtr Checked (TArray (Num l0) (Num h0) t')) n).
+            assert ((TPtr Checked (TArray (Num (l0 - n)) (Num (h0 - n)) t)) 
+             = sub_type_bound (TPtr Checked (TArray (Num l0) (Num h0) t)) n).
             unfold sub_type_bound,sub_bound. reflexivity.
             rewrite H6.
             apply SPlusChecked. assumption.
             unfold is_array_ptr. easy.
-            apply cast_type_bound_ptr.
-            apply cast_type_bound_array.
-            unfold cast_bound. reflexivity.
-            unfold cast_bound. reflexivity.
-            apply simple_type_means_cast_same. assumption.
           - (* n1 <= 0 *)
             exists RNull.
             subst. 
@@ -4646,6 +4681,15 @@ Proof with eauto 20 with Progress.
     (* Leo: This is becoming hacky *)
     inv Hewf.
     inv H1.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                    (TPtr Checked (TNTArray l h t)) H3 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TNTArray l h t))) as Hx'.
+    constructor. inv Hx. inv H2. constructor. easy. apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
     (*
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
@@ -4666,33 +4710,28 @@ Proof with eauto 20 with Progress.
       destruct IH2 as [ HVal2 | [ HRed2 | HUnchk2 ] ]; eauto.
       * left.
         inv HVal2.
-        ctx (EDeref (EPlus (ELit n1 t1) (ELit n t))) (in_hole (EPlus (ELit n1 t1) (ELit n t)) (CDeref CHole)).
+        ctx (EDeref (EPlus (ELit n1 t1) (ELit n t0))) (in_hole (EPlus (ELit n1 t1) (ELit n t0)) (CDeref CHole)).
         inv HTy1.
-        specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t')) H10) as eq1.
+        specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H10 Hx') as eq1.
         inv eq1. inv H7.
         exists Checked.
         exists st.
         exists H.
         { destruct (Z_gt_dec n1 0).
           - (* n1 > 0 *)
-            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t'))))).
-            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t'))))
-                (in_hole (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t'))) (CDeref CHole)).
+            exists (RExpr (EDeref (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t))))).
+            ctx (EDeref (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t))))
+                (in_hole (ELit (n1 + n) (TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t))) (CDeref CHole)).
             rewrite HCtx.
             rewrite HCtx0.
             inv HTy2.
             eapply RSExp; eauto.
-            assert ((TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t')) 
-             = sub_type_bound (TPtr Checked (TNTArray (Num l0) (Num h0) t')) n).
+            assert ((TPtr Checked (TNTArray (Num (l0 - n)) (Num (h0 - n)) t)) 
+             = sub_type_bound (TPtr Checked (TNTArray (Num l0) (Num h0) t)) n).
             unfold sub_type_bound,sub_bound. reflexivity.
             rewrite H6.
             apply SPlusChecked. assumption.
             unfold is_array_ptr. easy.
-            apply cast_type_bound_ptr.
-            apply cast_type_bound_ntarray.
-            unfold cast_bound. reflexivity.
-            unfold cast_bound. reflexivity.
-            apply simple_type_means_cast_same. assumption.
           - (* n1 <= 0 *)
             exists RNull.
             subst. 
@@ -4721,7 +4760,8 @@ Proof with eauto 20 with Progress.
     clear HMode.
 
     (* Invoke IH on e1 *)
-    inv Hewf. apply IH1 in H2. 2 : { easy. }
+    inv Hewf.
+    apply IH1 in H2. 2 : { easy. }
     destruct H2 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1 as [ n1' t1' WTt1' Ht1' ].
@@ -4742,7 +4782,8 @@ Proof with eauto 20 with Progress.
               eapply step_implies_reduces.
               eapply SAssignNull; eauto. lia.
               apply (well_typed_means_simple) in H4.
-              apply eval_simple_type_same. assumption.
+              apply simple_type_means_eval_same. assumption.
+              constructor. easy.
             + solve_empty_scope.
             + left. unfold allocate_meta in H2.
               destruct w; inv H2; simpl in *. inv H0. inv H2.
@@ -4771,6 +4812,7 @@ Proof with eauto 20 with Progress.
                  inv H0. inv H2. inv WT.
               ++ inv H0.  inv H2. inv WT.
               ++ inv H0.  inv H2. inv WT.
+              ++ inv H0. inv H2. inv WT.
          }
       * unfold reduces in HRed2. destruct HRed2 as [ H' [ ? [ ? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
@@ -4789,7 +4831,17 @@ Proof with eauto 20 with Progress.
     clear HMode.
 
     (* Invoke IH on e1 *)
-    inv Hewf. apply IH1 in H2. 2 : { easy. }
+    inv Hewf.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                  (TPtr Checked (TArray l h t)) H2 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TArray l h t))) as Hx'.
+    constructor. inv Hx. inv H4. constructor. easy. apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
+    apply IH1 in H2. 2 : { easy. }
     destruct H2 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1 as [ n1' t1' WTt1' Ht1' ].
@@ -4807,7 +4859,7 @@ Proof with eauto 20 with Progress.
             + exfalso; inv H0.
             + exfalso; inv H0.
             + left.
-              specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H4) as eq1.
+              specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H4 Hx') as eq1.
               inv eq1. inv H2.
 
               destruct (Z_gt_dec h0 0).
@@ -4831,7 +4883,7 @@ Proof with eauto 20 with Progress.
                 unfold get_high_ptr. easy.
             + solve_empty_scope.
             + left.
-              specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H4) as eq1.
+              specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H4 Hx') as eq1.
               inv eq1. inv H5.
 
               destruct (Z_gt_dec n1' 0).
@@ -4847,7 +4899,7 @@ Proof with eauto 20 with Progress.
                         inv H0. inv H5.
                         eapply step_implies_reduces.
                         eapply (SAssign); eauto.
-                        apply (simple_type_means_cast_same st) in H6.
+                        apply (simple_type_means_cast_same t st) in H6.
                         apply (cast_type_bound_same st t t t'0) in H6.
                         inv H8. inv H10.
                         destruct (H3 0). unfold allocate_meta in H2.
@@ -4915,7 +4967,17 @@ Proof with eauto 20 with Progress.
     clear HMode.
 
     (* Invoke IH on e1 *)
-    inv Hewf. apply IH1 in H2. 2 : { easy. }
+    inv Hewf.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                  (TPtr Checked (TNTArray l h t)) H2 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TNTArray l h t))) as Hx'.
+    constructor. inv Hx. inv H4. constructor. easy. apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
+    apply IH1 in H2. 2 : { easy. }
     destruct H2 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1 as [ n1' t1' WTt1' Ht1' ].
@@ -4933,7 +4995,7 @@ Proof with eauto 20 with Progress.
             + exfalso; inv H0.
             + exfalso; inv H0.
             + left.
-              specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H4) as eq1.
+              specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H4 Hx') as eq1.
               inv eq1. inv H2.
 
               destruct (Z_gt_dec h0 0).
@@ -4956,7 +5018,7 @@ Proof with eauto 20 with Progress.
                 unfold get_high_ptr. easy. 
             + solve_empty_scope.
             + left.
-              specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H4) as eq1.
+              specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H4 Hx') as eq1.
               inv eq1. inv H5.
 
               destruct (Z_gt_dec n1' 0).
@@ -4972,7 +5034,7 @@ Proof with eauto 20 with Progress.
                         inv H0. inv H5.
                         eapply step_implies_reduces.
                         eapply SAssign; eauto.
-                        apply (simple_type_means_cast_same st) in H6.
+                        apply (simple_type_means_cast_same t st) in H6.
                         apply (cast_type_bound_same st t t t'0) in H6.
                         inv H8. inv H10.
                         destruct (H3 0). unfold allocate_meta in H2.
@@ -5040,7 +5102,19 @@ Proof with eauto 20 with Progress.
     (* If m' is unchecked, then we are typing mode is unchecked *)
     destruct m'; [> | right; eauto 20 with Progress].
     clear HMode.
-    inv Hewf. inv H2.
+    inv Hewf.
+    inv H2.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                  (TPtr Checked (TArray l h t)) H4 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TArray l h t))) as Hx'.
+    constructor. inv Hx. inv H2. constructor.
+    apply subtype_stack_no_etype with (t := t') (D := D) (s := st); try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
     (*
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
@@ -5067,7 +5141,7 @@ Proof with eauto 20 with Progress.
                   (in_hole (EPlus (ELit n t0) (ELit n0 t1)) (CAssignL CHole e3)).
         inv HTy1.
         inv HTy2.
-        specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H9) as eq1.
+        specialize (well_typed_means_simple (TPtr Checked (TArray l h t)) H9 Hx') as eq1.
         inv eq1. inv H6.
         {
           inv H11. inv H13. inv H5. inv H8. inv H15. inv H13. inv H16.
@@ -5110,14 +5184,12 @@ Proof with eauto 20 with Progress.
           - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. lia.
                 unfold is_array_ptr. easy.
-                apply empty_means_cast_type_bound_same. assumption.
                 eauto.
               * eapply RSHaltNull. eapply SPlusNull. lia.
                 unfold is_array_ptr. easy. eauto.
           -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. lia.
                 unfold is_array_ptr. easy. 
-                apply empty_means_cast_type_bound_same. assumption.
                 eauto.
               * eapply RSHaltNull. eapply SPlusNull. lia.
                 unfold is_array_ptr. easy. eauto.
@@ -5138,6 +5210,17 @@ Proof with eauto 20 with Progress.
     destruct m'; [> | right; eauto 20 with Progress].
     clear HMode.
     inv Hewf. inv H2.
+    assert (bound_env empty_env) as eq1. unfold bound_env.
+    intros. apply EnvFacts.empty_mapsto_iff in H0.  inv H0.
+    Check ext_type_well_bound.
+    specialize (ext_type_well_bound e1 D F st H empty_env m
+                  (TPtr Checked (TNTArray l h t)) H4 Hfun HDwf eq1 HTy1) as Hx.
+    assert (no_etype (TPtr Checked (TNTArray l h t))) as Hx'.
+    constructor. inv Hx. inv H2. constructor.
+    apply subtype_stack_no_etype with (t := t') (D := D) (s := st); try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    apply no_ebound_ext_bound_anti; try easy.
+    clear eq1.
     (*
     assert (exists l0 h0, t = (TPtr Checked (TArray l0 h0 t'))).
     {
@@ -5164,7 +5247,7 @@ Proof with eauto 20 with Progress.
                   (in_hole (EPlus (ELit n t0) (ELit n0 t1)) (CAssignL CHole e3)).
         inv HTy1.
         inv HTy2.
-        specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H9) as eq1.
+        specialize (well_typed_means_simple (TPtr Checked (TNTArray l h t)) H9 Hx') as eq1.
         inv eq1. inv H6.
         {
           inv H11. inv H13. inv H5. inv H8. inv H15. inv H13. inv H16.
@@ -5207,14 +5290,12 @@ Proof with eauto 20 with Progress.
           - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. lia.
                 unfold is_array_ptr. easy.
-                apply empty_means_cast_type_bound_same. assumption.
                 eauto.
               * eapply RSHaltNull. eapply SPlusNull. lia.
                 unfold is_array_ptr. easy. eauto.
           -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
               * eapply RSExp. eapply SPlusChecked. lia.
                 unfold is_array_ptr. easy. 
-                apply empty_means_cast_type_bound_same. assumption.
                 eauto.
               * eapply RSHaltNull. eapply SPlusNull. lia.
                 unfold is_array_ptr. easy. eauto.
@@ -5558,26 +5639,6 @@ Qed.
 *)
 
 
-Lemma subtype_word_type : forall D m t1 t2, word_type t1 -> 
-        subtype D (TPtr m t1) (TPtr m t2) -> t2 = t1 \/ (exists l h, nat_leq (Num 0) l
-                                   /\ nat_leq h (Num 1) /\ t2 = TArray l h t1).
-Proof.
-  intros. 
-  inv H0. left. easy.
-  right. exists l. exists h. easy.
-  inv H. inv H. inv H. inv H. inv H.
-  inv H. inv H.
-Qed.
-
-Lemma replicate_gt_eq : forall x t, 0 < x -> Z.of_nat (length (Zreplicate (x) t)) = x.
-Proof.
-  intros.
-  unfold Zreplicate.
-  destruct x eqn:eq1. lia.
-  simpl. 
-  rewrite replicate_length. lia.
-  lia.
-Qed.
 
 Lemma nth_error_map_snd : forall (l : list (Z*type)) t i,
                 nth_error (map snd l) i = Some t -> (exists x, nth_error l i = Some (x,t)).
