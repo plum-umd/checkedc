@@ -903,7 +903,7 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
       step D F s H (EVar x) s H (RExpr (ELit v t))
   | Strlen : forall s H x n n' m l h t t1, 
      (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
-     (forall i , n <= i < n+n'+1 -> (exists n1 t1, Heap.MapsTo n (n1,t1) H /\ n1 <> 0))
+     (forall i , n <= i < n+n'+1 -> (exists n1 t1, Heap.MapsTo i (n1,t1) H /\ n1 <> 0))
       -> Heap.MapsTo (n+n'+1) (0,t1) H ->
             step D F s H (EStrlen x) (change_strlen_stack s x m t l n n' h) H (RExpr (ELit n' TNat))
   | SCall : forall AS s s' H x el t tvl e e' m, 
@@ -5899,8 +5899,8 @@ Qed.
 
 Create HintDb Preservation.
 
-Definition heap_wt_all (D : structdef) (H:heap) := forall x n t, Heap.MapsTo x (n,t) H
-            -> word_type t /\ type_wf D t /\ simple_type t.
+Definition heap_wt_all (D : structdef) (Q:theta) (H:heap) := forall x n t, Heap.MapsTo x (n,t) H
+            -> word_type t /\ type_wf D t /\ simple_type t /\ well_typed_lit D Q H empty_scope n t.
 
 Definition stack_consistent_grow (S S' : stack) (env : env) := 
        forall x v t, Env.In x env -> sub_domain env S -> Stack.MapsTo x (v,t) S -> Stack.MapsTo x (v,t) S'.
@@ -6380,10 +6380,10 @@ Proof.
    apply IHt with (S := S) (AS := AS) (env := env0); try easy.
 Qed.
 
-(*
+
 Lemma stack_wf_out : forall tvl es D Q H env AS S S',
-     sub_domain env S -> stack_wt D S -> stack_wf D Q H env S ->
-     env_wt D env ->
+     sub_domain env S -> stack_wt D S -> stack_wf D Q env S ->
+     env_wt D env -> stack_heap_consistent D Q H S ->
      (forall a, In a tvl -> ~ Env.In (fst a) env) ->
      (forall x n t ta, Env.MapsTo x t env -> Stack.MapsTo x (n,ta) S ->
            (exists t', cast_type_bound S t t' /\ subtype D Q ta t')) ->
@@ -6400,94 +6400,82 @@ Lemma stack_wf_out : forall tvl es D Q H env AS S S',
             @well_typed_lit D Q H empty_scope v t').
 Proof.
   intros.
-  induction H10. inv H9. intros.
-  inv H11.
-  intros. inv H9.
+  induction H11. inv H10. intros.
+  inv H12.
+  intros. inv H10.
   assert ((forall a : Env.key * type,
              In a tvl ->
              ~ Env.In (elt:=type) (fst a) env0)).
-  intros. apply H4. simpl. right. easy.
+  intros. apply H5. simpl. right. easy.
   assert ((forall (n n' : nat) (a b : Env.key * type),
              n <> n' ->
              nth_error tvl n = Some a ->
              nth_error tvl n' = Some b -> fst a <> fst b)).
   intros.
-  specialize (H7 (S n0) (S n') a b).
-  simpl in H7. apply H7; try easy. lia.
+  specialize (H8 (S n0) (S n') a b).
+  simpl in H8. apply H8; try easy. lia.
   assert ((forall e : expression,
              In e es ->
              (exists (n : Z) (t : type),
                 e = ELit n t /\ word_type t /\ type_wf D t /\ simple_type t) \/
              (exists y : var, e = EVar y))).
-  intros. apply H8. simpl. right. easy.
-  specialize (IHeval_el H0 H1 H2 H9 H5 H6 H13 H14 H21). clear H13. clear H14.
-  simpl in H11. destruct H11. inv H11.
-  inv H18. inv H10.
+  intros. apply H9. simpl. right. easy.
+  specialize (IHeval_el H0 H1 H2 H4 H10 H6 H7 H14 H15 H22). clear H14. clear H15.
+  simpl in H12. destruct H12. inv H12.
+  inv H19. inv H11.
   exists n.
-  apply simple_type_means_cast_same with (s := s) in H11 as eq1.
+  apply simple_type_means_cast_same with (s := s) in H12 as eq1.
   exists (subst_type AS t).
   split. easy. 
   split.
-  apply (cast_type_bound_same s (subst_type AS t) (subst_type AS t) t' eq1) in H19.
-  rewrite H19. apply Stack.add_1. easy.
+  apply (cast_type_bound_same s (subst_type AS t) (subst_type AS t) t' eq1) in H20.
+  rewrite H20. apply Stack.add_1. easy.
   apply subtype_well_type with (t := t'0); try easy.
   assert (In (ELit n t'0) (ELit n t'0 :: es)). simpl. left. easy.
-  apply H8 in H10. destruct H10. destruct H10 as [na [ta [X1 [X2 [X3 X4]]]]].
-  inv X1. apply subtype_type_wf in H14. easy. easy. destruct H10. inv H10.
-  inv H10.
+  apply H9 in H11. destruct H11. destruct H11 as [na [ta [X1 [X2 [X3 X4]]]]].
+  inv X1. apply subtype_type_wf in H15. easy. easy. destruct H11. inv H11.
+  inv H11.
   assert (well_type_bound_in env0 t'0).
   apply H3 with (x := x0); easy.
-  specialize (gen_cast_type_bound_same env0 s t'0 H10 H0) as eq1.
+  specialize (gen_cast_type_bound_same env0 s t'0 H11 H0) as eq1.
   destruct eq1.
-  apply cast_means_simple_type in H15 as eq1.
-  apply cast_means_simple_type in H22 as eq2.
-  specialize (H5 x0 n t'0 t'1 H11 H20) as eq3.
-  destruct eq3. destruct H16.
-  specialize (cast_type_bound_same s t'0 x1 x2 H15 H16) as eq3. subst.
+  apply cast_means_simple_type in H16 as eq1.
+  apply cast_means_simple_type in H23 as eq2.
+  specialize (H6 x0 n t'0 t'1 H12 H21) as eq3.
+  destruct eq3. destruct H17.
+  specialize (cast_type_bound_same s t'0 x1 x2 H16 H17) as eq3. subst.
   unfold stack_wt in H1.
-  specialize (cast_subtype_same t'0 D Q s x2 (subst_type AS t) t' H14 H15 H22 H6) as eq3.
+  specialize (cast_subtype_same t'0 D Q s x2 (subst_type AS t) t' H15 H16 H23 H7) as eq3.
   assert (word_type x2).
-  apply cast_word_type in H15; try easy.
-  specialize (H3 x0 t'0 H11). easy.
-  inv H18. inv eq3. inv H17. inv H22. inv H15.
+  apply cast_word_type in H16; try easy.
+  specialize (H3 x0 t'0 H12). easy.
+  inv H19. inv eq3. inv H18. inv H23. inv H16.
   exists n. exists TNat.
   split. easy.
   split. apply Stack.add_1. easy.  apply TyLitInt.
-  specialize (subtype_trans D Q t'1 t' m w H17 eq3) as eq4.
+  specialize (subtype_trans D Q t'1 t' m w H18 eq3) as eq4.
   exists n. exists t'. split. easy.
   split. apply Stack.add_1. easy.
   unfold stack_wf in *.
-  specialize (H2 x0 t'0 H11).
-  destruct H2 as [v [ta [tb [X1 [X2 [X3 X4]]]]]].
+  specialize (H2 x0 t'0 H12).
+  destruct H2 as [v [ta [tb [X1 [X2 X3]]]]].
   apply Stack.mapsto_always_same with (v1 := (n, t'1)) in X3 as eq6; try easy. inv eq6.
-  apply H1 in X3. destruct X3 as [X3a [X3b X3c]].
+  apply H1 in X3 as X4. destruct X4 as [X3a [X3b X3c]].
   apply subtype_well_type with (t := tb); try easy.
   apply subtype_type_wf with (Q := Q) (t' := t')  in X3b. easy. easy.
+  unfold stack_heap_consistent in *.
+  apply H4 with (x := x0); try easy.
   simpl in *.
-  specialize (IHeval_el H11).
+  specialize (IHeval_el H12).
   destruct IHeval_el as [v [ta [X1 [X2 X3]]]].
   exists v. exists ta.
   split. easy. split.
-  apply nth_no_appear with (y := x) (w := t) in H7.
+  apply nth_no_appear with (y := x) (w := t) in H8.
   apply Stack.add_2. easy. easy.
   easy. easy.
 Qed.
 
 
-Lemma stack_wf_core : forall D Q H env S, stack_wf D Q H env S ->
-    (forall x n t ta, Env.MapsTo x t env -> Stack.MapsTo x (n,ta) S ->
-           (exists t', cast_type_bound S t t' /\ subtype D Q ta t')).
-Proof.
-  intros.
-  unfold stack_wf in *.
-  specialize (H0 x t H1).
-  destruct H0 as [v [t' [t'' [X1 [X2 [X3 X4]]]]]].
-  exists t'. split. easy.
-  apply Stack.mapsto_always_same with (v1 := (v,t'')) in H2; try easy. inv H2.
-  easy.
-Qed.
-
-*)
 Lemma well_type_args_well_bound : forall D Q H env AS es tvl,
    @well_typed_args D Q H env AS es tvl -> 
    (forall x t, In (x,t) tvl -> well_type_bound_in env (subst_type AS t)).
@@ -6539,11 +6527,38 @@ Definition theta_wt (Q:theta) (env:env) (S:stack) :=
      (forall x, Theta.In x Q -> Env.In x env)
   /\ (forall x n ta, Theta.MapsTo x GeZero Q -> Stack.MapsTo x (n,ta) S -> 0 <= n).
 
+Lemma stack_wf_core : forall D Q env S, stack_wf D Q env S ->
+    (forall x n t ta, Env.MapsTo x t env -> Stack.MapsTo x (n,ta) S ->
+           (exists t', cast_type_bound S t t' /\ subtype D Q ta t')).
+Proof.
+  intros.
+  unfold stack_wf in *.
+  specialize (H x t H0).
+  destruct H as [v [t' [t'' [X1 [X2 X3]]]]].
+  exists t'. split. easy.
+  apply Stack.mapsto_always_same with (v1 := (v,t'')) in H1; try easy. inv H1.
+  easy.
+Qed.
 
-(*
+Lemma stack_tvl_has : forall tvl AS S es S', eval_el AS S tvl es S'
+        -> (forall x t, In (x,t) tvl -> exists n ta, Stack.MapsTo x (n,ta) S').
+Proof.
+  intros. induction H.
+  simpl in *. easy.
+  simpl in H0. destruct H0.
+  inv H0. exists n. exists t'. apply Stack.add_1. easy.
+  destruct (Nat.eq_dec x x0). subst.
+  exists n. exists t'. apply Stack.add_1. easy.
+  apply IHeval_el in H0.
+  destruct H0. destruct H0.
+  exists x1. exists x2.
+  apply Stack.add_2. lia. easy.
+Qed.
+
+
 Lemma stack_wf_trans :
    forall D Q H env env' S S' AS tvl es,
-   stack_wt D S -> sub_domain env S -> stack_wf D Q H env S -> env_wt D env ->
+   stack_wt D S -> sub_domain env S -> stack_wf D Q env S -> stack_heap_consistent D Q H S -> env_wt D env ->
      (forall a, In a tvl -> ~ Env.In (fst a) env) ->
      (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) ->
      (forall x t, Env.MapsTo x t env' -> Env.MapsTo x t env \/ In (x,t) tvl) ->
@@ -6552,25 +6567,26 @@ Lemma stack_wf_trans :
                  /\ word_type t /\ type_wf D t /\ simple_type t) \/ (exists y, e = EVar y)) ->
      @well_typed_args D Q H env AS es tvl ->
      get_dept_map tvl es = Some AS ->
-     eval_el AS S tvl es S' -> stack_wf D Q H env' S'.
+     eval_el AS S tvl es S' ->
+      stack_wf D Q env' S'.
 Proof.
   intros.
   assert (length tvl = length es) as eq1.
   rewrite (well_typed_args_same_length D Q H env0 AS es tvl); try easy.
-  specialize (stack_consist_trans S S' env0 tvl es AS H1 H4 eq1 H11) as eq2.
-  specialize (stack_wf_core D Q H env0 S H2) as eq3.
-  specialize (stack_wf_out tvl es D Q H env0 AS S S' H1 H0 H2 H3 H4 eq3 H7 H5 H8 H9 H11) as eq4.
+  specialize (stack_consist_trans S S' env0 tvl es AS H1 H5 eq1 H12) as eq2.
+  specialize (stack_wf_core D Q env0 S H2) as eq3.
+  specialize (stack_wf_out tvl es D Q H env0 AS S S' H1 H0 H2 H4 H3 H5 eq3 H8 H6 H9 H10 H12) as eq4.
   unfold stack_wf in *.
   intros.
-  apply H6 in H12.
-  destruct H12. apply H2 in H12 as eq5. destruct eq5 as [v [ta [tb [X1 [X2 [X3 X4]]]]]].
+  apply H7 in H13.
+  destruct H13. apply H2 in H13 as eq5. destruct eq5 as [v [ta [tb [X1 [X2 X3]]]]].
   exists v. exists ta. exists tb.
   split. apply stack_grow_cast_type_same with (env := env0) (S := S); try easy.
   unfold env_wt in *.
-  apply H3 in H12. easy. split. easy. split.
+  apply H4 in H13. easy. split. easy.
   unfold stack_consistent_grow in *.
-  apply eq2; try easy. exists t. easy. easy.
-  apply eq4 in H12 as eq5.
+  apply eq2; try easy. exists t. easy.
+  apply eq4 in H13 as eq5.
   destruct eq5 as [v [ta [X1 [X2 X3]]]].
   exists v. exists ta. exists ta.
   split.
@@ -6587,10 +6603,90 @@ Proof.
   apply (as_stack_in AS tvl es S S'); try easy.
   intros. 
   apply (as_diff AS tvl es) with (n := n) (n' := n'); try easy.
-  split. constructor. split. easy. easy.
+  split. constructor. easy.
 Qed.
 
-*)
+Lemma subtype_word_type : forall D Q t t', subtype D Q t t' -> word_type t -> word_type t'.
+Proof.
+  intros.
+  inv H. assumption.
+  1-8:constructor.
+Qed.
+
+Lemma stack_heap_consistent_trans : forall tvl es D Q H env AS S S',
+     sub_domain env S -> stack_wt D S -> stack_wf D Q env S ->
+     env_wt D env -> stack_heap_consistent D Q H S ->
+     (forall a, In a tvl -> ~ Env.In (fst a) env) ->
+     (forall x n t ta, Env.MapsTo x t env -> Stack.MapsTo x (n,ta) S ->
+           (exists t', cast_type_bound S t t' /\ subtype D Q ta t')) ->
+     (forall x n ta, Theta.MapsTo x GeZero Q -> Stack.MapsTo x (n,ta) S -> 0 <= n) ->
+     (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) ->
+     (forall e, In e es -> (exists n t, e = ELit n t
+                 /\ word_type t /\ type_wf D t /\ simple_type t) \/ (exists y, e = EVar y)) ->
+     @well_typed_args D Q H env AS es tvl ->
+     eval_el AS S tvl es S' ->  stack_heap_consistent D Q H S'.
+Proof.
+  intros.
+  induction H11. inv H10. easy.
+  unfold stack_heap_consistent in *.
+  intros. inv H10.
+  assert ((forall a : Env.key * type,
+             In a tvl ->
+             ~ Env.In (elt:=type) (fst a) env0)).
+  intros. apply H5. simpl. right. easy.
+  assert ((forall (n n' : nat) (a b : Env.key * type),
+             n <> n' ->
+             nth_error tvl n = Some a ->
+             nth_error tvl n' = Some b -> fst a <> fst b)).
+  intros.
+  specialize (H8 (S n1) (S n') a b).
+  simpl in H8. apply H8; try easy. lia.
+  assert ((forall e : expression,
+             In e es ->
+             (exists (n : Z) (t : type),
+                e = ELit n t /\ word_type t /\ type_wf D t /\ simple_type t) \/
+             (exists y : var, e = EVar y))).
+  intros. apply H9. simpl. right. easy.
+  specialize (IHeval_el H0 H1 H2 H4 H10 H6 H7 H14 H15 H22). clear H14. clear H15.
+  inv H11.
+  inv H19.
+  destruct (Nat.eq_dec x0 x). subst.
+  apply Stack.mapsto_add1 in H13. inv H13.
+  apply simple_type_means_cast_same with (s := s) in H15 as eq1.
+  apply cast_type_bound_same with (t' := (subst_type AS t)) in H18; try easy.
+  rewrite <- H18.
+  apply subtype_well_type with (t := t'0); try easy.
+  assert (In (ELit n t'0) (ELit n t'0 :: es)).
+  simpl. left. easy. apply H9 in H11.
+  destruct H11. destruct H11. destruct H11. destruct H11. inv H11.
+  apply subtype_type_wf with (Q := Q) (t := x1); try easy.
+  destruct H11. inv H11.
+  apply Stack.add_3 in H13.
+  apply IHeval_el in H13. easy. lia.
+  inv H19.
+  apply H4 in H20 as eq1.
+  destruct (Nat.eq_dec x0 x). subst.
+  apply Stack.mapsto_add1 in H13. inv H13.
+  unfold stack_wf in H2.
+  apply H2 in H14 as eq2.
+  destruct eq2 as [va [ta [tb [X1 [X2 X3]]]]].
+  apply Stack.mapsto_always_same with (v1 := (n,t'0)) in X3; try easy. inv X3.
+  assert (subtype D Q ta t').
+  apply cast_subtype_same with (S := s) (t1 := t'1) (t2 := (subst_type AS t)); try easy.
+  assert (subtype D Q tb t').
+  apply H1 in H20.
+  assert (word_type ta).
+  apply (subtype_word_type D Q tb); try easy.
+  inv H13. inv H11. inv X2. constructor.
+  apply subtype_trans with (m := m) (w := w); try easy.
+  apply subtype_well_type with (t := tb); try easy.
+  apply H1 in H20.
+  apply cast_means_simple_type in H21. easy.
+  apply subtype_type_wf with (Q := Q) (t := tb); try easy.
+  apply H1 in H20. easy.
+  apply Stack.add_3 in H13.
+  apply IHeval_el in H13. easy. lia.
+Qed.
 
 Lemma theta_grow_type : forall D F S H env Q m e t,
   @well_typed D F S H env empty_theta m e t
@@ -6810,7 +6906,7 @@ Qed.
 
 Lemma gen_rets_as_cast_same:
    forall tvl D Q H env es AS S t t', get_dept_map tvl es = Some AS ->
-   stack_wf D Q H env S ->
+   stack_wf D Q env S ->
    gen_rets_types S tvl es t t' -> 
    well_bound_vars_type tvl t ->
    @well_typed_args D Q H env AS es tvl ->
@@ -6930,7 +7026,7 @@ Qed.
 Lemma preservation : forall D S H env Q e t S' H' e',
     @structdef_wf D ->
     heap_wf D H ->
-    heap_wt_all D H ->
+    heap_wt_all D Q H ->
     fun_wf D fenv S' H' ->
     expr_wf D fenv e ->
     stack_wt D S ->
@@ -7006,9 +7102,8 @@ Proof with eauto 20 with Preservation.
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst. inv H5.
     rewrite H6 in HMap. inv HMap.
-    rewrite H10 in HGen. inv HGen.
     specialize (gen_arg_env_good tvl env) as X1.
-    destruct X1 as [enva X1].
+    destruct X1 as [enva X1]. rewrite H10 in HGen. inv HGen.
     specialize (sub_domain_grows tvl es env enva s s' AS X1 H13 HSubDom) as X2.
     exists enva. exists Q.
     split. easy.
@@ -7021,7 +7116,19 @@ Proof with eauto 20 with Preservation.
     specialize (gen_arg_env_has_all tvl env enva X1 x0 t0 H) as eq1. easy.
     unfold theta_wt in *. destruct HQt. easy.
     inv HEwf. easy.
-    split. easy.
+    split.
+    apply (stack_heap_consistent_trans tvl es D Q H' env AS s s'); try easy.
+    unfold fun_wf in *.
+    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    unfold stack_wf in *. intros. specialize (HSwf x0 t0 H).
+    destruct HSwf as [va [tc [td [Y1 [Y2 Y3]]]]].
+    apply Stack.mapsto_always_same with (v1 := (n,ta)) in Y3; try easy. inv Y3.
+    exists tc. easy.
+    unfold theta_wt in *. destruct HQt. easy.
+    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    inv HEwf. easy.
+    split.
+    easy.
     destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]].
     left. destruct m'. 2: { assert (Unchecked = Unchecked) by easy. apply HMode in H. easy. } 
     specialize (gen_rets_type_exists tvl D Q H' env es AS s t HSubDom H10 HArg) as eq1.
@@ -7086,7 +7193,7 @@ Proof with eauto 20 with Preservation.
     specialize (HSwf x t2 H). easy.
     apply Z.leb_nle in eq1.
     specialize (HSwf x (TPtr Checked (TNTArray h l t)) Wb).
-    destruct HSwf as [va [ta [tb [Y1 [Y2 [Y3 Y4]]]]]].
+    destruct HSwf as [va [ta [tb [Y1 [Y2 Y3]]]]].
     apply Stack.mapsto_always_same with (v1 := (va,tb)) in H4; try easy.
     inv H4.
     apply Env.mapsto_always_same with (v1 := t2) in Wb; try easy. subst.
@@ -7099,45 +7206,68 @@ Proof with eauto 20 with Preservation.
     apply cast_type_bound_not_nat with (env := env) (m := Checked) (tb := ((TNTArray h l t))); try easy.
     split.
     apply subtype_trans with (m := m) (w := (TNTArray l0 (Num h0) t0)); try easy.
-    split. apply Stack.add_1. easy.
-    inv Y4. constructor. constructor. solve_empty_scope.
-    apply eq2.
-    apply SubTyNtArray.
- easy. split. easy.
-    constructor. split. intros.
+    apply Stack.add_1. easy.
+    specialize (HSwf x0 t2 H).
+    destruct HSwf as [va [ta [tb [X1 [X2 X3]]]]].
+    exists va.  exists ta. exists tb.
+    split.
+    destruct (n' <=? h0) eqn:eq1. apply Z.leb_le in eq1. easy.
+    apply Z.leb_nle in eq1.
+    apply cast_type_bound_not_nat with (env := env) (m := Checked) (tb := ((TNTArray h l t))); try easy.
+    apply Henvt in H as eq2. destruct eq2 as [Y5 [Y6 Y7]]. easy.
+    split. easy.
+    destruct (n' <=? h0) eqn:eq1. apply Z.leb_le in eq1. easy.
+    apply Z.leb_nle in eq1.
+    apply Stack.add_2. lia. easy.
+    split.
+    unfold stack_heap_consistent in *.
+    intros.
+    unfold change_strlen_stack in H.
+    destruct (n' <=? h0) eqn:eq1. apply Z.leb_le in eq1.
+    apply HSHwf with (x := x0); try easy.
+    apply Z.leb_nle in eq1.
+    destruct (Nat.eq_dec x0 x). subst.
+    apply Stack.mapsto_add1 in H. inv H.
+    apply HSHwf in H4. inv H4. constructor. constructor.
+    solve_empty_scope.
+    unfold allocate_meta in *. 
+    unfold scope_set_add in *. inv H3. inv H2. inv H7.
+    apply TyLitC with (w := ((TNTArray (Num l1) (Num n') t0)))
+     (b := l1) (ts := (Zreplicate (n' - l1 + 1) t0)); eauto.
+    constructor. easy. apply SubTyRefl.
+    intros.
+    unfold scope_set_add.
+    destruct (n' - l1 + 1) as [| p | ?] eqn:Hp.
+    simpl in *. lia. rewrite replicate_gt_eq in H.
+    rewrite <- Hp in *.
+    assert (l1 + (n' - l1 + 1) = n' + 1) by lia. rewrite H2 in *. clear H2.
+    destruct (Z_ge_dec h0 k).
+    destruct (Z_gt_dec 0 l1). admit. admit. admit. admit. admit. inv H5. inv H5.
+    admit.
+    apply Stack.add_3 in H. apply HSHwf in H. easy. lia.
+    split. easy.
+    left. constructor. constructor.
+  (*T-Strlen*)
+  - inv Hreduces.
+    destruct E; inversion H1; simpl in *; subst. inv H5. exists env. exists Q.
+    split.
     unfold change_strlen_stack.
-    destruct (n' <=? h0).
-    apply H in H2. eauto.
-    destruct (Nat.eq_dec x x0). subst.
-    apply H in H2 as eq1.
-    destruct eq1 as [v [ta [tb [X1 [X2 [X3 [X4 X5]]]]]]].
-    specialize (Stack.mapsto_always_same (Z*type) x0 (n, TPtr m (TNTArray l0 (Num h0) t0))
-                 (v, tb) s H4 X3) as eq1. inv eq1.
-    specialize (subtype_ptr D Q m (TNTArray l0 (Num h0) t0) ta X2) as eq1.
-    destruct eq1. subst.
-    specialize (cast_ptr_left s t2 m x X1) as eq1.
-    destruct eq1. subst.
-
-    exists n. exists (TPtr m (TNTArray l0 (Num n') t0)). exists (TPtr m (TNTArray l0 (Num n') t0)).
-    split. assumption.
-    split. unfold heap_consistent. eauto.
-    right. inv HSwf. destruct H.
-    specialize (gen_cast_type_bound_same env s' t Wb HSubDom) as eq1.
-    destruct eq1.
-    specialize (H x t HVarInEnv) as eq2.
-    destruct eq2. destruct H3. destruct H3. destruct H3.
-    destruct H4. destruct H5. destruct H6. 
-    apply Stack.find_2 in H10.
-    specialize (Stack.mapsto_always_same (Z*type) x (x1, x3) (v, t0) s' H5 H10) as eq1.
-    injection eq1. intros. subst.
-    exists x2. exists t0.
-    split. easy. split. easy.
-    apply TyLit.
-    apply (simple_type_well_bound env). assumption.
-    apply (WTStack D s' H' empty_scope v t0 t0).
-    apply simple_type_means_cast_same.
-    assumption.
-    assumption.
+    unfold sub_domain in *.
+    intros. destruct (n' <=? h0).
+    apply HSubDom. easy.
+    destruct (Nat.eq_dec x0 x). subst.
+    exists (n, TPtr m (TNTArray l0 (Num n') t0)).
+    apply Stack.add_1. easy.
+    apply HSubDom in H.
+    destruct H.
+    exists x1.
+    apply Stack.add_2. lia. easy.
+    split.
+    unfold stack_wf in *. intros.
+    unfold change_strlen_stack. 
+    destruct (Nat.eq_dec x0 x). subst.
+    unfold stack_wt in *.
+    apply Hswt in H4 as eq1. destruct eq1 as [X1 [X2 X3]].
   (* T-Let *)
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst.
