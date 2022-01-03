@@ -85,7 +85,6 @@ Inductive mode : Type :=
 
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
-  
 
 (* a bound is either a value or a expression as the form of var + num. *)
 Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
@@ -94,16 +93,8 @@ Inductive type : Type :=
   | TNat : type
   | TPtr : mode -> type -> type
   | TStruct : struct -> type
-<<<<<<< HEAD:coq/CheckedC.v
   | TArray : bound -> bound -> type -> type
   | TNTArray : bound -> bound -> type -> type.
-=======
-  | TArray : Z -> Z -> type -> type.
-
-Inductive kind : Set :=
-  | KType : type -> kind
-  | KArray : Z -> Z -> type -> type -> kind.
->>>>>>> master:coq/CheckedC.v.crashcoqide
 
 Definition type_eq_dec (t1 t2 : type): {t1 = t2} + {~ t1 = t2}.
   repeat decide equality.
@@ -139,7 +130,6 @@ Module StructDef := Map.Make Nat_as_OT.
 
 Definition structdef := StructDef.t fields.
 
-<<<<<<< HEAD:coq/CheckedC.v
 (*
 Inductive none_bound_only : bound -> Prop :=
     | none_bound_only_1: forall n, none_bound_only (Num n)
@@ -193,8 +183,6 @@ Inductive ext_type_in : list var -> type -> Prop :=
   | ext_type_in_ntarray : forall l b1 b2 t, ext_bound_in l b1 -> ext_bound_in l b2
                         -> ext_type_in l t -> ext_type_in l (TNTArray b1 b2 t).
 *)
-=======
->>>>>>> master:coq/CheckedC.v.crashcoqide
 
 Inductive type_wf (D : structdef) : type -> Prop :=
   | WFTNat : type_wf D (TNat)
@@ -1092,7 +1080,6 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
          s H' (RExpr (ELit n1 (TPtr Checked w')))
   | SMallocHighOOB : forall s H w t' h,
       h <= 0 ->
-<<<<<<< HEAD:coq/CheckedC.v
       eval_type_bound s w = Some t' ->
       get_high t' = Some (Num h) ->
       step D F s H (EMalloc w)  s H RBounds
@@ -1121,35 +1108,6 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
               ~ is_rexpr r 
               -> step D F s H (EDeref (ELit n t)) s H r
                  -> step D F s H (EIf x e1 e2) s H r.
-=======
-      t = TPtr Checked (TArray l h t1) ->
-      step D
-        H (EAssign (ELit n t) (ELit n1 t1))
-        H RBounds
-  | SAssignLowOOB : forall H n t n1 t1 l h,
-      l > 0 ->
-      t = TPtr Checked (TArray l h t1) ->
-      step D
-        H (EAssign (ELit n t) (ELit n1 t1))
-        H RBounds
-  | SDerefNull : forall H t n w,
-      n <= 0 ->
-      t = TPtr Checked w ->
-      step D
-        H (EDeref (ELit n t))
-        H RNull
-  | SAssignNull : forall H t w n n1 t',
-      n1 <= 0 ->
-      t = TPtr Checked w ->
-      step D
-        H (EAssign (ELit n1 t) (ELit n t'))
-        H RNull
-  (*| SPlusHigh : forall H n1 t1 n2 t2 t
-    (forall l h t, t1 <> TPtr Checked (TArray l h t)) -> 
-      step D
-        H (TPtr Checked (TArray l (EPlus (ELit n1 t1) (ELit n2 t2)) t))
-        H (RExpr (ELit (n1 + n2) t1))*).
->>>>>>> master:coq/CheckedC.v.crashcoqide
 
 Hint Constructors step.
 
@@ -1230,7 +1188,6 @@ Inductive well_typed_lit (D : structdef) (Q:theta) (H : heap) : scope -> Z -> ty
 
 
 Hint Constructors well_typed_lit.
-
 
 (** It turns out, the induction principle that Coq generates automatically isn't very useful. *)
 
@@ -6656,7 +6613,6 @@ Proof.
   1-8:constructor.
 Qed.
 
-<<<<<<< HEAD:coq/CheckedC.v
 Lemma stack_heap_consistent_trans : forall tvl es D Q H env AS S S',
      sub_domain env S -> stack_wt D S -> stack_wf D Q env S ->
      env_wt D env -> stack_heap_consistent D Q H S ->
@@ -6739,255 +6695,6 @@ Proof.
   intros. remember empty_theta as Q'. induction H0;subst;eauto.
   constructor.
 Admitted.
-=======
-Lemma set_remove_add :
-  forall x s, set_equal (set_remove_all x (set_add eq_dec_nt x s)) (set_remove_all x s).
-Proof.
-  intros x s y; split; intros H; destruct (eq_dec_nt x y); subst; eauto.
-  - apply set_remove_all_elim1 in H; congruence.
-  - apply set_remove_all_elim2 in H.
-    apply set_add_elim in H.
-    inv H; try congruence.
-    apply set_remove_all_intro; auto.
-  - apply set_remove_all_elim1 in H; congruence.
-  - apply set_remove_all_intro; auto.
-    apply set_remove_all_elim2 in H.
-    apply set_add_intro1; auto.
-Qed.
-
-Lemma set_equal_symmetry : forall (s1 s2 : scope),
-    set_equal s1 s2 -> set_equal s2 s1.
-Proof.  
-  intros s1 s2 Eq x; split; intro H;
-  apply Eq; auto.
-Qed.  
-  
-Lemma scope_swap :
-  forall D H x y s N T,
-    @well_typed_lit D H (set_remove_all x (set_add eq_dec_nt y s)) N T ->
-    @well_typed_lit D H (set_add eq_dec_nt y (set_remove_all x s)) N T.
-Proof.
-  intros D H x y s N T HWT.
-  destruct (eq_dec_nt x y).
-  - subst.
-    pose proof (set_remove_add y s).
-    apply scope_replacement with (s' := set_remove_all y s) in HWT; auto.
-    apply scope_weakening; auto.
-  - assert (Neq: y <> x) by auto.
-    pose proof (set_equal_add_remove s y x Neq) as Hyp.
-    eapply scope_replacement.
-    + eapply HWT.
-    + apply set_equal_symmetry.
-      auto.
-Qed.
-
-
-Lemma subtype_well_type : forall D H env t t' n,
-@well_typed_lit D H env n t ->
-subtype D t t' ->
-@well_typed_lit D H env n t'.
-Proof.
-  intros. induction H1.
-  - assumption.
-  - inv H0.
-    + eauto.
-    + eauto.
-    + assert (Hsub : subtype D t0 (TPtr Checked (TArray l' h' t))).
-      {
-        inv H7.
-        - eapply SubTySubsume; eauto.
-        - eapply SubTySubsume; omega.
-      }
-      eauto.
-    + unfold allocate_meta in H6. inv H6.
-      admit.
-  - inv H0.
-    + eauto.
-    + eauto. 
-    + assert (HSub : subtype D t (TPtr Checked TNat)).
-      {
-        inv H8.
-        - eapply SubTyStructArrayField; eauto.
-      }
-      eauto.
-    + eapply TyLitC; eauto.
-      unfold allocate_meta; eauto.
-      unfold allocate_meta in H7.
-      simpl in H7. destruct (StructDef.find (elt:=fields) T D) eqn:Hf.
-      * inv H7. rewrite map_length in H8.
-        assert (StructDef.MapsTo T f D) by (eapply find_implies_mapsto; eauto).
-        assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
-        rewrite H3 in *.
-        assert (((length (Fields.elements (elt:=type) fs)) >= 1)%nat) by (eapply fields_implies_length; eauto).
-        intros. simpl in H5.
-        destruct (H8 k). zify. omega.
-        exists x. exists TNat.
-        assert (k = 0) by (destruct k; inv H5; eauto; exfalso; zify; omega).
-        rewrite H7 in *. simpl. split; eauto.
-        destruct H6. destruct H6.
-        simpl in H6. 
-        rewrite <- (element_implies_element T fs D TNat H1 H2) in H6.
-        inv H6. destruct H9.
-        split. assumption. eauto.
-      * inv H7.
-
-Admitted.
-
-
-induction H0. 
-  - inv H1. eauto.
-  - assert (exists t, t' = (TPtr Unchecked t)) by (inv H1; eauto).
-    destruct H0. rewrite H0. eauto.
-  - eauto.
-  - assert (subtype D t t').
-    {
-      inv H1; inv H2.
-      * eapply SubTyRefl.
-      * eapply SubTySubsume; eauto.
-      * eapply SubTyStructArrayField; eauto.
-      * eapply SubTySubsume; eauto.
-      * eapply SubTySubsume; eauto; omega.
-      * eapply SubTyStructArrayField; eauto.
-    }
-    assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
-    destruct H4. rewrite H4 in *.
-    eapply TyLitRec; eauto.
-  - assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto). 
-    unfold allocate_meta in H0.
-    induction w.
-    * inv H1. eapply TyLitC; eauto.
-    * inv H1. eapply TyLitC; eauto.
-    * inv H1. eapply TyLitC; eauto.
-      eapply TyLitC; eauto.
-      unfold allocate_meta; eauto.
-      simpl in H0. destruct (StructDef.find (elt:=fields) s0 D) eqn:Hf.
-      + inv H0. rewrite map_length in H2.
-        assert (StructDef.MapsTo s0 f D) by (eapply find_implies_mapsto; eauto).
-        assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
-        rewrite H1 in *.
-        assert (((length (Fields.elements (elt:=type) fs)) >= 1)%nat) by (eapply fields_implies_length; eauto).
-        intros. simpl in H5.
-        destruct (H2 k). zify. omega.
-        exists x. exists TNat.
-        assert (k = 0) by (destruct k; inv H5; eauto; exfalso; zify; omega).
-        rewrite H9 in *. simpl. split; eauto.
-        destruct H7. destruct H7.
-        simpl in H7. 
-        rewrite <- (element_implies_element s0 fs D TNat H0 H8) in H7.
-        inv H7. destruct H10.
-        split. assumption. eauto.
-      + inv H0.
-    * inv H0.
-      inv H1. clear H3. 
-        + eapply TyLitC; eauto.
-          unfold allocate_meta; eauto.
-        + clear H3.
-          eapply TyLitC.
-          unfold allocate_meta; eauto.
-          intros. 
-          assert (Hmin : (h' - l') > 0).
-          {
-                destruct (h' - l'); zify; (try omega); simpl in *; inv H0;
-                exfalso; rewrite Z.add_0_r in *; omega.
-          }
-          assert (Hpos : exists p, h' - l' = Z.pos p).
-          {
-           destruct (h' - l'); zify; (try omega).
-           exists p; eauto.
-          }
-          assert ((z0 - z) >= (h' - l')) by omega.
-          assert ((length (Zreplicate (z0 - z) w) >= (length (Zreplicate (h' - l') w)))%nat).
-          {
-            destruct (z0 - z).
-            * simpl. destruct (h' - l'); simpl; eauto. exfalso. zify; omega.
-            * simpl. rewrite replicate_length. destruct (h' - l');
-              simpl; eauto; (try omega). rewrite replicate_length; zify; omega.
-            * exfalso; zify; omega.
-          }
-          destruct (H2 k).
-          split. 
-            ** omega.
-            ** destruct Hpos as [p Hpos].
-              assert (h' > l') by omega.
-              assert (psuc : exists n, Pos.to_nat p = S n) by (eapply pos_succ; eauto).
-              (*very convoluted*)
-              destruct (z0 - z)eqn:Hz.
-              ++ exfalso; omega.
-              ++ rewrite Hpos in *. simpl in *.
-                 rewrite replicate_length in *.
-                 assert (Hp : Z.of_nat (Pos.to_nat p) = Z.pos p).
-                 {
-                  destruct psuc as [n0 psuc]. rewrite psuc.
-                  zify; omega.
-                 } clear psuc.
-                 assert (psuc: exists n, Pos.to_nat p0 = S n) by eapply pos_succ; eauto.
-                 assert (Hp0 : Z.of_nat (Pos.to_nat p0) = Z.pos p0).
-                 {
-                  destruct psuc as [n0 psuc]. rewrite psuc.
-                  zify; omega.
-                 }
-                 rewrite Hp0. rewrite <- Hz. 
-                 assert (z + (z0 - z) = z0) by omega.
-                 rewrite H5. rewrite Hp in H0.
-                 rewrite <- Hpos in H0.
-                 assert (l' + (h' - l') = h') by omega.
-                 rewrite H6 in H0. omega.
-              ++ exfalso; zify; omega.
-          ** destruct H4.
-             destruct H4 as [? [? ?]].
-             exists x. exists x0.
-             split.
-             ++ destruct Hpos as [p Hpos]. rewrite Hpos in *.
-                simpl. 
-                assert (k - l' <= k - z) by omega.
-                assert (z0 - z > 0) by omega.
-                assert (Hpos2 : exists p0, z0 - z = Z.pos p0).
-                {
-                  destruct (z0 - z); inv H9.
-                  exists p0; eauto.
-                } 
-                destruct Hpos2 as [p0 Hpos2]. rewrite Hpos2 in H4.
-                simpl in *.
-                assert (Hlen : ((Pos.to_nat p0) > (Z.to_nat (k - z)))%nat).
-                {
-                  eapply replicate_length_nth. symmetry. eauto.
-                }
-                admit.
-             ++ split; eauto.
-
-             (*++ split; eauto. 
-                assert (well_typed_lit D H
-               (set_add eq_dec_nt (n, TPtr Checked (TArray l' h' w))
-               (set_add eq_dec_nt
-               (n, TPtr Checked (TArray z z0 w))
-                s)) x w) by (eapply scope_weakening; eauto).
-                assert (set_equal (set_add eq_dec_nt (n, TPtr Checked (TArray l' h' w))
-          (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w)) s))
-              (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w))
-               (set_add eq_dec_nt
-               (n, TPtr Checked (TArray l' h' w))
-                s))).
-                { eapply set_equal_add_add; eauto. instantiate (1:=s). unfold set_equal.
-                  intros; split; intros; assumption. } 
-                assert (well_typed_lit D H
-               (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w))
-               (set_add eq_dec_nt
-               (n, TPtr Checked (TArray l' h' w))
-                s)) x w). 
-               { eapply scope_replacement; eauto. }*)
-                
-
-          
-Admitted.*
-
-Lemma scope_extra :
-  forall D H n1 n2 t1 t2 s,
-    @well_typed_lit D H (set_add eq_dec_nt (n1, t1) s) n2 t2  ->
-     (n1, t1) <> (n2, t2) ->
-    @well_typed_lit D H s n2 t2.
-
-
->>>>>>> master:coq/CheckedC.v.crashcoqide
 
 Check List.find.
 
