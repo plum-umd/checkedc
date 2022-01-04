@@ -780,8 +780,8 @@ Definition malloc_bound (t:type) : Prop :=
               | _ => True
    end.
 
-Definition change_strlen_stack (s:stack) (x : var) (m:mode) (t:type) (l:bound) (n n' h:Z) :=
-     if n' <=? h then s else @Stack.add (Z * type) x (n,TPtr m (TNTArray l (Num n') t)) s. 
+Definition change_strlen_stack (s:stack) (x : var) (m:mode) (t:type) (l n n' h:Z) :=
+     if n' <=? h then s else @Stack.add (Z * type) x (n,TPtr m (TNTArray (Num l) (Num n') t)) s. 
 
 Fixpoint gen_stack (vl:list var)  (es:list expression) (e:expression) : option expression := 
    match vl with [] => Some e
@@ -902,10 +902,23 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
       (Stack.MapsTo x (v,t) s) ->
       step D F s H (EVar x) s H (RExpr (ELit v t))
   | Strlen : forall s H x n n' m l h t t1, 
-     (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
-     (forall i , n <= i < n+n'+1 -> (exists n1 t1, Heap.MapsTo i (n1,t1) H /\ n1 <> 0))
+     h > 0 -> l <= 0 ->
+     (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) (Num h) t))) s) ->
+     (forall i , n <= i < n+n'+1 -> (exists n1, Heap.MapsTo i (n1,t1) H /\ n1 <> 0))
       -> Heap.MapsTo (n+n'+1) (0,t1) H ->
             step D F s H (EStrlen x) (change_strlen_stack s x m t l n n' h) H (RExpr (ELit n' TNat))
+  | StrlenHighOOB : forall s H x n t m l h,
+      h <= 0 ->
+     (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
+      step D F s H (EStrlen x) s H RBounds
+  | StrlenLowOOB : forall s H x n t m l h,
+      l > 0 ->
+     (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) h t))) s) ->
+      step D F s H (EStrlen x) s H RBounds
+  | StrlenNull : forall s H x t n m l h,
+      n <= 0 -> 
+     (Stack.MapsTo x (n,(TPtr m (TNTArray l h t))) s) ->
+      step D F s H (EStrlen x) s H RNull
   | SCall : forall AS s s' H x el t tvl e e' m, 
            F x = Some (tvl,t,e,m) ->
            get_dept_map tvl el = Some AS ->
@@ -5428,14 +5441,14 @@ Proof.
   destruct (n' <=? h).
   apply (H3 x0 v t0). assumption.
   destruct (Nat.eq_dec x x0). subst.
-  apply Stack.mapsto_add1 in H7. inv H7.
-  apply H3 in H4. inv H4. constructor.
-  inv H7. constructor.
-  inv H8. inv H4. split.
-  constructor. inv H10. constructor. easy. easy.
-  inv H9. inv H8. constructor. constructor. easy.
-  apply Stack.add_3 in H7.
-  apply H3 in H7. easy. easy.
+  apply Stack.mapsto_add1 in H9. inv H9.
+  apply H3 in H6. inv H6. constructor.
+  inv H9. constructor.
+  inv H9. inv H10. split.
+  constructor. inv H6. constructor. inv H11. easy. inv H11. easy.
+  inv H9. constructor. inv H11. constructor. easy.
+  apply Stack.add_3 in H9.
+  apply H3 in H9. easy. easy.
   apply stack_simple_eval_el with (D := D) in H6. easy. easy.
   intros.
   unfold fun_wf in *.
@@ -7022,6 +7035,16 @@ Proof.
   constructor.
 Qed.
 
+Lemma replicate_nth_anti {A:Type} : forall (n k : nat) (x : A),
+    (k < n)%nat -> nth_error (replicate n x) k = Some x.
+  Proof.
+    induction n; intros k w H.
+    - lia.
+    - simpl. destruct k. simpl. easy.
+      assert (k < n)%nat by lia.
+      apply IHn with (x := w) in H0. simpl. easy. 
+Qed.
+
 (* Type Preservation Theorem. *)
 Lemma preservation : forall D S H env Q e t S' H' e',
     @structdef_wf D ->
@@ -7177,7 +7200,7 @@ Proof with eauto 20 with Preservation.
     intros. destruct (n' <=? h0).
     apply HSubDom. easy.
     destruct (Nat.eq_dec x0 x). subst.
-    exists (n, TPtr m (TNTArray l0 (Num n') t0)).
+    exists (n, TPtr m (TNTArray (Num l0) (Num n') t0)).
     apply Stack.add_1. easy.
     apply HSubDom in H.
     destruct H.
@@ -7188,24 +7211,23 @@ Proof with eauto 20 with Preservation.
     unfold change_strlen_stack. 
     destruct (Nat.eq_dec x0 x). subst.
     unfold stack_wt in *.
-    apply Hswt in H4 as eq1. destruct eq1 as [X1 [X2 X3]].
+    apply Hswt in H7 as eq1. destruct eq1 as [X1 [X2 X3]].
     destruct (n' <=? h0) eqn:eq1. apply Z.leb_le in eq1.
     specialize (HSwf x t2 H). easy.
     apply Z.leb_nle in eq1.
     specialize (HSwf x (TPtr Checked (TNTArray h l t)) Wb).
     destruct HSwf as [va [ta [tb [Y1 [Y2 Y3]]]]].
-    apply Stack.mapsto_always_same with (v1 := (va,tb)) in H4; try easy.
-    inv H4.
+    apply Stack.mapsto_always_same with (v1 := (va,tb)) in H7; try easy.
+    inv H7.
     apply Env.mapsto_always_same with (v1 := t2) in Wb; try easy. subst.
-    exists n. exists ta. exists (TPtr m (TNTArray l0 (Num n') t0)).
-    assert (subtype D Q (TPtr m (TNTArray l0 (Num n') t0)) (TPtr m (TNTArray l0 (Num h0) t0))).
+    exists n. exists ta. exists (TPtr m (TNTArray (Num l0) (Num n') t0)).
+    assert (subtype D Q (TPtr m (TNTArray (Num l0) (Num n') t0)) (TPtr m (TNTArray (Num l0) (Num h0) t0))).
     apply SubTyNtSubsume.
-    destruct l0. constructor. easy. constructor. easy.
-    constructor. lia.
+    constructor. easy. constructor. lia.
     split. apply Henvt in H as eq2. destruct eq2 as [Y5 [Y6 Y7]].
     apply cast_type_bound_not_nat with (env := env) (m := Checked) (tb := ((TNTArray h l t))); try easy.
     split.
-    apply subtype_trans with (m := m) (w := (TNTArray l0 (Num h0) t0)); try easy.
+    apply subtype_trans with (m := m) (w := (TNTArray (Num l0) (Num h0) t0)); try easy.
     apply Stack.add_1. easy.
     specialize (HSwf x0 t2 H).
     destruct HSwf as [va [ta [tb [X1 [X2 X3]]]]].
@@ -7228,22 +7250,112 @@ Proof with eauto 20 with Preservation.
     apply Z.leb_nle in eq1.
     destruct (Nat.eq_dec x0 x). subst.
     apply Stack.mapsto_add1 in H. inv H.
-    apply HSHwf in H4. inv H4. constructor. constructor.
+    apply HSHwf in H7 as eq3. inv eq3. constructor. constructor.
     solve_empty_scope.
     unfold allocate_meta in *. 
-    unfold scope_set_add in *. inv H3. inv H2. inv H7.
-    apply TyLitC with (w := ((TNTArray (Num l1) (Num n') t0)))
-     (b := l1) (ts := (Zreplicate (n' - l1 + 1) t0)); eauto.
+    unfold scope_set_add in *. inv H3. inv H2. inv H10.
+    apply TyLitC with (w := ((TNTArray (Num l0) (Num n') t0)))
+     (b := l0) (ts := (Zreplicate (n' - l0 + 1) t0)); eauto.
     constructor. easy. apply SubTyRefl.
     intros.
     unfold scope_set_add.
-    destruct (n' - l1 + 1) as [| p | ?] eqn:Hp.
-    simpl in *. lia. rewrite replicate_gt_eq in H.
-    rewrite <- Hp in *.
-    assert (l1 + (n' - l1 + 1) = n' + 1) by lia. rewrite H2 in *. clear H2.
+    destruct (n' - l0 + 1) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+    rewrite replicate_gt_eq in H; try easy.
+    rewrite <- Hp in *. assert (l0 + (n' - l0 + 1) = n' + 1) by lia.
+    rewrite H2 in *. clear H2.
+    specialize (H11 n) as eq2.
+    assert (n <= n < n + n' + 1) by lia.
+    apply eq2 in H2. clear eq2.
+    specialize (H12 0) as eq2.
+    assert (l0 <= 0 < l0 + Z.of_nat (length (Zreplicate (h0 - l0 + 1) t0))).
+    rewrite replicate_gt_eq; try lia.
+    apply eq2 in H3. clear eq2.
+    destruct H3 as [na [ta [X1 [X2 X3]]]].
+    destruct H2 as [nb [X4 X5]].
+    rewrite Z.add_0_r in X2.
+    apply Heap.mapsto_always_same with (v1 := (nb,t1)) in X2; try easy. inv X2.
+    symmetry in X1.
+    destruct (h0 - l0 + 1) as [| p1 | ?] eqn:Hp1; zify; [lia | |lia].
+    unfold Zreplicate in X1.
+    apply replicate_nth in X1. subst.
     destruct (Z_ge_dec h0 k).
-    destruct (Z_gt_dec 0 l1). admit. admit. admit. admit. admit. inv H5. inv H5.
-    admit.
+    specialize (H12 k).
+    assert (l0 <= k < l0 + Z.of_nat (length (Zreplicate (Z.pos p1) ta))).
+    rewrite replicate_gt_eq; try lia.
+    apply H12 in H2. destruct H2 as [nc [tc [Y1 [Y2 Y3]]]].
+    exists nc. exists tc.
+    split. unfold Zreplicate in *.
+    symmetry in Y1.
+    apply replicate_nth in Y1. subst.
+    rewrite Hp.
+    rewrite replicate_nth_anti. easy. lia. easy.
+    specialize (H11 (n+k)).
+    assert (n <= n + k < n + n' + 1) by lia.
+    apply H11 in H2.
+    destruct H2 as [nb [Y1 Y2]].
+    apply HHWt in Y1 as eq2.
+    exists nb. exists ta.
+    split. unfold Zreplicate. rewrite Hp.
+    rewrite replicate_nth_anti. easy. lia. easy.
+    inv H8. inv H8. inv H2. inv H16. inv H8.
+    destruct (Z_ge_dec h2 n').
+    apply subtype_well_type with (t := (TPtr Checked (TNTArray (Num l2) (Num h2) t0))); try easy.
+    constructor. constructor. easy.
+    constructor. apply Hswt in H7. constructor.
+    destruct H7. destruct H2. inv H2. inv H13. easy.
+    destruct H7 as [Y1 [Y2 Y3]]. inv Y2. inv H2. easy.
+    apply TyLitC with (w := (TNTArray (Num l2) 
+           (Num h2) t0)) (b := l2) (ts := Zreplicate (h2 - l2 + 1) t0); try easy.
+    constructor. easy.
+    constructor. intros.
+    unfold scope_set_add.
+    inv H10.
+    specialize (H12 k H). easy.
+    apply SubTyNtSubsume. constructor. lia. constructor. lia.
+    inv H10.
+    apply TyLitC with (w := ((TNTArray (Num l0) (Num n') t0)))
+     (b := l0) (ts := (Zreplicate (n' - l0 + 1) t0)); eauto.
+    constructor. easy. apply SubTyRefl.
+    intros.
+    unfold scope_set_add.
+    destruct (n' - l0 + 1) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+    rewrite replicate_gt_eq in H; try easy.
+    rewrite <- Hp in *. assert (l0 + (n' - l0 + 1) = n' + 1) by lia.
+    rewrite H2 in *. clear H2.
+    specialize (H11 n) as eq2.
+    assert (n <= n < n + n' + 1) by lia.
+    apply eq2 in H2. clear eq2.
+    specialize (H12 0) as eq2.
+    assert (l2 <= 0 < l2 + Z.of_nat (length (Zreplicate (h2 - l2 + 1) t0))).
+    rewrite replicate_gt_eq; try lia.
+    apply eq2 in H8. clear eq2.
+    destruct H8 as [na [ta [X1 [X2 X3]]]].
+    destruct H2 as [nb [X4 X5]].
+    rewrite Z.add_0_r in X2.
+    apply Heap.mapsto_always_same with (v1 := (nb,t1)) in X2; try easy. inv X2.
+    symmetry in X1.
+    destruct (h2 - l2 + 1) as [| p1 | ?] eqn:Hp1; zify; [lia | |lia].
+    unfold Zreplicate in X1.
+    apply replicate_nth in X1. subst.
+    destruct (Z_ge_dec h2 k).
+    specialize (H12 k).
+    assert (l2 <= k < l2 + Z.of_nat (length (Zreplicate (Z.pos p1) ta))).
+    rewrite replicate_gt_eq; try lia.
+    apply H12 in H2. destruct H2 as [nc [tc [Y1 [Y2 Y3]]]].
+    exists nc. exists tc.
+    rewrite Hp.
+    split. unfold Zreplicate in *.
+    symmetry in Y1.
+    apply replicate_nth in Y1. subst.
+    rewrite replicate_nth_anti. easy. lia. easy.
+    specialize (H11 (n+k)).
+    assert (n <= n + k < n + n' + 1) by lia.
+    apply H11 in H2.
+    destruct H2 as [nb [Y1 Y2]].
+    apply HHWt in Y1 as eq2.
+    exists nb. exists ta.
+    split. unfold Zreplicate. rewrite Hp.
+    rewrite replicate_nth_anti. easy. lia. easy.
     apply Stack.add_3 in H. apply HSHwf in H. easy. lia.
     split. easy.
     left. constructor. constructor.
@@ -8199,4 +8311,5 @@ Proof.
       apply H2.
     + reflexivity.
 Qed. 
+
 
