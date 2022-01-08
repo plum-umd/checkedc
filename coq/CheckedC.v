@@ -4811,7 +4811,6 @@ Proof with eauto 20 with Progress.
       inv HRed1; ctx (EAssign (in_hole e E) e2) (in_hole e (CAssignL E e2))...
     + destruct HUnchk1 as [ e' [ E [ ] ] ]; subst.
       ctx (EAssign (in_hole e' E) e2) (in_hole e' (CAssignL E e2))...
-(*
   - (* Assign2 rule for array. *)
     right.
 
@@ -4821,26 +4820,22 @@ Proof with eauto 20 with Progress.
 
     (* Invoke IH on e1 *)
     inv Hewf.
-    inv HHwt. rename H4 into Y1. rename H5 into Y2.
-    apply (IH1 Y1) in H2. 2 : { easy. }
+    apply (IH1) in H2. 2 : { easy. }
     destruct H2 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1 as [ n1' t1' WTt1' Ht1' ].
       (* Invoke IH on e2 *)
-      apply (IH2 Y2) in H3. 2 : { easy. }
+      apply (IH2) in H3.
       inv H3 as [ HVal2 | [ HRed2 | [| HUnchk2 ] ] ]; idtac...
       * (* Case: e2 is a value, so we can take a step *)
         inv HVal2 as [n2' t2' Wtt2' Ht2' ].
         {
             inv HTy1; eauto.
-            inv Y1. 
-            assert (Hsim := H0).
-            apply H3 in H0. clear H3.
+            assert (Hsim := H0). inv H0. inv H3.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ _ |- _ ] => inv H
             end...
             + left.
-              inv Hsim. inv H3.
 
               destruct (Z_gt_dec h0 0).
               * (* h > 0 - Assign  *)
@@ -4863,7 +4858,6 @@ Proof with eauto 20 with Progress.
                 unfold get_high_ptr. easy.
             + solve_empty_scope.
             + left.
-              inv Hsim. inv H4.
 
               destruct (Z_gt_dec n1' 0).
                 ++ destruct (Z_gt_dec h0 0).
@@ -4875,31 +4869,88 @@ Proof with eauto 20 with Progress.
                       unfold eval_type_bound, eval_bound. reflexivity.
                       unfold get_low_ptr. easy. }
                       { (* l <= 0 *)
+                        inv H4. inv H5.
+                        destruct (H9 0).
+                        rewrite replicate_gt_eq. lia. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
                         eapply step_implies_reduces.
                         eapply (SAssign); eauto.
-                        apply (simple_type_means_cast_same t st) in H5.
-                        destruct (H6 0). unfold allocate_meta in H3.
-                        inv H3. 
-                        assert (Hmin : h0 - l0 > 0) by lia.
-                        assert (Hpos : exists p, h0 - l0 = Z.pos p).
-                        {
-                          destruct (h0 - l0); inv Hmin.
-                          exists p; eauto.
-                        }
-                        destruct Hpos as [p Hpos].
-                        rewrite Hpos. simpl.
-                        rewrite replicate_length.
-                        zify; lia.
-                        rewrite Z.add_0_r in H2.
-                        destruct H2 as [? [? [? ?]]].
-                        assert (Heap.find n1' H = Some (x, x0)) by (eapply Heap.find_1; assumption).
-                        eapply HeapProp.F.in_find_iff. 
-                        rewrite H8. easy.
-                        constructor. constructor. easy. easy. 
-                        apply (simple_type_means_cast_same t st) in H5. apply H5.
-                        intros l1 h1 t1 Heq; inv Heq; zify.
-                        lia.
-                        intros. inv H2.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TArray (Num l0) (Num h0) t) st) in H3.
+                        constructor. apply H3.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
+                        apply get_root_array.
+                        inv H12. inv H13.
+                        inv WT. inv H5.
+                        destruct (H9 0). simpl in *. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TPtr Checked (TArray (Num l0) (Num h0) TNat)) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
+                        apply get_root_array.
+                        inv H5.
+                        destruct (H9 0). simpl in *. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same
+                                   (TPtr Checked (TArray (Num l0) (Num h0) (TPtr m0 w))) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
+                        apply get_root_array.
+                        inv H8. inv H8. inv H8. inv H12.
+                        inv H5.
+                        destruct (H9 0).
+                        rewrite replicate_gt_eq. lia. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TPtr Checked (TArray (Num l0) (Num h0) t)) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
+                        apply get_root_array.
+                        inv H3. inv H8. inv H12. inv H5.
+                        destruct (H9 0).
+                        rewrite replicate_gt_eq. lia. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TPtr Checked (TArray (Num l0) (Num h0) t)) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
+                        apply get_root_array.
+                        inv H3. inv H13. inv H14.
+                        inv H5.
+                        apply StructDef.find_1 in H11. rewrite H11 in *.
+                        inv H4.
+                        destruct (H9 0).
+                        assert ( Z.of_nat (length (map snd (Fields.elements (elt:=type) fs))) > 0). 
+                       {
+                             eapply struct_subtype_non_empty; eauto.
+                              apply (SubTyStructArrayField_1 D Q T fs m).
+                             apply StructDef.find_2. easy. easy.
+                             apply StructDef.find_2. easy. 
+                       } lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same
+                                   (TPtr Checked (TArray (Num l0) (Num h0) TNat)) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0. split. lia. lia.
+                        intros. inv H0.
                         apply get_root_array.
                       }
                     * (* h <= 0 *)
@@ -4930,6 +4981,7 @@ Proof with eauto 20 with Progress.
         inv HRed2; ctx (EAssign (ELit n1' t1') (in_hole e E)) (in_hole e (CAssignR n1' t1' E))...
       * destruct HUnchk2 as [ e' [ E [ ] ] ]; subst.
         ctx (EAssign (ELit n1' t1') (in_hole e' E)) (in_hole e' (CAssignR n1' t1' E))...
+      * easy.
     + (* Case: e1 reduces *)
       destruct HRed1 as [ H' [ ? [? [ r HRed1 ] ] ] ].
       inv HRed1; ctx (EAssign (in_hole e E) e2) (in_hole e (CAssignL E e2))...
@@ -4945,26 +4997,22 @@ Proof with eauto 20 with Progress.
 
     (* Invoke IH on e1 *)
     inv Hewf.
-    inv HHwt. rename H4 into Y1. rename H5 into Y2.
-    apply (IH1 Y1) in H2. 2 : { easy. }
+    apply (IH1) in H2. 2 : { easy. }
     destruct H2 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1 as [ n1' t1' WTt1' Ht1' ].
       (* Invoke IH on e2 *)
-      apply (IH2 Y2) in H3. 2 : { easy. }
+      apply (IH2) in H3. 2 : { easy. }
       inv H3 as [ HVal2 | [ HRed2 | [| HUnchk2 ] ] ]; idtac...
       * (* Case: e2 is a value, so we can take a step *)
         inv HVal2 as [n2' t2' Wtt2' Ht2' ].
         {
             inv HTy1; eauto.
-            inv Y1.
-            assert (Hsim := H0).
-            apply (H3) in H0. clear H3.
+            assert (Hsim := H0). inv H0. inv H3.
             match goal with
             | [ H : well_typed_lit _ _ _ _ _ _ |- _ ] => inv H
             end...
             + left.
-              inv Hsim. inv H3.
 
               destruct (Z_gt_dec h0 0).
               * (* h > 0 - Assign  *)
@@ -4986,7 +5034,6 @@ Proof with eauto 20 with Progress.
                 unfold get_high_ptr. easy. 
             + solve_empty_scope.
             + left.
-              inv Hsim. inv H4.
 
               destruct (Z_gt_dec n1' 0).
                 ++ destruct (Z_gt_dec h0 0).
@@ -4998,31 +5045,32 @@ Proof with eauto 20 with Progress.
                       unfold eval_type_bound,eval_bound. reflexivity. 
                       unfold get_low_ptr. easy. }
                       { (* l <= 0 *)
+                        inv H4. inv H5.
+                        destruct (H9 0).
+                        rewrite replicate_gt_eq. lia. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
                         eapply step_implies_reduces.
-                        eapply SAssign; eauto.
-                        apply (simple_type_means_cast_same t st) in H5.
-                        destruct (H6 0). unfold allocate_meta in H3.
-                        inv H3. 
-                        assert (Hmin : h0 - l0 + 1 > 0) by lia.
-                        assert (Hpos : exists p, h0 - l0 + 1 = Z.pos p).
-                        {
-                          destruct (h0 - l0 + 1); inv Hmin.
-                          exists p; eauto.
-                        }
-                        destruct Hpos as [p Hpos].
-                        rewrite Hpos. simpl.
-                        rewrite replicate_length.
-                        zify; lia.
-                        rewrite Z.add_0_r in H2.
-                        destruct H2 as [? [? [? ?]]].
-                        assert (Heap.find n1' H = Some (x, x0)) by (eapply Heap.find_1; assumption).
-                        eapply HeapProp.F.in_find_iff. 
-                        rewrite H8. easy.
-                        constructor. constructor. easy. easy. 
-                        apply (simple_type_means_cast_same t st) in H5. apply H5. 
-                        intros l1 h1 t1 Heq; inv Heq; zify; lia.
-                        intros l1 h1 t1 Heq; inv Heq; zify; lia. 
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TNTArray (Num l0) (Num h0) t) st) in H3.
+                        constructor. apply H3.
+                        intros. inv H0.
+                        intros. inv H0. split. lia. lia.
                         apply get_root_ntarray.
+                        inv H8. inv H8. inv H8. inv H12.
+                        inv H5.
+                        destruct (H9 0).
+                        rewrite replicate_gt_eq. lia. lia.
+                        destruct H0 as [ta [X1 [X2 X3]]].
+                        eapply step_implies_reduces.
+                        eapply (SAssign); eauto.
+                        rewrite Z.add_0_r in X2. apply X2.
+                        apply (simple_type_means_cast_same (TPtr Checked (TNTArray (Num l0) (Num h0) t)) st) in Hsim.
+                        apply Hsim.
+                        intros. inv H0.
+                        intros. inv H0. split. lia. lia.
+                        apply get_root_ntarray.
+                        inv H3.
                       }
                     * (* h <= 0 *)
                       eapply step_implies_reduces.
@@ -5082,28 +5130,23 @@ Proof with eauto 20 with Progress.
     remember t' as t. clear Heqt t'.
     *)
     (* Invoke IH on e1 *)
-    inv HHwt. inv H2. rename H6 into Y1. rename H7 into Y2. rename H8 into Y3. 
-    apply (IH1 Y2) in H4. 2 : { easy. }
+    apply (IH1) in H4. 2 : { easy. }
     destruct H4 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1.
       (* Invoke IH on e2 *)
-      apply (IH2 Y3) in H5. 2 : { easy. }
+      apply (IH2) in H5. 2 : { easy. }
       destruct H5 as [ HVal2 | [ HRed2 | [| HUnchk2 ] ] ]; idtac...
       * inv HVal2.
         ctx (EAssign (EPlus (ELit n t0) (ELit n0 t1)) e3) 
                   (in_hole (EPlus (ELit n t0) (ELit n0 t1)) (CAssignL CHole e3)).
         inv HTy1.
         inv HTy2.
-        inv Y2.
         assert (Hsim := H2).
-        apply H8 in H2. clear H8.
         inv Hsim. inv H8.
-        inv Y3.
         assert (simple_type TNat). constructor.
-        apply H8 in H7. clear H8.
         {
-          apply (IH3 Y1) in H3. 2 : { easy. }
+          apply (IH3) in H3. 2 : { easy. }
           inv H2; inv H7; (eauto 20 with Progress); 
             try solve_empty_scope.
           - destruct H3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
@@ -5111,46 +5154,26 @@ Proof with eauto 20 with Progress.
               inv HTy3.
               left; eauto...
               destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 4 eexists.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
+              * eapply RSExp... eapply SPlusChecked. easy.
                 unfold is_array_ptr. easy.
               * eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
             + destruct HRed3 as [H' [? [r HRed3]]].
+              destruct (Z_gt_dec n 0).
               rewrite HCtx; left; do 4 eexists.
-              eapply RSHaltNull... eapply SPlusNull. lia. 
+              eapply RSExp... eapply SPlusChecked. easy.
                 unfold is_array_ptr. easy.
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; do 4 eexists.
-              eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-          - destruct H3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            + inv HVal3.
-              inv HTy3.
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-            + destruct HRed3 as [H' [? [r HRed3]]].
               rewrite HCtx; left; do 4 eexists.
               eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              destruct (Z_gt_dec n 0).
+              rewrite HCtx; left; do 4 eexists.
+              eapply RSExp... eapply SPlusChecked. easy.
+                unfold is_array_ptr. easy.
               rewrite HCtx; left; do 4 eexists.
               eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
-          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSExp. eapply SPlusChecked. lia.
-                unfold is_array_ptr. easy.
-                eauto.
-              * eapply RSHaltNull. eapply SPlusNull. lia.
-                unfold is_array_ptr. easy. eauto.
-          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSExp. eapply SPlusChecked. lia.
-                unfold is_array_ptr. easy. 
-                eauto.
-              * eapply RSHaltNull. eapply SPlusNull. lia.
-                unfold is_array_ptr. easy. eauto.
         }
       * destruct HRed2 as [ H' [ ? [? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -5182,28 +5205,23 @@ Proof with eauto 20 with Progress.
     remember t' as t. clear Heqt t'.
     *)
     (* Invoke IH on e1 *)
-    inv HHwt. inv H2. rename H6 into Y1. rename H7 into Y2. rename H8 into Y3. 
-    apply (IH1 Y2) in H4. 2 : { easy. }
+    apply (IH1) in H4. 2 : { easy. }
     destruct H4 as [ HVal1 | [ HRed1 | [| HUnchk1 ] ] ]; idtac...
     + (* Case: e1 is a value *)
       inv HVal1.
       (* Invoke IH on e2 *)
-      apply (IH2 Y3) in H5. 2 : { easy. }
+      apply (IH2) in H5. 2 : { easy. }
       destruct H5 as [ HVal2 | [ HRed2 | [| HUnchk2 ] ] ]; idtac...
       * inv HVal2.
         ctx (EAssign (EPlus (ELit n t0) (ELit n0 t1)) e3) 
                   (in_hole (EPlus (ELit n t0) (ELit n0 t1)) (CAssignL CHole e3)).
         inv HTy1.
         inv HTy2.
-        inv Y2.
         assert (Hsim := H2).
-        apply H8 in H2. clear H8.
         inv Hsim. inv H8.
-        inv Y3.
         assert (simple_type TNat). constructor.
-        apply H8 in H7. clear H8.
         {
-          apply (IH3 Y1) in H3. 2 : { easy. }
+          apply (IH3) in H3. 2 : { easy. }
           inv H2; inv H7; (eauto 20 with Progress); 
             try solve_empty_scope.
           - destruct H3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
@@ -5211,46 +5229,26 @@ Proof with eauto 20 with Progress.
               inv HTy3.
               left; eauto...
               destruct (Z_gt_dec n 0); subst; rewrite HCtx; do 4 eexists.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
+              * eapply RSExp... eapply SPlusChecked. easy.
                 unfold is_array_ptr. easy.
               * eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
             + destruct HRed3 as [H' [? [r HRed3]]].
+              destruct (Z_gt_dec n 0).
               rewrite HCtx; left; do 4 eexists.
-              eapply RSHaltNull... eapply SPlusNull. lia. 
+              eapply RSExp... eapply SPlusChecked. easy.
                 unfold is_array_ptr. easy.
-            + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
-              rewrite HCtx; left; do 4 eexists.
-              eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-          - destruct H3 as [ HVal3 | [ HRed3 | [| HUnchk3]]]; idtac...
-            + inv HVal3.
-              inv HTy3.
-              destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-              * eapply RSHaltNull... eapply SPlusNull. lia.
-                unfold is_array_ptr. easy.
-            + destruct HRed3 as [H' [? [r HRed3]]].
               rewrite HCtx; left; do 4 eexists.
               eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
             + destruct HUnchk3 as [ e' [ E [ He2 HEUnchk ]]]; subst.
+              destruct (Z_gt_dec n 0).
+              rewrite HCtx; left; do 4 eexists.
+              eapply RSExp... eapply SPlusChecked. easy.
+                unfold is_array_ptr. easy.
               rewrite HCtx; left; do 4 eexists.
               eapply RSHaltNull... eapply SPlusNull. lia.
                 unfold is_array_ptr. easy.
-          - destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSExp. eapply SPlusChecked. lia.
-                unfold is_array_ptr. easy.
-                eauto.
-              * eapply RSHaltNull. eapply SPlusNull. lia.
-                unfold is_array_ptr. easy. eauto.
-          -  destruct (Z_gt_dec n 0); rewrite HCtx; left; do 4 eexists.
-              * eapply RSExp. eapply SPlusChecked. lia.
-                unfold is_array_ptr. easy. 
-                eauto.
-              * eapply RSHaltNull. eapply SPlusNull. lia.
-                unfold is_array_ptr. easy. eauto.
         }
       * destruct HRed2 as [ H' [ ? [? [ r HRed2 ] ] ] ].
         inv HRed2; ctx (EAssign (EPlus (ELit n t0) (in_hole e E)) e3) (in_hole e (CAssignL (CPlusR n t0 E) e3))...
@@ -5263,9 +5261,34 @@ Proof with eauto 20 with Progress.
   (* Istatement. It is impossible due to empty env. *)
    - inversion HEnv.
    - inversion HEnv.
+   - right.
+    inv Hewf.
+    apply (IH1) in H3. 2:{ easy. }
+    (* Invoke the IH on `e1` *)
+    destruct H3 as [ HVal1 | [ HRed1 | HUnchk1 ] ].
+    (* Case: `e1` is a value *)
+    + (* We don't know if we can take a step yet, since `e2` might be unchecked. *)
+      inv HVal1 as [ n1 t1 ].
+      (* Invoke the IH on `e2` *)
+       left.
+       destruct n1 eqn:eq1.
+       eapply (step_implies_reduces D).
+       eapply SIfFalse;eauto.
+       eapply (step_implies_reduces D).
+       eapply SIfTrue;eauto. lia.
+       eapply (step_implies_reduces D).
+       eapply SIfTrue;eauto. lia.
+    (* Case: `e1` reduces *)
+    + (* We can take a step by reducing `e1` *)
+      left.
+      ctx (EIf e1 e2 e3) (in_hole e1 (CIf CHole e2 e3))...
+    (* Case: `e1` is unchecked *)
+    + (* `EPlus e1 e2` must be unchecked, since `e1` is *)
+      right.
+      ctx (EIf e1 e2 e3) (in_hole e1 (CIf CHole e2 e3)).
+      destruct HUnchk1...
 Qed.
-*)
-Admitted.
+
 (* Define the property of a stack. *)
 Definition stack_wt D (S:stack) := 
     forall x v t, Stack.MapsTo x (v,t) S -> word_type t /\ type_wf D t /\ simple_type t.
@@ -7676,7 +7699,7 @@ Proof with eauto 20 with Preservation.
     apply TyLit. constructor.
     apply well_typed_exchange_strlen; try easy.
   (* T-Let *)
-(*
+
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst.
     + clear H0. clear H9. rename e'0 into e'.
@@ -8408,8 +8431,7 @@ Proof with eauto 20 with Preservation.
         eapply SubTyRefl. eauto... eauto... 
       * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
         split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
-*)
-Admitted.
+Qed.
 
 (* ... for Blame *)
 
