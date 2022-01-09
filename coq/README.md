@@ -3,19 +3,17 @@
 This repository contains a mechanization of the syntax,
 semantics (dynamic and static), and metatheory of core Checked C.
 Mechanization was carried out with The Coq Proof Assistant,
-version 8.8 (Nov 2018).
+version 8.12 (Sep 2021).
 
 The development depends only on the Coq standard library, and related tooling (`coqdoc`, `coq_makefile`, etc.)
 
 ## Building
 
-To build the `coqdoc` style documentation, run
-
-    % make html
-
 To build the actually proof development, run
 
     % make
+
+Open A Coq Assistent, and then Open CheckedC.v file, and then you can see the step by step proof result.
 
 ## Overview
 
