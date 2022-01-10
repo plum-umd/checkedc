@@ -430,7 +430,7 @@ Inductive expression : Type :=
   | EAssign : expression -> expression -> expression (* *e = e *)
   | EIfDef : var -> expression -> expression -> expression (* if * x then e1 else e2. *)
   | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
-  | EUnchecked : list (var * type) -> expression -> expression.
+  | EUnchecked : expression -> expression.
 
 Parameter fenv : env -> funid -> option (list (var * type) * type * expression * mode).
 
@@ -511,10 +511,9 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
       expr_wf D F e1 ->
       expr_wf D F e2 ->
       expr_wf D F (EAssign e1 e2)
-  | WFEUnchecked : forall tvl e,
-      (forall x t, In (x,t) tvl -> word_type t /\ type_wf D Checked t) ->
+  | WFEUnchecked : forall e,
       expr_wf D F e ->
-      expr_wf D F (EUnchecked tvl e).
+      expr_wf D F (EUnchecked e).
 
 
 (* Standard substitution.
@@ -663,7 +662,7 @@ Inductive context : Type :=
   | CAssignR : Z -> type -> context -> context
   | CRet : var -> (Z*type) -> option (Z * type) -> context -> context
   | CIf : context -> expression -> expression -> context
-  | CUnchecked : list (var *type) -> context -> context.
+  | CUnchecked : context -> context.
 
 Fixpoint in_hole (e : expression) (E : context) : expression :=
   match E with
@@ -679,7 +678,7 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
   | CRet x old a E' => ERet x old a (in_hole e E')
   | CIf E' e1 e2 => EIf (in_hole e E') e1 e2
-  | CUnchecked tvl E' => EUnchecked tvl (in_hole e E')
+  | CUnchecked E' => EUnchecked (in_hole e E')
   end.
 
 
@@ -697,7 +696,7 @@ Fixpoint mode_of (E : context) : mode :=
   | CAssignR _ _ E' => mode_of E'
   | CRet x old a E' => mode_of E'
   | CIf E' e1 e2 => mode_of E'
-  | CUnchecked tvl E' => Unchecked
+  | CUnchecked E' => Unchecked
   end.
 
 Fixpoint compose (E_outer : context) (E_inner : context) : context :=
@@ -714,7 +713,7 @@ Fixpoint compose (E_outer : context) (E_inner : context) : context :=
   | CAssignR n t E' => CAssignR n t (compose E' E_inner)
   | CRet x old a E' => CRet x old a (compose E' E_inner)
   | CIf E' e1 e2 => CIf (compose E' E_inner) e1 e2
-  | CUnchecked tvl E' => CUnchecked tvl (compose E' E_inner)
+  | CUnchecked E' => CUnchecked (compose E' E_inner)
   end.
 
 Lemma hole_is_id : forall e,
@@ -1165,8 +1164,8 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
       get_low t' = Some (Num l) ->
       step D F s H (EMalloc w)  s H RBounds
 
-  | SUnchecked : forall s H tvl n t,
-      step D F s H (EUnchecked tvl (ELit n t)) s H (RExpr (ELit n t))
+  | SUnchecked : forall s H n t,
+      step D F s H (EUnchecked (ELit n t)) s H (RExpr (ELit n t))
    | SIfDefTrueNotNTHit : forall s H x n t e1 e2 n1 t1, 
            Stack.MapsTo x (n,t) s ->
            step D F s H (EDeref (ELit n t)) s H (RExpr (ELit n1 t1)) ->
@@ -1251,20 +1250,20 @@ Inductive well_typed_lit (D : structdef) (Q:theta) (H : heap) : scope -> Z -> ty
       well_typed_lit D Q H s n (TPtr Unchecked w)
   | TyLitZero : forall s t,
       well_typed_lit D Q H s 0 t
-  | TyLitRec : forall s n w t,
-      set_In (n, t) s ->
-      subtype D Q t (TPtr Checked w) ->
-      well_typed_lit D Q H s n (TPtr Checked w)
-  | TyLitC : forall sc n w t b ts,
-      simple_type w ->
-      subtype D Q (TPtr Checked w) (TPtr Checked t) ->
+  | TyLitRec : forall s m n w t,
+      set_In (n, t) s -> m <> Unchecked ->
+      subtype D Q t (TPtr m w) ->
+      well_typed_lit D Q H s n (TPtr m w)
+  | TyLitC : forall sc m n w t b ts,
+      simple_type w -> m <> Unchecked ->
+      subtype D Q (TPtr m w) (TPtr m t) ->
       Some (b, ts) = allocate_meta D w ->
       (forall k, b <= k < b + Z.of_nat(List.length ts) ->
                  exists n' t',
                    Some t' = List.nth_error ts (Z.to_nat (k - b)) /\
                    Heap.MapsTo (n + k) (n', t') H /\
-                   well_typed_lit D Q H (scope_set_add n (TPtr Checked w) sc) n' t') ->
-      well_typed_lit D Q H sc n (TPtr Checked t).
+                   well_typed_lit D Q H (scope_set_add n (TPtr m w) sc) n' t') ->
+      well_typed_lit D Q H sc n (TPtr m t).
 
 
 Hint Constructors well_typed_lit.
@@ -1282,19 +1281,20 @@ Lemma well_typed_lit_ind' :
     (forall (s : scope) (n : Z), P s n TNat) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s : scope) (n : Z) (w : type) (t : type), set_In (n, t) s -> subtype D Q t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
-       (forall (s : scope) (n : Z) (w : type) (t: type) (ts : list type) (b : Z),
-        simple_type w ->
-        subtype D Q (TPtr Checked w) (TPtr Checked t) ->
+       (forall (s : scope) (m:mode) (n : Z) (w : type) (t : type),
+                    set_In (n, t) s -> m <> Unchecked -> subtype D Q t (TPtr m w) -> P s n (TPtr m w)) ->
+       (forall (s : scope) (m:mode) (n : Z) (w : type) (t: type) (ts : list type) (b : Z),
+         simple_type w -> m <> Unchecked ->
+        subtype D Q (TPtr m w) (TPtr m t) ->
         Some (b, ts) = allocate_meta D w ->
         (forall k : Z,
          b <= k < b + Z.of_nat (length ts) ->
          exists (n' : Z) (t' : type),
            Some t' = nth_error ts (Z.to_nat (k - b)) /\
            Heap.MapsTo (n + k) (n', t') H /\
-           well_typed_lit D Q H (scope_set_add n (TPtr Checked w) s) n' t' /\
-           P (scope_set_add n (TPtr Checked w) s) n' t') ->
-        P s n (TPtr Checked t)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D Q H s n w -> P s n w.
+           well_typed_lit D Q H (scope_set_add n (TPtr m w) s) n' t' /\
+           P (scope_set_add n (TPtr m w) s) n' t') ->
+        P s n (TPtr m t)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D Q H s n w -> P s n w.
 Proof.
   intros D Q H P.
   intros HTyLitInt
@@ -1307,9 +1307,9 @@ Proof.
             | TyLitInt _ _ _ s' n' => HTyLitInt s' n'
             | TyLitU _ _ _ s' n' w' => HTyLitU s' n' w'
             | TyLitZero _ _ _ s' t' => HTyLitZero s' t'
-            | TyLitRec _ _ _ s' n' w' t' Hscope Hsub => HTyLitRec s' n' w' t' Hscope Hsub
-            | TyLitC _ _ _ s' n' w' t' b ts HSim Hsub Hts IH =>
-              HTyLitC s' n' w' t' ts b HSim Hsub Hts (fun k Hk =>
+            | TyLitRec _ _ _ s' m' n' w' t' Hscope Hmode Hsub => HTyLitRec s' m' n' w' t' Hscope Hmode Hsub
+            | TyLitC _ _ _ s' m' n' w' t' b ts HSim Hmode Hsub Hts IH =>
+              HTyLitC s' m' n' w' t' ts b HSim Hmode Hsub Hts (fun k Hk =>
                                          match IH k Hk with
                                          | ex_intro _ n' Htmp =>
                                            match Htmp with
@@ -1319,7 +1319,7 @@ Proof.
                                                match Hrest1 with
                                                | conj Hheap Hwt =>
                                                  ex_intro _ n' (ex_intro _ t' 
-                     (conj Ht' (conj Hheap (conj Hwt (F (scope_set_add _ (TPtr Checked w') s') n' t' Hwt)))))
+                     (conj Ht' (conj Hheap (conj Hwt (F (scope_set_add _ (TPtr m' w') s') n' t' Hwt)))))
                                                end
                                              end
                                            end
