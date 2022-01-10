@@ -92,7 +92,7 @@ Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
 
 Inductive type : Type :=
   | TNat : type
-  | TPtr : bound -> mode -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
+  | TPtr : mode -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
   | TStruct : struct -> type
   | TArray : bound -> bound -> type -> type
   | TNTArray : bound -> bound -> type -> type.
@@ -107,7 +107,7 @@ Defined.
 
 Inductive word_type : type -> Prop :=
   | WTNat : word_type (TNat)
-  | WTPtr : forall n m w, word_type (TPtr n m w).
+  | WTPtr : forall m w, word_type (TPtr m w).
 
 Hint Constructors word_type.
 
@@ -155,8 +155,8 @@ Inductive well_bound_in : env -> bound -> Prop :=
 
 Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
-   | well_type_bound_in_ptr : forall b m t env, well_bound_in env b ->
-                       well_type_bound_in env t -> well_type_bound_in env (TPtr b m t)
+   | well_type_bound_in_ptr : forall m t env, 
+                       well_type_bound_in env t -> well_type_bound_in env (TPtr m t)
    | well_type_bound_in_struct : forall env T, well_type_bound_in env (TStruct T)
    | well_type_bound_in_array : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
                                       well_type_bound_in env t -> well_type_bound_in env (TArray l h t)
@@ -166,7 +166,7 @@ Inductive well_type_bound_in : env -> type -> Prop :=
 (* Definition of simple type meaning that no bound variables. *)
 Inductive simple_type : type -> Prop := 
   | SPTNat : simple_type TNat
-  | SPTPtr : forall n m w, simple_type w -> simple_type (TPtr (Num n) m w)
+  | SPTPtr : forall m w, simple_type w -> simple_type (TPtr m w)
   | SPTStruct : forall t, simple_type (TStruct t)
   | SPTArray : forall l h t, simple_type t -> simple_type (TArray (Num l) (Num h) t)
   | SPTNTArray : forall l h t, simple_type t -> simple_type (TNTArray (Num l) (Num h) t).
@@ -188,8 +188,8 @@ Inductive ext_type_in : list var -> type -> Prop :=
 
 Inductive type_wf (D : structdef) : mode -> type -> Prop :=
   | WFTNat : forall m, type_wf D m (TNat)
-  | WFTPtrChecked : forall n m w, type_wf D m w -> type_wf D Checked (TPtr n m w)
-  | WFTPtrUnChecked : forall n m m' w, m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr n m' w)
+  | WFTPtrChecked : forall m w, type_wf D m w -> type_wf D Checked (TPtr m w)
+  | WFTPtrUnChecked : forall m m' w, m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr m' w)
   | WFTStruct : forall m T,
       (exists (fs : fields), StructDef.MapsTo T fs D) ->
       type_wf D m (TStruct T)
@@ -259,36 +259,36 @@ Qed.
 
 Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D Q t t
-  | SubTyTaintedNTArray : forall b1 l h t, word_type t -> 
-                 subtype D Q (TPtr b1 Tainted (TNTArray l h t)) (TPtr b1 Unchecked t)
-  | SubTyTaintedArray  : forall b1 l h t, word_type t ->  subtype D Q (TPtr b1 Tainted (TArray l h t)) (TPtr b1 Unchecked t)
-  | SubTyTaintedStruct : forall b1 T, subtype D Q (TPtr b1 Tainted (TStruct T)) (TPtr b1 Unchecked TNat)
-  | SubTyBot : forall b l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
-                           -> subtype D Q (TPtr b Checked t) (TPtr b Checked (TArray l h t))
-  | SubTyOne : forall b l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
-                             -> subtype D Q (TPtr b Checked (TArray l h t)) (TPtr b Checked t)
-  | SubTyOneNT : forall b l h t, word_type t -> nat_leq Q l (Num 0) ->nat_leq Q (Num 1) h
-                             -> subtype D Q (TPtr b Checked (TNTArray l h t)) (TPtr b Checked t)
-  | SubTySubsume : forall b l h l' h' t m,
+  | SubTyTaintedNTArray : forall l h t, word_type t -> 
+                 subtype D Q (TPtr Tainted (TNTArray l h t)) (TPtr Unchecked t)
+  | SubTyTaintedArray  : forall l h t, word_type t ->  subtype D Q (TPtr Tainted (TArray l h t)) (TPtr Unchecked t)
+  | SubTyTaintedStruct : forall T, subtype D Q (TPtr Tainted (TStruct T)) (TPtr Unchecked TNat)
+  | SubTyBot : forall l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
+                           -> subtype D Q (TPtr Checked t) (TPtr Checked (TArray l h t))
+  | SubTyOne : forall l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
+                             -> subtype D Q (TPtr Checked (TArray l h t)) (TPtr Checked t)
+  | SubTyOneNT : forall l h t, word_type t -> nat_leq Q l (Num 0) ->nat_leq Q (Num 1) h
+                             -> subtype D Q (TPtr Checked (TNTArray l h t)) (TPtr Checked t)
+  | SubTySubsume : forall l h l' h' t m,
     nat_leq Q l l' -> nat_leq Q h' h -> 
-    subtype D Q (TPtr b m (TArray l h t)) (TPtr b m (TArray l' h' t))
-  | SubTyNtArray : forall b l h l' h' t m,
+    subtype D Q (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtArray : forall l h l' h' t m,
     nat_leq Q l l' -> nat_leq Q h' h ->
-                subtype D Q (TPtr b m (TNTArray l h t)) (TPtr b m (TArray l' h' t))
-  | SubTyNtSubsume : forall b l h l' h' t m,
+                subtype D Q (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtSubsume : forall l h l' h' t m,
     nat_leq Q l l' -> nat_leq Q h' h -> 
-    subtype D Q (TPtr b m (TNTArray l h t)) (TPtr b m (TNTArray l' h' t))
-  | SubTyStructArrayField_1 : forall b (T : struct) (fs : fields),
+    subtype D Q (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
+  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields),
     StructDef.MapsTo T fs D ->
     Some (TNat) = (Fields.find 0%nat fs) ->
-    subtype D Q (TPtr b Checked (TStruct T)) (TPtr b Checked (TNat))
-  | SubTyStructArrayField_2 : forall b (T : struct) (fs : fields) l h,
+    subtype D Q (TPtr Checked (TStruct T)) (TPtr Checked (TNat))
+  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) l h,
     StructDef.MapsTo T fs D ->
     Some (TNat) = (Fields.find 0%nat fs) -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-    subtype D Q (TPtr b Checked (TStruct T)) (TPtr b Checked (TArray l h (TNat))).
+    subtype D Q (TPtr Checked (TStruct T)) (TPtr Checked (TArray l h (TNat))).
 
 (* Subtyping transitivity. *)
-Lemma subtype_trans : forall D Q t t' b m w, subtype D Q t (TPtr b m w) -> subtype D Q (TPtr b m w) t' -> subtype D Q t t'.
+Lemma subtype_trans : forall D Q t t' m w, subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'.
 Proof.
  intros. inv H; inv H0.
       * eapply SubTyRefl.
@@ -313,70 +313,70 @@ Proof.
       * inv H3.
       * eapply SubTyTaintedStruct;easy.
       * eapply SubTyBot; eauto.
-      * inv H2.
+      * inv H1.
       * eapply SubTyRefl.
-      * eapply SubTyBot;eauto. eapply nat_leq_trans. apply H6. assumption.
-         eapply nat_leq_trans. apply H10. assumption.
+      * eapply SubTyBot;eauto. eapply nat_leq_trans. apply H5. assumption.
+         eapply nat_leq_trans. apply H9. assumption.
       * eapply SubTyOne; eauto.
       * eapply SubTySubsume;eauto.
-        eapply nat_leq_trans. apply H6. assumption.
-        eapply nat_leq_trans. apply H8. assumption.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
+        eapply nat_leq_trans. apply H5. assumption.
+        eapply nat_leq_trans. apply H4. assumption.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
       * eapply SubTyOneNT; eauto.
       * eapply SubTyNtArray; eauto.
-        eapply nat_leq_trans. apply H6. assumption.
-        eapply nat_leq_trans. apply H8. assumption.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
-      * inv H5.
+        eapply nat_leq_trans. apply H5. assumption.
+        eapply nat_leq_trans. apply H4. assumption.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
+      * inv H3.
       * eapply SubTySubsume; eauto.
       * eapply SubTyTaintedArray;easy.
-      * inv H3.
+      * inv H2.
       * eapply SubTyOne; eauto.
         eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H10. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
       * eapply SubTySubsume; eauto.
         eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyNtArray; eauto.
       * eapply SubTyTaintedNTArray;easy.
-      * inv H3.
-      * eapply SubTyOneNT; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H10. assumption.
-      * eapply SubTyNtArray; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyNtSubsume; eauto.
-      * eapply SubTyTaintedNTArray;easy.
-      * inv H3.
-      * eapply SubTyOneNT; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H10. assumption.
-      * eapply SubTyNtArray; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyNtSubsume; eauto.
-        eapply nat_leq_trans. apply H4. assumption.
-        eapply nat_leq_trans. apply H9. assumption.
-      * eapply SubTyStructArrayField_1; eauto.
-      * eapply SubTyStructArrayField_2; eauto.
-      * eapply SubTyStructArrayField_2; eauto.
       * inv H2.
+      * eapply SubTyOneNT; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTyNtArray; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
+      * eapply SubTyNtSubsume; eauto.
+      * eapply SubTyTaintedNTArray;easy.
+      * inv H2.
+      * eapply SubTyOneNT; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H9. assumption.
+      * eapply SubTyNtArray; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
+      * eapply SubTyNtSubsume; eauto.
+        eapply nat_leq_trans. apply H4. assumption.
+        eapply nat_leq_trans. apply H8. assumption.
       * eapply SubTyStructArrayField_1; eauto.
       * eapply SubTyStructArrayField_2; eauto.
-        eapply nat_leq_trans. apply H7. assumption.
-        eapply nat_leq_trans. apply H11. assumption.
+      * eapply SubTyStructArrayField_2; eauto.
+      * inv H1.
+      * eapply SubTyStructArrayField_1; eauto.
+      * eapply SubTyStructArrayField_2; eauto.
+        eapply nat_leq_trans. apply H6. assumption.
+        eapply nat_leq_trans. apply H10. assumption.
 Qed.
 
 
@@ -405,8 +405,8 @@ Definition cast_bound (s:stack) (b:bound) : option bound :=
 
 Inductive cast_type_bound (s:stack) : type -> type -> Prop :=
    | cast_type_bound_nat : cast_type_bound s (TNat) (TNat)
-   | cast_type_bound_ptr : forall b b' c t t', cast_bound s b = Some b' -> cast_type_bound s t t'
-                 -> cast_type_bound s (TPtr b c t) (TPtr b' c t')
+   | cast_type_bound_ptr : forall c t t', cast_type_bound s t t'
+                 -> cast_type_bound s (TPtr c t) (TPtr c t')
    | cast_type_bound_array : forall l l' h h' t t', cast_bound s l = Some l' -> cast_bound s h = Some h' ->
                   cast_type_bound s t t' -> cast_type_bound s (TArray l h t) (TArray l' h' t')
    | cast_type_bound_ntarray : forall l l' h h' t t', cast_bound s l = Some l' -> cast_bound s h = Some h' ->
@@ -456,13 +456,13 @@ Definition is_array_ptr (t:type) : Prop :=
 
 Definition simple_option (D : structdef) (a:option (Z*type)) :=
   match a with None => True
-         | Some (v,t) => word_type t /\ type_wf D t /\ simple_type t
+         | Some (v,t) => word_type t /\ type_wf D Checked t /\ simple_type t
   end.
 
 Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
   | WFELit : forall n t,
     word_type t ->
-    type_wf D t ->
+    type_wf D Checked t ->
     simple_type t ->
     expr_wf D F (ELit n t)
   | WFEVar : forall x,
@@ -472,11 +472,11 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
   | WFECall : forall x el, 
       (forall env v, fenv env x = Some v) ->
       (forall e, In e el -> (exists n t, e = ELit n t
-                 /\ word_type t /\ type_wf D t /\ simple_type t) \/ (exists y, e = EVar y)) ->
+                 /\ word_type t /\ type_wf D Checked t /\ simple_type t) \/ (exists y, e = EVar y)) ->
       expr_wf D F (ECall x el)
   | WFRet : forall x old a e, simple_option D (Some old) -> simple_option D a -> expr_wf D F e -> expr_wf D F (ERet x old a e)
   | WFEDynCast : forall t e, 
-     is_array_ptr t -> type_wf D t -> expr_wf D F e -> expr_wf D F (EDynCast t e)
+     is_array_ptr t -> type_wf D Checked t -> expr_wf D F e -> expr_wf D F (EDynCast t e)
   | WFELet : forall x e1 e2,
       expr_wf D F e1 ->
       expr_wf D F e2 ->
@@ -491,10 +491,10 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
       expr_wf D F e3 ->
       expr_wf D F (EIf e1 e2 e3)
   | WFEMalloc : forall w,
-      type_wf D w -> expr_wf D F (EMalloc w)
+      type_wf D Checked w -> expr_wf D F (EMalloc w)
   | WFECast : forall t e,
       word_type t ->
-      type_wf D t ->
+      type_wf D Checked t ->
       expr_wf D F e ->
       expr_wf D F (ECast t e)
   | WFEPlus : forall e1 e2,
@@ -512,7 +512,7 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
       expr_wf D F e2 ->
       expr_wf D F (EAssign e1 e2)
   | WFEUnchecked : forall tvl e,
-      (forall x t, In (x,t) tvl -> word_type t /\ type_wf D t) ->
+      (forall x t, In (x,t) tvl -> word_type t /\ type_wf D Checked t) ->
       expr_wf D F e ->
       expr_wf D F (EUnchecked tvl e).
 
@@ -527,7 +527,7 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
 Inductive value (D : structdef) : expression -> Prop :=
   VLit : forall (n : Z) (t : type),
     word_type t ->
-    type_wf D t ->
+    type_wf D Checked t ->
     simple_type t ->
     value D (ELit n t).
 
