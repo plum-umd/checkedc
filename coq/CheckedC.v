@@ -1719,9 +1719,8 @@ Inductive well_typed { D : structdef } {F : FEnv} {S:stack} {H:heap}
       join_type D Q S t2 t3 t4 -> 
       well_typed env Q m (EIf e1 e2 e3) t4. 
 
-
-Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:heap) :=
-     forall env env' f tvl t e m, F env f = Some (tvl,t,e,m) -> 
+Definition fun_wf (D : structdef) (F:FEnv) (H:heap) :=
+     forall env env' S f tvl t e m, F env f = Some (tvl,t,e,m) -> 
           gen_arg_env env tvl env' ->
           (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D t' /\ well_bound_vars_type tvl t') /\
           (forall a, In a tvl -> ~ Env.In (fst a) env) /\
@@ -1732,6 +1731,23 @@ Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:heap) :=
 
 Definition sub_domain (env: env) (S:stack) := forall x, Env.In x env -> Stack.In x S.
 
+
+Definition heap_wt_all (D : structdef) (Q:theta) (H:heap) := forall x n t, Heap.MapsTo x (n,t) H
+            -> word_type t /\ type_wf D t /\ simple_type t /\ well_typed_lit D Q H empty_scope n t.
+
+Definition stack_consistent_grow (S S' : stack) (env : env) := 
+       forall x v t, Env.In x env -> sub_domain env S -> Stack.MapsTo x (v,t) S -> Stack.MapsTo x (v,t) S'.
+
+Definition stack_wf D Q env s :=
+    (forall x t,
+         Env.MapsTo x t env ->
+         exists v t' t'',
+           cast_type_bound s t t' /\
+           subtype D Q t'' t' /\
+            Stack.MapsTo x (v, t'') s).
+
+Definition stack_heap_consistent D Q H S :=
+    forall x n t, Stack.MapsTo x (n,t) S -> well_typed_lit D Q H empty_scope n t.
 
 Local Close Scope Z_scope.
 
@@ -3047,7 +3063,7 @@ Lemma progress : forall D s H m e t,
     structdef_wf D ->
     heap_wf D H ->
     expr_wf D fenv e ->
-    fun_wf D fenv s H ->
+    fun_wf D fenv H ->
     @well_typed D fenv s H empty_env empty_theta m e t ->
     value D e \/
     reduces D (fenv empty_env) s H e \/
@@ -3060,7 +3076,7 @@ Proof with eauto 20 with Progress.
                      env Q m x t Wb                                             | (* Variables *)
                      env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
                      env Q m x h l t Wb                                         | (* Strlen *)
-                     env Q m x y e l h t ta Alpha Wb HTy IH Hx                     | (* LetStrlen *)
+                     env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
                      env Q m x e1 e2 t b Alpha HTy1 IH1 HTy2 IH2 Hx Hdept       | (* Let-Nat-Expr *)
                      env Q m x e1 t1 e2 t Alpha HTy1 IH1 HTy2 IH2 Hx            | (* Let-Expr *)
                      env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
@@ -5474,7 +5490,7 @@ Qed.
 
 Lemma stack_simple_prop : forall D env S H S' H' e e',
          sub_domain env S ->
-         fun_wf D fenv S' H' -> expr_wf D fenv e -> stack_wt D S ->
+         fun_wf D fenv H' -> expr_wf D fenv e -> stack_wt D S ->
             step D (fenv env) S H e S' H' (RExpr e') -> stack_wt D S'.
 Proof.
   intros.
@@ -5498,7 +5514,7 @@ Proof.
   unfold fun_wf in *.
   specialize (gen_arg_env_good tvl env0) as X1.
   destruct X1.
-  specialize (H1 env0 x1 x tvl t e m H4 H9).
+  specialize (H1 env0 x1 s' x tvl t e m H4 H9).
   specialize (sub_domain_grows tvl el env0 x1 s s' AS H9 H6 H0) as eq1.
   destruct H1.
   destruct (H1 x0 t0 H8). easy.
@@ -5990,22 +6006,6 @@ Qed.
 
 Create HintDb Preservation.
 
-Definition heap_wt_all (D : structdef) (Q:theta) (H:heap) := forall x n t, Heap.MapsTo x (n,t) H
-            -> word_type t /\ type_wf D t /\ simple_type t /\ well_typed_lit D Q H empty_scope n t.
-
-Definition stack_consistent_grow (S S' : stack) (env : env) := 
-       forall x v t, Env.In x env -> sub_domain env S -> Stack.MapsTo x (v,t) S -> Stack.MapsTo x (v,t) S'.
-
-Definition stack_wf D Q env s :=
-    (forall x t,
-         Env.MapsTo x t env ->
-         exists v t' t'',
-           cast_type_bound s t t' /\
-           subtype D Q t'' t' /\
-            Stack.MapsTo x (v, t'') s).
-
-Definition stack_heap_consistent D Q H S :=
-    forall x n t, Stack.MapsTo x (n,t) S -> well_typed_lit D Q H empty_scope n t.
 
 (*
 Inductive stack_wf D Q H : env -> stack -> Prop :=
@@ -7158,7 +7158,7 @@ Lemma preservation : forall D S H env Q e t S' H' e',
     @structdef_wf D ->
     heap_wf D H ->
     heap_wt_all D Q H ->
-    fun_wf D fenv S' H' ->
+    fun_wf D fenv H ->
     expr_wf D fenv e ->
     stack_wt D S ->
     env_wt D env ->
@@ -7210,7 +7210,7 @@ Proof with eauto 20 with Preservation.
                      env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
                      env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
                      env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin (* If *)
-                 ]; intros e' s' H' HFun Hreduces; subst.
+                 ]; intros e' s' H' Hreduces; subst.
   (* T-Lit, impossible because values do not step *)
   - exfalso. eapply lit_are_nf...
   (* T-Var *)
@@ -7242,8 +7242,8 @@ Proof with eauto 20 with Preservation.
     split. 
     apply (stack_wf_trans D Q H' env enva s s' AS tvl es); try easy.
     unfold fun_wf in *.
-    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
-    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    destruct (HFun env enva s' x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    destruct (HFun env enva s' x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
     intros.
     specialize (gen_arg_env_has_all tvl env enva X1 x0 t0 H) as eq1. easy.
     unfold theta_wt in *. destruct HQt. easy.
@@ -7251,17 +7251,17 @@ Proof with eauto 20 with Preservation.
     split.
     apply (stack_heap_consistent_trans tvl es D Q H' env AS s s'); try easy.
     unfold fun_wf in *.
-    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    destruct (HFun env enva s' x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
     unfold stack_wf in *. intros. specialize (HSwf x0 t0 H).
     destruct HSwf as [va [tc [td [Y1 [Y2 Y3]]]]].
     apply Stack.mapsto_always_same with (v1 := (n,ta)) in Y3; try easy. inv Y3.
     exists tc. easy.
     unfold theta_wt in *. destruct HQt. easy.
-    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
+    destruct (HFun env enva s' x tvl t e m' H6 X1) as [Y1 [Y2 Y3]]. easy.
     inv HEwf. easy.
     split.
     easy.
-    destruct (HFun env enva x tvl t e m' H6 X1) as [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]].
+    destruct (HFun env enva s' x tvl t e m' H6 X1) as [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]].
     left. destruct m'. 2: { assert (Unchecked = Unchecked) by easy. apply HMode in H. easy. } 
     specialize (gen_rets_type_exists tvl D Q H' env es AS s t HSubDom H10 HArg) as eq1.
     destruct eq1.
@@ -7703,6 +7703,7 @@ Proof with eauto 20 with Preservation.
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst.
     + clear H0. clear H9. rename e'0 into e'.
+      Set Printing All.
       specialize (stack_grow_prop D F s H s' H' (ELet x e1 e2) e' HSSA H5) as eq1.
       specialize (stack_simple_prop D F s H s' H' (ELet x e1 e2) e' SSimple H5) as eq2.
       inv H5. exists (Env.add x t0 env). inv HEwf.
@@ -8474,14 +8475,6 @@ Proof.
     apply cast_means_simple_type in H0. easy.
 Qed.
 
-Lemma fun_wf_step : forall D env S H e S' H' e',
-    @structdef_wf D ->
-    fun_wf D fenv S H ->
-    @step D (fenv env) S H e S' H' (RExpr e') ->
-    fun_wf D fenv S' H'.
-Proof.
-Admitted.
-
 Lemma heap_wt_step : forall D F Q S H e S' H' e',
     heap_wt_all D Q H ->
     @step D F S H e S' H' (RExpr e') ->
@@ -8541,8 +8534,8 @@ Definition normal { D : structdef } {F:funid -> option (list (var * type) * type
 Definition stuck { D : structdef } {F:funid -> option (list (var * type) * type * expression * mode)}
         (S:stack) (H : heap) (r : result) : Prop :=
   match r with
-  | RBounds => True
-  | RNull => True
+  | RBounds => False
+  | RNull => False
   | RExpr e => @normal D F S H e /\ ~ value D e
   end.
 
@@ -8568,7 +8561,7 @@ Theorem blame : forall D S H e t m S' H' r,
     @structdef_wf D ->
     heap_wf D H ->
     heap_wt_all D empty_theta H ->
-    fun_wf D fenv S H ->
+    fun_wf D fenv H ->
     stack_wt D S ->
     @expr_wf D fenv e ->
     @well_typed D fenv S H empty_env empty_theta Checked e t ->
@@ -8609,7 +8602,6 @@ Proof.
       * apply IHHeval.
         inv H0. eapply heap_wf_step; eauto.
         inv H0. eapply heap_wt_step;eauto.
-        inv H0. eapply fun_wf_step;eauto.
         inv H0. eapply stack_wt_step;eauto.
         eapply expr_wf_reduce; eauto.
         assert (@heap_consistent D empty_theta H' H
