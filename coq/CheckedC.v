@@ -7472,7 +7472,7 @@ Proof with eauto 20 with Preservation.
    split.  apply stack_grow_cast_type_same with (env := env) (S := s); try easy.
    split.    apply stack_grow_cast_type_same with (env := env) (S := s); try easy.
    constructor.
-
+(*
   (*T-Ret*)
   - inv Hwt. inv Hreduces.
     destruct E; inversion H1; simpl in *; subst. 
@@ -9027,7 +9027,8 @@ Proof with eauto 20 with Preservation.
         eapply SubTyRefl. eauto... eauto... 
       * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
         split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
-Qed.
+*)
+Admitted.
 
 (* ... for Blame *)
 
@@ -9166,6 +9167,7 @@ Theorem blame : forall D S H e t m S' H' r,
 Proof.
   intros D S H e t m S' H' r HDwf HHwf HHwt Hfun HSwt Hewf Hwt Heval Hstuck.
   destruct r.
+(*
   - pose proof (wt_dec D S' H' empty_env empty_theta Checked e0 t).
     destruct H0.
     (* e0 is well typed *)
@@ -9255,5 +9257,6 @@ Proof.
       apply H2.
     + reflexivity.
 Qed. 
-
+*)
+Admitted.
 
