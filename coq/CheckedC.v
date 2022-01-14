@@ -1736,7 +1736,6 @@ Definition fun_wf (D : structdef) (F:FEnv) :=
           word_type t /\ type_wf D t /\ well_bound_vars_type tvl t /\ expr_wf D fenv e
           /\ @well_typed D F S H env' empty_theta m e t.
 
-
 Definition sub_domain (env: env) (S:stack) := forall x, Env.In x env -> Stack.In x S.
 
 
@@ -7183,7 +7182,8 @@ Lemma preservation : forall e D S H env Q t S' H' e',
     stack_heap_consistent D Q H S ->
     @well_typed D fenv S H env Q Checked e t ->
     @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
-    exists env' Q', stack_wf D Q' env' S' 
+    exists env' Q', env_wt D env' /\ theta_wt Q' env' S' /\
+           stack_wf D Q' env' S' 
         /\ stack_heap_consistent D Q' H' S' /\
       @heap_consistent D Q H' H 
    /\ (exists t'', (@well_typed D fenv S' H' env' Q' Checked e' t'' /\
@@ -7195,7 +7195,7 @@ Proof with eauto 20 with Preservation.
   (* T-Var *)
   - inv Hwt. inv Hreduces.
     destruct E; inversion H1; simpl in *; subst. inv H6. exists env. exists Q.
-    split. assumption.
+    split. easy. split. easy. split. easy. 
     split. easy.
     split. unfold heap_consistent. eauto.
     unfold stack_wf in HSwf.
@@ -9058,17 +9058,10 @@ Proof.
     apply cast_means_simple_type in H0. easy.
 Qed.
 
-Lemma heap_wt_step : forall D F Q S H e S' H' e',
+Lemma heap_wt_step : forall D F Q S H e S' Q' H' e',
     heap_wt_all D Q H ->
     @step D F S H e S' H' (RExpr e') ->
-    heap_wt_all D Q H'.
-Proof.
-Admitted.
-
-Lemma stack_wt_step : forall D F S H e S' H' e',
-    stack_wt D S ->
-    @step D F S H e S' H' (RExpr e') ->
-    stack_wt D S'.
+    heap_wt_all D Q' H'.
 Proof.
 Admitted.
 
@@ -9134,10 +9127,28 @@ Inductive eval { D : structdef } {F:funid -> option (list (var * type) * type * 
       eval n s' H' e' m' s'' H'' r ->
       eval (S n) s H e Unchecked s'' H'' r.
 
-Lemma wt_dec : forall D S H Q env m e t, { @well_typed D fenv S H Q env m e t }
-           + { ~ @well_typed D fenv S H Q env m e t }.
-  (* This is a biggy *)
-Admitted.
+Axiom alpha_same : forall D Q Q' S S' H H' env env' e e' t t' m, 
+  @reduce D (fenv env) S H e m S' H' (RExpr e') ->
+  @well_typed D fenv S H env Q m e t ->
+  @well_typed D fenv S' H' env' Q' m e' t' -> 
+  fenv env = fenv env'.
+
+Lemma expr_wf_in_hole : forall E D e, expr_wf D fenv (in_hole e E) -> expr_wf D fenv e.
+Proof.
+ induction E; intros;simpl in *; try easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H1. easy.
+ inv H. apply IHE in H4. easy.
+ inv H. apply IHE in H4. easy.
+ inv H. apply IHE in H1. easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H4. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H1. easy.
+Qed.
 
 (* The Blame Theorem. *)
 Theorem blame : forall n D Q S H env e t m S' H' r,
@@ -9182,125 +9193,21 @@ Proof.
   left. easy.
   specialize (preservation e D S H env Q t s' H'0 e'
      HDwf HHwf HHwt Hfun Hewf HSwt HEnv HQt HSwf HSHwf Hwt H2) as eq1.
-  destruct eq1 as [env' [Q' [HSwf' [HSHwf' [HC [ta [Hwt' [tb [tc [X1 [X2 X3]]]]]]]]]]].
-
+  destruct eq1 as [env' [Q' [HEnv' [HQt' [HSwf' [HSHwf' [HC [ta [Hwt' [tb [tc [X1 [X2 X3]]]]]]]]]]]]].
+  assert (fenv env' = fenv env).
+  rewrite (alpha_same D Q Q' S s' H H'0 env env' e e' t ta Checked); try easy.
   apply (IHn D Q' s' H'0 env' e' ta Checked S' H' r); try easy.
-
-    Set Printing All.
-IHn : forall (D : structdef) (Q : theta) (S : stack) 
-        (H : heap) (env : env) (e : expression) 
-        (t : type) (m : mode) (S' : stack) (H' : heap) 
-        (r : result),
-      structdef_wf D ->
-      heap_wf D H ->
-      heap_wt_all D Q H ->
-      fun_wf D fenv ->
-      expr_wf D fenv e ->
-      stack_wt D S ->
-      env_wt D env ->
-      theta_wt Q env S ->
-      stack_wf D Q env S ->
-      stack_heap_consistent D Q H S ->
-      well_typed env Q Checked e t ->
-      eval n S H e m S' H' r ->
-      stuck S' H' r ->
-      m = Unchecked \/
-      (exists (E : context) (e0 : expression),
-         r = RExpr (in_hole e0 E) /\ mode_of E = Unchecked)
-Lemma preservation : forall e D S H env Q t S' H' e',
-    @structdef_wf D ->
-    heap_wf D H ->
-    heap_wt_all D Q H ->
-    fun_wf D fenv ->
-    expr_wf D fenv e ->
-    stack_wt D S ->
-    env_wt D env ->
-    theta_wt Q env S ->
-    sub_domain env S ->
-    stack_wf D Q env S ->
-    stack_heap_consistent D Q H S ->
-    @well_typed D fenv S H env Q Checked e t ->
-    @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
-    exists env' Q',
-      sub_domain env' S' /\ stack_wf D Q' env' S' 
-        /\ stack_heap_consistent D Q' H' S' /\
-      @heap_consistent D Q H' H 
-   /\ (exists t'', (@well_typed D fenv S' H' env' Q' Checked e' t'' /\
-            (exists tx ty, cast_type_bound S' t tx /\ cast_type_bound S' t'' ty /\ subtype D Q' ty tx))).
-
-
-  2: {
-    inv Heval.
-    unfold stuck,normal in Hstuck.
-    2: {
-      apply (IHn D Q s' H'0 env e' t Checked S' H'); try easy.
-      6 :{
-          Set Printing All.
-      }
-    }
-  }
-  destruct r.
-  - pose proof (wt_dec D S' H' empty_env empty_theta Checked e0 t).
-    destruct H0.
-    (* e0 is well typed *)
-    + remember (RExpr e0) as r.
-      induction Heval; subst.
-      * inv Heqr.
-        assert (value D e0 \/ reduces D (fenv empty_env) S H e0 \/ unchecked Checked e0).
-        { apply progress with (t := t); eauto. }
-        destruct H0.
-        unfold stuck in Hstuck.
-        destruct Hstuck.
-        exfalso. apply H2. assumption.
-        destruct H0.
-        unfold stuck in Hstuck.
-        destruct Hstuck.
-        unfold normal in H1.
-        unfold reduces in H0.
-        exfalso. apply H1.
-        assumption.
-        unfold unchecked in H0.
-        destruct H0.
-        inversion H0.
-        right. destruct H0. destruct H0. destruct H0.
-        exists x0.
-        exists x.
-        split.
-        rewrite H0. reflexivity.
-        assumption.
-      * apply IHHeval.
-        inv H0. eapply heap_wf_step; eauto.
-        inv H0. eapply heap_wt_step;eauto.
-        inv H0. admit. admit. admit. admit. admit. admit. admit.
-      * left. reflexivity.
-    (* e0 is not well typed *)
-    + remember (RExpr e0) as r.
-      induction Heval; subst.
-      * inv Heqr.
-        exfalso.
-        apply n.
-        assumption.
-      * apply IHHeval.
-        inv H0. eapply heap_wf_step; eauto. admit. admit. admit. admit. admit. admit. admit. admit.
-      * left. reflexivity.
-  - left.
-    clear Hstuck.
-    remember RNull as r.
-    induction Heval; subst.
-    + inversion Heqr.
-    + apply IHHeval; try reflexivity.
-      inv H0.
-      eapply heap_wf_step; eauto. admit. admit. admit. admit. admit. 
-    + reflexivity.
-  - left.
-    clear Hstuck.
-    remember RBounds as r.
-    induction Heval; subst.
-    + inversion Heqr.
-    + apply IHHeval; try reflexivity.
-      inv H0.
-      eapply heap_wf_step; eauto.
-      admit. admit. admit. admit. admit.
-    + reflexivity.
-Admitted.
+  inv H2.
+  eapply heap_wf_step; eauto.
+  inv H2.
+  eapply heap_wt_step;eauto.
+  eapply expr_wf_reduce;eauto.
+  inv H2.
+  eapply stack_simple_prop with (e := e0); eauto.
+  apply stack_wf_sub in HSwf. apply HSwf.
+  apply expr_wf_in_hole in Hewf. easy.
+  rewrite H0. easy.
+  rewrite H0. easy.
+  left. easy.
+Qed.
 
