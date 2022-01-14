@@ -397,7 +397,7 @@ Inductive expression : Type :=
   | EVar : var -> expression
   | EStrlen : var -> expression
   | ECall : funid -> list expression -> expression
-  | ERet : var -> Z* type -> option (Z * type) -> expression -> expression (* return new value, old value and the type. *)
+  | ERet : var -> Z* type -> expression -> expression (* return new value, old value and the type. *)
   | EDynCast : type -> expression -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : type -> expression
@@ -431,11 +431,12 @@ Definition is_array_ptr (t:type) : Prop :=
              | _ => False
   end.
 
-
+(*
 Definition simple_option (D : structdef) (a:option (Z*type)) :=
   match a with None => True
          | Some (v,t) => word_type t /\ type_wf D t /\ simple_type t
   end.
+*)
 
 Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
   | WFELit : forall n t,
@@ -452,7 +453,8 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
       (forall e, In e el -> (exists n t, e = ELit n t
                  /\ word_type t /\ type_wf D t /\ simple_type t) \/ (exists y, e = EVar y)) ->
       expr_wf D F (ECall x el)
-  | WFRet : forall x old a e, simple_option D (Some old) -> simple_option D a -> expr_wf D F e -> expr_wf D F (ERet x old a e)
+  | WFRet : forall x a e, word_type (snd a) /\ type_wf D (snd a) /\ simple_type (snd a)
+          -> expr_wf D F e -> expr_wf D F (ERet x a e)
   | WFEDynCast : forall t e, 
      is_array_ptr t -> type_wf D t -> expr_wf D F e -> expr_wf D F (EDynCast t e)
   | WFELet : forall x e1 e2,
@@ -635,7 +637,7 @@ Inductive context : Type :=
   | CDeref : context -> context
   | CAssignL : context -> expression -> context
   | CAssignR : Z -> type -> context -> context
-  | CRet : var -> (Z*type) -> option (Z * type) -> context -> context
+  | CRet : var -> (Z*type) -> context -> context
   | CIf : context -> expression -> expression -> context
   | CUnchecked : context -> context.
 
@@ -651,7 +653,7 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   | CDeref E' => EDeref (in_hole e E')
   | CAssignL E' e' => EAssign (in_hole e E') e'
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
-  | CRet x old a E' => ERet x old a (in_hole e E')
+  | CRet x a E' => ERet x a (in_hole e E')
   | CIf E' e1 e2 => EIf (in_hole e E') e1 e2
   | CUnchecked E' => EUnchecked (in_hole e E')
   end.
@@ -669,7 +671,7 @@ Fixpoint mode_of (E : context) : mode :=
   | CDeref E' => mode_of E'
   | CAssignL E' _ => mode_of E'
   | CAssignR _ _ E' => mode_of E'
-  | CRet x old a E' => mode_of E'
+  | CRet x a E' => mode_of E'
   | CIf E' e1 e2 => mode_of E'
   | CUnchecked E' => Unchecked
   end.
@@ -686,7 +688,7 @@ Fixpoint compose (E_outer : context) (E_inner : context) : context :=
   | CDeref E' => CDeref (compose E' E_inner)
   | CAssignL E' e' => CAssignL (compose E' E_inner) e'
   | CAssignR n t E' => CAssignR n t (compose E' E_inner)
-  | CRet x old a E' => CRet x old a (compose E' E_inner)
+  | CRet x a E' => CRet x a (compose E' E_inner)
   | CIf E' e1 e2 => CIf (compose E' E_inner) e1 e2
   | CUnchecked E' => CUnchecked (compose E' E_inner)
   end.
@@ -903,7 +905,7 @@ Inductive gen_rets  (AS: list (var*bound)) (S: stack) : list (var * type) -> lis
    gen_rets_empty : forall e, gen_rets AS S [] [] e e
   | gen_rets_many : forall x t t' xl e1 v es e2 e',  gen_rets AS S xl es e2 e' ->
           eval_arg S e1 (subst_type AS t) (ELit v t') ->
-          gen_rets AS S ((x,t)::xl) (e1::es) e2 (ERet x (v,t') (Stack.find x S) e').
+          gen_rets AS S ((x,t)::xl) (e1::es) e2 (ERet x (v,t') e').
 
 (* Checked C semantics. *)
 Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * expression * mode)) : stack -> heap 
@@ -938,13 +940,14 @@ Inductive step (D : structdef) (F:funid -> option (list (var * type) * type * ex
   | SLet : forall s H x n t e t',
       cast_type_bound s t t' ->
       step D F s H (ELet x (ELit n t) e) (Stack.add x (n,t') s) H 
-                     (RExpr (ERet x (n,t') (Stack.find x s) e))
-
+                     (RExpr (ERet x (n,t') e))
+(*
   | SRetSome : forall s H x a ta ntb n t, 
           step D F s H (ERet x ntb (Some (a,ta)) (ELit n t))
                   (Stack.add x (a,ta) s) H (RExpr (ELit n t))
+*)
   | SRetNone : forall s H x ntb n t, 
-          step D F s H (ERet x ntb None (ELit n t))
+          step D F s H (ERet x ntb (ELit n t))
                   (Stack.remove x s) H (RExpr (ELit n t))
   | SPlusChecked : forall s H n1 t1 n2,
       n1 > 0 -> is_check_array_ptr t1 -> 
@@ -1591,19 +1594,17 @@ Inductive well_typed { D : structdef } {F : FEnv} {S:stack} {H:heap}
       ~ In x (get_tvars t) ->
       well_typed env Q m (ELet x e1 e2) t
 
-  | TyRetTNat : forall env Q m x na a e t,
+  | TyRetTNat : forall env Q m x na e t,
       Env.In x env ->
       In x (get_tvars t) ->
       well_typed env Q m e t ->
-      elem_make_sense D Q H a ->
-      well_typed env Q m (ERet x (na,TNat) a e) (subst_type [(x,(Num na))] t)
+      well_typed env Q m (ERet x (na,TNat) e) (subst_type [(x,(Num na))] t)
 
-  | TyRet : forall env Q m x na ta a e t,
+  | TyRet : forall env Q m x na ta e t,
       Env.In x env ->
       well_typed env Q m e t ->
       ~ In x (get_tvars t) ->
-      elem_make_sense D Q H a ->
-      well_typed env Q m (ERet x (na,ta) a e) t
+      well_typed env Q m (ERet x (na,ta) e) t
 
   | TyPlus : forall env Q m e1 e2,
       well_typed env Q m e1 (TNat) ->
@@ -1726,8 +1727,8 @@ Inductive well_typed { D : structdef } {F : FEnv} {S:stack} {H:heap}
       join_type D Q S t2 t3 t4 -> 
       well_typed env Q m (EIf e1 e2 e3) t4. 
 
-Definition fun_wf (D : structdef) (F:FEnv) (H:heap) :=
-     forall env env' S f tvl t e m, F env f = Some (tvl,t,e,m) -> 
+Definition fun_wf (D : structdef) (F:FEnv) :=
+     forall H env env' S f tvl t e m, F env f = Some (tvl,t,e,m) -> 
           gen_arg_env env tvl env' ->
           (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D t' /\ well_bound_vars_type tvl t') /\
           (forall a, In a tvl -> ~ Env.In (fst a) env) /\
@@ -3020,7 +3021,7 @@ Proof.
   assert (length es = length tvl). inv H. easy.
   apply IHtvl with (AS:= AS) (S := S) (S' := s') (e := e) in H0; try easy.
   destruct H0. 
-  exists (ERet x (n,t') (Stack.find x S) x0).
+  exists (ERet x (n,t') x0).
   constructor. easy. easy.
 Qed.
 
@@ -3064,20 +3065,43 @@ Proof.
 Qed.
 *)
 
+Lemma stack_wf_sub : forall D Q env S, stack_wf D Q env S -> sub_domain env S.
+Proof.
+  intros. unfold stack_wf,sub_domain in *.
+  intros. destruct H0. apply H in H0.
+  destruct H0. destruct H0. destruct H0.
+  exists (x1,x3). easy.
+Qed.
+
+(* Define the property of a stack. *)
+Definition stack_wt D (S:stack) := 
+    forall x v t, Stack.MapsTo x (v,t) S -> word_type t /\ type_wf D t /\ simple_type t.
+
+Definition env_wt D (env : env) :=
+    forall x t, Env.MapsTo x t env -> word_type t /\ type_wf D t /\ well_type_bound_in env t.
+
+Definition theta_wt (Q:theta) (env:env) (S:stack) :=
+     (forall x, Theta.In x Q -> Env.In x env)
+  /\ (forall x n ta, Theta.MapsTo x GeZero Q -> Stack.MapsTo x (n,ta) S -> 0 <= n).
+
 
 (* The Type Progress Theorem *)
-Lemma progress : forall D s H m e t,
+Lemma progress : forall D Q H s env m e t,
     structdef_wf D ->
     heap_wf D H ->
+    fun_wf D fenv ->
     expr_wf D fenv e ->
-    fun_wf D fenv H ->
-    @well_typed D fenv s H empty_env empty_theta m e t ->
+    stack_wt D s ->
+    env_wt D env ->
+    theta_wt Q env s ->
+    stack_wf D Q env s ->
+    stack_heap_consistent D Q H s ->
+    @well_typed D fenv s H env Q m e t ->
     value D e \/
-    reduces D (fenv empty_env) s H e \/
+    reduces D (fenv env) s H e \/
     unchecked m e.
 Proof with eauto 20 with Progress.
-  intros D st H m e t HDwf HHwf Hewf Hfun Hwt.
-  remember empty_env as env.
+  intros D Q H st env m e t HDwf HHwf Hfun Hewf HSwt Henv HQt HSwf HSHwf Hwt.
   induction Hwt as [
                      env Q m n t HTyLit                                         | (* Literals *)
                      env Q m x t Wb                                             | (* Variables *)
@@ -3086,8 +3110,8 @@ Proof with eauto 20 with Progress.
                      env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
                      env Q m x e1 e2 t b Alpha HTy1 IH1 HTy2 IH2 Hx Hdept       | (* Let-Nat-Expr *)
                      env Q m x e1 t1 e2 t Alpha HTy1 IH1 HTy2 IH2 Hx            | (* Let-Expr *)
-                     env Q m x na a e t HIn Hx HTy1 IH1 HSense                  | (* RetNat *)
-                     env Q m x na ta a e t HIn HTy1 IH1 Hx HSense               | (* Ret *)
+                     env Q m x na e t HIn Hx HTy1 IH1                           | (* RetNat *)
+                     env Q m x na ta e t HIn HTy1 IH1 Hx                        | (* Ret *)
                      env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
                      env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
                      env Q m w Wb                                               | (* Malloc *)
@@ -3116,7 +3140,13 @@ Proof with eauto 20 with Progress.
     inv Hewf. apply VLit. 1-3:assumption.
   (* Case: TyVar *)
   - (* Impossible, since environment is empty *)
-    inversion Wb.
+    right. left. 
+    apply HSwf in Wb as eq1.
+    destruct eq1 as [va [ta [tb [X1 [X2 X3]]]]].
+    eapply step_implies_reduces.
+    Check SVar.
+    apply (SVar D (fenv env) st H x va tb); try easy.
+(*
   - (* Call Case *)
     right. left. inv Hewf.
     specialize (well_typed_args_same_length D Q H empty_env AS es tvl HArg) as X1.
@@ -3152,7 +3182,7 @@ Proof with eauto 20 with Progress.
       left.  
       inv HVal1...
       apply (step_implies_reduces D (fenv empty_env) H st 
-              (ELet x (ELit n t0) e2) H (Stack.add x (n, t0) st) (RExpr(ERet x (n,t0) (Stack.find x st) e2))).
+              (ELet x (ELit n t0) e2) H (Stack.add x (n, t0) st) (RExpr(ERet x (n,t0) e2))).
       apply SLet.
       apply simple_type_means_cast_same. easy.
     (* Case: `e1` reduces *)
@@ -3177,7 +3207,7 @@ Proof with eauto 20 with Progress.
       left.  
       inv HVal1...
       apply (step_implies_reduces D (fenv empty_env) H st 
-              (ELet x (ELit n t0) e2) H (Stack.add x (n, t0) st) (RExpr(ERet x (n,t0) (Stack.find x st) e2))).
+              (ELet x (ELit n t0) e2) H (Stack.add x (n, t0) st) (RExpr(ERet x (n,t0) e2))).
       apply SLet.
       apply simple_type_means_cast_same.
       easy.
@@ -5310,14 +5340,10 @@ Proof with eauto 20 with Progress.
       right.
       ctx (EIf e1 e2 e3) (in_hole e1 (CIf CHole e2 e3)).
       destruct HUnchk1...
-Qed.
+*)
+Admitted.
 
-(* Define the property of a stack. *)
-Definition stack_wt D (S:stack) := 
-    forall x v t, Stack.MapsTo x (v,t) S -> word_type t /\ type_wf D t /\ simple_type t.
 
-Definition env_wt D (env : env) :=
-    forall x t, Env.MapsTo x t env -> word_type t /\ type_wf D t /\ well_type_bound_in env t.
 
 (*
 Lemma stack_simple_aux : forall D S x, stack_wf D (add_nt_one S x) -> stack_wf D S.
@@ -5497,7 +5523,7 @@ Qed.
 
 Lemma stack_simple_prop : forall D env S H S' H' e e',
          sub_domain env S ->
-         fun_wf D fenv H' -> expr_wf D fenv e -> stack_wt D S ->
+         fun_wf D fenv -> expr_wf D fenv e -> stack_wt D S ->
             step D (fenv env) S H e S' H' (RExpr e') -> stack_wt D S'.
 Proof.
   intros.
@@ -5521,7 +5547,7 @@ Proof.
   unfold fun_wf in *.
   specialize (gen_arg_env_good tvl env0) as X1.
   destruct X1.
-  specialize (H1 env0 x1 s' x tvl t e m H4 H9).
+  specialize (H1 H env0 x1 s' x tvl t e m H4 H9).
   specialize (sub_domain_grows tvl el env0 x1 s s' AS H9 H6 H0) as eq1.
   destruct H1.
   destruct (H1 x0 t0 H8). easy.
@@ -5536,12 +5562,6 @@ Proof.
   apply cast_means_simple_type with (s := s) (t := t). easy.
   apply Stack.add_3 in H5.
   apply H3 in H5. easy. easy.
-  inv H2. unfold simple_option in *.
-  unfold stack_wt in *. intros.
-  destruct (Nat.eq_dec x x0). subst.
-  apply Stack.mapsto_add1 in H2. inv H2. easy.
-  apply Stack.add_3 in H2.
-  apply H3 in H2. easy. easy.
   unfold stack_wt in *.
   intros.
   apply Stack.remove_3 in H4.
@@ -6621,10 +6641,6 @@ Proof.
 Admitted.
 
 
-Definition theta_wt (Q:theta) (env:env) (S:stack) :=
-     (forall x, Theta.In x Q -> Env.In x env)
-  /\ (forall x n ta, Theta.MapsTo x GeZero Q -> Stack.MapsTo x (n,ta) S -> 0 <= n).
-
 Lemma stack_wf_core : forall D Q env S, stack_wf D Q env S ->
     (forall x n t ta, Env.MapsTo x t env -> Stack.MapsTo x (n,ta) S ->
            (exists t', cast_type_bound S t t' /\ subtype D Q ta t')).
@@ -6849,17 +6865,14 @@ Proof.
   assert (In (x, t) ((x, t) :: xl)). simpl in *. left. easy.
   apply eq1 in H4. destruct H4.
   constructor.
-  inv H3.
-  unfold simple_option. split.
+  simpl. inv H3.
+  split.
   apply cast_word_type in H10; try easy.
   apply subst_type_word_type. easy.
   split.
   apply cast_type_wf with (D:= D) in H10; try easy.
   apply subst_type_type_wf. easy.
   apply cast_means_simple_type in H10. easy.
-  unfold simple_option.
-  assert (In (x, t) ((x, t) :: xl)). simpl in *. left. easy.
-  apply eq1 in H3. destruct H3.
   split.
   apply cast_word_type in H12; try easy.
   apply subst_type_word_type. easy.
@@ -6867,11 +6880,6 @@ Proof.
   apply cast_type_wf with (D:= D) in H12; try easy.
   apply subst_type_type_wf. easy.
   apply cast_means_simple_type in H12. easy.
-  unfold simple_option.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2.
-  destruct p. unfold stack_wt in *.
-  apply Stack.find_2 in eq2.
-  apply H in eq2. easy. easy.
   apply IHgen_rets; try easy. intros.
   specialize (H2 x0 t'0).
   assert (In (x0, t'0) ((x, t) :: xl)). simpl. right. easy.
@@ -6905,38 +6913,22 @@ Proof.
   apply tmem_in in eq1. inv H15.
   apply TyRetTNat.
   specialize (H4 x TNat). simpl in *. exists TNat. apply H4. left. easy. easy. easy.
-  unfold elem_make_sense.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2. destruct p.
-  apply Stack.find_2 in eq2.
-  apply H5 in eq2. easy. easy.
   assert (~ In x (get_tvars t'1)).
   intros R. apply tmem_in in R.
   rewrite eq1 in R. easy.
   inv H15. apply TyRet.
   specialize (H4 x TNat). simpl in *. exists TNat. apply H4. left. easy. easy. easy.
-  unfold elem_make_sense.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2. destruct p.
-  apply Stack.find_2 in eq2.
-  apply H5 in eq2. easy. easy.
   inv H13.
   apply Stack.find_1 in H12. rewrite H12 in *.
   destruct (tmem (get_tvars t'1) x) eqn:eq1.
   apply tmem_in in eq1. inv H15.
   apply TyRetTNat.
   specialize (H4 x TNat). simpl in *. exists TNat. apply H4. left. easy. easy. easy.
-  unfold elem_make_sense.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2. destruct p.
-  apply Stack.find_2 in eq2.
-  apply H5 in eq2. easy. easy.
   assert (~ In x (get_tvars t'1)).
   intros R. apply tmem_in in R.
   rewrite eq1 in R. easy.
   inv H15. apply TyRet.
   specialize (H4 x TNat). simpl in *. exists TNat. apply H4. left. easy. easy. easy.
-  unfold elem_make_sense.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2. destruct p.
-  apply Stack.find_2 in eq2.
-  apply H5 in eq2. easy. easy.
   assert (match t0 with
       | TNat =>
           match e1 with
@@ -6959,7 +6951,7 @@ Proof.
   destruct t0; try easy. rewrite H7 in *. clear H7.
   inv H15.
   inv H0.
-  specialize (well_typed_type_nat D F S' H env0 Q m e' t'0 H14 H13) as eq1.
+  specialize (well_typed_type_nat D F S' H env0 Q m e' t'0 H14 H11) as eq1.
   apply TyRet.
   specialize (H4 x t0) as eq2.
   simpl in *. exists t0. apply eq2; try easy. left. easy.
@@ -6972,10 +6964,6 @@ Proof.
   apply eq2 in H0.
   apply Env.mapsto_always_same with (v1 := TNat) in H0; try easy.
   rewrite <- H0 in *. contradiction.
-  unfold elem_make_sense.
-  destruct (Stack.find (elt:=Z * type) x S) eqn:eq2. destruct p.
-  apply Stack.find_2 in eq2.
-  apply H5 in eq2. easy. easy.
   inv H0. easy.
   intros. apply H4. simpl. right. easy.
 Qed.
@@ -7186,30 +7174,27 @@ Lemma preservation : forall e D S H env Q t S' H' e',
     @structdef_wf D ->
     heap_wf D H ->
     heap_wt_all D Q H ->
-    fun_wf D fenv H ->
+    fun_wf D fenv ->
     expr_wf D fenv e ->
     stack_wt D S ->
     env_wt D env ->
     theta_wt Q env S ->
-    sub_domain env S ->
     stack_wf D Q env S ->
     stack_heap_consistent D Q H S ->
     @well_typed D fenv S H env Q Checked e t ->
     @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
-    exists env' Q',
-      sub_domain env' S' /\ stack_wf D Q' env' S' 
+    exists env' Q', stack_wf D Q' env' S' 
         /\ stack_heap_consistent D Q' H' S' /\
       @heap_consistent D Q H' H 
    /\ (exists t'', (@well_typed D fenv S' H' env' Q' Checked e' t'' /\
             (exists tx ty, cast_type_bound S' t tx /\ cast_type_bound S' t'' ty /\ subtype D Q' ty tx))).
 Proof with eauto 20 with Preservation.
   induction e; intros D s H env Q ta s' H' e'
-     HDwf HHwf HHWt HFun HEwf Hswt Henvt HQt HSubDom HSwf HSHwf Hwt Hreduces; subst.
+     HDwf HHwf HHWt HFun HEwf Hswt Henvt HQt HSwf HSHwf Hwt Hreduces; subst.
   - inv Hwt. exfalso. eapply lit_are_nf...
   (* T-Var *)
   - inv Hwt. inv Hreduces.
     destruct E; inversion H1; simpl in *; subst. inv H6. exists env. exists Q.
-    split. easy.
     split. assumption.
     split. easy.
     split. unfold heap_consistent. eauto.
@@ -7224,6 +7209,7 @@ Proof with eauto 20 with Preservation.
     split. apply simple_type_means_cast_same.
     unfold stack_wt in *.
     specialize (Hswt v v0 t H11). easy. easy.
+(*
   (*T-Strlen*)
   - inv Hwt. inv Hreduces.
     destruct E; inversion H1; simpl in *; subst. inv H6. exists env. exists Q.
@@ -9028,6 +9014,7 @@ Proof with eauto 20 with Preservation.
       * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
         split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
 *)
+*)
 Admitted.
 
 (* ... for Blame *)
@@ -9136,16 +9123,16 @@ Definition stuck { D : structdef } {F:funid -> option (list (var * type) * type 
   end.
 
 Inductive eval { D : structdef } {F:funid -> option (list (var * type) * type * expression * mode)} :
-    stack -> heap -> expression -> mode -> stack -> heap -> result -> Prop :=
-  | eval_refl   : forall S H e m, eval S H e m S H (RExpr e)
-  | eval_transC : forall S H S' H' S'' H'' e e' r,
-      @reduce D F S H e Checked S' H' (RExpr e') ->
-      eval S' H' e' Checked S'' H'' r ->
-      eval S H e Checked S'' H'' r
-  | eval_transU : forall S H S' H' S'' H'' m' e e' r,
-      @reduce D F S H e Unchecked S' H' (RExpr e') ->
-      eval S' H' e' m' S'' H'' r ->
-      eval S H e Unchecked S'' H'' r.
+    nat -> stack -> heap -> expression -> mode -> stack -> heap -> result -> Prop :=
+  | eval_refl   : forall n S H e m, eval n S H e m S H (RExpr e)
+  | eval_transC : forall n s H s' H' s'' H'' e e' r,
+      @reduce D F s H e Checked s' H' (RExpr e') ->
+      eval n s' H' e' Checked s'' H'' r ->
+      eval (S n) s H e Checked s'' H'' r
+  | eval_transU : forall n s H s' H' s'' H'' m' e e' r,
+      @reduce D F s H e Unchecked s' H' (RExpr e') ->
+      eval n s' H' e' m' s'' H'' r ->
+      eval (S n) s H e Unchecked s'' H'' r.
 
 Lemma wt_dec : forall D S H Q env m e t, { @well_typed D fenv S H Q env m e t }
            + { ~ @well_typed D fenv S H Q env m e t }.
@@ -9153,21 +9140,106 @@ Lemma wt_dec : forall D S H Q env m e t, { @well_typed D fenv S H Q env m e t }
 Admitted.
 
 (* The Blame Theorem. *)
-Theorem blame : forall D S H e t m S' H' r,
+Theorem blame : forall n D Q S H env e t m S' H' r,
     @structdef_wf D ->
     heap_wf D H ->
-    heap_wt_all D empty_theta H ->
-    fun_wf D fenv H ->
-    stack_wt D S ->
+    heap_wt_all D Q H ->
+    fun_wf D fenv ->
     @expr_wf D fenv e ->
-    @well_typed D fenv S H empty_env empty_theta Checked e t ->
-    @eval D (fenv empty_env) S H e m S' H' r ->
-    @stuck D (fenv empty_env) S' H' r ->
+    stack_wt D S ->
+    env_wt D env ->
+    theta_wt Q env S ->
+    stack_wf D Q env S ->
+    stack_heap_consistent D Q H S ->
+    @well_typed D fenv S H env Q Checked e t ->
+    @eval D (fenv env) n S H e m S' H' r ->
+    @stuck D (fenv env) S' H' r ->
     m = Unchecked \/ (exists E e0, r = RExpr (in_hole e0 E) /\ mode_of E = Unchecked).
 Proof.
-  intros D S H e t m S' H' r HDwf HHwf HHwt Hfun HSwt Hewf Hwt Heval Hstuck.
+  induction n;
+  intros D Q S H env e t m S' H' r HDwf HHwf HHwt Hfun Hewf HSwt HEnv HQt HSwf HSHwf Hwt Heval Hstuck.
+  inv Heval. destruct m.
+  unfold stuck,normal in Hstuck.
+  destruct Hstuck.
+  specialize (progress D Q H' S' env Checked e t
+    HDwf HHwf Hfun Hewf HSwt HEnv HQt HSwf HSHwf Hwt) as eq1.
+  destruct eq1. easy.
+  destruct H1. unfold reduces in *. easy.
+  unfold unchecked in *. destruct H1. left. easy.
+  right. destruct H1 as [ea [Ea [X1 X2]]].
+  exists Ea. exists ea. split. rewrite X1. easy. easy.
+  left. easy.
+  inv Heval. destruct m.
+  unfold stuck,normal in Hstuck.
+  destruct Hstuck.
+  specialize (progress D Q H' S' env Checked e t
+    HDwf HHwf Hfun Hewf HSwt HEnv HQt HSwf HSHwf Hwt) as eq1.
+  destruct eq1. easy.
+  destruct H1. unfold reduces in *. easy.
+  unfold unchecked in *. destruct H1. left. easy.
+  right. destruct H1 as [ea [Ea [X1 X2]]].
+  exists Ea. exists ea. split. rewrite X1. easy. easy.
+  left. easy.
+  specialize (preservation e D S H env Q t s' H'0 e'
+     HDwf HHwf HHwt Hfun Hewf HSwt HEnv HQt HSwf HSHwf Hwt H2) as eq1.
+  destruct eq1 as [env' [Q' [HSwf' [HSHwf' [HC [ta [Hwt' [tb [tc [X1 [X2 X3]]]]]]]]]]].
+
+  apply (IHn D Q' s' H'0 env' e' ta Checked S' H' r); try easy.
+
+    Set Printing All.
+IHn : forall (D : structdef) (Q : theta) (S : stack) 
+        (H : heap) (env : env) (e : expression) 
+        (t : type) (m : mode) (S' : stack) (H' : heap) 
+        (r : result),
+      structdef_wf D ->
+      heap_wf D H ->
+      heap_wt_all D Q H ->
+      fun_wf D fenv ->
+      expr_wf D fenv e ->
+      stack_wt D S ->
+      env_wt D env ->
+      theta_wt Q env S ->
+      stack_wf D Q env S ->
+      stack_heap_consistent D Q H S ->
+      well_typed env Q Checked e t ->
+      eval n S H e m S' H' r ->
+      stuck S' H' r ->
+      m = Unchecked \/
+      (exists (E : context) (e0 : expression),
+         r = RExpr (in_hole e0 E) /\ mode_of E = Unchecked)
+Lemma preservation : forall e D S H env Q t S' H' e',
+    @structdef_wf D ->
+    heap_wf D H ->
+    heap_wt_all D Q H ->
+    fun_wf D fenv ->
+    expr_wf D fenv e ->
+    stack_wt D S ->
+    env_wt D env ->
+    theta_wt Q env S ->
+    sub_domain env S ->
+    stack_wf D Q env S ->
+    stack_heap_consistent D Q H S ->
+    @well_typed D fenv S H env Q Checked e t ->
+    @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
+    exists env' Q',
+      sub_domain env' S' /\ stack_wf D Q' env' S' 
+        /\ stack_heap_consistent D Q' H' S' /\
+      @heap_consistent D Q H' H 
+   /\ (exists t'', (@well_typed D fenv S' H' env' Q' Checked e' t'' /\
+            (exists tx ty, cast_type_bound S' t tx /\ cast_type_bound S' t'' ty /\ subtype D Q' ty tx))).
+
+
+  2: {
+    inv Heval.
+    unfold stuck,normal in Hstuck.
+    2: {
+      apply (IHn D Q s' H'0 env e' t Checked S' H'); try easy.
+      6 :{
+          Set Printing All.
+      }
+    }
+  }
   destruct r.
-(*
   - pose proof (wt_dec D S' H' empty_env empty_theta Checked e0 t).
     destruct H0.
     (* e0 is well typed *)
@@ -9199,16 +9271,7 @@ Proof.
       * apply IHHeval.
         inv H0. eapply heap_wf_step; eauto.
         inv H0. eapply heap_wt_step;eauto.
-        inv H0. eapply stack_wt_step;eauto.
-        eapply expr_wf_reduce; eauto.
-        assert (@heap_consistent D empty_theta H' H
-              /\ @well_typed D (fenv) S' H' empty_env empty_theta Checked e' t).
-        { apply preservation with (e := e); assumption. }
-        destruct H1.
-        assumption.
-        reflexivity.
-        assumption.
-        assumption.
+        inv H0. admit. admit. admit. admit. admit. admit. admit.
       * left. reflexivity.
     (* e0 is not well typed *)
     + remember (RExpr e0) as r.
@@ -9218,15 +9281,7 @@ Proof.
         apply n.
         assumption.
       * apply IHHeval.
-        inv H0. eapply heap_wf_step; eauto.
-        eapply expr_wf_reduce; eauto.
-        assert (@heap_consistent D H' H /\ @well_typed D H' empty_env Checked e' t).
-        { apply preservation with (e := e); assumption. }
-        destruct H1.
-        assumption.
-        reflexivity.
-        assumption.
-        assumption.
+        inv H0. eapply heap_wf_step; eauto. admit. admit. admit. admit. admit. admit. admit. admit.
       * left. reflexivity.
   - left.
     clear Hstuck.
@@ -9235,12 +9290,7 @@ Proof.
     + inversion Heqr.
     + apply IHHeval; try reflexivity.
       inv H0.
-      eapply heap_wf_step; eauto.
-      eapply expr_wf_reduce; eauto.
-      assert (@heap_consistent D H' H /\ @well_typed D H' empty_env Checked e' t).
-      { apply preservation with (e := e); eauto. }
-      destruct H1.
-      apply H2.
+      eapply heap_wf_step; eauto. admit. admit. admit. admit. admit. 
     + reflexivity.
   - left.
     clear Hstuck.
@@ -9250,13 +9300,7 @@ Proof.
     + apply IHHeval; try reflexivity.
       inv H0.
       eapply heap_wf_step; eauto.
-      eapply expr_wf_reduce; eauto.
-      assert (@heap_consistent D H' H /\ @well_typed D H' empty_env Checked e' t).
-      { apply preservation with (e := e); eauto. }
-      destruct H1.
-      apply H2.
+      admit. admit. admit. admit. admit.
     + reflexivity.
-Qed. 
-*)
 Admitted.
 
