@@ -210,7 +210,7 @@
    (--> (eH (in-hole eE (* n)))
         (eH (in-hole eE n_0))
         (where n_0 (⊢eheap-lookup eH n))
-        eE-Deref)
+        eE-Def)
 
    ;; don't forget the underscore!!!!!
    (--> (eH (in-hole eE (* n = n_0)))
@@ -289,7 +289,7 @@
    (--> (eH eΣ (* n) (eK ...))
         (eH eΣ n_0 (eK ...))
         (where n_0 (⊢eheap-lookup eH n))
-        eE-Deref)
+        eE-Def)
 
    (--> (eH eΣ (* n = n_0) (eK ...))
         (eH_′ eΣ n_0 (eK ...))
@@ -428,11 +428,11 @@
 
    (--> (eH eΣ (* eS) (eK ...))
         (eH eΣ eS ((* []) eK ...))
-        eE-Deref-Eval)
+        eE-Def-Eval)
 
    (--> (eH eΣ i ((* []) eK ...))
         (eH eΣ (* i) (eK ...))
-        eE-Deref-Cont)
+        eE-Def-Cont)
 
    (--> (eH eΣ (x = eS) (eK ...))
         (eH eΣ eS ((x = []) eK ...))
@@ -512,172 +512,179 @@
 
   [(⊢↝/name (H (let x = (n_0 : vτ_0) in (in-hole E (x + i_0))))
        (H (let x = (n_0 : vτ_0) in (in-hole E i_1))
-          E-VarTy))
+          S-VarTy))
    (where i_1 ,(+ (term n_0) (term i_0)))
-   E-VarTy]
+   S-VarTy]
 
-  [(⊢↝/name (H (let x = (n_0 : vτ_0)  in (n_2 : vτ_2))) (H (n_2 : vτ_2) E-Let))
-   E-Let]
+  ;; popping the stack
+  [(⊢↝/name (H (let x = (n_0 : vτ_0)  in (n_2 : vτ_2))) (H (n_2 : vτ_2) S-Let))
+   S-Let]
 
-  [(⊢↝/name (H (let x = (n : vτ) in (name e (in-hole E x)))) (H (let x = (n : vτ) in (in-hole E (n : vτ))) E-VarNonNT))
+  ;; The non-nt-deref-or-strlen? precondition ensures the if (* x) case is prioritized
+  ;; over the normal variable substitution case 
+  [(⊢↝/name (H (let x = (n : vτ) in (name e (in-hole E x)))) (H (let x = (n : vτ) in (in-hole E (n : vτ))) S-VarNonNT))
    (where #t (⊢non-nt-deref-or-strlen? vτ e))
-   E-VarNonNT]
+   S-VarNonNT]
 
-  [(⊢↝/name (H (let x = (n : vτ_1) in (in-hole E (* x)))) (H (let x = (n : vτ_2) in (in-hole E (n_′ : vτ_′))) E-VarNT-Incr))
+  ;; S-IfNTT
+  [(⊢↝/name (H (let x = (n : vτ_1) in (in-hole E (* x)))) (H (let x = (n : vτ_2) in (in-hole E (n_′ : vτ_′))) S-VarNT-Incr))
    (where (n_′ : vτ_′) (⊢heap-lookup H n))
    (where #f ,(zero? (term n_′)))
    (where vτ_2 (⊢nt-incr vτ_1))
-   E-VarNT-Incr]
+   S-VarNT-Incr]
 
-  [(⊢↝/name (H (let x = (n : vτ_1) in (in-hole E (* x)))) (H (let x = (n : vτ_1) in (in-hole E (* (n : vτ_1)))) E-VarNT-Sub))
+  [(⊢↝/name (H (let x = (n : vτ_1) in (in-hole E (* x)))) (H (let x = (n : vτ_1) in (in-hole E (* (n : vτ_1)))) S-VarNT-Sub))
    (side-condition ,(let ([i (term (⊢heap-lookup H n))])
                       (or (not i)
                           (zero? (first i)))))
-   E-VarNT-Sub]
+   S-VarNT-Sub]
 
   ;; this are just like their array counterparts
-  [(⊢↝/name (H (* (n : vτ))) (H Bounds X-NTDerefOOB))
+  [(⊢↝/name (H (* (n : vτ))) (H Bounds S-DefNtArrayBound))
    (where (ptr c (ntarray l h vτ_1)) vτ)
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
-   X-NTDerefOOB]
+   S-DefNtArrayBound]
 
-  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H Bounds X-NTAssignOOB))
+  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H Bounds S-AssignNtArrayBound))
    (where (ptr c (ntarray l h vτ_1)) vτ)
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(not (and (<= (term l) 0) (< 0 (term h)))))
-   X-NTAssignOOB]
+   S-AssignNtArrayBound]
 
-  [(⊢↝/name (H ((0 : vτ) + (n : vτ_′))) (H Null X-BinopNTNull))
+  [(⊢↝/name (H ((0 : vτ) + (n : vτ_′))) (H Null S-AddNtArrNull))
    (where (ptr c (ntarray l h vτ_1)) vτ)
-   X-BinopNTNull]
+   S-AddNtArrNull]
 
   ;; file a bug report on microsoft/checkedc?
-  [(⊢↝/name (H (strlen (0 : vτ))) (H Null X-StrNull))
+  [(⊢↝/name (H (strlen (0 : vτ))) (H Null S-StrNull))
    (where (ptr c (ntarray l h vτ_1)) vτ)
-   X-StrNull]
+   S-StrNull]
 
-  [(⊢↝/name (H (strlen (n : vτ))) (H Bounds X-StrOOB))
+  [(⊢↝/name (H (strlen (n : vτ))) (H Bounds S-StrBound))
    (where (ptr c (ntarray l h vτ_1)) vτ)
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
-   X-StrOOB]
+   S-StrBound]
 
-  [(⊢↝/name (H (strlen (n : vτ))) (H (n_1 : int) E-Str))
+  ;; The Redex model supports non-widening strlen
+  [(⊢↝/name (H (strlen (n : vτ))) (H (n_1 : int) S-Str))
    (where n_1 (⊢strlen n H))
    (where (ptr _ (ntarray l h vτ_1)) vτ)
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(and (<= (term l) 0) (<= 0 (term h))))
-   E-Str]
+   S-Str]
 
-  [(⊢↝/name (H (call n_1 (n_args : vτ_args) ..._1))  (H (⊢build-call-stack e (x (n_args : vτ_args)) ...) E-Fun))
+  [(⊢↝/name (H (call n_1 (n_args : vτ_args) ..._1))  (H (⊢build-call-stack e (x (n_args : vτ_args)) ...) S-Fun))
    (where (defun ((x : τ_2′) ..._1 e) : τ) (⊢fun-lookup ,(*F*) n_1))
-   E-Fun]
+   S-Fun]
 
-  [(⊢↝/name (H (dyn-bound-cast vτ (n : vτ_′))) (H (n : vτ_′) E-DynCast)) ;; note that the annotation does not change
+  [(⊢↝/name (H (dyn-bound-cast vτ (n : vτ_′))) (H (n : vτ_′) S-DynCast)) ;; note that the annotation does not change
    (where #t (⊢bounds-within vτ vτ_′)) ;; only need the ntarray/array subsumption cases
-   E-DynCast]
+   S-DynCast]
 
-  [(⊢↝/name (H (dyn-bound-cast vτ (n : vτ_′))) (H Bounds X-DynCast))
+  [(⊢↝/name (H (dyn-bound-cast vτ (n : vτ_′))) (H Bounds S-DynCastBound))
    (where #f (⊢bounds-within vτ vτ_′))
-   X-DynCast]
+   S-DynCastBound]
 
   ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   ;; Old rules
-  [(⊢↝/name (H ((n_1 : vτ_1) + (n_2 : vτ_2))) (H (n_3 : vτ_3) E-Binop))
+  [(⊢↝/name (H ((n_1 : vτ_1) + (n_2 : vτ_2))) (H (n_3 : vτ_3) S-Add))
    (where n_3 ,(+ (term n_1) (term n_2)))
    (where vτ_3 (⊢binop-type vτ_1 n_1 n_2))
-   E-Binop]
+   S-Add]
 
-  [(⊢↝/name (H (cast vτ (n : vτ_′))) (H (n : vτ) E-Cast))
-   E-Cast]
+  [(⊢↝/name (H (cast vτ (n : vτ_′))) (H (n : vτ) S-Cast))
+   S-Cast]
 
-  [(⊢↝/name (H (* (n : vτ))) (H (n_1 : vτ_1) E-Deref))
+  [(⊢↝/name (H (* (n : vτ))) (H (n_1 : vτ_1) S-Def))
    (where #t (⊢deref-ok? vτ))
    (where (n_1 : _) (⊢heap-lookup H n))
    (where vτ_1 (⊢deref-type-dyn ,(*D*) vτ))
-   E-Deref]
+   S-Def]
 
   ;; the type stored on the heap musn't change
   ;; the type attached to n_1 can stay as the evaluation result because it's all on the stack
-  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H_′ (n_1 : vτ_1) E-Assign))
+  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H_′ (n_1 : vτ_1) S-Assign))
    (where #t (⊢assign-ok? vτ))
    (where H_′ (⊢heap-update H n n_1))
-   E-Assign]
+   S-Assign]
 
-  [(⊢↝/name (H (& (n : vτ) → f_i)) (H (n_0 : vτ_0) E-Amper))
+  [(⊢↝/name (H (& (n : vτ) → f_i)) (H (n_0 : vτ_0) S-Struct))
    (where (n_0 : vτ_0) (⊢& vτ f_i n))
-   E-Amper]
+   S-Struct]
 
-  [(⊢↝/name (H (malloc vω)) (H_′ (n_1 : (ptr c vω)) E-Malloc))
+  [(⊢↝/name (H (malloc vω)) (H_′ (n_1 : (ptr c vω)) S-Malloc))
    (where (vτ_1 ...) (⊢types ,(*D*) vω))
    (where ((n : vτ) ...) H)
    (where H_′ ((n : vτ) ... (0 : vτ_1) ...))
    (where n_1 ,(add1 (length (term H))))
    (where #t (⊢malloc-type-wf vω))      ; making sure the lower bound is always 0
    (side-condition ,(positive? (term (⊢sizeof vω))))
-   E-Malloc]
+   S-Malloc]
 
-  [(⊢↝/name (H (malloc vω)) (H (0 : (ptr c vω)) E-MallocZero))
+  [(⊢↝/name (H (malloc vω)) (H (0 : (ptr c vω)) S-MallocZero))
    (where #t (⊢malloc-type-wf vω))      ; making sure the lower bound is always 0
    (side-condition ,(not (positive? (term (⊢sizeof vω)))))
-   E-MallocZero]
+   S-MallocZero]
 
-  [(⊢↝/name (H (unchecked (n : vτ))) (H (n : vτ) E-Unchecked))
-   E-Unchecked]
+  [(⊢↝/name (H (unchecked (n : vτ))) (H (n : vτ) S-Unchecked))
+   S-Unchecked]
 
-  [(⊢↝/name (H (* (n : vτ))) (H Bounds X-DerefOOB))
+  ;; array and nt-array combined in a single rule
+  [(⊢↝/name (H (* (n : vτ))) (H Bounds S-DefBound))
    (side-condition ,(not (zero? (term n))))
    (where (ptr c (array l h vτ_1)) vτ)
    (side-condition ,(not (and (<= (term l) 0) (< 0 (term h)))))
-   X-DerefOOB]
+   S-DefBound]
 
-  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H Bounds X-AssignOOB))
+  [(⊢↝/name (H (* (n : vτ) = (n_1 : vτ_1))) (H Bounds S-AssignBound))
    (side-condition ,(not (zero? (term n))))
    (where (ptr c (array l h vτ_1)) vτ)
    (side-condition ,(not (and (<= (term l) 0) (< 0 (term h)))))
-   X-AssignOOB]
+   S-AssignBound]
 
-  [(⊢↝/name (H (* (0 : vτ))) (H Null X-DerefNull))
+  [(⊢↝/name (H (* (0 : vτ))) (H Null S-DefNull))
    (where (ptr c vω) vτ)
-   X-DerefNull]
+   S-DefNull]
 
-  [(⊢↝/name (H (* (0 : vτ) = (n_1 : vτ_′))) (H Null X-AssignNull))
+  [(⊢↝/name (H (* (0 : vτ) = (n_1 : vτ_′))) (H Null S-AssignNull))
    (where (ptr c vω) vτ)
-   X-AssignNull]
+   S-AssignNull]
 
-  [(⊢↝/name (H (& (0 : vτ) → f)) (H Null X-AmperNull))
+  [(⊢↝/name (H (& (0 : vτ) → f)) (H Null S-StructNull))
    (where (ptr c (struct T)) vτ)
-   X-AmperNull]
+   S-StructNull]
 
-  [(⊢↝/name (H ((0 : vτ) + (n : vτ_′))) (H Null X-BinopNull))
+  [(⊢↝/name (H ((0 : vτ) + (n : vτ_′))) (H Null S-AddNull))
    (where (ptr c (array l h vτ_1)) vτ)
-   X-BinopNull]
+   S-AddNull]
 
-  [(⊢↝/name (H (if (n : vτ) e_1 e_2)) (H e_1 If-T))
+  [(⊢↝/name (H (if (n : vτ) e_1 e_2)) (H e_1 S-IfT))
    (side-condition ,(< (term 0) (term n)))
-   If-T]
-  [(⊢↝/name (H (if (n : vτ) e_1 e_2)) (H e_2 If-F))
+   S-IfT]
+  [(⊢↝/name (H (if (n : vτ) e_1 e_2)) (H e_2 S-IfF))
    (side-condition ,(= (term 0) (term n)))
-   If-F]
+   S-IfF]
 
   [(⊢↝/name (H (let x = (n : (ptr c (ntarray l h vτ))) in (in-hole E (strlen x))))
-       (H (let x = (n : (ptr c (ntarray l h_′ vτ))) in (in-hole E (n_1 : int))) E-VarNTstr))
+            (H (let x = (n : (ptr c (ntarray l h_′ vτ))) in (in-hole E (n_1 : int))) S-StrWiden))
    (where n_1 (⊢strlen n H))
    (where h_′ ,(max (term h) (term n_1)))
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(and (<= (term l) 0) (<= 0 (term h))))
-   E-VarNTstr]
+   S-StrWiden]
 
+  ;; extra rules for prioritizing if (* x) over plain if
   [(⊢↝/name (H (let x = (0 : (ptr c (ntarray l h vτ))) in (in-hole E (strlen x))))
-       (H Null E-VarNTNull))
-   E-VarNTNull]
+       (H Null S-VarNTNull))
+   S-VarNTNull]
 
   [(⊢↝/name (H (let x = (n : (ptr c (ntarray l h vτ))) in (in-hole E (strlen x))))
-            (H Bounds E-VarNTOOB))
+            (H Bounds S-VarNTBound))
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
-   E-VarNTOOB])
+   S-VarNTBound])
 
 
 (define-judgment-form CoreChkC+
@@ -1191,7 +1198,7 @@
                    (let x = (2 : (ptr c (ntarray 0 0 int))) in (strlen (x + (1 : int))))))
             (term (((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) Bounds)))
 
-  ;; E-VarNTstr
+  ;; S-VarNTstr
   (test--> (---> 'c)
             (term (((1 : int) (1 : int) (1 : int) (1 : int) (0 : int))
                    (let x = (2 : (ptr c (ntarray 0 0 int))) in (strlen x))))
@@ -1220,7 +1227,7 @@
 
 
 
-  ;; E-VarTy
+  ;; S-VarTy
   (test--> (---> 'c)
            (term (() (let x = (1 : int) in
                           (malloc (array (x + 0) (x + 0) int)))))
@@ -1252,7 +1259,7 @@
             (term (() (let x = (1 : int) in (let y = (0 : (ptr c (array (x + 0) 0 int))) in y))))
             (term (() (0 : (ptr c (array 1 0 int))))))
 
-  ;; E-Malloc (cases where it gets stuck)
+  ;; S-Malloc (cases where it gets stuck)
   (test-->> (---> 'c)
             (term (() (malloc (array 2 3 int))))
             (term (() (malloc (array 2 3 int)))))
@@ -1261,7 +1268,7 @@
             (term (() (malloc (array 0 3 int))))
             (term (((0 : int) (0 : int) (0 : int)) (1 : (ptr c (array 0 3 int))))))
 
-  ;; E-Malloc (empty)
+  ;; S-Malloc (empty)
   (test-->> (---> 'c)
             (term (() (malloc (array 0 -1 int))))
             (term (() (0 : (ptr c (array 0 -1 int))))))
@@ -1754,7 +1761,7 @@
 
   [(⊢wf Γ (ptr c ω))
    (where #t (⊢malloc-type-wf ω))
-   ------------- T-Malloc
+   ------------- T-Mac
    (⊢ty>>> Γ σ ρ m (malloc ω) (malloc (⊢sizeof ω)) (ptr c ω))]
 
   [(⊢ty>>> Γ σ ρ u e ee τ)
@@ -1776,11 +1783,11 @@
   [(⊢ty>>> Γ σ ρ m e ee (ptr m_′ ω))
    (where τ (⊢deref-type ω))
    (where #t (⊢mode-ok? m_′ m))
-   ------------- T-Deref
+   ------------- T-Def
    (⊢ty>>> Γ σ ρ m (* e) (⊢widen-bounds-deref ρ e (ptr m_′ ω)
                                            (* (⊢insert-check #f ρ e ee (ptr m_′ ω)))) τ)]
 
-  ;; generalize T-Index?
+  
   [(⊢ty>>> Γ σ ρ m e_1 ee_1 (ptr m_′ ω))
    (⊢ty>>> Γ σ ρ m e_2 ee_2 int)
    (where #t (⊢mode-ok? m_′ m))
@@ -1790,7 +1797,7 @@
    (where (ee_lo ee_hi) (⊢get-accurate-bounds ρ e_1 ω))
    (where (x_ee x_ee1 x_ee2)
           ,(variables-not-in (term (ee_1 ee_2 ρ ω)) '(x x x)))
-   ------------- T-Index
+   ------------- T-Ind
    (⊢ty>>> Γ σ ρ m
            (* (e_1 + e_2))
            (* (let x_ee1 = ee_1 in
@@ -2726,6 +2733,7 @@
   [('() 'Null '()) ee]
   [(_ _ _) 'stuck])
 
+;; Theorem 4: Simulation (small step version)
 (define (simulation-small-step e-conf)
   (match-let ([(list H e) e-conf])
     (let ([ee-conf (list (erase-heap H) (compile-e* e #:H H))])
@@ -2994,9 +3002,3 @@
                      (*F* 
                       '((defun ((g2556441 : int) (g2556442 : int) (g2556443 : int) (g2556444 : int) (* (let g2556445 = (malloc int) in g2556445))) : int) (defun ((g2556446 : int) (g2556447 : int) (g2556448 : int) (1 : int)) : int))))
                   (progress-preservation '(* (let g2556449 = (let g2556450 = (if (7 : int) (let g2556451 = (malloc (struct g2556435)) in g2556451) (let g2556452 = (malloc (struct g2556435)) in g2556452)) in (* (& g2556450 → g2556438))) in (let g2556453 = (dyn-bound-cast (ptr c (ntarray -9 (g2556449 + 1) int)) (let g2556454 = (malloc (ntarray 0 (g2556449 + 18) int)) in (g2556454 + (14 : int)))) in (cast (ptr c (array -9 7 int)) (let g2556455 = (let g2556457 = (malloc (ntarray 0 2 int)) in (g2556457 + (2 : int))) in (if (* g2556455 = (2 : int)) (let g2556456 = (cast (ptr c (ntarray 0 0 int)) g2556455) in (let g2556458 = (malloc (array 0 21 int)) in (g2556458 + (10 : int)))) (let g2556456 = (cast (ptr c (ntarray 0 0 int)) g2556455) in (let g2556459 = (malloc (array 0 21 int)) in (g2556459 + (10 : int))))))))) = (let g2556460 = (let g2556461 = (malloc (struct g2556435)) in g2556461) in (* (& g2556460 → g2556436)))))))))
-
-
-
-
-
-;; (* (let g2556449 = (0 : int) in (let g2556453 = (dyn-bound-cast (ptr c (ntarray -9 (g2556449 + 1) int)) (let g2556454 = (malloc (ntarray 0 (g2556449 + 18) int)) in (g2556454 + (14 : int)))) in (cast (ptr c (array -9 7 int)) (let g2556455 = (let g2556457 = (malloc (ntarray 0 2 int)) in (g2556457 + (2 : int))) in (if (* g2556455 = (2 : int)) (let g2556456 = (cast (ptr c (ntarray 0 0 int)) g2556455) in (let g2556458 = (malloc (array 0 21 int)) in (g2556458 + (10 : int)))) (let g2556456 = (cast (ptr c (ntarray 0 0 int)) g2556455) in (let g2556459 = (malloc (array 0 21 int)) in (g2556459 + (10 : int))))))))) = (let g2556460 = (let g2556461 = (malloc (struct g2556435)) in g2556461) in (* (& g2556460 → g2556436))))
