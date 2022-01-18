@@ -6,23 +6,13 @@ Require Import Coq.FSets.FMapFacts.
 (** * Document Conventions *)
 
 (* 
-(** It is common when defining syntax for a language on paper to associate one or manysimple_type *)
-(*     _metavariables_ with each syntactic class. For example, the metavariables <<x>>, <<y>>,
-    and <<z>> are often used to represent the syntactic class of program variables. It is *)
-    understood that wherever these metavariables appear they indicate an implicit universalf
-    quantification over all members of the syntactic class they represent. In Coq, however,Rq
 
-(* 
-    we have no such issue -- all quantification must be made explicit. However, we must still *)
-    grapple with the hardest problem in computer science: naming our quantified variables.
-    To ameliorate this problem, we maintain two stylistic invariants.
+This is the Coq model for the Checked-C formalism.
 
-    - (1) Whenever a new piece of syntax is introduced we we will include, in parentheses,
-          its associated metavariable. We will then use this as the naming convention for
-          naming universally quantified variables in the future.
-    - (2) Whenever syntax, semantics, or proofs appear in the associated paper
-          ("Checked C for Safety, Gradually") we take this to be an authoritative source
-          for naming. *)
+Checked-C is a backward compatable compiler with C. Its main feature
+is to compiled a program with enough dynamic checks to ensure that checked pointers are not misused
+due to null-pointer deference or out-of-bound pointer dereference.
+*)
 
 (** * Syntax *)
 
@@ -130,12 +120,6 @@ Module StructDef := Map.Make Nat_as_OT.
 
 Definition structdef := StructDef.t fields.
 
-(*
-Inductive none_bound_only : bound -> Prop :=
-    | none_bound_only_1: forall n, none_bound_only (Num n)
-    | none_bound_only_2: forall x y, none_bound_only (Var x y None).
-*)
-
 
 Module Env := Map.Make Nat_as_OT.
 Module EnvFacts := FMapFacts.Facts (Env).
@@ -161,7 +145,7 @@ Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_ntarray : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
                                       well_type_bound_in env t -> well_type_bound_in env (TNTArray l h t).
 
-(* Definition of simple type meaning that no bound variables. *)
+(* Definition of simple type meaning that the type has no bound variables. *)
 Inductive simple_type : type -> Prop := 
   | SPTNat : simple_type TNat
   | SPTPtr : forall m w, simple_type w -> simple_type (TPtr m w)
@@ -169,20 +153,6 @@ Inductive simple_type : type -> Prop :=
   | SPTArray : forall l h t, simple_type t -> simple_type (TArray (Num l) (Num h) t)
   | SPTNTArray : forall l h t, simple_type t -> simple_type (TNTArray (Num l) (Num h) t).
 
-(*
-Inductive ext_bound_in : list var -> bound -> Prop :=
-  | ext_bound_in_num : forall l n, ext_bound_in l (Num n)
-  | ext_bound_in_var : forall l y n, ext_bound_in l (Var y n).
-
-Inductive ext_type_in : list var -> type -> Prop :=
-  | ext_type_in_nat : forall l, ext_type_in l (TNat)
-  | ext_type_in_ptr : forall l c t, ext_type_in l t -> ext_type_in l (TPtr c t)
-  | ext_type_in_struct : forall l t, ext_type_in l (TStruct t)
-  | ext_type_in_array : forall l b1 b2 t, ext_bound_in l b1 -> ext_bound_in l b2
-                        -> ext_type_in l t -> ext_type_in l (TArray b1 b2 t)
-  | ext_type_in_ntarray : forall l b1 b2 t, ext_bound_in l b1 -> ext_bound_in l b2
-                        -> ext_type_in l t -> ext_type_in l (TNTArray b1 b2 t).
-*)
 
 Inductive type_wf (D : structdef) : type -> Prop :=
   | WFTNat : type_wf D (TNat)
@@ -198,21 +168,6 @@ Inductive type_wf (D : structdef) : type -> Prop :=
       word_type t ->
       type_wf D t ->
       type_wf D (TNTArray l h t).
-
-(*
-Definition no_ebound (b:bound): Prop :=
-   match b with Num n => True
-             | Var x y => True
-   end. 
-
-
-Inductive no_etype : type -> Prop :=
-  | no_etype_nat : no_etype (TNat)
-  | no_etype_ptr : forall m w, no_etype w -> no_etype (TPtr m w)
-  | no_etype_struct : forall T, no_etype (TStruct T)
-  | no_etype_array : forall l h t, no_etype t -> no_ebound l -> no_ebound h -> no_etype (TArray l h t)
-  | no_etype_ntarray : forall l h t,  no_etype t -> no_ebound l -> no_ebound h -> no_etype (TNTArray l h t).
-*)
 
 Definition fields_wf (D : structdef) (fs : fields) : Prop :=
   forall f t,
@@ -253,7 +208,8 @@ Proof.
   constructor. lia.
 Qed.
 
-
+(* This is the Checked-C subtyping relationship. If x <= y, then one can cast the pointer x to y, 
+   and y is allowed to use in any context of using x. *)
 Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype D Q t t
   | SubTyBot : forall m l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
@@ -392,6 +348,14 @@ Inductive cast_type_bound (s:stack) : type -> type -> Prop :=
    | cast_type_bound_struct : forall t, cast_type_bound s (TStruct t) (TStruct t).
 
 
+(* Compared to the Checked-C in Redex, there are two difference.
+   First, function arguments are restricted to constants and variables.
+    We enforces this by argument well-formedness.
+    Second, We split if expression into EIfDef where it has the form: if *x then e1 else e2,
+    and EIf where it allows an arbitary expression with the type int.
+    We have the distinct for simplifying the proof. Now, the EIfDef represents the second semantic context rule in Fig.4,
+    while the latter represents the first one, and it will not have any side-effects. 
+    *)
 Inductive expression : Type :=
   | ELit : Z -> type -> expression
   | EVar : var -> expression
@@ -432,10 +396,11 @@ Definition is_array_ptr (t:type) : Prop :=
   end.
 
 (*
-Definition simple_option (D : structdef) (a:option (Z*type)) :=
-  match a with None => True
-         | Some (v,t) => word_type t /\ type_wf D t /\ simple_type t
-  end.
+epxression well-fromedness.
+The main thing is that constants need to have a simple_type meaning that no type variables inside.
+This is because constants represent program values.
+It does not make sense to say that a value is
+an integer while the type of the value is some type constructs with variable bounds.
 *)
 
 Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
@@ -1279,36 +1244,6 @@ Proof.
             end).
 Qed.
 
-(*
-Definition heap_well_typed (D:structdef) (Q:theta) (H:heap) (n:Z) (t:type) :=
-      simple_type t -> well_typed_lit D Q H empty_scope n t.
-
-Inductive heap_wt_arg (D:structdef) (Q:theta) (H:heap) : expression -> Prop :=
-     | HtArgLit : forall n t, heap_well_typed D Q H n t -> heap_wt_arg D Q H (ELit n t)
-     | HtArgVar : forall x, heap_wt_arg D Q H (EVar x).
-
-Inductive heap_wt_args (D:structdef) (Q:theta) (H:heap) : list expression -> Prop :=
-    heap_wt_empty : heap_wt_args D Q H ([])
-  | heap_wt_many : forall e el, heap_wt_arg D Q H e -> heap_wt_args D Q H el -> heap_wt_args D Q H (e::el).
-
-Inductive heap_wt (D:structdef) (Q:theta) (H:heap) : expression -> Prop :=
-   | HtLit : forall n t, heap_well_typed D Q H n t -> heap_wt D Q H (ELit n t)
-   | HtVar : forall x, heap_wt D Q H (EVar x)
-   | HtStrlen : forall x, heap_wt D Q H (EStrlen x)
-   | HtCall : forall f el, heap_wt_args D Q H el -> heap_wt D Q H (ECall f el)
-   | HtRet : forall x old a e, heap_wt D Q H e -> heap_wt D Q H (ERet x old a e)
-   | HtDynCast : forall t e, heap_wt D Q H e -> heap_wt D Q H (EDynCast t e)
-   | HtLet : forall x e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (ELet x e1 e2)
-   | HtMalloc : forall t, heap_wt D Q H (EMalloc t)
-   | HtCast : forall t e, heap_wt D Q H e -> heap_wt D Q H (ECast t e)
-   | HtPlus : forall e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EPlus e1 e2)
-   | HtFieldAddr : forall e f, heap_wt D Q H e -> heap_wt D Q H (EFieldAddr e f)
-   | HtDeref : forall e, heap_wt D Q H e -> heap_wt D Q H (EDeref e)
-   | HtAssign : forall e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EAssign e1 e2)
-   | HtIf : forall x e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EIf x e1 e2)
-   | HtUnChecked : forall e, heap_wt D Q H e -> heap_wt D Q H (EUnchecked e).
-
-*)
 Definition is_ptr (t : type) : Prop :=
     match t with TPtr m x => True 
               | _ => False
@@ -1358,6 +1293,13 @@ Inductive well_bound_vars_type {A:Type}: list (var * A) -> type -> Prop :=
                         -> well_bound_vars_type l t -> well_bound_vars_type l (TNTArray b1 b2 t).
 
 
+(* well-typed_arg is basically the well_typed relationship but it deals with the function arguments.
+   We use it to enforce the function argument well-formedness in Coq.
+   In addition, we use it to aovide the need of mutual recursive inductive relations in Coq.
+   Otherwise, in order to prove a theorem related to types, 
+   we need to prove it for a list of function arguments,
+   each of which also needs a proof for expression types, which can again be a function call.
+*)
 Inductive well_typed_arg (D: structdef) (Q:theta) (H : heap) (env:env): 
                  expression -> type -> Prop :=
      | ArgLit : forall n t t',
@@ -1378,67 +1320,6 @@ Inductive well_typed_args {D: structdef} {Q:theta} {H : heap}:
                  well_typed_arg D Q H env e (subst_type s t) ->
                         well_typed_args env s es vl
                         -> well_typed_args env s (e::es) ((v,t)::vl).
-
-(*
-Inductive gen_env : env -> list (var * type) -> env -> Prop :=
-     | gen_env_empty : forall env, gen_env env [] env
-     | gen_env_many : forall x t l env env', gen_env env l env' -> gen_env env ((x,t)::l) (Env.add x t env').
-
-
-Definition subst_bound_val (x:var) (n:Z) (b:bound) : bound :=
-   match b with Num m => Num m
-              | Var y m => if (Nat.eqb x y) then Num (n+m) else Var y m
-   end.
-
-Fixpoint subst_type_val (x:var) (n:Z) (b:type) : type :=
-   match b with TNat => TNat
-              | TPtr c t => TPtr c (subst_type_val x n t)
-              | TStruct t => TStruct t
-              | TArray l h t => TArray (subst_bound_val x n l) (subst_bound_val x n h) (subst_type_val x n t)
-              | TNTArray l h t => TNTArray (subst_bound_val x n l) (subst_bound_val x n h) (subst_type_val x n t)
-   end.
-
-
-Definition subst_bound_var (x:var) (n:var) (b:bound) : bound :=
-   match b with Num m => Num m
-              | Var y m => if (Nat.eqb x y) then (Var n m) else Var y m
-   end.
-
-Fixpoint subst_type_var (x:var) (n:var) (b:type) : type :=
-   match b with TNat => TNat
-              | TPtr c t => TPtr c (subst_type_var x n t)
-              | TStruct t => TStruct t
-              | TArray l h t => TArray (subst_bound_var x n l) (subst_bound_var x n h) (subst_type_var x n t)
-              | TNTArray l h t => TNTArray (subst_bound_var x n l) (subst_bound_var x n h) (subst_type_var x n t)
-   end.
-
-Inductive subst_all_arg : var -> expression -> type -> type -> Prop :=
-   | subt_arg_lit : forall x n t t', subst_all_arg x (ELit n t) t' (subst_type_val x n t')
-   | subt_arg_var : forall x y t', subst_all_arg x (EVar y) t' (subst_type_var x y t').
-
-Inductive subst_all_args : list (var*type) -> list expression -> type -> type -> Prop :=
-   | subt_arg_empty : forall t, subst_all_args [] [] t t
-   | subt_arg_many_1 : forall x tvl e el t t' t'', subst_all_arg x e t t' ->
-                 subst_all_args tvl el t' t'' -> subst_all_args ((x,TNat)::tvl) (e::el) t t''
-   | subt_arg_many_2 : forall x tvl e el t t' ta,
-         ta <> TNat -> subst_all_args tvl el t t' -> subst_all_args ((x,ta)::tvl) (e::el) t t'.
-*)
-(*
-Inductive to_ext_bound : var -> bound -> bound -> Prop :=
-   | to_ext_num : forall x n, to_ext_bound x (Num n) (Num n)
-   | to_ext_var_1 : forall x n, to_ext_bound x (Var x n) (ExVar x n)
-   | to_ext_var_2 : forall x y n, x <> y -> to_ext_bound x (Var y n) (Var y n)
-   | to_ext_exvar : forall x y n, to_ext_bound x (ExVar y n) (ExVar y n).
-
-Inductive to_ext_type : var -> type -> type -> Prop :=
-   | to_ext_nat : forall x, to_ext_type x TNat TNat
-   | to_ext_ptr : forall x c t t',  to_ext_type x t t' -> to_ext_type x (TPtr c t) (TPtr c t')
-   | to_ext_struct : forall x t, to_ext_type x (TStruct t) (TStruct t)
-   | to_ext_array : forall x l h t l' h' t', to_ext_bound x l l' -> to_ext_bound x h h' ->
-                      to_ext_type x t t' -> to_ext_type x (TArray l h t) (TArray l' h' t')
-    | to_ext_ntarray : forall x l h t l' h' t', to_ext_bound x l l' -> to_ext_bound x h h' ->
-                      to_ext_type x t t' -> to_ext_type x (TNTArray l h t) (TNTArray l' h' t')
-*)
 
 Fixpoint eq_nat (s:stack) (e:expression) :=
   match e with (ELit n TNat) => Some n
@@ -1465,25 +1346,6 @@ Definition add_nt_one_env (s : env) (x:var) : env :=
                              | _ => s
    end.
 
-(*
-
-Inductive to_ext_bound : var -> bound -> bound -> Prop :=
-   | to_ext_num : forall x n, to_ext_bound x (Num n) (Num n)
-   | to_ext_var_1 : forall x n, to_ext_bound x (Var x n) (ExVar x n)
-   | to_ext_var_2 : forall x y n, x <> y -> to_ext_bound x (Var y n) (Var y n)
-   | to_ext_exvar : forall x y n, to_ext_bound x (ExVar y n) (ExVar y n).
-
-Inductive to_ext_type : var -> type -> type -> Prop :=
-   | to_ext_nat : forall x, to_ext_type x TNat TNat
-   | to_ext_ptr : forall x c t t',  to_ext_type x t t' -> to_ext_type x (TPtr c t) (TPtr c t')
-   | to_ext_struct : forall x t, to_ext_type x (TStruct t) (TStruct t)
-   | to_ext_array : forall x l h t l' h' t', to_ext_bound x l l' -> to_ext_bound x h h' ->
-                      to_ext_type x t t' -> to_ext_type x (TArray l h t) (TArray l' h' t')
-    | to_ext_ntarray : forall x l h t l' h' t', to_ext_bound x l l' -> to_ext_bound x h h' ->
-                      to_ext_type x t t' -> to_ext_type x (TNTArray l h t) (TNTArray l' h' t')
-   | to_ext_ext_1 : forall x t, to_ext_type x (TExt x t) (TExt x t)
-   | to_ext_ext_2 : forall x y t t', x <> y -> to_ext_type x t t' -> to_ext_type x (TExt x t) (TExt x t').
-*)
 Definition get_tvar_bound (b:bound) : list var :=
      match b with Num n => [] | Var x n => [x]  end.
 
@@ -1494,53 +1356,6 @@ Fixpoint get_tvars (t:type) : (list var) :=
              | TArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
              | TNTArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
    end.
-
-(*
-Inductive vars_to_ext : list var -> type -> type -> Prop :=
-    vars_to_ext_empty : forall t, vars_to_ext [] t t
-  | vars_to_ext_many : forall x l t t' t'', to_ext_type x t t' 
-             -> vars_to_ext l (TExt x t') t'' -> vars_to_ext (x::l) t t''.
-*)
-
-(*
-Inductive well_bound_args {A:Type}: list (var * type) -> list (var * A) -> type -> Prop := 
-    well_bound_args_empty : forall l t, well_bound_vars_type l t -> well_bound_args [] l t
-  | well_bound_args_many : forall x t1 tvl l t, well_bound_vars_type l t1
-                           -> well_bound_args tvl l t -> well_bound_args ((x,t1)::tvl) l t.
-
-Inductive well_arg_bound_in {A:Type}: list (var * A) -> expression -> Prop :=
-   | well_arg_bound_in_lit : forall s v t, well_bound_vars_type s t -> well_arg_bound_in s (ELit v t)
-   | well_arg_bound_in_var : forall s x, (exists a, In (x,a) s) -> well_arg_bound_in s (EVar x).
-
-Inductive well_args_bound_in {A:Type}: list (var * A) -> list expression -> Prop :=
-   | well_args_bound_empty : forall l, well_args_bound_in l []
-   | well_args_bound_many : forall l x xl, well_arg_bound_in l x -> well_args_bound_in l xl -> well_args_bound_in l (x::xl).
-
-Inductive well_expr_bound_in {A:Type}: list (var * A) -> expression -> Prop :=
-   | well_expr_bound_in_lit : forall s v t, well_bound_vars_type s t -> well_expr_bound_in s (ELit v t)
-   | well_expr_bound_in_var : forall s x, (exists a, In (x,a) s) -> well_expr_bound_in s (EVar x)
-   | well_expr_bound_in_str : forall s x,(exists a, In (x,a) s) -> well_expr_bound_in s (EStrlen x)
-   | well_expr_bound_in_call : forall s x el, well_args_bound_in s el ->  well_expr_bound_in s (ECall x el)
-   | well_expr_bound_in_let : forall s x e1 e2, well_expr_bound_in s e1 
-           -> well_expr_bound_in s e2 -> well_expr_bound_in s (ELet x e1 e2)
-   | well_expr_bound_in_malloc : forall s t, list_type_bound_in s t -> well_expr_bound_in s (EMalloc t)
-   | well_expr_bound_in_cast : forall s t e, list_type_bound_in s t ->
-                    well_expr_bound_in s e -> well_expr_bound_in s (ECast t e)
-   | well_expr_bound_in_dyncast : forall s t e, list_type_bound_in s t ->
-                    well_expr_bound_in s e -> well_expr_bound_in s (EDynCast t e)
-   | well_expr_bound_in_plus : forall s e1 e2,  well_expr_bound_in s e1 ->
-                 well_expr_bound_in s e2 -> well_expr_bound_in s (EPlus e1 e2)
-   | well_expr_bound_in_field : forall s e1 f,  well_expr_bound_in s e1 ->
-                well_expr_bound_in s (EFieldAddr e1 f)
-   | well_expr_bound_in_deref : forall s e,  well_expr_bound_in s e ->
-                well_expr_bound_in s (EDeref e)
-   | well_expr_bound_in_assign : forall s e1 e2,  well_expr_bound_in s e1 ->
-                 well_expr_bound_in s e2 -> well_expr_bound_in s (EAssign e1 e2)
-   | well_expr_bound_in_if : forall s x e1 e2, In x s -> well_expr_bound_in s e1 ->
-                 well_expr_bound_in s e2 -> well_expr_bound_in s (EIf x e1 e2)
-   | well_expr_bound_in_unchecked : forall s e,  well_expr_bound_in s e ->
-                well_expr_bound_in s (EUnchecked e).
-*)
 
 Fixpoint get_nat_vars (l : list (var * type)) : list var :=
    match l with [] => []
