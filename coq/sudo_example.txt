@@ -1,0 +1,124 @@
+//This is a Checked-C RLBox model example document with sudo code now.
+
+/*
+1. for simplifying the verification process,
+    we shuold have tainted pointers and all pointers returned from 
+   the code should be tainted pointers that are created from checked region.
+   Here, f is an unsafe function.
+
+   From this example, we can also see that, it is usually the case that
+   when we insert a tainted pointer to an unsafe function, the stack scope
+   of the function is preserved, so that we should have the static type
+   information for the pointer in the stack.
+
+*/
+
+   tainted ptr<array 0 10 int> a = malloc(10);
+   int x = unchecked { f(a) };
+   int b = * a+3; // need extra checks because a might change in the unchecked block.
+              // the needed check information of a is in stack.
+
+/*
+
+Example 1 following up:
+
+
+   For verifying a tainted pointer, there are three things need to verify.
+   First, if the tainted poniter is null, because f(a) might assign 'a' to null.
+   Second, if the tainted pointer is out-of-bound, because f(a) might shift the variable's address.
+   Third, checking the pointer type hierarchy in heap. This is defined as a predicate in Checked-C.
+   The predicate is:
+
+Inductive well_typed_lit (D : structdef) (Q:theta) (H : heap) : scope -> Z -> type -> Prop :=
+  | TyLitInt : forall s n,
+      well_typed_lit D Q H s n TNat
+  | TyLitU : forall s n w,
+      well_typed_lit D Q H s n (TPtr Unchecked w)
+  | TyLitZero : forall s t,
+      well_typed_lit D Q H s 0 t
+  | TyLitRec : forall s n w t,
+      set_In (n, t) s ->
+      subtype D Q t (TPtr Checked w) ->
+      well_typed_lit D Q H s n (TPtr Checked w)
+  | TyLitC : forall sc n w t b ts,
+      simple_type w ->
+      subtype D Q (TPtr Checked w) (TPtr Checked t) ->
+      Some (b, ts) = allocate_meta D w ->
+      nt_array_prop H n (TPtr Checked t) ->
+      (forall k, b <= k < b + Z.of_nat(List.length ts) ->
+                 exists n' t',
+                   Some t' = List.nth_error ts (Z.to_nat (k - b)) /\
+                   Heap.MapsTo (n + k) (n', t') H /\
+                   well_typed_lit D Q H (scope_set_add n (TPtr Checked w) sc) n' t') ->
+      well_typed_lit D Q H sc n (TPtr Checked t).
+
+    For example, if a+3 is a valid heap location,
+    if the field is a certain type location, if the type is int or a null pointer, it is fine.
+    if the type is a pointer and it is not null,
+    then the location that the pointer value pointing to also needs to be well_typed.
+
+*/
+
+/*
+2. Currently, I do not allow the unchecked block to return a type other than integers.
+   The x above should be an integer. 
+   Here is a problem with the fact that if x is a pointer.
+   In the main function, we do not have any static information about x.
+   We will rely on RLBox to help us finish the check, which might be costly.
+
+*/
+
+   tainted ptr<array 0 10 int> a = malloc(10)
+   tainted ptr<array 0 10 int> x = unchecked { f(a) };
+   int b = * x+5; // how to check x?
+
+/*
+3. If we want to allow x to be a pointer
+   we might want to do the following. We create a checked pointer y
+   in check region, and use RLBox copy to carefully copy data from x to y.
+   The copying step is also a verification step, so that 
+   we can directly copy data in x to y.
+*/
+
+   tainted ptr<array 0 10 int> a = malloc(10);
+   ptr<array 0 10 int> y = malloc(10);
+   unchecked { x = f(a); rl_copy_verify(x,y,10); };
+   int b = * y+5; // how to check x?
+
+/*
+4. Arun has a concern that if we input an tainted pointer a, 
+   and if f assigns null to the pointer, what happen?
+   Does this mean that we crash the checked regions?
+
+   I said this is not a problem, because if there is a null pointer,
+   it will be captured by the Checked-C semantics, which means that
+   the Checked-C compiler's dynamic null check will capture the error,
+   so that it is not a crash.
+
+*/
+
+   tainted ptr<array 0 10 int> a = malloc(10);
+   int x = unchecked { f(a) }; //assume a is assigned to null.
+   int b = * a+3; //null pointer a that is captured by the semantics.
+                  //captured by the Checked-c dynamic check.
+
+/*
+5. As a further thought of example 4, we might want to
+   make the unchecked block as a new kind of function header, 
+   then we can do variable renaming in the unchecked block,
+   so that even if the unsafe function in f changes tainted pointers,
+   it will not affect the pointer content outside the unchecked region.
+   the new syntax of unchecked block is unchecked (type x_1, type x_2,...) {exp}
+
+*/
+
+   tainted ptr<array 0 10 int> a = malloc(10);
+   int x = unchecked (ptr<array 0 10 int> a) { f(a) }; 
+       //the unchecked block execution replace a with a', and then execution the body f(a').
+       //even if a' is assigned to null, the content of a does not change.
+   int b = * a+3; //we do not need to verify if a is a null, because it will not. 
+                  //we do not need to verify if a is out-of-bound, because it will not.
+                  //we need to verify the type structure of a. specifically,
+                  //the type structure of a+3.
+
+
