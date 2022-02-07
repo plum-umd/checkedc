@@ -121,4 +121,31 @@ Inductive well_typed_lit (D : structdef) (Q:theta) (H : heap) : scope -> Z -> ty
                   //we need to verify the type structure of a. specifically,
                   //the type structure of a+3.
 
+6. Freeing a tainted pointer in untrusted code
+tainted<int*, ...> p = sandbox.malloc_in_sandbox<int>(sizeof(int));
+sandbox.invoke_sandbox_function(foo, p);
+// safe because foo cannot possibly modify the value stored at &p
+printf("%d\n", UNSAFE_sandboxed(p, sandbox));
+ // apparently, UNSAFE_sandboxed does verify at least something for the wasm backend
 
+// Question:
+// what if foo tries to free p?
+
+
+7. Same as 6 but with the added complexity of nested pointers
+tainted<int **, ...> p = sandbox.malloc_in_sandbox<int*>(sizeof(int*));
+sandbox.invoke_sandbox_function(foo, p);
+
+// like the previous example, this should be safe as long as p is not freed in the untrusted code
+int* p_derefed = * UNSAFE_sandboxed(p, sandbox);
+
+// what can we do with p_derefed? what happens if we try to dereference it?
+// There are several things the sandbox can do to *p:
+// 1. *p = malloc(int)
+// 2. *p = some garbage address
+// 3. *p = some magically obtained host code (assuming there is a leak elsewhere)?
+// In case it's not obvious, the sandbox can't modify p itself because C (not C++!) is call-by-value
+int v = *p_derefed;
+
+// it also feels awkward that you can remove tainted<int **> altogether
+// I'm expecting something nested: tainted<tainted<int*>*>
