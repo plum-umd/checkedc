@@ -87,8 +87,17 @@ Inductive mode : Type :=
     the memory location which holds the `self` field of `my_foo` contains a pointer which
     refers back to `my_foo`. Thus, `my_foo` is self-referential. *)
 
-(* a bound is either a value or a expression as the form of var + num. *)
-Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
+(* a bound is either a value or a expression as the form of var + num. 
+   Num => n
+   Var => x + n
+   NVar => n + (x + n')
+   VVar => x + (x' + n)
+*)
+Inductive bound : Set :=
+  | Num : Z -> bound
+  | Var : var -> Z -> bound
+  | NVar : Z -> var -> Z -> bound
+  | VVar : var -> var -> Z -> bound.
 
 Inductive type : Type :=
   | TNat : type
@@ -151,7 +160,10 @@ Definition empty_venv := @Env.empty var.
 (* well_bound definition might not needed in the type system, since the new expr_wf will guarantee that. *)
 Inductive well_bound_in : env -> bound -> Prop :=
    | well_bound_in_num : forall env n, well_bound_in env (Num n)
-   | well_bound_in_var : forall env x y, Env.MapsTo x TNat env -> well_bound_in env (Var x y).
+   | well_bound_in_var : forall env x y, Env.MapsTo x TNat env -> well_bound_in env (Var x y)
+   | well_bound_in_nvar : forall env m n x, Env.MapsTo x TNat env -> well_bound_in env (NVar m x n)
+   | well_bound_in_vvar : forall env x y n, Env.MapsTo x TNat env -> Env.MapsTo y TNat env -> well_bound_in env (VVar x y n).
+
 
 Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
@@ -240,20 +252,58 @@ Definition empty_theta := @Theta.empty theta_elem.
 Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
   | nat_leq_num : forall l h, l <= h -> nat_leq T (Num l) (Num h)
   | nat_leq_var : forall x l h, l <= h -> nat_leq T (Var x l) (Var x h)
-  | nat_leq_num_var : forall x l h, Theta.MapsTo x GeZero T -> l <= h -> nat_leq T (Num l) (Var x h).
-
+  | nat_leq_nvar : forall x y l h, l <= h -> nat_leq T (NVar x y l) (NVar x y h)
+  | nat_leq_vvar : forall x y l h, l <= h -> nat_leq T (VVar x y l) (VVar x y h)
+  | nat_leq_var_vvar : forall x y l h, Theta.MapsTo y GeZero T -> l <= h -> nat_leq T (Var x l) (VVar x y h).
+                                                                            
+                                                                       
 Lemma nat_leq_trans : forall T a b c,  nat_leq T a b -> nat_leq T b c -> nat_leq T a c.
 Proof.
   intros.
-  destruct a. destruct b. destruct c.
-  inv H. inv H0.
-  apply nat_leq_num. lia.
-  inv H. inv H0. apply nat_leq_num_var; try easy. lia.
-  destruct c. inv H0.
-  inv H. inv H0.
-  constructor. easy. lia.
-  inv H. inv H0.
-  constructor. lia.
+  destruct a.
+  - destruct b.
+    + destruct c.
+      inv H. inv H0.
+      apply nat_leq_num. lia.
+      inv H. inv H0. try easy.
+      try easy.
+    + destruct c; inv H0; inv H.
+    + destruct c; inv H0; inv H.
+    + destruct c; inv H0; inv H.
+  - destruct b.
+    + destruct c.
+      inv H; inv H0.
+      try easy.
+      inv H. inv H0.
+    + destruct c. try easy.
+      inv H. inv H0. constructor. lia.
+      try easy.
+      inv H. inv H0. constructor. try easy. lia.
+    + destruct c. try easy.
+      try easy. try easy.
+      inv H.
+    + destruct c. try easy.
+      try easy. easy.
+      inv H. inv H0. constructor. easy. lia.
+  - destruct b.
+    + destruct c. try easy.
+      try easy.
+      try easy.
+      try easy.
+    + destruct c. try easy.
+      try easy.
+      try easy. try easy.
+    + destruct c. try easy.
+      try easy.
+      inv H. inv H0. constructor. lia.
+      try easy.
+    + destruct c. try easy. try easy. try easy. easy.
+  - destruct b.
+    + destruct c. easy. easy. easy. easy.
+    + destruct c. easy. easy. easy. easy.
+    + destruct c. easy. easy. easy. easy.
+    + destruct c. easy. easy. easy.
+      inv H. inv H0. constructor. lia.
 Qed.
 
 
@@ -399,8 +449,13 @@ Definition empty_dyn_env := @Stack.empty type.
 *)
 
 Definition cast_bound (s:stack) (b:bound) : option bound :=
-   match b with Num n => Some (Num n)
-             | Var x n => (match (Stack.find x s) with Some (v,t) => Some (Num (n+v)) | None => None end)
+  match b with
+  | Num n => Some (Num n)
+  | Var x n => (match (Stack.find x s) with Some (v,t) => Some (Num (n+v)) | None => None end)
+  | NVar m x n => (match (Stack.find x s) with Some (v,t) => Some (Num (m+v+n)) | None => None end)
+  | VVar x y n => (match (Stack.find x s) with
+                    Some (v,t) => (match (Stack.find y s) with Some (v',t') => Some (Num (v+v'+n)) | None => None end)
+                    | None => None end)
    end.
 
 Inductive cast_type_bound (s:stack) : type -> type -> Prop :=
@@ -742,25 +797,25 @@ Qed.
 
 (* TODO: say more *)
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
-
+(*
 Definition eval_bound (s:stack) (b:bound) : option bound :=
    match b with Num n => Some (Num n)
              | Var x n => (match (Stack.find x s) with Some (v,t) => Some (Num (v + n)) | None => None end)
    end.
-
+*)
 Definition eval_type_bound (s : stack) (t : type) : option type := 
   match t with | TPtr c (TArray l h t) => 
-                   match eval_bound s l with None => None
+                   match cast_bound s l with None => None
                                          | Some l' => 
-                     match eval_bound s h with None => None
+                     match cast_bound s h with None => None
                                       | Some h' => 
                                 Some (TPtr c (TArray l' h' t))
                      end
                    end
               | TPtr c (TNTArray l h t) => 
-                   match eval_bound s l with None => None
+                   match cast_bound s l with None => None
                                          | Some l' => 
-                     match eval_bound s h with None => None
+                     match cast_bound s h with None => None
                                       | Some h' => 
                                 Some (TPtr c (TNTArray l' h' t))
                      end
@@ -802,7 +857,9 @@ Definition is_rexpr (r : result) : Prop :=
 
 Definition sub_bound (b:bound) (n:Z) : (bound) :=
   match b with Num m => Num (m - n)
-           | Var x m => Var x (m - n)
+          | Var x m => Var x (m - n)
+          | NVar l x m => NVar l x (m - n)
+          | VVar x y m => VVar x y (m - n)
   end.
 
 Definition sub_type_bound (t:type) (n:Z) : type :=
@@ -880,14 +937,34 @@ Fixpoint get_dept_map (l:list (var * type)) (es:list expression) :=
     end.
 
 Definition subst_bound (b:bound) (x:var) (b1:bound) := 
-   match b with Num n => (Num n)
-           | Var y n => 
-        if var_eq_dec y x then
-           match b1 with (Num m) => (Num (n+m))
-                         | (Var z m) => (Var z (n+m))
-           end
-        else Var y n
-   end.
+  match b with
+  | Num n => (Num n)
+  | Var y n =>
+    if var_eq_dec y x then
+      match b1 with
+      | (Num m) => (Num (n+m))
+      | (Var z m) => (Var z (n+m))
+      | (NVar l z m) => (NVar l z (n+m))
+      | (VVar z w m) => (VVar z w (n+m))
+      end
+    else Var y n
+  | NVar l y n =>
+      match b1 with
+      | (Num m) => (Num (n+m))
+      | (Var w m) => (Var w (n+m))
+      | (NVar l w m) => (NVar l w (n+m))
+      | (VVar v w m) => (VVar v w (n+m))
+      end
+  | VVar y z n =>
+    if var_eq_dec y x then
+      match b1 with
+      | (Num m) => (Num (n+m))
+      | (Var w m) => (Var w (n+m))
+      | (NVar l w m) => (NVar l w (n+m))
+      | (VVar w v m) => (VVar w v (n+m))
+      end
+    else VVar y z n
+  end.
 
 Fixpoint subst_bounds (b:bound) (s: list (var*bound)) :=
   match s with [] => b
@@ -1581,7 +1658,12 @@ Inductive to_ext_type : var -> type -> type -> Prop :=
    | to_ext_ext_2 : forall x y t t', x <> y -> to_ext_type x t t' -> to_ext_type x (TExt x t) (TExt x t').
 *)
 Definition get_tvar_bound (b:bound) : list var :=
-     match b with Num n => [] | Var x n => [x]  end.
+  match b with
+  | Num n => []
+  | Var x n => [x]
+  | NVar m x n => []
+  | VVar x y n => [x]
+  end.
 
 Fixpoint get_tvars (t:type) : (list var) :=
    match t with TNat => []
@@ -1865,7 +1947,7 @@ Hint Constructors well_typed.
 Lemma ptr_subtype_equiv : forall D Q m w t,
 subtype D Q w (TPtr m t) ->
 exists t', w = (TPtr m t').
-Proof.
+Proof. (*
   intros. remember (TPtr m t) as p. generalize dependent t. induction H.
   - intros. exists t0. rewrite Heqp. reflexivity.
   - intros. inv Heqp. exists t. easy.
@@ -1881,7 +1963,7 @@ Proof.
     rewrite H1. reflexivity.
   - intros. inv Heqp. exists (TStruct T).
     reflexivity.
-Qed.
+Qed.*) Admitted.
 
 (* this might be an issue if we want to make checked pointers
 a subtype of unchecked pointers. This will need to
