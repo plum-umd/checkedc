@@ -1906,14 +1906,15 @@ Inductive well_typed { D : structdef } {F : FEnv} {S:stack} {H:real_heap}
       join_type D Q S t2 t3 t4 -> 
       mode_leq m' m ->
       well_typed env Q m (EIfDef x e1 e2) t4
-(*
+
   | TyIfDefNT : forall env Q m m' x l t e1 e2 t2 t3 t4,
-      Env.MapsTo x (TPtr m' (TNTArray l (Num 0) t)) env ->
-      well_typed (Env.add x (TPtr m' (TNTArray l (Num 1) t)) env) Q m e1 t2 -> well_typed env Q m e2 t3 ->
+      Env.MapsTo x (TPtr m' (TNTArray l (Var x 0) t)) env ->
+      well_typed (Env.add x (TPtr m' (TNTArray l (Var x 1) t)) env) Q m e1 t2 -> well_typed env Q m e2 t3 ->
       join_type D Q S t2 t3 t4 -> 
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env Q m (EIfDef x e1 e2) t4
-*)
+
+
   | TyIf : forall env Q m e1 e2 e3 t2 t3 t4,
       well_typed env Q m e1 TNat ->
       well_typed env Q m e2 t2 ->
