@@ -93,15 +93,25 @@ Inductive mode : Type :=
    NVar => n + (x + n')
    VVar => x + (x' + n)
 *)
+Inductive bound : Set := | Num : Z -> bound | Var : var -> Z -> bound.
+
+(*
 Inductive bound : Set :=
   | Num : Z -> bound
   | Var : var -> Z -> bound
   | NVar : Z -> var -> Z -> bound
   | VVar : var -> var -> Z -> bound.
+*)
+
+Inductive ptrType : Set := StaticType | StackType | HeapType.
+
+Inductive ptrName : Set := NumPtr : Z -> ptrName | VarPtr : var -> ptrName.
+
+Definition ptrMode := option (ptrType * ptrName).
 
 Inductive type : Type :=
   | TNat : type
-  | TPtr : mode -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
+  | TPtr : mode -> ptrMode -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
   | TStruct : struct -> type
   | TArray : bound -> bound -> type -> type
   | TNTArray : bound -> bound -> type -> type.
@@ -116,7 +126,7 @@ Defined.
 
 Inductive word_type : type -> Prop :=
   | WTNat : word_type (TNat)
-  | WTPtr : forall m w, word_type (TPtr m w).
+  | WTPtr : forall m pm w, word_type (TPtr m pm w).
 
 Hint Constructors word_type.
 
@@ -159,21 +169,27 @@ Definition empty_venv := @Env.empty var.
 
 (* well_bound definition might not needed in the type system, since the new expr_wf will guarantee that. *)
 Definition is_ptr (t : type) : Prop :=
-    match t with TPtr m x => True 
+    match t with TPtr m pm x => True 
               | _ => False
     end.
 
 Inductive well_bound_in : env -> bound -> Prop :=
    | well_bound_in_num : forall env n, well_bound_in env (Num n)
-   | well_bound_in_var : forall env t x y, Env.MapsTo x t env -> is_ptr t -> well_bound_in env (Var x y)
-   | well_bound_in_nvar : forall env m n x, Env.MapsTo x TNat env -> well_bound_in env (NVar m x n)
-   | well_bound_in_vvar : forall env x t y n, Env.MapsTo x t env -> is_ptr t -> Env.MapsTo y TNat env -> well_bound_in env (VVar x y n).
+   | well_bound_in_var : forall env x y, Env.MapsTo x TNat env -> well_bound_in env (Var x y).
+
+Definition well_ptr_bound_in (env:env) (p:ptrMode) :=
+   match p with None => True
+           | Some (t,a) => 
+            match a with VarPtr x => Env.MapsTo x TNat env
+                      | NumPtr n => True
+             end
+   end.
 
 
 Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
-   | well_type_bound_in_ptr : forall m t env, 
-                       well_type_bound_in env t -> well_type_bound_in env (TPtr m t)
+   | well_type_bound_in_ptr : forall m pm t env, well_ptr_bound_in env pm ->
+                       well_type_bound_in env t -> well_type_bound_in env (TPtr m pm t)
    | well_type_bound_in_struct : forall env T, well_type_bound_in env (TStruct T)
    | well_type_bound_in_array : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
                                       well_type_bound_in env t -> well_type_bound_in env (TArray l h t)
@@ -183,7 +199,8 @@ Inductive well_type_bound_in : env -> type -> Prop :=
 (* Definition of simple type meaning that no bound variables. *)
 Inductive simple_type : type -> Prop := 
   | SPTNat : simple_type TNat
-  | SPTPtr : forall m w, simple_type w -> simple_type (TPtr m w)
+  | SPTPtrNone : forall m w, simple_type w -> simple_type (TPtr m None w)
+  | SPTPtrSome : forall m t n w, simple_type w -> simple_type (TPtr m (Some (t,NumPtr n)) w)
   | SPTStruct : forall t, simple_type (TStruct t)
   | SPTArray : forall l h t, simple_type t -> simple_type (TArray (Num l) (Num h) t)
   | SPTNTArray : forall l h t, simple_type t -> simple_type (TNTArray (Num l) (Num h) t).
@@ -205,8 +222,8 @@ Inductive ext_type_in : list var -> type -> Prop :=
 
 Inductive type_wf (D : structdef) : mode -> type -> Prop :=
   | WFTNat : forall m, type_wf D m (TNat)
-  | WFTPtrChecked : forall m w, type_wf D m w -> type_wf D Checked (TPtr m w)
-  | WFTPtrUnChecked : forall m m' w, m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr m' w)
+  | WFTPtrChecked : forall m pm w, type_wf D m w -> type_wf D Checked (TPtr m pm w)
+  | WFTPtrUnChecked : forall m m' pm w, m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr m' pm w)
   | WFTStruct : forall m T,
       (exists (fs : fields), StructDef.MapsTo T fs D) ->
       type_wf D m (TStruct T)
@@ -257,65 +274,67 @@ Definition empty_theta := @Theta.empty theta_elem.
 Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
   | nat_leq_num : forall l h, l <= h -> nat_leq T (Num l) (Num h)
   | nat_leq_var : forall x l h, l <= h -> nat_leq T (Var x l) (Var x h)
-  | nat_leq_nvar : forall x y l h, l <= h -> nat_leq T (NVar x y l) (NVar x y h)
-  | nat_leq_vvar : forall x y l h, l <= h -> nat_leq T (VVar x y l) (VVar x y h)
-  | nat_leq_var_vvar : forall x y l h, Theta.MapsTo y GeZero T -> l <= h -> nat_leq T (Var x l) (VVar x y h).
-                                                                            
-                                                                       
+  | nat_leq_num_var : forall x l h, Theta.MapsTo x GeZero T -> l <= h -> nat_leq T (Num l) (Var x h).
+
 Lemma nat_leq_trans : forall T a b c,  nat_leq T a b -> nat_leq T b c -> nat_leq T a c.
 Proof.
   intros.
-  destruct a.
-  - destruct b.
-    + destruct c.
-      inv H. inv H0.
-      apply nat_leq_num. lia.
-      inv H. inv H0. try easy.
-      try easy.
-    + destruct c; inv H0; inv H.
-    + destruct c; inv H0; inv H.
-    + destruct c; inv H0; inv H.
-  - destruct b.
-    + destruct c.
-      inv H; inv H0.
-      try easy.
-      inv H. inv H0.
-    + destruct c. try easy.
-      inv H. inv H0. constructor. lia.
-      try easy.
-      inv H. inv H0. constructor. try easy. lia.
-    + destruct c. try easy.
-      try easy. try easy.
-      inv H.
-    + destruct c. try easy.
-      try easy. easy.
-      inv H. inv H0. constructor. easy. lia.
-  - destruct b.
-    + destruct c. try easy.
-      try easy.
-      try easy.
-      try easy.
-    + destruct c. try easy.
-      try easy.
-      try easy. try easy.
-    + destruct c. try easy.
-      try easy.
-      inv H. inv H0. constructor. lia.
-      try easy.
-    + destruct c. try easy. try easy. try easy. easy.
-  - destruct b.
-    + destruct c. easy. easy. easy. easy.
-    + destruct c. easy. easy. easy. easy.
-    + destruct c. easy. easy. easy. easy.
-    + destruct c. easy. easy. easy.
-      inv H. inv H0. constructor. lia.
+  destruct a. destruct b. destruct c.
+  inv H. inv H0.
+  apply nat_leq_num. lia.
+  inv H. inv H0. apply nat_leq_num_var; try easy. lia.
+  destruct c. inv H0.
+  inv H. inv H0.
+  constructor. easy. lia.
+  inv H. inv H0.
+  constructor. lia.
 Qed.
 
+Definition union := list (list var).
 
-Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
-  | SubTyRefl : forall t, subtype D Q t t
-  | SubTyTaintedNTArray : forall l h t, word_type t -> 
-                 subtype D Q (TPtr Tainted (TNTArray l h t)) (TPtr Unchecked t)
+Fixpoint union_find (env:union) (x:var) := 
+    match env with [] => None
+             | (xl::xll) => if find (fun y =>  Nat.eqb x y) xl then Some xl else union_find xll x
+    end.
+
+Fixpoint union_remove_find (env:union) (x:var) : option (list var * union) := 
+    match env with [] => None
+             | (xl::xll) => if find (fun y =>  Nat.eqb x y) xl then Some (xl,xll) 
+            else match union_remove_find xll x with None => None
+                | Some (yl,yll) => Some (yl,xl::yll)
+                 end
+    end.
+
+Fixpoint par_add (env:union) (x:var) (yl:list var) := 
+    match env with [] => [(x::yl)]
+                | (xl::xll) => if find (fun z =>  Nat.eqb x z) xl then (xl ++ yl)::xll else xl::(par_add xll x yl)
+    end.
+
+Definition union_add (env:union) (x y:var) := 
+    match union_remove_find env y with None => par_add env x [y]
+          | Some (xl,xll) => par_add xll x xl
+    end.
+
+Definition union_same (env:union) (x y:var) :=
+   match union_find env x with None => False
+                 | Some xl => if find (fun z => Nat.eqb y z) xl then True else False
+    end.
+
+Inductive ptr_mode_same (U:union) : ptrMode -> ptrMode -> Prop :=
+  | ptr_mode_num : forall t l, ptr_mode_same U (Some (t,NumPtr l)) (Some (t,NumPtr l))
+  | ptr_mode_var : forall t l h, union_same U l h -> ptr_mode_same U (Some (t,VarPtr l)) (Some (t,VarPtr h)).
+    
+
+Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop :=
+  | SubTyReflNat :  subtypeRef D U Q TNat TNat
+  | SubTypeReflPtr : forall pm pm' m t t', ptr_mode_same U pm pm' -> subtypeRef D U Q t t' -> subtypeRef D U Q (TPtr m pm t) (TPtr m pm' t').
+
+Inductive subtype (D : structdef) (U:union) (Q:theta) : type -> type -> Prop :=
+  | SubTyTaintedNTArray : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t' -> ptr_mode_same U pm pm' ->
+                 subtype D U Q (TPtr Tainted pm (TNTArray l h t)) (TPtr Unchecked pm' t').
+(*
+   change below to the same above the above rule.
+
   | SubTyTaintedArray  : forall l h t, word_type t ->  subtype D Q (TPtr Tainted (TArray l h t)) (TPtr Unchecked t)
   | SubTyTaintedStruct : forall T, subtype D Q (TPtr Tainted (TStruct T)) (TPtr Unchecked TNat)
   | SubTyBot : forall l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
@@ -434,7 +453,7 @@ Proof.
         eapply nat_leq_trans. apply H10. assumption.
 Qed.
 
-
+*)
 
 (* Defining stack. *)
 Module Stack := Map.Make Nat_as_OT.
@@ -451,7 +470,7 @@ Definition empty_arg_stack := @Stack.empty bound.
 Definition dyn_env := Stack.t type.
 
 Definition empty_dyn_env := @Stack.empty type.
-*)
+
 
 Definition cast_bound (s:stack) (b:bound) : option bound :=
   match b with
@@ -472,7 +491,7 @@ Inductive cast_type_bound (s:stack) : type -> type -> Prop :=
    | cast_type_bound_ntarray : forall l l' h h' t t', cast_bound s l = Some l' -> cast_bound s h = Some h' ->
                   cast_type_bound s t t' -> cast_type_bound s (TNTArray l h t) (TNTArray l' h' t')
    | cast_type_bound_struct : forall t, cast_type_bound s (TStruct t) (TStruct t).
-
+*)
 
 Inductive expression : Type :=
   | ELit : Z -> type -> expression
@@ -483,6 +502,7 @@ Inductive expression : Type :=
   | EDynCast : type -> expression -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : mode -> type -> expression
+  | EAlloca : mode -> type -> expression
   | ECast : type -> expression -> expression
   | EPlus : expression -> expression -> expression
   | EFieldAddr : expression -> field -> expression
