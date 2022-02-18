@@ -509,6 +509,8 @@ Inductive expression : Type :=
   | EDeref : expression -> expression (*  * e *)
   | EAssign : expression -> expression -> expression (* *e = e *)
   | EIfDef : var -> expression -> expression -> expression (* if * x then e1 else e2. *)
+  | EIfPtrEq : expression -> expression -> expression -> expression (* if e1 = e2 then e3 else e4. *)
+  | EIfPtrLt : expression -> expression -> expression -> expression (* if e1 < e2 then e3 else e4. *)
   | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
   | EUnchecked : expression -> expression.
 
