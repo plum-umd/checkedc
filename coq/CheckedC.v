@@ -105,18 +105,21 @@ Inductive bound : Set :=
 
 Inductive ptrType : Set := StaticType | HeapType.
 
+(*
 Inductive ptrName : Set := NumPtr : Z -> ptrName | VarPtr : var -> ptrName.
 
 Definition ptrMode := option (ptrType * ptrName).
+ *)
 
 Inductive type : Type :=
   | TNat : type
-  | TPtr : mode -> ptrMode -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
+  | TPtr : mode -> ptrType -> type -> type (* number of byptes. Num 0 represents a null pointer. *)
   | TStruct : struct -> type
   | TArray : bound -> bound -> type -> type
   | TNTArray : bound -> bound -> type -> type
   | TFun : type -> list type -> type.
 
+(*
 Definition ptrMode_dec (p1 p2: ptrMode): {p1 = p2} + {~ p1 = p2}.
   repeat decide equality.
 Defined.
@@ -125,27 +128,13 @@ Definition bound_dec (p1 p2: bound): {p1 = p2} + {~ p1 = p2}.
   repeat decide equality.
 Defined.
 
-(*
 Definition type_eq_dec (t1 t2 : type): {t1 = t2} + {~ t1 = t2}.
-  generalize dependent t1.
-  generalize dependent t2.
-  decide equality.
-  apply ptrMode_dec.
-  decide equality.
-  decide equality.
-  apply bound_dec.
-  apply bound_dec.
-  apply bound_dec.
-  apply bound_dec.
-  Check list_eq_dec.
-  apply list_eq_dec.
-  decide equality.
+  repeat decide equality.
 Defined.
 *)
 
 (** Word types, <<t>>, are either numbers, [WTNat], or pointers, [WTPtr].
     Pointers must be annotated with a [mode] and a (compound) [type]. *)
-
 
 Inductive word_type : type -> Prop :=
   | WTNat : word_type (TNat)
@@ -200,6 +189,7 @@ Inductive well_bound_in : env -> bound -> Prop :=
    | well_bound_in_num : forall env n, well_bound_in env (Num n)
    | well_bound_in_var : forall env x y, Env.MapsTo x TNat env -> well_bound_in env (Var x y).
 
+(*
 Definition well_ptr_bound_in (env:env) (p:ptrMode) :=
    match p with None => True
            | Some (t,a) => 
@@ -207,12 +197,11 @@ Definition well_ptr_bound_in (env:env) (p:ptrMode) :=
                       | NumPtr n => True
              end
    end.
-
+*)
 
 Inductive well_type_bound_in : env -> type -> Prop :=
    | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
-   | well_type_bound_in_ptr : forall m pm t env, well_ptr_bound_in env pm ->
-                       well_type_bound_in env t -> well_type_bound_in env (TPtr m pm t)
+   | well_type_bound_in_ptr : forall m pm t env, well_type_bound_in env t -> well_type_bound_in env (TPtr m pm t)
    | well_type_bound_in_struct : forall env T, well_type_bound_in env (TStruct T)
    | well_type_bound_in_array : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
                                       well_type_bound_in env t -> well_type_bound_in env (TArray l h t)
@@ -222,8 +211,7 @@ Inductive well_type_bound_in : env -> type -> Prop :=
 (* Definition of simple type meaning that no bound variables. *)
 Inductive simple_type : type -> Prop := 
   | SPTNat : simple_type TNat
-  | SPTPtrNone : forall m w, simple_type w -> simple_type (TPtr m None w)
-  | SPTPtrSome : forall m t n w, simple_type w -> simple_type (TPtr m (Some (t,NumPtr n)) w)
+  | SPTPtr : forall m w pm, simple_type w -> simple_type (TPtr m pm w)
   | SPTStruct : forall t, simple_type (TStruct t)
   | SPTArray : forall l h t, simple_type t -> simple_type (TArray (Num l) (Num h) t)
   | SPTNTArray : forall l h t, simple_type t -> simple_type (TNTArray (Num l) (Num h) t).
@@ -343,48 +331,46 @@ Definition union_same (env:union) (x y:var) :=
                  | Some xl => if find (fun z => Nat.eqb y z) xl then True else False
     end.
 
+(*
 Inductive ptr_mode_same (U:union) : ptrMode -> ptrMode -> Prop :=
   | ptr_mode_num : forall t l, ptr_mode_same U (Some (t,NumPtr l)) (Some (t,NumPtr l))
   | ptr_mode_var : forall t l h, union_same U l h -> ptr_mode_same U (Some (t,VarPtr l)) (Some (t,VarPtr h)).
-    
+*)    
 
+(*
 Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop :=
   | SubTyReflNat :  subtypeRef D U Q TNat TNat
   | SubTypeReflPtr : forall pm pm' m t t', ptr_mode_same U pm pm' 
        -> subtypeRef D U Q t t' -> subtypeRef D U Q (TPtr m pm t) (TPtr m pm' t').
-
-Inductive subtype (D : structdef) (U:union) (Q:theta) : type -> type -> Prop :=
-  | SubTypeFun : forall pm pm' t t' tl tl', ptr_mode_same U pm pm' -> subtype D U Q t' t ->
-               (forall n ta tb, nth_error tl n = Some ta -> nth_error tl' n = Some tb -> subtype D U Q ta tb) ->
-                                             subtype D U Q (TPtr Checked pm (TFun t tl)) (TPtr Checked pm' (TFun t' tl'))
-  | SubTyTaintedNTArray : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t' -> ptr_mode_same U pm pm' ->
-                                             subtype D U Q (TPtr Tainted pm (TNTArray l h t)) (TPtr Unchecked pm' t')
-  | SubTyTaintedArray : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t' -> ptr_mode_same U pm pm' ->
-                                           subtype D U Q (TPtr Tainted pm (TArray l h t)) (TPtr Unchecked pm' t')
-  | SubTyTaintedStruct : forall pm pm' T, ptr_mode_same U pm pm' ->
-            subtype D U Q (TPtr Tainted pm (TStruct T)) (TPtr Unchecked pm' TNat)
-  | SubTyBot : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t' ->
-                ptr_mode_same U pm pm' -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
-                        -> subtype D U Q (TPtr Checked pm t) (TPtr Checked pm' (TArray l h t'))
-  | SubTyOne : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t'
-                      -> ptr_mode_same U pm pm' -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h 
-                        -> subtype D U Q (TPtr Checked pm t) (TPtr Checked pm' t')
-  | SubTyOneNT : forall pm pm' l h t t', word_type t -> subtypeRef D U Q t t' -> 
-                   ptr_mode_same U pm pm' -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h 
-                           -> subtype D U Q (TPtr Checked pm (TNTArray l h t)) (TPtr Checked pm' t')
-  | SubTySubsume : forall pm pm' l h l' h' t m, ptr_mode_same U pm pm' -> nat_leq Q l l' 
-                              -> nat_leq Q h' h -> subtype D U Q (TPtr m pm (TArray l h t)) (TPtr m pm' (TArray l' h' t))
-  | SubTyNtArray : forall pm pm' l h l' h' t m, ptr_mode_same U pm pm' -> nat_leq Q l l'
-                           -> nat_leq Q h' h -> subtype D U Q (TPtr m pm (TNTArray l h t)) (TPtr m pm' (TArray l' h' t))
-  | SubstNtSubsume : forall pm pm' l h l' h' t m, ptr_mode_same U pm pm' 
-                -> nat_leq Q l l' -> nat_leq Q h' h -> subtype D U Q (TPtr m pm (TNTArray l h t)) (TPtr m pm' (TNTArray l' h' t))
-  | SubTyStructArrayFielf_1 :  forall (T : struct) (fs : fields) pm pm', ptr_mode_same U pm pm'
-              -> StructDef.MapsTo T fs D -> Some (TNat) = (Fields.find 0%nat fs) -> 
-                             subtype D U Q (TPtr Checked pm (TStruct T)) (TPtr Checked pm' (TNat))
-  | SubTyStructArrayField_2 :  forall (T : struct) (fs : fields) pm pm' l h, ptr_mode_same U pm pm' 
-             -> StructDef.MapsTo T fs D -> Some (TNat) = (Fields.find 0%nat fs) -> nat_leq Q (Num 0) l 
-                -> nat_leq Q h (Num 1) -> subtype D U Q (TPtr Checked pm (TStruct T)) (TPtr Checked pm' (TArray l h (TNat))).
-   
+*)
+Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
+  | SubTypeFun : forall pm t t' tl tl', pm = StaticType -> subtype D Q t' t ->
+               (forall n ta tb, nth_error tl n = Some ta -> nth_error tl' n = Some tb -> subtype D Q ta tb) ->
+                                             subtype D Q (TPtr Checked pm (TFun t tl)) (TPtr Checked pm (TFun t' tl'))
+  | SubTyRefl : forall t, subtype D Q t t
+  | SubTyBot : forall pm m l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
+                           -> subtype D Q (TPtr m pm t) (TPtr m pm (TArray l h t))
+  | SubTyOne : forall pm m l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
+                             -> subtype D Q (TPtr m pm (TArray l h t)) (TPtr m pm t)
+  | SubTyOneNT : forall pm m l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
+                             -> subtype D Q (TPtr m pm (TNTArray l h t)) (TPtr m pm t)
+  | SubTySubsume : forall pm l h l' h' t m,
+    nat_leq Q l l' -> nat_leq Q h' h -> 
+    subtype D Q (TPtr m pm (TArray l h t)) (TPtr m pm (TArray l' h' t))
+  | SubTyNtArray : forall pm l h l' h' t m,
+    nat_leq Q l l' -> nat_leq Q h' h ->
+                subtype D Q (TPtr m pm (TNTArray l h t)) (TPtr m pm (TArray l' h' t))
+  | SubTyNtSubsume : forall pm l h l' h' t m,
+    nat_leq Q l l' -> nat_leq Q h' h -> 
+    subtype D Q (TPtr m pm (TNTArray l h t)) (TPtr m pm (TNTArray l' h' t))
+  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m pm,
+    StructDef.MapsTo T fs D ->
+    Some (TNat) = (Fields.find 0%nat fs) ->
+    subtype D Q (TPtr m pm (TStruct T)) (TPtr m pm (TNat))
+  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) pm m l h,
+    StructDef.MapsTo T fs D ->
+    Some (TNat) = (Fields.find 0%nat fs) -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+    subtype D Q (TPtr m pm (TStruct T)) (TPtr m pm (TArray l h (TNat))).
 (* Subtyping transitivity. *)
 (*
 Lemma subtype_trans : forall D Q t t' m w, subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'.
