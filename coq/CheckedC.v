@@ -877,16 +877,16 @@ Inductive eval_type_bound (s:stack) : type -> type -> Prop :=
    | eval_type_bound_ntarray : forall l l' h h' t t', eval_bound s l = Some l' -> eval_bound s h = Some h' ->
                   eval_type_bound s t t' -> eval_type_bound s (TNTArray l h t) (TNTArray l' h' t')
    | eval_type_bound_struct : forall t, eval_type_bound s (TStruct t) (TStruct t).
-
+(*
 Definition eval_base (s:stack) (b:ptrMode) : ptrMode :=
    match b with None => None
              | Some (t,NumPtr x) => Some (t, NumPtr x)
              | Some (t,VarPtr x) => match (Stack.find x s) with Some (v,ta) => Some (t,NumPtr v) | _ => None end
    end.
-
+*)
 Inductive eval_type_base (s:stack) : type -> type -> Prop :=
    | cast_type_base_nat : eval_type_base s (TNat) (TNat)
-   | cast_type_base_ptr : forall c pm t t', eval_type_base s (TPtr c pm t) (TPtr c (eval_base s pm) t')
+   | cast_type_base_ptr : forall c pm t t', eval_type_base s (TPtr c pm t) (TPtr c pm t')
    | cast_type_base_array : forall l h t t', 
                   eval_type_base s t t' -> eval_type_base s (TArray l h t) (TArray l h t')
    | cast_type_base_ntarray : forall l h t t', 
@@ -1076,13 +1076,13 @@ Definition scope_set_add (v:Z) (t:type) (s:scope) :=
                | _ => s
      end.
 *)
-
+(*
 Definition add_pm (pm:ptrMode) i :=
    match pm with None => None
            | Some (t,NumPtr n) => Some (t, (NumPtr (n+(Z_of_nat i))))
            | a => a
    end.
-
+*)
 
 Inductive well_typed_lit (D : structdef) (U: union) (Q:theta) (H : heap) : scope -> Z -> type -> Prop :=
   | TyLitInt : forall s n,
@@ -1177,14 +1177,13 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       (Stack.MapsTo x (v,t) s) ->
       step D U F s H (EVar x) s H (RExpr (ELit v t))
   | StrlenChecked : forall s H1 H2 x pm n n' l h t t1, 
-     h > n -> l <= n -> 0 <= n' -> pm <> None ->
+     h > n -> l <= n -> 0 <= n' ->
      (Stack.MapsTo x (n,(TPtr Checked pm (TNTArray (Num l) (Num h) t))) s) ->
      (forall i , n <= i < n+n'+1 -> (exists n1, Heap.MapsTo i (n1,t1) H1 /\ n1 <> 0))
       -> Heap.MapsTo (n+n'+1) (0,t1) H1 ->
             step D U F s (H1,H2) (EStrlen x) (change_strlen_stack s x Checked pm t l n n' h) (H1,H2) (RExpr (ELit n' TNat))
-
   | StrlenTainted : forall s H1 H2 x pm n n' l h t t1, 
-     h > n -> l <= n -> 0 <= n' -> pm <> None ->
+     h > n -> l <= n -> 0 <= n' ->
      (Stack.MapsTo x (n,(TPtr Tainted pm (TNTArray (Num l) (Num h) t))) s) ->
      (forall i , n <= i < n+n'+1 -> (exists n1, Heap.MapsTo i (n1,t1) H2 /\ n1 <> 0 
               /\ well_typed_lit D U empty_theta H2 empty_scope n1 t1))
@@ -1195,10 +1194,11 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
      (Stack.MapsTo x (n,(TPtr Unchecked pm t)) s) ->
      (forall i , n <= i < n+n'+1 -> (exists n1, Heap.MapsTo i (n1,t1) H2 /\ n1 <> 0))
       -> Heap.MapsTo (n+n'+1) (0,t1) H2 ->
-            step D U F s (H1,H2) (EStrlen x) s (H1,H2) (RExpr (ELit n' TNat))
+      step D U F s (H1,H2) (EStrlen x) s (H1,H2) (RExpr (ELit n' TNat))
+ (*          
   | StrlenNone : forall s H1 H2 x m  n l h t, m <> Unchecked ->
-     (Stack.MapsTo x (n,(TPtr m None (TNTArray l h t))) s) ->
-            step D U F s (H1,H2) (EStrlen x) s (H1,H2) (RNull)
+     (Stack.MapsTo x (n,(TPtr m  (TNTArray l h t))) s) ->
+            step D U F s (H1,H2) (EStrlen x) s (H1,H2) (RNull).
 
   | StrlenHighOOB : forall s H x m pm n t l h,
       h <= n -> m <> Unchecked ->
@@ -1208,7 +1208,8 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       l > n -> m <> Unchecked ->
      (Stack.MapsTo x (n,(TPtr m pm (TNTArray (Num l) h t))) s) ->
       step D U F s H (EStrlen x) s H RBounds
-  | StrlenNull : forall s H x t m pm n l h,
+*)  
+| StrlenNull : forall s H x t m pm n l h,
       n <= 0 -> m <> Unchecked ->
      (Stack.MapsTo x (n,(TPtr m pm (TNTArray l h t))) s) ->
       step D U F s H (EStrlen x) s H RNull
@@ -1264,6 +1265,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s H (EDynCast t (ELit n t'))
          s H (RExpr (ELit n (TPtr Checked pm (TArray (Num l) (Num h) w))))
+  (*
   | SCastArrayLowOOB1 : forall s H t n pm t' l h w l' h' w',
      eval_type_bound s t (TPtr Checked pm (TArray (Num l) (Num h) w)) ->
       eval_type_bound s t' (TPtr Checked pm (TArray (Num l') (Num h') w')) ->
@@ -1279,11 +1281,13 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       eval_type_bound s t' (TPtr Checked pm (TArray (Num l') (Num h') w')) ->
            h' < h -> 
            step D U F s H (EDynCast t (ELit n t')) s H RBounds
+*)
   | SCastNTArray : forall s H t n pm t' l h w l' h' w',
      eval_type_bound s t (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ->
       eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
           l' <= l -> l < h -> h <= h' ->
-      step D U F s H (EDynCast t (ELit n t')) s H (RExpr (ELit n (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ))
+          step D U F s H (EDynCast t (ELit n t')) s H (RExpr (ELit n (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ))
+               (*
   | SCastNTArrayLowOOB1 : forall s H t n pm t' l h w l' h' w',
      eval_type_bound s t (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ->
       eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
@@ -1299,26 +1303,28 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
            h' < h -> 
            step D U F s H (EDynCast t (ELit n t')) s H RBounds
+*)
   | SDerefChecked : forall s H1 H2 n pm n1 t1 t t2 tv,
-      eval_type_bound s (TPtr Checked pm t) t2 -> pm <> None ->
+      eval_type_bound s (TPtr Checked pm t) t2 ->
       Heap.MapsTo n (n1, t1) H1 ->
       (forall l h t', t2 = TPtr Checked pm (TArray (Num l) (Num h) t') -> l <= n < h) ->
       (forall l h t', t2 = TPtr Checked pm (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
       @get_root D t2 tv ->
       step D U F s (H1,H2) (EDeref (ELit n (TPtr Checked pm t))) s (H1,H2) (RExpr (ELit n1 tv))
   | SDerefTainted : forall s H1 H2 n pm n1 t1 t t2 tv,
-      eval_type_bound s (TPtr Tainted pm t) t2 -> pm <> None ->
+      eval_type_bound s (TPtr Tainted pm t) t2 ->
       Heap.MapsTo n (n1, t1) H2 -> well_typed_lit D U empty_theta H2 empty_scope n1 t1 ->
       (forall l h t', t2 = TPtr Tainted pm (TArray (Num l) (Num h) t') -> l <= n < h) ->
       (forall l h t', t2 = TPtr Tainted pm (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
       @get_root D t2 tv ->
       step D U F s (H1,H2) (EDeref (ELit n (TPtr Tainted pm t))) s (H1,H2) (RExpr (ELit n1 tv))
+           (*
   | SDerefNone : forall s H1 H2 m n pm n1 t1 t t2 tv,
       eval_type_bound s (TPtr m pm t) t2 -> m <> Unchecked -> pm = None ->
       Heap.MapsTo n (n1, t1) H2 -> 
       @get_root D t2 tv ->
       step D U F s (H1,H2) (EDeref (ELit n (TPtr m pm t))) s (H1,H2) RNull
-
+*)
 (* Add two rules for when pm = None. *)
 
   | SDerefUnChecked : forall s H1 H2 m pm n n1 t1 t t2 tv,
@@ -1327,6 +1333,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       m <> Checked ->
       @get_root D t2 tv ->
       step D U F s (H1,H2) (EDeref (ELit n (TPtr m pm t))) s (H1,H2) (RExpr (ELit n1 tv))
+           (*
   | SDerefHighOOB : forall s H n t t' h,
       h <= n ->
       eval_type_bound s t t' ->
@@ -1340,9 +1347,9 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
   | SDerefNull : forall s H pm t n,
       n <= 0 -> pm = None ->
       step D U F s H (EDeref (ELit n (TPtr Checked pm t))) s H RNull
-
+*)
   | SAssignChecked : forall s H1 H2 n pm t na ta tv n1 t1 tv',
-      Heap.MapsTo n (na,ta) H1 -> pm <> None ->
+      Heap.MapsTo n (na,ta) H1 ->
       eval_type_bound s (TPtr Checked pm t) tv ->
       (forall l h t', tv = TPtr Checked pm (TArray (Num l) (Num h) t') -> l <= n < h) -> 
       (forall l h t', tv = TPtr Checked pm (TNTArray (Num l) (Num h) t') -> l <= n < h) -> 
@@ -1352,7 +1359,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
          s (Heap.add n (n1, ta) H1,H2) (RExpr (ELit n1 tv'))
 
   | SAssignTainted : forall s H1 H2 n pm t na ta tv n1 t1 tv',
-      Heap.MapsTo n (na,ta) H2 -> pm <> None ->
+      Heap.MapsTo n (na,ta) H2 ->
           well_typed_lit D U empty_theta H2 empty_scope na ta ->
       eval_type_bound s (TPtr Tainted pm t) tv ->
       (forall l h t', tv = TPtr Tainted pm (TArray (Num l) (Num h) t') -> l <= n < h) -> 
@@ -1361,7 +1368,8 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s (H1,H2)  (EAssign (ELit n (TPtr Tainted pm t)) (ELit n1 t1))
          s (Heap.add n (n1, ta) H1,H2) (RExpr (ELit n1 tv'))
-         
+
+   (*      
   | SAssignNone : forall s H1 H2 m n pm t na ta tv n1 t1 tv',
       Heap.MapsTo n (na,ta) H2 -> m <> Unchecked -> pm = None ->
       eval_type_bound s (TPtr m pm t) tv ->
@@ -1369,6 +1377,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s (H1,H2)  (EAssign (ELit n (TPtr m pm t)) (ELit n1 t1))
          s (Heap.add n (n1, ta) H1,H2) RNull
+*)
 (* Add two rules for when pm = None. *)
 
   | SAssignUnChecked : forall s H1 H2 m pm n t na ta tv n1 t1 tv',
@@ -1378,6 +1387,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s (H1,H2)  (EAssign (ELit n (TPtr m pm t)) (ELit n1 t1))
          s (H1,Heap.add n (n1, ta) H2) (RExpr (ELit n1 tv'))
+         (*
   | SAssignHighOOB : forall s H n t t' n1 t1 h,
       h <= n ->
       eval_type_bound s t t' ->
@@ -1399,6 +1409,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       pm = None ->
       step D U F
          s H (EAssign (ELit n1 t) (ELit n t')) s H RNull
+*)
   | SFieldAddrChecked : forall s H n pm t (fi : field) n0 t0 T fs i fi ti,
       n > 0 ->
       t = TPtr Checked pm (TStruct T) ->
@@ -1406,22 +1417,21 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
       n0 = n + Z.of_nat(i) ->
-      t0 = TPtr Checked (add_pm pm i) ti ->
+      t0 = TPtr Checked pm ti ->
       word_type ti ->
       step D U F
          s H (EFieldAddr (ELit n t) fi)
          s H (RExpr (ELit n0 t0))
-
+(*
   | SFieldAddrCheckedNone : forall s H n t T (fi : field),
       n > 0 ->
       t = TPtr Checked None (TStruct T) ->
       step D U F
          s H (EFieldAddr (ELit n t) fi)
          s H (RNull)
-
+*)
   | SFieldAddrTainted : forall s H n pm t (fi : field) n0 t0 T fs i fi ti,
-      n > 0 -> pm <> None ->
-      t = TPtr Tainted pm (TStruct T) ->
+      n > 0 -> t = TPtr Tainted pm (TStruct T) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
@@ -1432,14 +1442,14 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s H (EFieldAddr (ELit n t) fi)
          s H (RExpr (ELit n0 t0))
-
+         
   | SFieldAddrNull : forall s H (fi : field) m n T pm,
       n <= 0 -> m <> Unchecked  ->
       step D U F
          s H (EFieldAddr (ELit n (TPtr m pm (TStruct T))) fi)
          s H RNull
+         
   | SFieldAddr : forall s H n t (fi : field) n0 t0 T fs i fi ti pm,
-      pm <>  None ->
       t = TPtr Unchecked pm (TStruct T) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
@@ -1450,19 +1460,19 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
         s H (EFieldAddr (ELit n t) fi)
         s H (RExpr (ELit n0 t0))
-  | SMallocChecked : forall s H1 H2 w w' H1' n1,
+  | SMallocChecked : forall s H1 H2 w w' H1' n1 pm,
       eval_type_bound s w w' -> malloc_bound w' ->
       allocate D H1 w' = Some (n1, H1') ->
       step D U F
          s (H1,H2) (EMalloc Checked w)
-         s (H1',H2) (RExpr (ELit n1 (TPtr Checked (Some (HeapType,NumPtr n1)) w')))
-
+         s (H1',H2) (RExpr (ELit n1 (TPtr Checked pm w')))
   | SMallocUnChecked : forall s H1 H2 m w w' H2' n1 pm,
-      eval_type_bound s w w' -> malloc_bound w' -> m <> Checked -> pm <> None ->
+      eval_type_bound s w w' -> malloc_bound w' -> m <> Checked ->
       allocate D H2 w' = Some (n1, H2') ->
       step D U F
          s (H1,H2) (EMalloc m w)
          s (H1,H2') (RExpr (ELit n1 (TPtr m pm w')))
+         (*
   | SMallocHighOOB : forall s H m w t' h l,
       h <= l ->
       eval_type_bound s w t' ->
@@ -1475,7 +1485,7 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       eval_type_bound s w t' ->
       get_low t' = Some (Num l) ->
       step D U F s H (EMalloc m w)  s H RBounds
-
+*)
   | SUnchecked : forall s H n,
       step D U F s H (EUnchecked (ELit n TNat)) s H (RExpr (ELit n TNat))
    | SIfDefTrueNotNTHit : forall s H x n t e1 e2 n1 t1, 
@@ -1507,7 +1517,6 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
            step D U F s H (EIfPtrLt (ELit n t) (ELit n' t') e1 e2) s H (RExpr e1)
   | SIfLtFalse : forall s H n n' t t' e1 e2,  n' <= n ->
            step D U F s H (EIfPtrLt (ELit n t) (ELit n' t') e1 e2) s H (RExpr e2).
-
 
 Hint Constructors step.
 
@@ -1594,17 +1603,17 @@ Inductive type_eq (S : stack) : type -> type -> Prop :=
      | type_eq_right: forall t1 t2, simple_type t2 -> eval_type_bound S t1 t2 -> type_eq S t1 t2.
 
 (* subtyping relation based on types. *)
-Inductive subtype_stack (D: structdef) (U:union) (Q:theta) (S:stack) : type -> type -> Prop :=
-     | subtype_same : forall t t', subtype D U Q t t' -> subtype_stack D U Q S t t'
+Inductive subtype_stack (D: structdef) (Q:theta) (S:stack) : type -> type -> Prop :=
+     | subtype_same : forall t t', subtype D Q t t' -> subtype_stack D Q S t t'
      | subtype_left : forall t1 t2 t2', simple_type t1 -> eval_type_bound S t2 t2'
-            -> subtype D U Q t1 t2' -> subtype_stack D U Q S t1 t2
+            -> subtype D Q t1 t2' -> subtype_stack D Q S t1 t2
      | subtype_right : forall t1 t1' t2, simple_type t2 -> eval_type_bound S t1 t1'
-            -> subtype D U Q t1' t2 -> subtype_stack D U Q S t1 t2.
+            -> subtype D Q t1' t2 -> subtype_stack D Q S t1 t2.
 
 (* The join opeartions. *)
-Inductive join_type (D : structdef) (U:union) (Q:theta) (S:stack) : type -> type -> type -> Prop :=
-   join_type_front : forall a b, subtype_stack D U Q S a b -> join_type D U Q S a b b
-  | join_type_end : forall a b, subtype_stack D U Q S b a -> join_type D U Q S a b a.
+Inductive join_type (D : structdef) (Q:theta) (S:stack) : type -> type -> type -> Prop :=
+   join_type_front : forall a b, subtype_stack D Q S a b -> join_type D Q S a b b
+  | join_type_end : forall a b, subtype_stack D Q S b a -> join_type D Q S a b a.
 
 Definition good_lit (H:heap) (n:Z) (t:type):=
       match t with TNat => True
@@ -1631,7 +1640,7 @@ Inductive well_typed_arg (D: structdef) (U:union) (Q:theta) (H : real_heap) (env
      | ArgLitChecked : forall n t t',
       simple_type t ->
       @well_typed_lit D U Q (fst H) empty_scope n t' ->
-      subtype D U Q t' t ->
+      subtype D Q t' t ->
       well_typed_arg D U Q H env Checked (ELit n t') t
      | ArgLitUnChecked : forall n t t',
       simple_type t ->
@@ -1639,7 +1648,7 @@ Inductive well_typed_arg (D: structdef) (U:union) (Q:theta) (H : real_heap) (env
      | ArgVar : forall m x t t',
       Env.MapsTo x t' env -> 
       well_type_bound_in env t ->
-      subtype D U Q t' t ->
+      subtype D Q t' t ->
       well_typed_arg D U Q H env m (EVar x) t.
 
 Inductive well_typed_args {D: structdef} {U:union} {Q:theta} {H : real_heap}: 
@@ -1857,12 +1866,23 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       Env.MapsTo x t env ->
       well_typed env U Q m (EVar x) t
 
-  | TyCall : forall env U Q pm m m' es x tvl t, 
-        (* get_dept_map tvl es = Some s -> *)
+  | TyCallStatic : forall env U Q pm m m' es x tvl t, 
+      (* get_dept_map tvl es = Some s -> *)
+        pm = StaticType ->
         fun_mode_eq m' m ->
         Env.MapsTo x (TPtr m' pm (TFun t tvl)) env ->
         @well_typed_args D U Q H env m es tvl ->
-           well_typed env U Q m (ECall x es) t
+        well_typed env U Q m (ECall x es) t
+
+(*
+  | TyCallHeap : forall env U Q pm m m' es x tvl t, 
+      (* get_dept_map tvl es = Some s -> *)
+        pm = HeapType ->
+        fun_mode_eq m' m ->
+        Env.MapsTo x (TPtr m' pm (TFun t tvl)) env ->
+        @well_typed_args D U Q H env m es tvl ->
+        well_typed env U Q m (ECall x es) t.
+*)
 
   | TyStrlen : forall env U Q x pm m m' h l t, 
       Env.MapsTo x (TPtr m' pm (TNTArray h l t)) env ->
@@ -1884,9 +1904,9 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       In x (get_tvars t) -> get_good_dept e1 = Some b ->
       well_typed env U Q m (ELet x e1 e2) (subst_type [(x,b)] t)
 
-  | TyLetPtrSame1 : forall env U Q ptr px m m' x e1 t1 e2 t,
+  | TyLetPtrSame1 : forall env U Q px pm m m' x e1 t1 e2 t,
       ~ Env.In x env ->
-      well_typed env U Q m e1 (TPtr m' (Some (ptr,VarPtr px)) t) ->
+      well_typed env U Q m e1 (TPtr m' pm t) ->
       well_typed (Env.add x t1 env) (union_add U x px) Q m e2 t ->
       ~ In x (get_tvars t) ->
         mode_leq m' m ->
@@ -1929,11 +1949,11 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
       well_typed env U Q m (EFieldAddr e fi) (TPtr m' pm ti)
 *)
-  | TyMallocChecked : forall env x m U Q w t e2,
+  | TyMallocChecked : forall env x m U Q w t e2 pm,
       ~ Env.In x env ->
       mode_leq m Checked ->
       well_type_bound_in env w ->
-      well_typed (Env.add x (TPtr Checked (Some (HeapType, VarPtr x)) w) env) (([x])::U) Q Checked e2 t ->
+      well_typed (Env.add x (TPtr Checked pm w) env) (([x])::U) Q Checked e2 t ->
       well_typed env U Q Checked (ELet x (EMalloc m w) e2) t
 
   | TyUnchecked : forall env U Q m e,
@@ -1947,31 +1967,31 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
   | TyCast2 : forall env U Q pm m m' t e t',
       well_type_bound_in env t ->
       well_typed env U Q Checked e t' -> 
-      subtype_stack D U Q S t' (TPtr m' pm t) ->
-      well_typed env U Q Checked (ECast (TPtr m None t) e) (TPtr m' pm t)
+      subtype_stack D Q S t' (TPtr m' pm t) ->
+      well_typed env U Q Checked (ECast (TPtr m pm t) e) (TPtr m' pm t)
 
   | TyDynCast1 : forall env U Q pm m e x y u v t t',
       well_type_bound_in env (TPtr m pm (TArray x y t)) ->
       well_typed env U Q Checked e (TPtr m pm (TArray u v t')) ->
       type_eq S t t' ->
       mode_leq m Checked ->
-      well_typed env U Q Checked (EDynCast (TPtr m None (TArray x y t)) e) (TPtr m pm (TArray x y t))
+      well_typed env U Q Checked (EDynCast (TPtr m pm (TArray x y t)) e) (TPtr m pm (TArray x y t))
   | TyDynCast2 : forall env U Q pm m e x y t t',
       ~ is_array_ptr (TPtr Checked pm t') ->
       type_eq S t t' ->
       well_type_bound_in env (TPtr m pm (TArray x y t)) ->
       well_typed env U Q m e (TPtr Checked pm t') ->
       mode_leq m Checked ->
-      well_typed env U Q Checked (EDynCast (TPtr m None (TArray x y t)) e) (TPtr m pm (TArray (Num 0) (Num 1) t))
+      well_typed env U Q Checked (EDynCast (TPtr m pm (TArray x y t)) e) (TPtr m pm (TArray (Num 0) (Num 1) t))
   | TyDynCast3 : forall env U Q pm m e x y u v t t',
       well_type_bound_in env (TPtr m pm (TNTArray x y t)) ->
       type_eq S t t' ->
       well_typed env U Q Checked e (TPtr m pm (TNTArray u v t')) ->
       mode_leq m Checked ->
-      well_typed env U Q Checked (EDynCast (TPtr m None (TNTArray x y t)) e) (TPtr m pm (TNTArray x y t))
+      well_typed env U Q Checked (EDynCast (TPtr m pm (TNTArray x y t)) e) (TPtr m pm (TNTArray x y t))
   | TyDeref : forall env U Q pm m e m' t l h t' t'',
-      well_typed env U Q m e t -> pm <> None ->
-      subtype D U Q t (TPtr m' pm t'') -> 
+      well_typed env U Q m e t ->
+      subtype D Q t (TPtr m' pm t'') -> 
       ((word_type t'' /\ t'' = t') 
        \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D  m' t')
        \/ (t'' = TNTArray l h t' /\ word_type t') /\ type_wf D  m' t') ->
@@ -1992,20 +2012,20 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       well_typed env Q m (EDeref (EPlus e1 e2)) t
 *)
   | TyAssign1 : forall env U Q pm m e1 e2 m' t t1,
-      subtype_stack D U Q S t1 t -> word_type t -> pm <> None ->
+      subtype_stack D Q S t1 t -> word_type t ->
       well_typed env U Q m e1 (TPtr m' pm t) ->
       well_typed env U Q m e2 t1 ->
       mode_leq m' m ->
       well_typed env U Q m (EAssign e1 e2) t
   | TyAssign2 : forall env U Q pm m e1 e2 m' l h t t',
-      word_type t -> type_wf D m' t -> subtype_stack D U Q S t' t ->
-      well_typed env U Q m e1 (TPtr m' pm (TArray l h t)) -> pm <> None ->
+      word_type t -> type_wf D m' t -> subtype_stack D Q S t' t ->
+      well_typed env U Q m e1 (TPtr m' pm (TArray l h t)) ->
       well_typed env U Q m e2 t' ->
       mode_leq m' m ->
       well_typed env U Q m (EAssign e1 e2) t
   | TyAssign3 : forall env  U Q pm m e1 e2 m' l h t t',
       word_type t -> type_wf D m' t -> 
-     subtype_stack D U Q S t' t -> pm <> None ->
+     subtype_stack D Q S t' t  ->
       well_typed env U Q m e1 (TPtr m' pm (TNTArray l h t)) ->
       well_typed env U Q m e2 t' ->
       mode_leq m' m ->
@@ -2030,12 +2050,12 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
 *)
   | TyIfDef : forall env U Q pm m m' x t t1 e1 e2 t2 t3 t4,
       Env.MapsTo x t env ->
-      subtype D U Q t (TPtr m' pm t1) ->
+      subtype D Q t (TPtr m' pm t1) ->
       (exists l h t', (word_type t1 /\ t1 = t')
          \/ (t1 = TArray l h t' /\ word_type t' /\ type_wf D m' t')
        \/ (t1 = TNTArray l h t' /\ word_type t' /\ type_wf D m' t')) ->
       well_typed env U Q m e1 t2 -> well_typed env U Q m e2 t3 ->
-      join_type D U Q S t2 t3 t4 -> 
+      join_type D Q S t2 t3 t4 -> 
       mode_leq m' m ->
       well_typed env U Q m (EIfDef x e1 e2) t4
 
@@ -2043,7 +2063,7 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       Env.MapsTo x (TPtr m' pm (TNTArray l (Var x 0) t)) env ->
       well_typed (Env.add x (TPtr m' pm (TNTArray l (Var x 1) t)) env) U Q m e1 t2 
         -> well_typed env U Q m e2 t3 ->
-      join_type D U Q S t2 t3 t4 -> 
+      join_type D Q S t2 t3 t4 -> 
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env U Q m (EIfDef x e1 e2) t4
 
@@ -2052,7 +2072,7 @@ Inductive well_typed { D : structdef } {S:stack} {H:real_heap}
       well_typed env U Q m e1 TNat ->
       well_typed env U Q m e2 t2 ->
       well_typed env U Q m e3 t3 ->
-      join_type D U Q S t2 t3 t4 -> 
+      join_type D Q S t2 t3 t4 -> 
       well_typed env U Q m (EIf e1 e2 e3) t4. 
 
 
