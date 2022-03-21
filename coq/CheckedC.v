@@ -517,6 +517,7 @@ Inductive expression : Type :=
   | EPlus : expression -> expression -> expression
   | EFieldAddr : expression -> field -> expression
   | EDeref : expression -> expression (*  * e *)
+  | EFunAssign : expression -> var -> expression (* *e = f *)
   | EAssign : expression -> expression -> expression (* *e = e *)
   | EIfDef : var -> expression -> expression -> expression (* if * x then e1 else e2. *)
   | EIfPtrEq : expression -> expression -> expression -> expression -> expression (* if e1 = e2 then e3 else e4. *)
@@ -612,6 +613,9 @@ Inductive expr_wf (D : structdef) (F:FEnv) : expression -> Prop :=
   | WFEDeref : forall e,
       expr_wf D F e ->
       expr_wf D F (EDeref e)
+  | WFEFunAssign : forall e1 e2,
+      expr_wf D F e1 ->
+      expr_wf D F (EFunAssign e1 e2)
   | WFEAssign : forall e1 e2,
       expr_wf D F e1 ->
       expr_wf D F e2 ->
@@ -763,6 +767,7 @@ Inductive context : Type :=
   | CDynCast : type -> context -> context
   | CCast : type -> context -> context
   | CDeref : context -> context
+  | CFunAssign : context -> var -> context
   | CAssignL : context -> expression -> context
   | CAssignR : Z -> type -> context -> context
   | CRet : var -> (Z*type) -> option (Z * type) -> context -> context
@@ -783,6 +788,7 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   | CDynCast t E' => EDynCast t (in_hole e E')
   | CCast t E' => ECast t (in_hole e E')
   | CDeref E' => EDeref (in_hole e E')
+  | CFunAssign E' e' => EFunAssign (in_hole e E') e'
   | CAssignL E' e' => EAssign (in_hole e E') e'
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
   | CRet x old a E' => ERet x old a (in_hole e E')
@@ -805,6 +811,7 @@ Fixpoint mode_of (E : context) : mode :=
   | CDynCast _ E' => mode_of E'
   | CCast _ E' => mode_of E'
   | CDeref E' => mode_of E'
+  | CFunAssign E' _ => mode_of E'
   | CAssignL E' _ => mode_of E'
   | CAssignR _ _ E' => mode_of E'
   | CRet x old a E' => mode_of E'
@@ -826,6 +833,7 @@ Fixpoint compose (E_outer : context) (E_inner : context) : context :=
   | CDynCast t E' => CDynCast t (compose E' E_inner)
   | CCast t E' => CCast t (compose E' E_inner)
   | CDeref E' => CDeref (compose E' E_inner)
+  | CFunAssign E' e' => CFunAssign (compose E' E_inner) e'
   | CAssignL E' e' => CAssignL (compose E' E_inner) e'
   | CAssignR n t E' => CAssignR n t (compose E' E_inner)
   | CRet x old a E' => CRet x old a (compose E' E_inner)
@@ -1213,8 +1221,25 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       n <= 0 -> m <> Unchecked ->
      (Stack.MapsTo x (n,(TPtr m pm (TNTArray l h t))) s) ->
       step D U F s H (EStrlen x) s H RNull
-  | SCall : forall AS s s' H x el t tvl e e' m n ft, 
-           Stack.MapsTo x (n,ft) s ->
+  | SCallStaticChecked : forall AS s s' H x el t tvl e e' n ft, 
+           Stack.MapsTo x (n,TPtr Checked StaticType ft) s ->
+           F n = Some (tvl,t,e,Checked) ->
+           get_dept_map tvl el = Some AS ->
+           eval_el AS s tvl el s' -> 
+           gen_rets AS s tvl el e e' ->
+          step D U F s H (ECall x el) s' H (RExpr (ECast (subst_type AS t) e'))
+  | SCallHeapChecked : forall AS s s' H x el t tvl e e' n n1 t1 ft, 
+           Stack.MapsTo x (n,TPtr Checked HeapType ft) s ->
+           Heap.MapsTo n (n1, t1) (fst H) ->
+           F n1 = Some (tvl,t,e,Checked) ->
+           get_dept_map tvl el = Some AS ->
+           eval_el AS s tvl el s' -> 
+           gen_rets AS s tvl el e e' ->
+          step D U F s H (ECall x el) s' H (RExpr (ECast (subst_type AS t) e'))
+  | SCallHeapUnchecked : forall AS s s' H x el t tvl e e' m m' n n1 t1 ft, 
+           m <> Checked -> m' <> Checked ->
+           Stack.MapsTo x (n,TPtr m' HeapType ft) s ->
+           Heap.MapsTo n (n1, t1) (snd H) ->
            F n = Some (tvl,t,e,m) ->
            get_dept_map tvl el = Some AS ->
            eval_el AS s tvl el s' -> 
@@ -1348,6 +1373,36 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       n <= 0 -> pm = None ->
       step D U F s H (EDeref (ELit n (TPtr Checked pm t))) s H RNull
 *)
+  | SFunAssignChecked1 : forall s H1 H2 n t tv na n1 t1 x ft,
+           Stack.MapsTo x (na,TPtr Checked HeapType ft) s ->
+           Heap.MapsTo na (n1, t1) H1 ->
+      eval_type_bound s t tv ->
+      step D U F
+         s (H1,H2)  (EFunAssign (ELit n (TPtr Checked HeapType t)) x)
+         s (Heap.add n (n1, t1) H1,H2) (RExpr (ELit n1 t1))
+  | SFunAssignChecked2 : forall s H1 H2 n t tv na x ft,
+           Stack.MapsTo x (na,TPtr Checked StaticType ft) s ->
+      eval_type_bound s t tv ->
+      step D U F
+         s (H1,H2) (EFunAssign (ELit n (TPtr Checked HeapType t)) x)
+         s (Heap.add n (na, TPtr Checked StaticType ft) H1,H2) 
+                   (RExpr (ELit na (TPtr Checked StaticType ft)))
+  | SFunAssignTainted1 : forall s H1 H2 n t tv na x ft m,
+           Stack.MapsTo x (na,TPtr m StaticType ft) s ->
+      eval_type_bound s t tv -> m <> Checked ->
+      step D U F
+         s (H1,H2) (EFunAssign (ELit n (TPtr Tainted HeapType t)) x)
+         s (Heap.add n (na, TPtr m StaticType ft) H1,H2) 
+                   (RExpr (ELit na (TPtr Tainted HeapType tv)))
+  | SFunAssignTainted2 : forall s H1 H2 n t tv na m n1 t1 x ft,
+           Stack.MapsTo x (na,TPtr m HeapType ft) s ->
+           Heap.MapsTo na (n1, t1) H1 ->
+      eval_type_bound s t tv -> m <> Checked ->
+      step D U F
+         s (H1,H2) (EFunAssign (ELit n (TPtr Tainted HeapType t)) x)
+         s (Heap.add n (n1, TPtr m StaticType ft) H1,H2) 
+                   (RExpr (ELit n1 (TPtr Tainted HeapType tv)))
+
   | SAssignChecked : forall s H1 H2 n pm t na ta tv n1 t1 tv',
       Heap.MapsTo n (na,ta) H1 ->
       eval_type_bound s (TPtr Checked pm t) tv ->
@@ -1368,7 +1423,6 @@ Inductive step (D : structdef) (U: union) (F:Z -> option (list (var * type) * ty
       step D U F
          s (H1,H2)  (EAssign (ELit n (TPtr Tainted pm t)) (ELit n1 t1))
          s (Heap.add n (n1, ta) H1,H2) (RExpr (ELit n1 tv'))
-
    (*      
   | SAssignNone : forall s H1 H2 m n pm t na ta tv n1 t1 tv',
       Heap.MapsTo n (na,ta) H2 -> m <> Unchecked -> pm = None ->
