@@ -535,9 +535,9 @@ Inductive expression : Type :=
 
 Definition funElem : Type := (list (var * type) * type * expression * mode).
 
-Parameter fenv : env -> Z -> option funElem.
+Parameter fenv : Z -> option funElem.
 
-Definition FEnv : Type := env -> Z -> option funElem.
+Definition FEnv : Type := Z -> option funElem.
 
 Definition Ffield : Type := Z -> option Z.
 
@@ -1940,7 +1940,6 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env Q m (EStrlen x) TNat
 
   | TyLetStrlen : forall env Q m m' x y e l h t ta, 
-      ~ Env.In x env ->
         mode_leq m' m ->
       Env.MapsTo y (TPtr m' (TNTArray l h ta)) env ->
       well_typed (Env.add x TNat (Env.add y (TPtr m' (TNTArray l (Var x 0) ta)) env)) (Theta.add x GeZero Q) m e t ->
@@ -1948,14 +1947,12 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env Q m (ELet x (EStrlen y) e) t
 
   | TyLetNat : forall env Q m x e1 e2 t b,
-      ~ Env.In x env ->
       well_typed env Q m e1 TNat ->
       well_typed (Env.add x TNat env) Q m e2 t ->
       In x (get_tvars t) -> get_good_dept e1 = Some b ->
       well_typed env Q m (ELet x e1 e2) (subst_type [(x,b)] t)
 
   | TyLetPtrSame1 : forall env Q m m' x e1 t1 e2 t,
-      ~ Env.In x env ->
       well_typed env Q m e1 (TPtr m' t) ->
       well_typed (Env.add x t1 env) Q m e2 t ->
       ~ In x (get_tvars t) ->
@@ -1963,7 +1960,6 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env Q m (ELet x e1 e2) t
 
   | TyLet : forall env Q m x e1 t1 e2 t,
-      ~ Env.In x env ->
       well_typed env Q m e1 t1 ->
       well_typed (Env.add x t1 env) Q m e2 t ->
       ~ In x (get_tvars t) ->
@@ -2000,7 +1996,6 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env U Q m (EFieldAddr e fi) (TPtr m' pm ti)
 *)
   | TyMallocChecked : forall env x m Q w t e2,
-      ~ Env.In x env ->
       mode_leq m Checked ->
       well_type_bound_in env w ->
       well_typed (Env.add x (TPtr Checked w) env) Q Checked e2 t ->
@@ -2132,14 +2127,13 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env Q m (EIf e1 e2 e3) t4. 
 
 
-Definition fun_wf (D : structdef) (F:env -> Z -> option funElem) (S:stack) (H:real_heap) :=
-     forall env env' f tvl t e m, F env f = Some (tvl,t,e,m) -> 
+Definition fun_wf (D : structdef) (F:Z -> option funElem) (S:stack) (H:real_heap) :=
+     forall env env' f tvl t e m, F f = Some (tvl,t,e,m) -> 
           gen_arg_env env tvl env' ->
           (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D m t' /\ well_bound_vars_type tvl t') /\
-          (forall a, In a tvl -> ~ Env.In (fst a) env) /\
           (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) /\
           word_type t /\ type_wf D m t /\ well_bound_vars_type tvl t /\ expr_wf D e
-          /\ @well_typed D (F env) S H env' empty_theta m e t.
+          /\ @well_typed D (F) S H env' empty_theta m e t.
 
 
 Definition sub_domain (env: env) (S:stack) := forall x, Env.In x env -> Stack.In x S.
