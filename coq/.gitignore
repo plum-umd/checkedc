@@ -5,3 +5,6 @@
 *.conf
 *.aux
 *.d
+*.vok
+*.vos
+.lia.cache
