@@ -1242,20 +1242,20 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
      (forall i , n <= i < n+n'+1 -> (exists n1, Heap.MapsTo i (n1,t1) H2 /\ n1 <> 0))
       -> Heap.MapsTo (n+n'+1) (0,t1) H2 ->
       step D F s (H1,H2) (EStrlen x) s (H1,H2) (RExpr (ELit n' TNat))
- (*          
+
   | StrlenNone : forall s H1 H2 x m  n l h t, m <> Unchecked ->
      (Stack.MapsTo x (n,(TPtr m  (TNTArray l h t))) s) ->
-            step D U F s (H1,H2) (EStrlen x) s (H1,H2) (RNull).
+            step D F s (H1,H2) (EStrlen x) s (H1,H2) (RNull)
 
-  | StrlenHighOOB : forall s H x m pm n t l h,
+  | StrlenHighOOB : forall s H x m n t l h,
       h <= n -> m <> Unchecked ->
-     (Stack.MapsTo x (n,(TPtr m pm (TNTArray l (Num h) t))) s) ->
-      step D U F s H (EStrlen x) s H RBounds
-  | StrlenLowOOB : forall s H x m pm n t l h,
+     (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
+      step D F s H (EStrlen x) s H RBounds
+  | StrlenLowOOB : forall s H x m n t l h,
       l > n -> m <> Unchecked ->
-     (Stack.MapsTo x (n,(TPtr m pm (TNTArray (Num l) h t))) s) ->
-      step D U F s H (EStrlen x) s H RBounds
-*)  
+     (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) h t))) s) ->
+      step D F s H (EStrlen x) s H RBounds
+
 | StrlenNull : forall s H x t m n l h,
       n <= 0 -> m <> Unchecked ->
      (Stack.MapsTo x (n,(TPtr m (TNTArray l h t))) s) ->
@@ -1326,44 +1326,43 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
       step D F
          s H (EDynCast t (ELit n t'))
          s H (RExpr (ELit n (TPtr Checked (TArray (Num l) (Num h) w))))
-  (*
-  | SCastArrayLowOOB1 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TArray (Num l') (Num h') w')) ->
+ 
+  | SCastArrayLowOOB1 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TArray (Num l') (Num h') w')) ->
            l < l' -> 
-           step D U F s H (EDynCast t (ELit n t'))  s H RBounds
-  | SCastArrayLowOOB2 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TArray (Num l') (Num h') w')) ->
+           step D F s H (EDynCast t (ELit n t'))  s H RBounds
+  | SCastArrayLowOOB2 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TArray (Num l') (Num h') w')) ->
            h <= l -> 
-           step D U F s H (EDynCast t (ELit n t')) s H RBounds
-  | SCastArrayHighOOB1 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TArray (Num l') (Num h') w')) ->
+           step D F s H (EDynCast t (ELit n t')) s H RBounds
+  | SCastArrayHighOOB1 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TArray (Num l') (Num h') w')) ->
            h' < h -> 
-           step D U F s H (EDynCast t (ELit n t')) s H RBounds
-*)
+           step D F s H (EDynCast t (ELit n t')) s H RBounds
   | SCastNTArray : forall s H t n t' l h w l' h',
      eval_type_bound s t = Some (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
           l' <= l -> l < h -> h <= h' ->
           step D F s H (EDynCast t (ELit n t')) s H (RExpr (ELit n (TPtr Checked (TNTArray (Num l) (Num h) w)) ))
-               (*
-  | SCastNTArrayLowOOB1 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
+               
+  | SCastNTArrayLowOOB1 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
            l < l' -> 
-           step D U F s H (EDynCast t (ELit n t')) s H RBounds
-  | SCastNTArrayLowOOB2 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
+           step D F s H (EDynCast t (ELit n t')) s H RBounds
+  | SCastNTArrayLowOOB2 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
            h <= l -> 
-           step D U F s H (EDynCast t (ELit n t')) s H RBounds
-  | SCastNTArrayHighOOB1 : forall s H t n pm t' l h w l' h' w',
-     eval_type_bound s t (TPtr Checked pm (TNTArray (Num l) (Num h) w)) ->
-      eval_type_bound s t' (TPtr Checked pm (TNTArray (Num l') (Num h') w')) ->
+           step D F s H (EDynCast t (ELit n t')) s H RBounds
+  | SCastNTArrayHighOOB1 : forall s H t n t' l h w l' h' w',
+     eval_type_bound s t = Some (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+      eval_type_bound s t' = Some (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
            h' < h -> 
-           step D U F s H (EDynCast t (ELit n t')) s H RBounds
-*)
+           step D F s H (EDynCast t (ELit n t')) s H RBounds
+
   | SDerefChecked : forall s H1 H2 n n1 t1 t t2 tv,
       eval_type_bound s (TPtr Checked t) = Some t2 ->
       Heap.MapsTo n (n1, t1) H1 ->
@@ -1378,13 +1377,13 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
       (forall l h t', t2 = TPtr Tainted (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
       @get_root D t2 tv ->
       step D F s (H1,H2) (EDeref (ELit n (TPtr Tainted t))) s (H1,H2) (RExpr (ELit n1 tv))
-           (*
-  | SDerefNone : forall s H1 H2 m n pm n1 t1 t t2 tv,
-      eval_type_bound s (TPtr m pm t) t2 -> m <> Unchecked -> pm = None ->
+
+  | SDerefNone : forall s H1 H2 m n n1 t1 t t2 tv,
+      eval_type_bound s (TPtr m t) = Some t2 -> m <> Unchecked ->
       Heap.MapsTo n (n1, t1) H2 -> 
       @get_root D t2 tv ->
-      step D U F s (H1,H2) (EDeref (ELit n (TPtr m pm t))) s (H1,H2) RNull
-*)
+      step D F s (H1,H2) (EDeref (ELit n (TPtr m t))) s (H1,H2) RNull
+
 (* Add two rules for when pm = None. *)
 
   | SDerefUnChecked : forall s H1 H2 m n n1 t1 t t2 tv,
@@ -1393,21 +1392,21 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
       m <> Checked ->
       @get_root D t2 tv ->
       step D F s (H1,H2) (EDeref (ELit n (TPtr m t))) s (H1,H2) (RExpr (ELit n1 tv))
-           (*
+  
   | SDerefHighOOB : forall s H n t t' h,
       h <= n ->
-      eval_type_bound s t t' ->
+      eval_type_bound s t = Some t' ->
       get_high_ptr t' = Some (Num h) ->
-      step D U F s H (EDeref (ELit n t)) s H RBounds
+      step D F s H (EDeref (ELit n t)) s H RBounds
   | SDerefLowOOB : forall s H n t t' l,
       l > n ->
-      eval_type_bound s t t' ->
+      eval_type_bound s t = Some t' ->
       get_low_ptr t' = Some (Num l) ->
-      step D U F s H (EDeref (ELit n t)) s H RBounds
-  | SDerefNull : forall s H pm t n,
-      n <= 0 -> pm = None ->
-      step D U F s H (EDeref (ELit n (TPtr Checked pm t))) s H RNull
-*)
+      step D F s H (EDeref (ELit n t)) s H RBounds
+  | SDerefNull : forall s H t n,
+      n <= 0 ->
+      step D F s H (EDeref (ELit n (TPtr Checked t))) s H RNull
+
   | SAssignChecked : forall s H1 H2 n t na ta tv n1 t1 tv',
       Heap.MapsTo n (na,ta) H1 ->
       eval_type_bound s (TPtr Checked t) = Some tv ->
