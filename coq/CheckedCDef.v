@@ -532,8 +532,10 @@ Inductive expression : Type :=
   | EDeref : expression -> expression (*  * e *)
   | EAssign : expression -> expression -> expression (* *e = e *)
   | EIfDef : var -> expression -> expression -> expression (* if * x then e1 else e2. *)
+(*
   | EIfPtrEq : expression -> expression -> expression -> expression -> expression (* if e1 = e2 then e3 else e4. *)
   | EIfPtrLt : expression -> expression -> expression -> expression -> expression (* if e1 < e2 then e3 else e4. *)
+*)
   | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
   | EUnchecked : expression -> expression.
 
@@ -601,6 +603,7 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       expr_wf D e2 ->
       expr_wf D e3 ->
       expr_wf D (EIf e1 e2 e3)
+(*
   | WFEIFEq : forall e1 e2 e3 e4,
       expr_wf D e1 ->
       expr_wf D e2 ->
@@ -613,6 +616,7 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       expr_wf D e3 ->
       expr_wf D e4 ->
       expr_wf D (EIfPtrEq e1 e2 e3 e4)
+*)
   | WFEMalloc : forall m w,
       type_wf D m w -> expr_wf D (EMalloc m w)
   | WFECast : forall t e,
@@ -785,10 +789,12 @@ Inductive context : Type :=
   | CAssignL : context -> expression -> context
   | CAssignR : Z -> type -> context -> context
   | CRet : var -> (Z*type) -> option (Z * type) -> context -> context
+(*
   | CIfEqL : context -> expression -> expression -> expression -> context
   | CIfEqR : expression -> context -> expression -> expression -> context
   | CIfLtL : context -> expression -> expression -> expression -> context
   | CIfLtR : expression -> context -> expression -> expression -> context
+*)
   | CIf : context -> expression -> expression -> context
   | CUnchecked : context -> context.
 
@@ -807,10 +813,12 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
   | CRet x old a E' => ERet x old a (in_hole e E')
   | CIf E' e1 e2 => EIf (in_hole e E') e1 e2
+(*
   | CIfEqL E' e1 e2 e3 => EIfPtrEq (in_hole e E') e1 e2 e3
   | CIfEqR e1 E' e2 e3 => EIfPtrEq e1 (in_hole e E') e2 e3
   | CIfLtL E' e1 e2 e3 => EIfPtrLt (in_hole e E') e1 e2 e3
   | CIfLtR e1 E' e2 e3 => EIfPtrLt e1 (in_hole e E') e2 e3
+*)
   | CUnchecked E' => EUnchecked (in_hole e E')
   end.
 
@@ -830,10 +838,12 @@ Fixpoint mode_of (E : context) : mode :=
   | CAssignR _ _ E' => mode_of E'
   | CRet x old a E' => mode_of E'
   | CIf E' e1 e2 => mode_of E'
+(*
   | CIfEqL E' e1 e2 e3 => mode_of E'
   | CIfEqR e1 E' e2 e3 => mode_of E'
   | CIfLtL E' e1 e2 e3 => mode_of E'
   | CIfLtR e1 E' e2 e3 => mode_of E'
+*)
   | CUnchecked E' => Unchecked
   end.
 
@@ -852,11 +862,12 @@ Fixpoint compose (E_outer : context) (E_inner : context) : context :=
   | CAssignR n t E' => CAssignR n t (compose E' E_inner)
   | CRet x old a E' => CRet x old a (compose E' E_inner)
   | CIf E' e1 e2 => CIf (compose E' E_inner) e1 e2
+(*
   | CIfEqL E' e1 e2 e3 => CIfEqL (compose E' E_inner) e1 e2 e3
   | CIfEqR e1 E' e2 e3 => CIfEqR e1 (compose E' E_inner) e2 e3
   | CIfLtL E' e1 e2 e3 => CIfLtL (compose E' E_inner) e1 e2 e3
   | CIfLtR e1 E' e2 e3 => CIfLtR e1 (compose E' E_inner) e2 e3
-
+*)
   | CUnchecked E' => CUnchecked (compose E' E_inner)
   end.
 
@@ -1556,7 +1567,8 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
    | SIfTrue : forall s H n t e1 e2, n <> 0 -> 
            step D F s H (EIf (ELit n t) e1 e2) s H (RExpr e1)
    | SIfFalse : forall s H t e1 e2, 
-              step D F s H (EIf (ELit 0 t) e1 e2) s H (RExpr e2)
+              step D F s H (EIf (ELit 0 t) e1 e2) s H (RExpr e2).
+(*
    | SIfEqTrue : forall s H n t t' e1 e2,
            step D F s H (EIfPtrEq (ELit n t) (ELit n t') e1 e2) s H (RExpr e1)
   | SIfEqFalse : forall s H n n' t t' e1 e2, n <> n' ->
@@ -1565,6 +1577,7 @@ Inductive step (D : structdef) (F:Z -> option (list (var * type) * type * expres
            step D F s H (EIfPtrLt (ELit n t) (ELit n' t') e1 e2) s H (RExpr e1)
   | SIfLtFalse : forall s H n n' t t' e1 e2,  n' <= n ->
            step D F s H (EIfPtrLt (ELit n t) (ELit n' t') e1 e2) s H (RExpr e2).
+*)
 
 Hint Constructors step.
 
