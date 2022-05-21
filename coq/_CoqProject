@@ -1,4 +1,5 @@
 -R . CHKC
+Coqlib.v
 Tactics.v
 ListUtil.v
 MapS.v

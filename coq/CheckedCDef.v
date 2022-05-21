@@ -1,8 +1,10 @@
-Require Import ExtLib.Data.Monads.OptionMonad.
-Require Import ExtLib.Structures.Monads.
+(** * CheckedCDef : Checked C Model Definition *)
+From CHKC Require Import
+  Coqlib
+  Tactics
+  ListUtil
+  Map.
 
-From CHKC Require Import Tactics ListUtil Map.
-Require Import Coq.FSets.FMapFacts.
 (** * Document Conventions *)
 
 (** It is common when defining syntax for a language on paper to associate one
@@ -33,22 +35,7 @@ Require Import Coq.FSets.FMapFacts.
     respectively. They are all implemented concretely as natural numbers. Each
     is a distinguished class of identifier in the syntax of the language. *)
 
-Require Export Psatz.
-Require Export Bool.
-Require Export Arith.
-Require Export Psatz.
-Require Export Program.
-Require Export List.
-Require Import ZArith.
-Require Import ZArith.BinIntDef.
-Require Export Reals.
-Export ListNotations.
-
-Require Export BinNums.
-Require Import BinPos BinNat.
-
 Local Open Scope Z_scope.
-
 
 Definition var    := nat.
 Definition field  := nat.
@@ -764,7 +751,6 @@ Definition heap_wf (D : structdef) (R : real_heap) : Prop :=
          0 < addr <= (Z.of_nat (Heap.cardinal (snd R))) <-> Heap.In addr (snd R)).
 
 Section allocation.
-
   Import ListNotations.
   Import MonadNotation.
   Local Open Scope monad_scope.
@@ -1353,6 +1339,16 @@ Section StackWf.
                  /\ subtype D Q t t'')
       ->
         stack_wf H env s.
+
+  Definition stack_heap_consistent H S := forall x n t,
+      Stack.MapsTo x (n,t) S ->
+      well_typed_lit D F Q H empty_scope n t.
+
+
+  Definition heap_consistent (H' : heap) (H : heap) : Prop :=
+    forall n t,
+      @well_typed_lit D F Q H empty_scope n t->
+      @well_typed_lit D F Q H' empty_scope n t.
 End StackWf.
 
 Hint Constructors well_typed_lit.
@@ -2366,12 +2362,13 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
 
 
 Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
-     forall env env' f tvl t e m, F f = Some (tvl,t,e,m) -> 
-          gen_arg_env env tvl env' ->
-          (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D m t' /\ well_bound_vars_type tvl t') /\
-          (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) /\
-          word_type t /\ type_wf D m t /\ well_bound_vars_type tvl t /\ expr_wf D e
-          /\ @well_typed D (F) S H env' empty_theta m e t.
+  forall env env' f tvl t e m,
+    F f = Some (tvl,t,e,m) -> 
+    gen_arg_env env tvl env' ->
+    (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D m t' /\ well_bound_vars_type tvl t') /\
+      (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) /\
+      word_type t /\ type_wf D m t /\ well_bound_vars_type tvl t /\ expr_wf D e
+    /\ @well_typed D (F) S H env' empty_theta m e t.
 
 
 Definition sub_domain (env: env) (S:stack) := forall x, Env.In x env -> Stack.In x S.

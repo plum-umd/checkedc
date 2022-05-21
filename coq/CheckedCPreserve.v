@@ -1,36 +1,20 @@
-Require Import ExtLib.Data.Monads.OptionMonad.
-Require Import ExtLib.Structures.Monads.
-
 From CHKC Require Import
+  Coqlib
   Tactics
   ListUtil
   Map
   CheckedCDef.
 
-Require Import Coq.FSets.FMapFacts.
-Require Export Psatz.
-Require Export Bool.
-Require Export Arith.
-Require Export Psatz.
-Require Export Program.
-Require Export List.
-Require Import ZArith.
-Require Import ZArith.BinIntDef.
-Require Export Reals.
-Export ListNotations.
-Require Export BinNums.
-Require Import BinPos BinNat.
-Local Open Scope Z_scope.
-
-
-
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
-  Lemma preservation : forall S H env Q e t S' H' e',
+  Variable F : FEnv.
+  Variable m : mode.
+
+  Lemma preservation : forall S R env Q e t S' H' e',
       @structdef_wf D ->
-      heap_wf D H ->
-      heap_wt_all D Q H ->
+      heap_wf D R ->
+      heap_wt_all D F m Q H ->
       fun_wf D fenv S' H' ->
       expr_wf D fenv e ->
       stack_wt D S ->
