@@ -174,6 +174,29 @@ Inductive none_bound_only : bound -> Prop :=
 *)
 
 
+Inductive type_wf (D : structdef) : mode -> type -> Prop :=
+| WFTNat : forall m, type_wf D m (TNat)
+| WFTPtrChecked : forall m w, type_wf D m w -> type_wf D Checked (TPtr m w)
+| WFTPtrUnChecked : forall m m' w,
+    m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr m' w)
+| WFTStruct : forall m T,
+    (exists (fs : fields), StructDef.MapsTo T fs D) ->
+    type_wf D m (TStruct T)
+| WFArray : forall m l h t,
+    word_type t ->
+    type_wf D m t ->
+    type_wf D m (TArray l h t)
+| WFNTArry : forall m l h t,       
+    word_type t ->
+    type_wf D m t ->
+    type_wf D m (TNTArray l h t)
+            
+| WFTFun : forall m b t ts,
+    word_type t -> type_wf D m t -> 
+    (forall t', In t' ts -> word_type t' /\ type_wf D m t') ->
+    type_wf D m (TFun b t ts).
+
+
 Module Env := Map.Make Nat_as_OT.
 Module EnvFacts := FMapFacts.Facts (Env).
 Definition env := Env.t type.
@@ -183,6 +206,9 @@ Definition empty_env := @Env.empty type.
 Definition venv := Env.t var.
 
 Definition empty_venv := @Env.empty var.
+
+
+
 
 (* well_bound definition might not needed in the type system, since the new
    [expr_wf] will guarantee that. *)
@@ -205,25 +231,47 @@ Definition well_ptr_bound_in (env:env) (p:ptrMode) :=
    end.
 *)
 
-Inductive well_type_bound_in : env -> type -> Prop :=
-   | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
-   | well_type_bound_in_ptr : forall m t env, well_type_bound_in env t -> well_type_bound_in env (TPtr m t)
-   | well_type_bound_in_struct : forall env T, well_type_bound_in env (TStruct T)
-   | well_type_bound_in_array : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
-                                      well_type_bound_in env t -> well_type_bound_in env (TArray l h t)
-   | well_type_bound_in_ntarray : forall env l h t, well_bound_in env l -> well_bound_in env h -> 
-                                      well_type_bound_in env t -> well_type_bound_in env (TNTArray l h t)
-   | well_type_bound_fun : forall env b t ts, well_bound_in env b -> well_type_bound_in env t
-                      -> (forall t', In t' ts -> well_type_bound_in env t') -> well_type_bound_in env (TFun b t ts).
+Section EnvWt.
+  Variable D : structdef.
+  Variable m : mode.
 
-(* Definition of simple type meaning that no bound variables. *)
+  Inductive well_type_bound_in : env -> type -> Prop :=
+  | well_type_bound_in_nat : forall env, well_type_bound_in env TNat
+  | well_type_bound_in_ptr : forall m t env,
+      well_type_bound_in env t -> well_type_bound_in env (TPtr m t)
+  | well_type_bound_in_struct : forall env T,
+      well_type_bound_in env (TStruct T)
+  | well_type_bound_in_array : forall env l h t,
+      well_bound_in env l -> well_bound_in env h -> 
+      well_type_bound_in env t -> well_type_bound_in env (TArray l h t)
+  | well_type_bound_in_ntarray : forall env l h t,
+      well_bound_in env l -> well_bound_in env h -> 
+      well_type_bound_in env t -> well_type_bound_in env (TNTArray l h t)
+  | well_type_bound_fun : forall env b t ts,
+      well_bound_in env b -> well_type_bound_in env t ->
+      (forall t', In t' ts -> well_type_bound_in env t') ->
+      well_type_bound_in env (TFun b t ts).
+
+  Definition env_wt (env : env) :=
+    forall x t,
+      Env.MapsTo x t env ->
+      word_type t /\ type_wf D m t /\ well_type_bound_in env t.
+End EnvWt.
+
+
+(* Definition of simple type meaning that has no bound variables. *)
 Inductive simple_type : type -> Prop := 
-  | SPTNat : simple_type TNat
-  | SPTPtr : forall m w, simple_type w -> simple_type (TPtr m w)
-  | SPTStruct : forall t, simple_type (TStruct t)
-  | SPTArray : forall l h t, simple_type t -> simple_type (TArray (Num l) (Num h) t)
-  | SPTNTArray : forall l h t, simple_type t -> simple_type (TNTArray (Num l) (Num h) t)
-  | SPTFun: forall l t ts, simple_type t -> (forall t', In t' ts -> simple_type t') -> simple_type (TFun (Num l) t ts).
+| SPTNat : simple_type TNat
+| SPTPtr : forall m w, simple_type w -> simple_type (TPtr m w)
+| SPTStruct : forall t, simple_type (TStruct t)
+| SPTArray : forall l h t,
+    simple_type t -> simple_type (TArray (Num l) (Num h) t)
+| SPTNTArray : forall l h t,
+    simple_type t -> simple_type (TNTArray (Num l) (Num h) t)
+| SPTFun: forall l t ts,
+    simple_type t ->
+    (forall t', In t' ts -> simple_type t') ->
+    simple_type (TFun (Num l) t ts).
 
 (*
 Inductive ext_bound_in : list var -> bound -> Prop :=
@@ -240,24 +288,8 @@ Inductive ext_type_in : list var -> type -> Prop :=
                         -> ext_type_in l t -> ext_type_in l (TNTArray b1 b2 t).
 *)
 
-Inductive type_wf (D : structdef) : mode -> type -> Prop :=
-  | WFTNat : forall m, type_wf D m (TNat)
-  | WFTPtrChecked : forall m w, type_wf D m w -> type_wf D Checked (TPtr m w)
-  | WFTPtrUnChecked : forall m m' w, m <> Checked -> m' <> Checked -> type_wf D m w -> type_wf D m (TPtr m' w)
-  | WFTStruct : forall m T,
-      (exists (fs : fields), StructDef.MapsTo T fs D) ->
-      type_wf D m (TStruct T)
-  | WFArray : forall m l h t,
-      word_type t ->
-      type_wf D m t ->
-      type_wf D m (TArray l h t)
-  | WFNTArry : forall m l h t,       
-      word_type t ->
-      type_wf D m t ->
-      type_wf D m (TNTArray l h t)
-  
-  | WFTFun : forall m b t ts, word_type t -> type_wf D m t -> 
-          (forall t', In t' ts -> word_type t' /\ type_wf D m t') -> type_wf D m (TFun b t ts).
+
+
 
 (*
 Definition no_ebound (b:bound): Prop :=
@@ -292,6 +324,7 @@ Module Theta := Map.Make Nat_as_OT.
 Definition theta := Theta.t theta_elem.
 
 Definition empty_theta := @Theta.empty theta_elem.
+
 
 (* This defines the subtyping relation. *)
 Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
@@ -498,6 +531,18 @@ Definition empty_stack := @Stack.empty (Z * type).
 Definition arg_stack := Stack.t bound.
 
 Definition empty_arg_stack := @Stack.empty bound.
+
+Section StackWt.
+  Variable D : structdef.
+  Variable m : mode.
+  Definition stack_wt (S:stack) := 
+    forall x v t, Stack.MapsTo x (v,t) S -> word_type t /\ type_wf D m t /\ simple_type t.
+End StackWt.
+
+Definition theta_wt (Q:theta) (env:env) (S:stack) :=
+  (forall x, Theta.In x Q -> Env.In x env)
+  /\ (forall x n ta, Theta.MapsTo x GeZero Q ->
+                     Stack.MapsTo x (n,ta) S -> 0 <= n).
 
 (*
 Definition dyn_env := Stack.t type.
@@ -1271,6 +1316,31 @@ Definition add_value (H:heap) (n:Z) (t:type) :=
    end.
 
 
+
+Section StackWf.
+  Variable D : structdef.
+  Variable F : FEnv.
+  Variable Q : theta.
+
+  Inductive stack_wf H : env -> stack -> Prop :=
+  | WFS_Stack : forall env s,
+      (forall x t,
+          Env.MapsTo x t env ->
+          exists v t' t'',
+            eval_type_bound s t = Some t' /\
+              subtype D Q t'' t' /\
+              Stack.MapsTo x (v, t'') s /\
+              well_typed_lit D F Q H empty_scope v t'')
+      /\ (forall x v t,
+             Stack.MapsTo x (v, t) s -> 
+             @well_typed_lit D F Q H empty_scope v t    
+             -> exists t' t'',
+                 @Env.MapsTo type x t' env /\ eval_type_bound s t' = Some t''
+                 /\ subtype D Q t t'')
+      ->
+        stack_wf H env s.
+End StackWf.
+
 Hint Constructors well_typed_lit.
 
 (** Memory, [M], is the composition of stack, checked heap and tainted heap *)
@@ -1747,8 +1817,8 @@ Hint Unfold reduces.
 (* Defining function calls. *)
 
 (** * Static Semantics *)
-
 Section HeapWt.
+  (** Well-typedness of Heaps *)
   (* MZ:
      Implicit abstraction here.
      Well-typeness requires assumptions on the mode when mallocing?
@@ -1793,12 +1863,28 @@ Section HeapWt.
   | HtIf : forall x e1 e2,
       heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EIf x e1 e2)
   | HtUnChecked : forall e, heap_wt Q H e -> heap_wt Q H (EUnchecked e).
+
+  Definition heap_wt_all (Q : theta) (H : heap) :=
+    forall x n t,
+      Heap.MapsTo x (n,t) H ->
+      word_type t /\ type_wf D m t /\ simple_type t
+      /\ well_typed_lit D F Q H empty_scope n t.
 End HeapWt.
 
+Section RHeapWt.
+(** Well-typedness of Real Heaps:
+    
+    One is in checked mode, another one is in tainted mode?
+ *)
+
+End RHeapWt.
+
+
 Definition is_nt_ptr (t : type) : Prop :=
-    match t with TPtr m (TNTArray l h t') => True 
-              | _ => False
-    end.
+  match t with
+  | TPtr m (TNTArray l h t') => True 
+  | _ => False
+  end.
 
 (* equivalence of type based on semantic meaning. *)
 Inductive type_eq (S : stack) : type -> type -> Prop := 
