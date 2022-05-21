@@ -352,8 +352,7 @@ Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop 
        -> subtypeRef D U Q t t' -> subtypeRef D U Q (TPtr m pm t) (TPtr m pm' t').
 *)
 Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
-  | SubTypeFun : forall m b t t' tl tl', subtype D Q t' t ->
-               (forall n ta tb, nth_error tl n = Some ta -> nth_error tl' n = Some tb -> subtype D Q ta tb) ->
+  | SubTypeFun : forall m b t t' tl tl', subtype D Q t' t -> subtype_list D Q tl tl' ->
                                              subtype D Q (TPtr m (TFun b t tl)) (TPtr m (TFun b t' tl'))
   | SubTyRefl : forall t, subtype D Q t t
   | SubTyTainted : forall t t', subtype D Q (TPtr Tainted t) (TPtr Unchecked t')
@@ -379,7 +378,12 @@ Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
   | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
     StructDef.MapsTo T fs D ->
     Some (TNat) = (Fields.find 0%nat fs) -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-    subtype D Q (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
+    subtype D Q (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat)))
+
+with subtype_list (D : structdef) (Q:theta) : list type -> list type -> Prop :=
+    subtype_empty : subtype_list D Q [] []
+  | subtype_many : forall a b al bl, subtype D Q a b -> subtype_list D Q al bl -> subtype_list D Q (a::al) (b::bl).
+
 (* Subtyping transitivity. *)
 (*
 Lemma subtype_trans : forall D Q t t' m w, subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'.
