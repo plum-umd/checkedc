@@ -1,34 +1,13 @@
 Require Import ExtLib.Data.Monads.OptionMonad.
 Require Import ExtLib.Structures.Monads.
 
-From CHKC Require Import Tactics ListUtil Map.
+From CHKC Require Import
+  Tactics
+  ListUtil
+  Map
+  CheckedCDef.
+
 Require Import Coq.FSets.FMapFacts.
-(** * Document Conventions *)
-
-(* 
-(** It is common when defining syntax for a language on paper to associate one or manysimple_type *)
-(*     _metavariables_ with each syntactic class. For example, the metavariables <<x>>, <<y>>,
-    and <<z>> are often used to represent the syntactic class of program variables. It is *)
-    understood that wherever these metavariables appear they indicate an implicit universalf
-    quantification over all members of the syntactic class they represent. In Coq, however,Rq
-
-
-    we have no such issue -- all quantification must be made explicit. However, we must still
-    grapple with the hardest problem in computer science: naming our quantified variables.
-    To ameliorate this problem, we maintain two stylistic invariants.
-
-    - (1) Whenever a new piece of syntax is introduced we we will include, in parentheses,
-          its associated metavariable. We will then use this as the naming convention for
-          naming universally quantified variables in the future.
-    - (2) Whenever syntax, semantics, or proofs appear in the associated paper
-          ("Checked C for Safety, Gradually") we take this to be an authoritative source
-          for naming. *)
-
-(** * Syntax *)
-
-(** The types [var], [field], and [struct] are the (distinguished) syntactic classes of program variables ([x]), fields ([f]), and structures [T])
-    respectively. They are all implemented concretely as natural numbers. Each is a distinguished class of identifier in the syntax of
-    the language. *)
 Require Export Psatz.
 Require Export Bool.
 Require Export Arith.
@@ -39,14 +18,19 @@ Require Import ZArith.
 Require Import ZArith.BinIntDef.
 Require Export Reals.
 Export ListNotations.
-
 Require Export BinNums.
 Require Import BinPos BinNat.
-Require Import CheckedCDef.
-
 Local Open Scope Z_scope.
 
-(* Type Preservation Theorem. *)
+
+Definition heap_wt_all (D : structdef) (Q : theta) (R : real_heap) :=
+  forall x n t,
+    Heap.MapsTo x (n,t) R ->
+    word_type t /\ type_wf D t /\ simple_type t
+    /\ well_typed_lit D Q H empty_scope n t.
+
+
+(** Type Preservation Theorem. *)
 Lemma preservation : forall D S H env Q e t S' H' e',
     @structdef_wf D ->
     heap_wf D H ->
@@ -62,48 +46,52 @@ Lemma preservation : forall D S H env Q e t S' H' e',
     @well_typed D fenv S H env Q Checked e t ->
     @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
     exists env' Q',
-      sub_domain env' S' /\ stack_wf D Q' env' S' 
-        /\ stack_heap_consistent D Q' H' S' /\
-      @heap_consistent D Q H' H 
-   /\ (@well_typed D fenv S' H' env' Q' Checked e' t
-       \/ (exists t' t'', eval_type_bound S' t t' 
-        /\ subtype D Q' t'' t' /\ @well_typed D fenv S' H' env' Q' Checked e' t'')).
+      sub_domain env' S'
+      /\ stack_wf D Q' env' S' 
+      /\ stack_heap_consistent D Q' H' S'
+      /\ @heap_consistent D Q H' H 
+      /\ (@well_typed D fenv S' H' env' Q' Checked e' t
+          \/ (exists t' t'',
+                 eval_type_bound S' t t' 
+                 /\ subtype D Q' t'' t'
+                 /\ @well_typed D fenv S' H' env' Q' Checked e' t'')).
 Proof with eauto 20 with Preservation.
   intros D s H env Q e t s' H' e' HDwf HHwf HHWt HFun HEwf Hswt Henvt HQt HSubDom HSwf HSHwf Hwt.
   generalize dependent H'. generalize dependent s'.  generalize dependent e'.
   remember Checked as m.
-  induction Hwt as [
-                     env Q m n t HTyLit                                         | (* Literals *)
-                     env Q m x t Wb                                             | (* Variables *)
-                     env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
-                     env Q m x h l t Wb                                         | (* Strlen *)
-                     env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
-                     env Q m x e1 e2 t b Alpha HTy1 IH1 HTy2 IH2 Hx Hdept       | (* Let-Nat-Expr *)
-                     env Q m x e1 t1 e2 t Alpha HTy1 IH1 HTy2 IH2 Hx            | (* Let-Expr *)
-                     env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
-                     env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
-                     env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
-                     env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
-                     env Q m w Wb                                               | (* Malloc *)
-                     env Q m e t HTy IH                                         | (* Unchecked *)
-                     env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
-                     env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
-                     env Q m e x y u v t t' Wb HTy IH Teq                       | (* DynCast - ptr array *)
-                     env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
-                     env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
-                     env Q m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
-                     env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
-                     env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
-                     env Q m e1 e2 m' t t1 HSub WT HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
-                     env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign array *)
-                     env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign nt-array *)
+  induction Hwt as
+    [
+      env Q m n t HTyLit                                         | (* Literals *)
+      env Q m x t Wb                                             | (* Variables *)
+      env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
+      env Q m x h l t Wb                                         | (* Strlen *)
+      env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
+      env Q m x e1 e2 t b Alpha HTy1 IH1 HTy2 IH2 Hx Hdept       | (* Let-Nat-Expr *)
+      env Q m x e1 t1 e2 t Alpha HTy1 IH1 HTy2 IH2 Hx            | (* Let-Expr *)
+      env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
+      env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
+      env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
+      env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
+      env Q m w Wb                                               | (* Malloc *)
+      env Q m e t HTy IH                                         | (* Unchecked *)
+      env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
+      env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
+      env Q m e x y u v t t' Wb HTy IH Teq                       | (* DynCast - ptr array *)
+      env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
+      env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
+      env Q m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
+      env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
+      env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
+      env Q m e1 e2 m' t t1 HSub WT HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
+      env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign array *)
+      env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign nt-array *)
 
-                     env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for array pointers *)
-                     env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
-                     env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
-                     env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
-                     env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin (* If *)
-                 ]; intros e' s' H' HFun Hreduces; subst.
+      env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for array pointers *)
+      env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
+      env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
+      env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
+      env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin (* If *)
+    ]; intros e' s' H' HFun Hreduces; subst.
   (* T-Lit, impossible because values do not step *)
   - exfalso. eapply lit_are_nf...
   (* T-Var *)
