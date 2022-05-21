@@ -713,63 +713,63 @@ Definition heap_wf (D : structdef) (R : real_heap) : Prop :=
 
 Section allocation.
 
-Import ListNotations.
-Import MonadNotation.
-Local Open Scope monad_scope.
+  Import ListNotations.
+  Import MonadNotation.
+  Local Open Scope monad_scope.
 
-Print replicate.
-Definition Zreplicate (z:Z) (T : type) : (list type) :=
-match z with
-  |Z.pos p => (replicate (Pos.to_nat p) T)
-  |_ => []
-end.
+  Print replicate.
+  Definition Zreplicate (z:Z) (T : type) : (list type) :=
+    match z with
+    |Z.pos p => (replicate (Pos.to_nat p) T)
+    |_ => []
+    end.
 
-(* Changed this, to return the lower bound *)
-Definition allocate_meta (D : structdef) (w : type)
-  : option (Z * list type) :=
-  match w with
-  | TStruct T =>
-    fs <- StructDef.find T D ;;
-    ret (0, List.map snd (Fields.elements fs))
-  | TArray (Num l) (Num h) T =>
-    Some (0, Zreplicate (h - l) T)
-  | TNTArray (Num l) (Num h) T =>
-    Some (0, Zreplicate (h - l + 1) T)
-  | _ => Some (0, [w])
-  end.
+  (* Changed this, to return the lower bound *)
+  Definition allocate_meta (D : structdef) (w : type)
+    : option (Z * list type) :=
+    match w with
+    | TStruct T =>
+        fs <- StructDef.find T D ;;
+        ret (0, List.map snd (Fields.elements fs))
+    | TArray (Num l) (Num h) T =>
+        Some (0, Zreplicate (h - l) T)
+    | TNTArray (Num l) (Num h) T =>
+        Some (0, Zreplicate (h - l + 1) T)
+    | _ => Some (0, [w])
+    end.
 
 
-Definition allocate_meta_no_bounds (D : structdef) (w : type)
-  : option (list type) :=
-  match (allocate_meta D w) with
-  | Some( _ , x) => Some x
-  | None => None
-end.
+  Definition allocate_meta_no_bounds (D : structdef) (w : type)
+    : option (list type) :=
+    match (allocate_meta D w) with
+    | Some( _ , x) => Some x
+    | None => None
+    end.
 
-Lemma allocate_meta_implies_allocate_meta_no_bounds : forall D w ts b,
-allocate_meta D w = Some (b, ts) -> allocate_meta_no_bounds D w = Some ts.
-Proof.
-  intros. unfold allocate_meta_no_bounds. rewrite H. reflexivity.
-Qed.
+  Lemma allocate_meta_implies_allocate_meta_no_bounds : forall D w ts b,
+      allocate_meta D w = Some (b, ts) -> allocate_meta_no_bounds D w = Some ts.
+  Proof.
+    intros. unfold allocate_meta_no_bounds. rewrite H. reflexivity.
+  Qed.
 
-(* allocate_meta can succeed with bad bounds. allocate itself shouldn't *)
-Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
-  let H_size := Z.of_nat(Heap.cardinal H) in
-  let base   := H_size + 1 in
-  match allocate_meta D w with
-  | Some (0, am) => 
-     let (_, H') := List.fold_left
-                  (fun (acc : Z * heap) (t : type) =>
-                     let (sizeAcc, heapAcc) := acc in
-                     let sizeAcc' := sizeAcc + 1 in
-                     let heapAcc' := Heap.add sizeAcc' (0, t) heapAcc in
-                     (sizeAcc', heapAcc'))
-                  am
-                  (H_size, H)
-     in
-     ret (base, H')
-  | _ => None
-  end.
+  (* allocate_meta can succeed with bad bounds. allocate itself shouldn't *)
+  Definition allocate (D : structdef) (H : heap) (w : type) : option (Z * heap) :=
+    let H_size := Z.of_nat(Heap.cardinal H) in
+    let base   := H_size + 1 in
+    match allocate_meta D w with
+    | Some (0, am) => 
+        let (_, H') := List.fold_left
+                         (fun (acc : Z * heap) (t : type) =>
+                            let (sizeAcc, heapAcc) := acc in
+                            let sizeAcc' := sizeAcc + 1 in
+                            let heapAcc' := Heap.add sizeAcc' (0, t) heapAcc in
+                            (sizeAcc', heapAcc'))
+                         am
+                         (H_size, H)
+        in
+        ret (base, H')
+    | _ => None
+    end.
 
 End allocation.
 
@@ -1174,11 +1174,12 @@ Definition nt_array_prop (H:heap) (n:Z) (t:type) :=
    | _ => True
    end.
 
-Definition tfun_prop (F:Z -> option funElem) (n:Z) (t:type) := 
+Definition tfun_prop (F: FEnv) (n:Z) (t:type) := 
    match t with TFun (Num n') t ts => ((n = n') /\ F n <> None) | _ => True end.
 
 
-Inductive well_typed_lit (D : structdef) (F:Z -> option funElem) (Q:theta) (H : heap) : scope -> Z -> type -> Prop :=
+Inductive well_typed_lit (D : structdef) (F: FEnv) (Q:theta) (H : heap)
+  : scope -> Z -> type -> Prop :=
   | TyLitInt : forall s n,
       well_typed_lit D F Q H s n TNat
   | TyLitU : forall s n w,
@@ -1210,7 +1211,7 @@ Inductive well_typed_lit (D : structdef) (F:Z -> option funElem) (Q:theta) (H : 
 
     TODO: write blog post about this *)
 Lemma well_typed_lit_ind' :
-  forall (D : structdef) (F: Z -> option funElem) (Q:theta) (H : heap) (P : scope -> Z -> type -> Prop),
+  forall (D : structdef) (F: FEnv) (Q:theta) (H : heap) (P : scope -> Z -> type -> Prop),
     (forall (s : scope) (n : Z), P s n TNat) ->
        (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
        (forall (s : scope) (t : type), P s 0 t) ->
@@ -1275,7 +1276,7 @@ Hint Constructors well_typed_lit.
 (** Memory, [M], is the composition of stack, checked heap and tainted heap *)
 Definition mem : Type := stack * real_heap.
 
-(** **Checked C semantics** *)
+(** ** Checked C Semantics *)
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 Inductive step
   (D : structdef) 
@@ -1706,6 +1707,7 @@ Inductive step
 
 Hint Constructors step.
 
+(** ** Reduction *)
 Inductive reduce
   (D : structdef)
   (F:Z -> option (list (var * type) * type * expression * mode))
@@ -1746,38 +1748,52 @@ Hint Unfold reduces.
 
 (** * Static Semantics *)
 
+Section HeapWt.
+  (* MZ:
+     Implicit abstraction here.
+     Well-typeness requires assumptions on the mode when mallocing?
+   *)
+  Variable D : structdef.
+  Variable F : FEnv.
+  Variable m : mode.
+  
+  Definition heap_well_typed (Q:theta) (H:heap)
+    (n:Z) (t:type) :=
+    simple_type t -> well_typed_lit D F Q H empty_scope n t.
 
-(*
-Definition heap_well_typed (D:structdef) (Q:theta) (H:heap) (n:Z) (t:type) :=
-      simple_type t -> well_typed_lit D Q H empty_scope n t.
+  Inductive heap_wt_arg (Q:theta) (H:heap)
+    : expression -> Prop :=
+  | HtArgLit : forall n t,
+      heap_well_typed Q H n t -> heap_wt_arg Q H (ELit n t)
+  | HtArgVar : forall x, heap_wt_arg Q H (EVar x).
 
-Inductive heap_wt_arg (D:structdef) (Q:theta) (H:heap) : expression -> Prop :=
-     | HtArgLit : forall n t, heap_well_typed D Q H n t -> heap_wt_arg D Q H (ELit n t)
-     | HtArgVar : forall x, heap_wt_arg D Q H (EVar x).
+  Inductive heap_wt_args (Q:theta) (H:heap)
+    : list expression -> Prop :=
+    heap_wt_empty : heap_wt_args Q H ([])
+  | heap_wt_many : forall e el,
+      heap_wt_arg Q H e -> heap_wt_args Q H el -> heap_wt_args Q H (e::el).
 
-Inductive heap_wt_args (D:structdef) (Q:theta) (H:heap) : list expression -> Prop :=
-    heap_wt_empty : heap_wt_args D Q H ([])
-  | heap_wt_many : forall e el, heap_wt_arg D Q H e -> heap_wt_args D Q H el -> heap_wt_args D Q H (e::el).
-
-Inductive heap_wt (D:structdef) (Q:theta) (H:heap) : expression -> Prop :=
-   | HtLit : forall n t, heap_well_typed D Q H n t -> heap_wt D Q H (ELit n t)
-   | HtVar : forall x, heap_wt D Q H (EVar x)
-   | HtStrlen : forall x, heap_wt D Q H (EStrlen x)
-   | HtCall : forall f el, heap_wt_args D Q H el -> heap_wt D Q H (ECall f el)
-   | HtRet : forall x old a e, heap_wt D Q H e -> heap_wt D Q H (ERet x old a e)
-   | HtDynCast : forall t e, heap_wt D Q H e -> heap_wt D Q H (EDynCast t e)
-   | HtLet : forall x e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (ELet x e1 e2)
-   | HtMalloc : forall t, heap_wt D Q H (EMalloc t)
-   | HtCast : forall t e, heap_wt D Q H e -> heap_wt D Q H (ECast t e)
-   | HtPlus : forall e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EPlus e1 e2)
-   | HtFieldAddr : forall e f, heap_wt D Q H e -> heap_wt D Q H (EFieldAddr e f)
-   | HtDeref : forall e, heap_wt D Q H e -> heap_wt D Q H (EDeref e)
-   | HtAssign : forall e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EAssign e1 e2)
-   | HtIf : forall x e1 e2, heap_wt D Q H e1 -> heap_wt D Q H e2 -> heap_wt D Q H (EIf x e1 e2)
-   | HtUnChecked : forall e, heap_wt D Q H e -> heap_wt D Q H (EUnchecked e).
-
-*)
-
+  Inductive heap_wt (Q:theta) (H:heap) : expression -> Prop :=
+  | HtLit : forall n t, heap_well_typed Q H n t -> heap_wt Q H (ELit n t)
+  | HtVar : forall x, heap_wt Q H (EVar x)
+  | HtStrlen : forall x, heap_wt Q H (EStrlen x)
+  | HtCall : forall f el, heap_wt_args Q H el -> heap_wt Q H (ECall f el)
+  | HtRet : forall x old a e, heap_wt Q H e -> heap_wt Q H (ERet x old a e)
+  | HtDynCast : forall t e, heap_wt Q H e -> heap_wt Q H (EDynCast t e)
+  | HtLet : forall x e1 e2,
+      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (ELet x e1 e2)
+  | HtMalloc : forall t, heap_wt Q H (EMalloc m t)
+  | HtCast : forall t e, heap_wt Q H e -> heap_wt Q H (ECast t e)
+  | HtPlus : forall e1 e2,
+      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EPlus e1 e2)
+  | HtFieldAddr : forall e f, heap_wt Q H e -> heap_wt Q H (EFieldAddr e f)
+  | HtDeref : forall e, heap_wt Q H e -> heap_wt Q H (EDeref e)
+  | HtAssign : forall e1 e2,
+      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EAssign e1 e2)
+  | HtIf : forall x e1 e2,
+      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EIf x e1 e2)
+  | HtUnChecked : forall e, heap_wt Q H e -> heap_wt Q H (EUnchecked e).
+End HeapWt.
 
 Definition is_nt_ptr (t : type) : Prop :=
     match t with TPtr m (TNTArray l h t') => True 
@@ -1826,7 +1842,7 @@ Inductive well_bound_vars_type {A:Type}: list (var * A) -> type -> Prop :=
         -> (forall t', In t' ts -> well_bound_vars_type l t') -> well_bound_vars_type l (TFun b t ts).
 
 
-Inductive well_typed_arg (D: structdef) (F:Z -> option funElem) (Q:theta) (H : real_heap) (env:env): 
+Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (H : real_heap) (env:env): 
                 mode -> expression -> type -> Prop :=
      | ArgLitChecked : forall n t t',
       simple_type t ->
@@ -1842,7 +1858,7 @@ Inductive well_typed_arg (D: structdef) (F:Z -> option funElem) (Q:theta) (H : r
       subtype D Q t' t ->
       well_typed_arg D F Q H env m (EVar x) t.
 
-Inductive well_typed_args {D: structdef} {U:Z -> option funElem} {Q:theta} {H : real_heap}: 
+Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {H : real_heap}: 
                    env -> mode -> list expression -> list (type) -> Prop :=
      | args_empty : forall env m, well_typed_args env m [] []
 
@@ -2051,7 +2067,7 @@ Definition is_off_zero (b:bound) :=
 
 
 (* The CoreChkC Type System. *)
-Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real_heap}
+Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
         : env -> theta -> mode -> expression -> type -> Prop :=
   | TyLitChecked : forall env Q n t,
       @well_typed_lit D F Q (fst H) empty_scope n t ->
@@ -2272,7 +2288,7 @@ Inductive well_typed { D : structdef } {F:Z -> option funElem} {S:stack} {H:real
       well_typed env Q m (EIf e1 e2 e3) t4. 
 
 
-Definition fun_wf (D : structdef) (F:Z -> option funElem) (S:stack) (H:real_heap) :=
+Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
      forall env env' f tvl t e m, F f = Some (tvl,t,e,m) -> 
           gen_arg_env env tvl env' ->
           (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D m t' /\ well_bound_vars_type tvl t') /\

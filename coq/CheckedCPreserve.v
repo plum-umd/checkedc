@@ -23,9 +23,9 @@ Require Import BinPos BinNat.
 Local Open Scope Z_scope.
 
 
-Definition heap_wt_all (D : structdef) (Q : theta) (R : real_heap) :=
+Definition heap_wt_all (D : structdef) (Q : theta) (H : heap) :=
   forall x n t,
-    Heap.MapsTo x (n,t) R ->
+    Heap.MapsTo x (n,t) H ->
     word_type t /\ type_wf D t /\ simple_type t
     /\ well_typed_lit D Q H empty_scope n t.
 
