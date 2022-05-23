@@ -822,29 +822,29 @@ Inductive result : Type :=
     The [mode_of] function takes a context, [E], and returns [m] (a mode) indicating whether the context has a
     subcontext which is unchecked. *)
 
-Inductive context : Type :=
-  | CHole : context
-  | CLet : var -> context -> expression -> context
-  | CCall : context -> list expression -> context
-  | CPlusL : context -> expression -> context
-  | CPlusR : Z -> type -> context -> context
-  | CFieldAddr : context -> field -> context
-  | CDynCast : type -> context -> context
-  | CCast : type -> context -> context
-  | CDeref : context -> context
-  | CAssignL : context -> expression -> context
-  | CAssignR : Z -> type -> context -> context
-  | CRet : var -> (Z*type) -> option (Z * type) -> context -> context
+Inductive ctxt : Type :=
+  | CHole : ctxt
+  | CLet : var -> ctxt -> expression -> ctxt
+  | CCall : ctxt -> list expression -> ctxt
+  | CPlusL : ctxt -> expression -> ctxt
+  | CPlusR : Z -> type -> ctxt -> ctxt
+  | CFieldAddr : ctxt -> field -> ctxt
+  | CDynCast : type -> ctxt -> ctxt
+  | CCast : type -> ctxt -> ctxt
+  | CDeref : ctxt -> ctxt
+  | CAssignL : ctxt -> expression -> ctxt
+  | CAssignR : Z -> type -> ctxt -> ctxt
+  | CRet : var -> (Z*type) -> option (Z * type) -> ctxt -> ctxt
 (*
-  | CIfEqL : context -> expression -> expression -> expression -> context
-  | CIfEqR : expression -> context -> expression -> expression -> context
-  | CIfLtL : context -> expression -> expression -> expression -> context
-  | CIfLtR : expression -> context -> expression -> expression -> context
+  | CIfEqL : ctxt -> expression -> expression -> expression -> ctxt
+  | CIfEqR : expression -> ctxt -> expression -> expression -> ctxt
+  | CIfLtL : ctxt -> expression -> expression -> expression -> ctxt
+  | CIfLtR : expression -> ctxt -> expression -> expression -> ctxt
 *)
-  | CIf : context -> expression -> expression -> context
-  | CUnchecked : context -> context.
+  | CIf : ctxt -> expression -> expression -> ctxt
+  | CUnchecked : ctxt -> ctxt.
 
-Fixpoint in_hole (e : expression) (E : context) : expression :=
+Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   match E with
   | CHole => e
   | CLet x E' e' => ELet x (in_hole e E') e'
@@ -869,7 +869,7 @@ Fixpoint in_hole (e : expression) (E : context) : expression :=
   end.
 
 
-Fixpoint mode_of (E : context) : mode :=
+Fixpoint mode_of (E : ctxt) : mode :=
   match E with
   | CHole => Checked
   | CLet _ E' _ => mode_of E'
@@ -893,7 +893,7 @@ Fixpoint mode_of (E : context) : mode :=
   | CUnchecked E' => Unchecked
   end.
 
-Fixpoint compose (E_outer : context) (E_inner : context) : context :=
+Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   match E_outer with
   | CHole => E_inner
   | CLet x E' e' => CLet x (compose E' E_inner) e'

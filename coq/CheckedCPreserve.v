@@ -4,42 +4,52 @@ From CHKC Require Import
   ListUtil
   Map
   CheckedCDef
-  CheckedCProp.
+  CheckedCProp
+  CheckedCPropDev.
 
+#[global]
+Hint Unfold heap_consistent : Preservation.
+
+Ltac solve_ctxt :=
+  match goal with
+  | [E : ctxt |- _] => 
+      destruct E; find_Hstep; inversion Hstep; simpl in *; subst; try congruence
+  end.  
+  
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
 
-  Lemma preservation : forall S R env Q e t S' R' e',
+  Lemma preservation : forall s R env Q e t s' R' e',
       structdef_wf D ->
       rheap_wf R ->
-      rheap_wt_all Q Checked R ->
-      (* fun_wf D S' R' -> *)
+      rheap_wt_all D fenv Q Checked R ->
+      (* fun_wf D s' R' -> *)
       expr_wf D e ->
-      stack_wt D Checked S ->
+      stack_wt D Checked s ->
       env_wt D Checked env ->
-      theta_wt Q env S ->
-      sub_domain env S ->
-      stack_rheap_wf Q R env S ->
-      stack_rheap_consistent Q R S ->
-      @well_typed D fenv S R env Q Checked e t ->
+      theta_wt Q env s ->
+      sub_domain env s ->
+      stack_rwf D fenv Q R env s ->
+      stack_rheap_consistent D fenv Q R s ->
+      @well_typed D fenv s R env Q Checked e t ->
       reduce D fenv
-        (S, R) e Checked
-        (S', R') (RExpr e') ->
+        (s, R) e Checked
+        (s', R') (RExpr e') ->
       exists env' Q',
-        sub_domain env' S'
-        /\ stack_rheap_wf Q' R' env' S'
-        /\ stack_rheap_consistent Q' R S'
-        /\ rheap_consistent Q' R' R
-        /\ (@well_typed D fenv S' R' env' Q' Checked e' t
+        sub_domain env' s'
+        /\ stack_rwf D fenv Q' R' env' s'
+        /\ stack_rheap_consistent D fenv Q' R s'
+        /\ rheap_consistent D fenv Q' R' R
+        /\ (@well_typed D fenv s' R' env' Q' Checked e' t
             \/ (exists t' t'',
-                   eval_type_bound S' t = Some t'
+                   eval_type_bound s' t = Some t'
                    /\ subtype D Q' t'' t'
-                   /\ @well_typed D fenv S' R' env' Q' Checked e' t'')).
+                   /\ @well_typed D fenv s' R' env' Q' Checked e' t'')).
   Proof with eauto 20 with Preservation.
-    intros S R env Q e t S' R' e'
-      HDwf HRwf HRWt HEwf Hswt Henvt HQt HSubDom HSwf HSHwf Hwt.
-    generalize dependent R'. generalize dependent S'.  generalize dependent e'.
+    intros s R env Q e t s' R' e'
+      HDwf HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hsrwf HsHwf Hwt.
+    generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
       [
@@ -64,9 +74,10 @@ Section Preservation.
         env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
         env Q m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
-        env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
-        env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
+        (* env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *) *)
+        (* env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *) *)
         env Q m e1 e2 m' t t1 HSub WT HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
+        env Q m e1 e2 m' t ts HTy1 IH1 HTy2 IH2 HMode HZero                        | (* Assign function *)
         env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign array *)
         env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign nt-array *)
         
@@ -75,26 +86,30 @@ Section Preservation.
         env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
         env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
         env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin (* If *)
-      ]; intros e' s' H' HFun Hreduces; subst.
+      ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - exfalso. eapply lit_are_nf...
+    (* T-LitUnchecked *)
+    - exfalso. eapply lit_are_nf...
     (* T-Var *)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst. inv H5. exists env. exists Q.
+    - inv Hreduces; solve_ctxt. inv H1.
+      inv H5. exists env. exists Q.
+      destruct R' as [Hchk Htnt]; subst.
       split. easy.
       split. assumption.
       split. easy.
-      split. unfold heap_consistent. eauto.
-      right. unfold stack_wf in HSwf.
-      unfold stack_heap_consistent in *.
-      specialize (HSwf x t Wb) as eq2.
-      destruct eq2 as [ vx [ t' [t'' [X1 [X2 X3]]]]].
-      specialize (Stack.mapsto_always_same (Z*type) x (vx, t'') (v, t0) s' X3 H10) as eq1.
-      inv eq1.
-      exists t'. exists t0.
-      split. easy. split. easy.
-      apply TyLit.
-      apply HSHwf with (x := x). easy.
+      split.
+      unfold rheap_consistent. intros * HR1 HR2. inv HR1; inv HR2...
+      right.
+      inversion Hsrwf; inv H. destruct H0 as [Henv Hstack].
+      specialize (Henv _ _ Wb) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
+      exists t', t''. intuition.
+      + specialize (Stack.mapsto_always_same _ _ _ _ _ H H3) as Heq. inv Heq.
+        apply TyLitChecked.
+        cbn. assumption.
+      + specialize (Stack.mapsto_always_same _ _ _ _ _ H H3) as Heq. inv Heq.
+        apply TyLitChecked.
+        cbn. assumption.
     (*T-Call*)
     - inv Hreduces.
       destruct E; inversion H1; simpl in *; subst. inv H5.
@@ -190,7 +205,7 @@ Section Preservation.
       specialize (HSwf x t2 H). easy.
       apply Z.leb_nle in eq1.
       specialize (HSwf x (TPtr Checked (TNTArray h l t)) Wb).
-      destruct HSwf as [va [ta [tb [Y1 [Y2 Y3]]]]].
+    destruct HSwf as [va [ta [tb [Y1 [Y2 Y3]]]]].
       apply Stack.mapsto_always_same with (v1 := (va,tb)) in H8; try easy.
       inv H8.
       apply Env.mapsto_always_same with (v1 := t2) in Wb; try easy. subst.

@@ -7,11 +7,13 @@ From CHKC Require Import
   Map
   CheckedCDef.
 
-Local Parameter D : structdef.
-Local Parameter F : FEnv.
+Create HintDb Preservation.
+
 
 Section HeapProp.
   Local Open Scope Z_scope.
+  Variable D : structdef.
+  Variable F : FEnv.
   Variable Q : theta.
   Variable m : mode.
 
@@ -76,6 +78,8 @@ End HeapProp.
 (** ** Real Heap Properties *)
 (** This section contains heap and stack properties lifted to real heaps. *)
 Section RealHeapProp.
+  Variable D : structdef.
+  Variable F : FEnv.
   Variable Q : theta.
   Variable m : mode.
 
@@ -83,47 +87,98 @@ Section RealHeapProp.
       R = (Hchk, Htnt) -> heap_wf Hchk /\ heap_wf Htnt.
 
   (** Types on the stack agree with those on the rheap. *)
-  Definition stack_rheap_consistent (R : real_heap) S := forall Hchk Htnt,
+  Definition stack_rheap_consistent (R : real_heap) S :=
+    forall Hchk Htnt x n t,
       R = (Hchk, Htnt) ->
-      stack_heap_consistent Q Hchk S /\ stack_heap_consistent Q Htnt S.
+      Stack.MapsTo x (n,t) S ->
+      (well_typed_lit D F Q Hchk empty_scope n t
+       \/ well_typed_lit D F Q Htnt empty_scope n t).
+
 
   (* FIXME: hold the definition for now *)
   Definition rheap_consistent (R' : real_heap) (R : real_heap) : Prop :=
     forall Hchk' Htnt' Hchk Htnt,
       R' = (Hchk', Htnt') -> R = (Hchk, Htnt) -> 
-      heap_consistent Q Hchk' Hchk /\ heap_consistent Q Htnt' Htnt.
+      heap_consistent D F Q Hchk' Hchk /\ heap_consistent D F Q Htnt' Htnt.
+  Hint Unfold rheap_consistent : Preservation.
 
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
-    heap_wt_all Q m Hchk /\ heap_wt_all Q m Htnt.
+    heap_wt_all D F Q m Hchk /\ heap_wt_all D F Q m Htnt.
 
 End RealHeapProp.
   
 Section StackProp.
+  Variable D : structdef.
+  Variable F : FEnv.
   Variable Q : theta.
   Variable m : mode.
 
-  Inductive stack_wf H : env -> stack -> Prop :=
-  | WFS_Stack : forall env s,
+
+  (* The following needs to be redefined in the ctx of 2 heaps *)
+  (* Inductive stack_wf H : env -> stack -> Prop := *)
+  (* | WFS_Stack : forall env s, *)
+  (*     (forall x t, *)
+  (*         Env.MapsTo x t env -> *)
+  (*         exists v t' t'', *)
+  (*           eval_type_bound s t = Some t' *)
+  (*           /\ subtype D Q t'' t' *)
+  (*           /\ Stack.MapsTo x (v, t'') s *)
+  (*           /\ well_typed_lit D F Q H empty_scope v t'') *)
+  (*     /\ (forall x v t, *)
+  (*            Stack.MapsTo x (v, t) s ->  *)
+  (*            @well_typed_lit D F Q H empty_scope v t -> *)
+  (*            exists t' t'', *)
+  (*              @Env.MapsTo type x t' env *)
+  (*              /\ eval_type_bound s t' = Some t'' *)
+  (*              /\ subtype D Q t t'') -> *)
+  (*     stack_wf H env s. *)
+
+
+  Inductive stack_rwf (R : real_heap) : env -> stack -> Prop :=
+  | WFS_Stack : forall env s Hchk Htnt,
+      R = (Hchk, Htnt) ->
       (forall x t,
           Env.MapsTo x t env ->
           exists v t' t'',
             eval_type_bound s t = Some t'
             /\ subtype D Q t'' t'
             /\ Stack.MapsTo x (v, t'') s
-            /\ well_typed_lit D F Q H empty_scope v t'')
+            /\ (well_typed_lit D F Q Hchk empty_scope v t''
+                \/ well_typed_lit D F Q Htnt empty_scope v t''))
       /\ (forall x v t,
-             Stack.MapsTo x (v, t) s -> 
-             @well_typed_lit D F Q H empty_scope v t ->
+             Stack.MapsTo x (v, t) s ->
+             (well_typed_lit D F Q Hchk empty_scope v t
+              \/ well_typed_lit D F Q Htnt empty_scope v t) ->
              exists t' t'',
                @Env.MapsTo type x t' env
                /\ eval_type_bound s t' = Some t''
                /\ subtype D Q t t'') ->
-      stack_wf H env s.
+      stack_rwf R env s.
 
 
-  Definition stack_rheap_wf (R : real_heap)  env S := forall Hchk Htnt, 
-    R = (Hchk, Htnt) ->
-    stack_wf Hchk env S /\ stack_wf Hchk env S.
+
 End StackProp. 
+
+
+Ltac find_Hstep :=
+  match goal with
+  | [H : step _ _ _ _ _ _ |- _] =>
+      let Hstep := fresh "Hstep" in
+      rename H into Hstep
+  end.
+
+
+Section GeneralProp.
+  Variable D : structdef.
+  Variable F : FEnv.
+  Lemma lit_are_nf : forall R s n t,
+      ~ exists R' s' m r, reduce D F (s, R) (ELit n t) m (s', R') r.
+  Proof.
+    intros R s n t Contra.
+    destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ].
+    inversion Contra; find_Hstep;
+      destruct E; inversion Hstep; cbn in *; subst; try congruence.
+  Qed.
+End GeneralProp.
 
