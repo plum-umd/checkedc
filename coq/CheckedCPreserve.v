@@ -3,45 +3,48 @@ From CHKC Require Import
   Tactics
   ListUtil
   Map
-  CheckedCDef.
+  CheckedCDef
+  CheckedCProp.
 
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
-  Variable F : FEnv.
-  Variable m : mode.
 
-  Lemma preservation : forall S R env Q e t S' H' e',
-      @structdef_wf D ->
-      heap_wf D R ->
-      heap_wt_all D F m Q H ->
-      fun_wf D fenv S' H' ->
-      expr_wf D fenv e ->
-      stack_wt D S ->
-      env_wt D env ->
+  Lemma preservation : forall S R env Q e t S' R' e',
+      structdef_wf D ->
+      rheap_wf R ->
+      rheap_wt_all Q Checked R ->
+      (* fun_wf D S' R' -> *)
+      expr_wf D e ->
+      stack_wt D Checked S ->
+      env_wt D Checked env ->
       theta_wt Q env S ->
       sub_domain env S ->
-      stack_wf D Q env S ->
-      stack_heap_consistent D Q H S ->
-      @well_typed D fenv S H env Q Checked e t ->
-      @reduce D (fenv env) S H e Checked S' H' (RExpr e') ->
+      stack_rheap_wf Q R env S ->
+      stack_rheap_consistent Q R S ->
+      @well_typed D fenv S R env Q Checked e t ->
+      reduce D fenv
+        (S, R) e Checked
+        (S', R') (RExpr e') ->
       exists env' Q',
         sub_domain env' S'
-        /\ stack_wf D Q' env' S' 
-        /\ stack_heap_consistent D Q' H' S'
-        /\ @heap_consistent D Q H' H 
-        /\ (@well_typed D fenv S' H' env' Q' Checked e' t
+        /\ stack_rheap_wf Q' R' env' S'
+        /\ stack_rheap_consistent Q' R S'
+        /\ rheap_consistent Q' R' R
+        /\ (@well_typed D fenv S' R' env' Q' Checked e' t
             \/ (exists t' t'',
-                   eval_type_bound S' t t' 
+                   eval_type_bound S' t = Some t'
                    /\ subtype D Q' t'' t'
-                   /\ @well_typed D fenv S' H' env' Q' Checked e' t'')).
+                   /\ @well_typed D fenv S' R' env' Q' Checked e' t'')).
   Proof with eauto 20 with Preservation.
-    intros D s H env Q e t s' H' e' HDwf HHwf HHWt HFun HEwf Hswt Henvt HQt HSubDom HSwf HSHwf Hwt.
-    generalize dependent H'. generalize dependent s'.  generalize dependent e'.
+    intros S R env Q e t S' R' e'
+      HDwf HRwf HRWt HEwf Hswt Henvt HQt HSubDom HSwf HSHwf Hwt.
+    generalize dependent R'. generalize dependent S'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
       [
         env Q m n t HTyLit                                         | (* Literals *)
+        env Q m n t                                                | (* Literals-Unchecked *)
         env Q m x t Wb                                             | (* Variables *)
         env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
         env Q m x h l t Wb                                         | (* Strlen *)
@@ -51,7 +54,8 @@ Section Preservation.
         env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
         env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
         env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
-        env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
+        env Q m t e1 e2 HTyfun HTy1 IH1 HTy2 IH2                   | (* Addition Index *)
+        (* env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *) *)
         env Q m w Wb                                               | (* Malloc *)
         env Q m e t HTy IH                                         | (* Unchecked *)
         env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
@@ -65,7 +69,7 @@ Section Preservation.
         env Q m e1 e2 m' t t1 HSub WT HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
         env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign array *)
         env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign nt-array *)
-  
+        
         env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for array pointers *)
         env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
         env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)

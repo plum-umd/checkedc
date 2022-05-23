@@ -744,12 +744,6 @@ Definition heap : Type := Heap.t (Z * type).
  *)
 Definition real_heap : Type := heap * heap. 
 
-Definition heap_wf (D : structdef) (R : real_heap) : Prop :=
-  (forall (addr : Z),
-      0 < addr <= (Z.of_nat (Heap.cardinal (fst R))) <-> Heap.In addr (fst R))
-  /\ (forall (addr : Z),
-         0 < addr <= (Z.of_nat (Heap.cardinal (snd R))) <-> Heap.In addr (snd R)).
-
 Section allocation.
   Import ListNotations.
   Import MonadNotation.
@@ -1249,7 +1243,6 @@ Inductive well_typed_lit (D : structdef) (F: FEnv) (Q:theta) (H : heap)
       well_typed_lit D F Q H sc n (TPtr m t).
 
 (** It turns out, the induction principle that Coq generates automatically isn't very useful. *)
-
 (** In particular, the TyLitC case does not have an induction hypothesis.
     So, we prove an alternative induction principle which is almost identical but includes
     an induction hypothesis for the TyLitC case.
@@ -1316,40 +1309,6 @@ Definition add_value (H:heap) (n:Z) (t:type) :=
    end.
 
 
-
-Section StackWf.
-  Variable D : structdef.
-  Variable F : FEnv.
-  Variable Q : theta.
-
-  Inductive stack_wf H : env -> stack -> Prop :=
-  | WFS_Stack : forall env s,
-      (forall x t,
-          Env.MapsTo x t env ->
-          exists v t' t'',
-            eval_type_bound s t = Some t' /\
-              subtype D Q t'' t' /\
-              Stack.MapsTo x (v, t'') s /\
-              well_typed_lit D F Q H empty_scope v t'')
-      /\ (forall x v t,
-             Stack.MapsTo x (v, t) s -> 
-             @well_typed_lit D F Q H empty_scope v t    
-             -> exists t' t'',
-                 @Env.MapsTo type x t' env /\ eval_type_bound s t' = Some t''
-                 /\ subtype D Q t t'')
-      ->
-        stack_wf H env s.
-
-  Definition stack_heap_consistent H S := forall x n t,
-      Stack.MapsTo x (n,t) S ->
-      well_typed_lit D F Q H empty_scope n t.
-
-
-  Definition heap_consistent (H' : heap) (H : heap) : Prop :=
-    forall n t,
-      @well_typed_lit D F Q H empty_scope n t->
-      @well_typed_lit D F Q H' empty_scope n t.
-End StackWf.
 
 Hint Constructors well_typed_lit.
 
@@ -1767,7 +1726,7 @@ Hint Constructors step.
 (** ** Reduction *)
 Inductive reduce
   (D : structdef)
-  (F:Z -> option (list (var * type) * type * expression * mode))
+  (F : FEnv)
   : mem -> expression -> mode -> mem -> result -> Prop :=
   | RSExp : forall M e m M' e' E,
       step D F M e M' (RExpr e') ->
@@ -1814,48 +1773,6 @@ Section HeapWt.
   Variable F : FEnv.
   Variable m : mode.
   
-  Definition heap_well_typed (Q:theta) (H:heap)
-    (n:Z) (t:type) :=
-    simple_type t -> well_typed_lit D F Q H empty_scope n t.
-
-  Inductive heap_wt_arg (Q:theta) (H:heap)
-    : expression -> Prop :=
-  | HtArgLit : forall n t,
-      heap_well_typed Q H n t -> heap_wt_arg Q H (ELit n t)
-  | HtArgVar : forall x, heap_wt_arg Q H (EVar x).
-
-  Inductive heap_wt_args (Q:theta) (H:heap)
-    : list expression -> Prop :=
-    heap_wt_empty : heap_wt_args Q H ([])
-  | heap_wt_many : forall e el,
-      heap_wt_arg Q H e -> heap_wt_args Q H el -> heap_wt_args Q H (e::el).
-
-  Inductive heap_wt (Q:theta) (H:heap) : expression -> Prop :=
-  | HtLit : forall n t, heap_well_typed Q H n t -> heap_wt Q H (ELit n t)
-  | HtVar : forall x, heap_wt Q H (EVar x)
-  | HtStrlen : forall x, heap_wt Q H (EStrlen x)
-  | HtCall : forall f el, heap_wt_args Q H el -> heap_wt Q H (ECall f el)
-  | HtRet : forall x old a e, heap_wt Q H e -> heap_wt Q H (ERet x old a e)
-  | HtDynCast : forall t e, heap_wt Q H e -> heap_wt Q H (EDynCast t e)
-  | HtLet : forall x e1 e2,
-      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (ELet x e1 e2)
-  | HtMalloc : forall t, heap_wt Q H (EMalloc m t)
-  | HtCast : forall t e, heap_wt Q H e -> heap_wt Q H (ECast t e)
-  | HtPlus : forall e1 e2,
-      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EPlus e1 e2)
-  | HtFieldAddr : forall e f, heap_wt Q H e -> heap_wt Q H (EFieldAddr e f)
-  | HtDeref : forall e, heap_wt Q H e -> heap_wt Q H (EDeref e)
-  | HtAssign : forall e1 e2,
-      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EAssign e1 e2)
-  | HtIf : forall x e1 e2,
-      heap_wt Q H e1 -> heap_wt Q H e2 -> heap_wt Q H (EIf x e1 e2)
-  | HtUnChecked : forall e, heap_wt Q H e -> heap_wt Q H (EUnchecked e).
-
-  Definition heap_wt_all (Q : theta) (H : heap) :=
-    forall x n t,
-      Heap.MapsTo x (n,t) H ->
-      word_type t /\ type_wf D m t /\ simple_type t
-      /\ well_typed_lit D F Q H empty_scope n t.
 End HeapWt.
 
 Section RHeapWt.
@@ -1915,21 +1832,21 @@ Inductive well_bound_vars_type {A:Type}: list (var * A) -> type -> Prop :=
         -> (forall t', In t' ts -> well_bound_vars_type l t') -> well_bound_vars_type l (TFun b t ts).
 
 
-Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (H : real_heap) (env:env): 
+Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (R : real_heap) (env:env): 
                 mode -> expression -> type -> Prop :=
      | ArgLitChecked : forall n t t',
       simple_type t ->
-      @well_typed_lit D F Q (fst H) empty_scope n t' ->
+      @well_typed_lit D F Q (fst R) empty_scope n t' ->
       subtype D Q t' t ->
-      well_typed_arg D F Q H env Checked (ELit n t') t
+      well_typed_arg D F Q R env Checked (ELit n t') t
      | ArgLitUnChecked : forall n t t',
       simple_type t ->
-      well_typed_arg D F Q H env Unchecked (ELit n t') t
+      well_typed_arg D F Q R env Unchecked (ELit n t') t
      | ArgVar : forall m x t t',
       Env.MapsTo x t' env -> 
       well_type_bound_in env t ->
       subtype D Q t' t ->
-      well_typed_arg D F Q H env m (EVar x) t.
+      well_typed_arg D F Q R env m (EVar x) t.
 
 Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {H : real_heap}: 
                    env -> mode -> list expression -> list (type) -> Prop :=
@@ -2053,13 +1970,16 @@ Definition get_tvar_bound (b:bound) : list var :=
   end.
 
 Fixpoint get_tvars (t:type) : (list var) :=
-   match t with TNat => []
-             | TPtr c t => get_tvars t
-             | TStruct t => []
-             | TArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
-             | TNTArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
-             | TFun b t tl => get_tvar_bound b ++ (get_tvars t)++(fold_left (fun acc t' => acc++(get_tvars t')) tl [])
-   end.
+  match t with
+    TNat => []
+  | TPtr c t => get_tvars t
+  | TStruct t => []
+  | TArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
+  | TNTArray l h t => get_tvar_bound l ++ get_tvar_bound h ++ get_tvars t
+  | TFun b t tl =>
+      get_tvar_bound b ++ get_tvars t ++
+        fold_left (fun acc t' => acc++(get_tvars t')) tl []
+  end.
 
 
 (*
@@ -2170,11 +2090,11 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
 
   | TyStrlen : forall env Q x m m' h l t, 
       Env.MapsTo x (TPtr m' (TNTArray h l t)) env ->
-        mode_leq m' m ->
+      mode_leq m' m ->
       well_typed env Q m (EStrlen x) TNat
 
   | TyLetStrlen : forall env Q m m' x y e l h t ta, 
-        mode_leq m' m ->
+      mode_leq m' m ->
       Env.MapsTo y (TPtr m' (TNTArray l h ta)) env ->
       well_typed (Env.add x TNat (Env.add y (TPtr m' (TNTArray l (Var x 0) ta)) env)) (Theta.add x GeZero Q) m e t ->
       ~ In x (get_tvars t) ->
@@ -2186,12 +2106,12 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       In x (get_tvars t) -> get_good_dept e1 = Some b ->
       well_typed env Q m (ELet x e1 e2) (subst_type [(x,b)] t)
 
-  | TyLetPtrSame1 : forall env Q m m' x e1 t1 e2 t,
-      well_typed env Q m e1 (TPtr m' t) ->
-      well_typed (Env.add x t1 env) Q m e2 t ->
-      ~ In x (get_tvars t) ->
-        mode_leq m' m ->
-      well_typed env Q m (ELet x e1 e2) t
+  (* | TyLetPtrSame1 : forall env Q m m' x e1 t1 e2 t, *)
+  (*     mode_leq m' m -> *)
+  (*     well_typed env Q m e1 (TPtr m' t) -> *)
+  (*     well_typed (Env.add x t1 env) Q m e2 t -> *)
+  (*     ~ In x (get_tvars t) -> *)
+  (*     well_typed env Q m (ELet x e1 e2) t *)
 
   | TyLet : forall env Q m x e1 t1 e2 t,
       well_typed env Q m e1 t1 ->
@@ -2371,7 +2291,8 @@ Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
     /\ @well_typed D (F) S H env' empty_theta m e t.
 
 
-Definition sub_domain (env: env) (S:stack) := forall x, Env.In x env -> Stack.In x S.
+Definition sub_domain (env: env) (S:stack) := forall x, 
+    Env.In x env -> Stack.In x S.
 
 
 Local Close Scope Z_scope.
