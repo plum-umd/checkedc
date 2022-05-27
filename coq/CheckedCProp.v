@@ -20,23 +20,20 @@ Section HeapProp.
   Definition heap_wf (H : heap) : Prop := forall (addr : Z),
       0 < addr <= (Z.of_nat (Heap.cardinal H)) <-> Heap.In addr H.
 
-  Definition stack_heap_consistent H S := forall x n t,
-      Stack.MapsTo x (n,t) S ->
-      well_typed_lit D F Q H empty_scope n t.
-
-  Definition heap_consistent (H' : heap) (H : heap) : Prop :=
+  Definition heap_consistent_checked (H' : heap) (H : heap) : Prop :=
     forall n t,
-      @well_typed_lit D F Q H empty_scope n t->
-      @well_typed_lit D F Q H' empty_scope n t.
+      well_typed_lit_checked D F Q H empty_scope n t->
+      well_typed_lit_checked D F Q H' empty_scope n t.
 
-  Definition heap_well_typed (H:heap)
+
+  Definition heap_well_typed_checked (H:heap)
     (n:Z) (t:type) :=
-    simple_type t -> well_typed_lit D F Q H empty_scope n t.
+    simple_type t -> well_typed_lit_checked D F Q H empty_scope n t.
 
   Inductive heap_wt_arg (H:heap)
     : expression -> Prop :=
   | HtArgLit : forall n t,
-      heap_well_typed H n t -> heap_wt_arg H (ELit n t)
+      heap_well_typed_checked H n t -> heap_wt_arg H (ELit n t)
   | HtArgVar : forall x, heap_wt_arg H (EVar x).
 
   Inductive heap_wt_args (H:heap)
@@ -46,7 +43,7 @@ Section HeapProp.
       heap_wt_arg H e -> heap_wt_args H el -> heap_wt_args H (e::el).
 
   Inductive heap_wt (H:heap) : expression -> Prop :=
-  | HtLit : forall n t, heap_well_typed H n t -> heap_wt H (ELit n t)
+  | HtLit : forall n t, heap_well_typed_checked H n t -> heap_wt H (ELit n t)
   | HtVar : forall x, heap_wt H (EVar x)
   | HtStrlen : forall x, heap_wt H (EStrlen x)
   | HtCall : forall f el, heap_wt_args H el -> heap_wt H (ECall f el)
@@ -70,7 +67,8 @@ Section HeapProp.
     forall x n t,
       Heap.MapsTo x (n,t) H ->
       word_type t /\ type_wf D m t /\ simple_type t
-      /\ well_typed_lit D F Q H empty_scope n t.
+      /\ well_typed_lit_checked D F Q H empty_scope n t.
+
   Local Close Scope Z_scope.
 End HeapProp.
 
@@ -91,20 +89,21 @@ Section RealHeapProp.
     forall Hchk Htnt x n t,
       R = (Hchk, Htnt) ->
       Stack.MapsTo x (n,t) S ->
-      (well_typed_lit D F Q Hchk empty_scope n t
-       \/ well_typed_lit D F Q Htnt empty_scope n t).
+      (well_typed_lit_checked D F Q Hchk empty_scope n t
+       \/ well_typed_lit_tainted D F Q Htnt empty_scope n t).
 
 
   (* FIXME: hold the definition for now *)
   Definition rheap_consistent (R' : real_heap) (R : real_heap) : Prop :=
     forall Hchk' Htnt' Hchk Htnt,
       R' = (Hchk', Htnt') -> R = (Hchk, Htnt) -> 
-      heap_consistent D F Q Hchk' Hchk /\ heap_consistent D F Q Htnt' Htnt.
+      heap_consistent_checked D F Q Hchk' Hchk.
+
   Hint Unfold rheap_consistent : Preservation.
 
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
-    heap_wt_all D F Q m Hchk /\ heap_wt_all D F Q m Htnt.
+    heap_wt_all D F Q m Hchk.
 
 End RealHeapProp.
   
@@ -114,50 +113,11 @@ Section StackProp.
   Variable Q : theta.
   Variable m : mode.
 
-
-  (* The following needs to be redefined in the ctx of 2 heaps *)
-  (* Inductive stack_wf H : env -> stack -> Prop := *)
-  (* | WFS_Stack : forall env s, *)
-  (*     (forall x t, *)
-  (*         Env.MapsTo x t env -> *)
-  (*         exists v t' t'', *)
-  (*           eval_type_bound s t = Some t' *)
-  (*           /\ subtype D Q t'' t' *)
-  (*           /\ Stack.MapsTo x (v, t'') s *)
-  (*           /\ well_typed_lit D F Q H empty_scope v t'') *)
-  (*     /\ (forall x v t, *)
-  (*            Stack.MapsTo x (v, t) s ->  *)
-  (*            @well_typed_lit D F Q H empty_scope v t -> *)
-  (*            exists t' t'', *)
-  (*              @Env.MapsTo type x t' env *)
-  (*              /\ eval_type_bound s t' = Some t'' *)
-  (*              /\ subtype D Q t t'') -> *)
-  (*     stack_wf H env s. *)
-
-
-  Inductive stack_rwf (R : real_heap) : env -> stack -> Prop :=
-  | WFS_Stack : forall env s Hchk Htnt,
-      R = (Hchk, Htnt) ->
-      (forall x t,
-          Env.MapsTo x t env ->
-          exists v t' t'',
-            eval_type_bound s t = Some t'
-            /\ subtype D Q t'' t'
-            /\ Stack.MapsTo x (v, t'') s
-            /\ (well_typed_lit D F Q Hchk empty_scope v t''
-                \/ well_typed_lit D F Q Htnt empty_scope v t''))
-      /\ (forall x v t,
-             Stack.MapsTo x (v, t) s ->
-             (well_typed_lit D F Q Hchk empty_scope v t
-              \/ well_typed_lit D F Q Htnt empty_scope v t) ->
-             exists t' t'',
-               @Env.MapsTo type x t' env
-               /\ eval_type_bound s t' = Some t''
-               /\ subtype D Q t t'') ->
-      stack_rwf R env s.
-
-
-
+  Definition stack_wf env s := forall x t,
+      Env.MapsTo x t env -> exists v t' t'',
+        eval_type_bound s t = Some t'
+        /\ subtype D Q t'' t' 
+        /\ Stack.MapsTo x (v, t'') s.
 End StackProp. 
 
 
@@ -177,8 +137,9 @@ Section GeneralProp.
   Proof.
     intros R s n t Contra.
     destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ].
-    inversion Contra; find_Hstep;
-      destruct E; inversion Hstep; cbn in *; subst; try congruence.
+    inv Contra; find_Hstep; destruct E; cbn in *; subst; inv Hstep;
+      try congruence.
   Qed.
+
 End GeneralProp.
 

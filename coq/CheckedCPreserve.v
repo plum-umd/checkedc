@@ -8,7 +8,8 @@ From CHKC Require Import
   CheckedCPropDev.
 
 #[global]
-Hint Unfold heap_consistent : Preservation.
+Hint Unfold rheap_consistent : Preservation.
+Hint Unfold heap_consistent_checked : Preservation.
 
 Ltac solve_ctxt :=
   match goal with
@@ -19,7 +20,6 @@ Ltac solve_ctxt :=
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
-
   Lemma preservation : forall s R env Q e t s' R' e',
       structdef_wf D ->
       rheap_wf R ->
@@ -30,7 +30,7 @@ Section Preservation.
       env_wt D Checked env ->
       theta_wt Q env s ->
       sub_domain env s ->
-      stack_rwf D fenv Q R env s ->
+      stack_wf D Q env s ->
       stack_rheap_consistent D fenv Q R s ->
       @well_typed D fenv s R env Q Checked e t ->
       reduce D fenv
@@ -38,7 +38,7 @@ Section Preservation.
         (s', R') (RExpr e') ->
       exists env' Q',
         sub_domain env' s'
-        /\ stack_rwf D fenv Q' R' env' s'
+        /\ stack_wf D Q' env' s'
         /\ stack_rheap_consistent D fenv Q' R s'
         /\ rheap_consistent D fenv Q' R' R
         /\ (@well_typed D fenv s' R' env' Q' Checked e' t
@@ -48,19 +48,19 @@ Section Preservation.
                    /\ @well_typed D fenv s' R' env' Q' Checked e' t'')).
   Proof with eauto 20 with Preservation.
     intros s R env Q e t s' R' e'
-      HDwf HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hsrwf HsHwf Hwt.
+      HDwf HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
       [
-        env Q m n t HTyLit                                         | (* Literals *)
-        env Q m n t                                                | (* Literals-Unchecked *)
-        env Q m x t Wb                                             | (* Variables *)
+        env Q n t HTyLit                                           | (* Literals *)
+        env Q n t                                                  | (* Literals-Unchecked *)
+        env Q m x t Hx                                             | (* Variables *)
         env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
         env Q m x h l t Wb                                         | (* Strlen *)
         env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
-        env Q m x e1 e2 t b Alpha HTy1 IH1 HTy2 IH2 Hx Hdept       | (* Let-Nat-Expr *)
-        env Q m x e1 t1 e2 t Alpha HTy1 IH1 HTy2 IH2 Hx            | (* Let-Expr *)
+        env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hx Hdept             | (* Let-Nat-Expr *)
+        env Q m x e1 t1 e2 t HTy1 IH1 HTy2 IH2 Hx                  | (* Let-Expr *)
         env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
         env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
         env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
@@ -92,8 +92,8 @@ Section Preservation.
     (* T-LitUnchecked *)
     - exfalso. eapply lit_are_nf...
     (* T-Var *)
-    - inv Hreduces; solve_ctxt. inv H1.
-      inv H5. exists env. exists Q.
+    - inv Hreduces; solve_ctxt. inv H1...
+      inv H5. exists env. exists Q. 
       destruct R' as [Hchk Htnt]; subst.
       split. easy.
       split. assumption.
@@ -101,15 +101,12 @@ Section Preservation.
       split.
       unfold rheap_consistent. intros * HR1 HR2. inv HR1; inv HR2...
       right.
-      inversion Hsrwf; inv H. destruct H0 as [Henv Hstack].
-      specialize (Henv _ _ Wb) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
+      specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
       exists t', t''. intuition.
-      + specialize (Stack.mapsto_always_same _ _ _ _ _ H H3) as Heq. inv Heq.
-        apply TyLitChecked.
-        cbn. assumption.
-      + specialize (Stack.mapsto_always_same _ _ _ _ _ H H3) as Heq. inv Heq.
-        apply TyLitChecked.
-        cbn. assumption.
+      specialize (Stack.mapsto_always_same _ _ _ _ _ H3 Hrst) as Heq; inv Heq.
+      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt];
+        apply TyLitChecked; cbn; [ assumption
+                                 | inv Etnt; cbn; constructor; congruence].
     (*T-Call*)
     - inv Hreduces.
       destruct E; inversion H1; simpl in *; subst. inv H5.
