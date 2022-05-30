@@ -143,3 +143,49 @@ Section GeneralProp.
 
 End GeneralProp.
 
+
+Section FunctionProp.
+  Lemma gen_arg_env_good : forall tvl enva, exists env, gen_arg_env enva tvl env.
+  Proof.
+    intros.
+    induction tvl. exists enva. subst. constructor.
+    destruct IHtvl.
+    destruct a.
+    exists (Env.add v t x).
+    constructor. easy.
+  Qed.
+
+
+  Lemma sub_domain_grow : forall env S x v t,
+      sub_domain env S -> sub_domain (Env.add x t env) (Stack.add x v S).
+  Proof with auto.
+    intros.
+    unfold sub_domain in *.
+    intros.
+    unfold Env.In,Env.Raw.PX.In in H0.
+    destruct H0.
+    unfold Stack.In,Stack.Raw.PX.In.
+    destruct (Nat.eq_dec x x0).
+    + subst.
+      exists v.
+      apply Stack.add_1...
+    + apply Env.add_3 in H0...
+      assert (Env.In x0 env)... 
+      unfold Env.In,Env.Raw.PX.In.
+      exists x1...
+      apply H in H1.
+      unfold Stack.In,Stack.Raw.PX.In in H1.
+      destruct H1.
+      exists x2.
+      apply Stack.add_2...
+  Qed.
+
+  Lemma sub_domain_grows : forall tvl es env env' s s' AS,
+      gen_arg_env env tvl env' -> eval_el AS s tvl es s' -> sub_domain env s ->
+      sub_domain env' s'.
+  Proof with auto.
+    induction tvl; intros; inv H0; inv H...
+    apply sub_domain_grow.
+    exact (IHtvl _ env env'0 s s'0 AS H7 H8 H1) .
+  Qed.
+End FunctionProp.

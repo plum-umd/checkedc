@@ -13,8 +13,17 @@ Hint Unfold heap_consistent_checked : Preservation.
 
 Ltac solve_ctxt :=
   match goal with
-  | [E : ctxt |- _] => 
-      destruct E; find_Hstep; inversion Hstep; simpl in *; subst; try congruence
+  | [E : ctxt |- _] =>
+      destruct E;
+      match goal with
+      | [Hstep : step _ _ _ _ _ _ |- _] =>
+          (* Leave [Hstep] there for goal information *)
+          inversion Hstep; subst; rename Hstep into _Hstep
+      end; 
+      try solve [cbn in *; subst; congruence];
+      match goal with
+      | [H : in_hole _ _ = _ |- _ ] => inv H
+      end
   end.  
   
 (** Type Preservation Theorem. *)
@@ -56,7 +65,7 @@ Section Preservation.
         env Q n t HTyLit                                           | (* Literals *)
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
-        env Q AS m m' es x tvl e t HMap HGen HMode HArg            | (* Call *)
+        env Q m m' b es x ts t HMode HZero HTyf IH1 HArgs          | (* Call *)
         env Q m x h l t Wb                                         | (* Strlen *)
         env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
         env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hx Hdept             | (* Let-Nat-Expr *)
@@ -92,7 +101,7 @@ Section Preservation.
     (* T-LitUnchecked *)
     - exfalso. eapply lit_are_nf...
     (* T-Var *)
-    - inv Hreduces; solve_ctxt. inv H1...
+    - inv Hreduces; solve_ctxt. 
       inv H5. exists env. exists Q. 
       destruct R' as [Hchk Htnt]; subst.
       split. easy.
@@ -103,14 +112,23 @@ Section Preservation.
       right.
       specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
       exists t', t''. intuition.
-      specialize (Stack.mapsto_always_same _ _ _ _ _ H3 Hrst) as Heq; inv Heq.
+      specialize (Stack.mapsto_always_same _ _ _ _ _ H4 Hrst) as Heq; inv Heq.
       specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt];
         apply TyLitChecked; cbn; [ assumption
                                  | inv Etnt; cbn; constructor; congruence].
+
     (*T-Call*)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst. inv H5.
-      rewrite H6 in HMap. inv HMap.
+    - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst. 
+      inv Hreduces. solve_ctxt.
+      (* SCallChecked *)
+      + specialize (gen_arg_env_good tvl env) as [env' HGen].
+        exists env', Q. 
+        split.
+        { exact (sub_domain_grows tvl es env env' s s' AS HGen H11 HsubDom). }
+        split.
+        
+      +
+        rewrite H6 in HMap. inv HMap.
       specialize (gen_arg_env_good tvl env) as X1.
       destruct X1 as [enva X1]. rewrite H10 in HGen. inv HGen.
       specialize (sub_domain_grows tvl es env enva s s' AS X1 H13 HSubDom) as X2.

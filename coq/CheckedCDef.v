@@ -974,17 +974,17 @@ Fixpoint eval_type_bound (s:stack) (t:type) :=
   | TFun b t ts =>
       match (eval_bound s b,eval_type_bound s t) with
         | (Some b',Some t') => 
-            match (fold_left
-                     (fun r => fun ta =>
+            match (fold_right
+                     (fun ta r =>
                         match r with
                         | None => None
                         | Some l =>
                             match eval_type_bound s ta with
                             | None => None
-                            | Some ta' => Some (l++[ta'])
+                            | Some ta' => Some (ta' :: l)
                             end
                         end)
-                     ts (Some []))
+                     (Some []) ts)
             with
             | None => None
             | Some ts' => Some (TFun b' t' ts')

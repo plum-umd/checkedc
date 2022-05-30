@@ -6,6 +6,7 @@ From Coq Require Export
   Arith
   Psatz
   Program
+  Program.Equality
   List
   ZArith
   ZArith.BinIntDef .
