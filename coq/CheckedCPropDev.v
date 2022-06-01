@@ -25,7 +25,7 @@ Section FunctionProp.
   Proof.
     intros * H. induction H; cbn; auto.
   Qed.
-    
+  
 
   (* what's in the arguments will not affact what was in the stack
      Q: why is this useful?
@@ -42,7 +42,7 @@ Section FunctionProp.
     apply Stack.add_2; [exact n0 | apply IHHel]; auto.
     intros. apply (Hnotin x1 t1). unfold In. right. assumption.
   Qed.
-    
+  
   (* Q: what's the purpose of reasoning about the length *)
   Lemma well_typed_arg_same_length : forall R env AS es tvl,
       @well_typed_args D fenv Q R env AS es tvl -> length es = length tvl.
@@ -69,7 +69,7 @@ Section FunctionProp.
   Qed.
 
 
-  Ltac solveOpt :=
+  Ltac solveOptBoth :=
     match goal with
     | [H : match ?P with | _ => _ end = Some _ |-
          match ?P' with | _ => _ end = Some _] =>
@@ -79,14 +79,37 @@ Section FunctionProp.
         destruct P' eqn:H'
     end; auto.
 
-  Ltac solveOptUp :=
+  Ltac solveOptBothIn H :=
+    match type of H with
+    | match ?P with | _ => _ end = Some _ =>
+        match goal with
+        | [H : match P with | _ => _ end = Some _ |-
+             match ?P' with | _ => _ end = Some _] =>
+            let H' := fresh H in
+            destruct P eqn:H'; inv H; auto;
+            let H' := fresh H in
+            destruct P' eqn:H'
+        end; auto
+    end.
+
+  Ltac solveOptIn H :=
+    match type of H with
+    | match ?X with |_ => _ end = Some _ =>
+        match goal with
+        | [H : match X with | _ => _ end = Some _ |- _] =>
+            let H' := fresh H in
+            destruct X eqn:H'; inv H
+        end; auto
+    end.
+
+  Ltac solveOptTop :=
     match goal with
     | [H : match ?P with | _ => _ end = Some _ |- _] =>
         let H' := fresh H in
         destruct P eqn:H'; inv H
     end; auto.
 
-  Ltac solveOptDown :=
+  Ltac solveOptGoal :=
     match goal with
     | |- match ?P' with | _ => _ end = Some _ =>
         let H' := fresh "Hgoal" in
@@ -102,6 +125,12 @@ Section FunctionProp.
     end; auto.
 
 
+  Tactic Notation "solveopt" := solveOptGoal.
+  Tactic Notation "solveopt" "in" hyp(H) := solveOptIn H.
+  Tactic Notation "solveopt2" := solveOptBoth.
+  Tactic Notation "solveopt2" "with" hyp(H) := solveOptBothIn H.
+  
+  
   Lemma stack_find_none : forall x S,
       Stack.find x S = None ->
       (forall (t : Z * type), ~ @Stack.In (Z * type) x S).
@@ -116,6 +145,17 @@ Section FunctionProp.
   Qed.
 
 
+  Ltac solveMaps :=
+    match goal with
+    | |- Env.In ?x ?m =>
+        unfold Env.In, Env.Raw.PX.In; eexists; eauto
+    | |- Stack.In ?x ?m =>
+        unfold Stack.In, Stack.Raw.PX.In; eexists; eauto
+    | |- Heap.In ?x ?m =>
+        unfold Heap.In, Heap.Raw.PX.In; eexists; eauto
+    end; auto.
+  
+
   Lemma same_eval_bound_in_consistent_stack : forall env S S' l, 
       well_bound_in env l -> 
       sub_domain env S ->
@@ -123,8 +163,7 @@ Section FunctionProp.
       eval_bound S l = eval_bound S' l.
   Proof with auto.
     intros * Hwb. inv Hwb; intros Hdom Hgrow...
-    assert (Env.In x env) as Hin.
-    { unfold Env.In, Env.Raw.PX.In. exists TNat... }
+    assert (Env.In x env) as Hin by solveMaps.
     unfold stack_consistent_grow in Hgrow.
     cbn. 
     destruct (Stack.find (elt:=Z * type) x S) eqn: Efind.
@@ -135,7 +174,21 @@ Section FunctionProp.
       eapply stack_find_none in Efind.
       congruence. intuition. constructor.
   Qed.
-      
+  
+
+  Ltac focusCut H tac :=
+    match type of H with
+    | (?P -> _) =>
+        match goal with
+        | [H : P -> _ |- _] =>
+            let Htmp := fresh "Hcut" in
+            assert P as Htmp; [tac | specialize (H Htmp)]
+        end
+    end.
+
+  (* Modus Ponens but on the subgoal *)
+  Tactic Notation "mopo" hyp(H) := focusCut H idtac.
+  Tactic Notation "mopo" hyp(H) "by" tactic(tac) := focusCut H tac.
   
   Lemma stack_grow_eval_type_same : forall env S S' t,
       well_type_bound_in env t ->
@@ -152,77 +205,96 @@ Section FunctionProp.
       end; invOpt.
     intros * Hwt Hsub Hgrow. induction Hwt; intros t' Hev;
       try solve [cbn in *; auto]; specialize (IHHwt Hsub Hgrow).
-    - cbn in *. solveOpt; solveIH.
-    - cbn in *. solveOpt; solveIH.
-      rewrite (same_eval_bound_in_consistent_stack env S S') by assumption.
-      rewrite (same_eval_bound_in_consistent_stack env S S') by assumption.
-      reflexivity.
-    - cbn in *. solveOpt; solveIH.
-      rewrite (same_eval_bound_in_consistent_stack env S S') by assumption.
-      rewrite (same_eval_bound_in_consistent_stack env S S') by assumption.
-      reflexivity.
+    - cbn in *. solveopt2; solveIH.
+    - cbn in *. solveopt2; solveIH.
+      rewrite (same_eval_bound_in_consistent_stack env S S')...
+      rewrite (same_eval_bound_in_consistent_stack env S S')...
+    - cbn in *. solveopt2; solveIH.
+      rewrite (same_eval_bound_in_consistent_stack env S S')...
+      rewrite (same_eval_bound_in_consistent_stack env S S')...
     - cbn in *.
-      solveOpt;
+      solveopt2;
         pose proof
-           ((same_eval_bound_in_consistent_stack env S S') b H Hsub Hgrow)
-        as Heq.
-      2: congruence.
-      rewrite Hev, Hev0 in Heq. inv Heq. clear Hev. clear Hev0.
-      solveOptUp. rewrite (IHHwt t0 eq_refl).
+          ((same_eval_bound_in_consistent_stack env S S') b H Hsub Hgrow)
+        as Heq; [idtac | congruence].
+      rewrite -> Hev, -> Hev0 in Heq. inv Heq. 
+      solveopt in H3. rewrite (IHHwt t0 eq_refl).
       (* now let's reason about fold_right *)
-      rewrite H5. 
+      rewrite H5.
       match goal with
       | [H : match ?P with _ => _ end = _ |- match ?R with _ => _ end = _] =>
           assert (P = R) as Heq
       end.
       {
-        induction ts; cbn...
-        rewrite IHts...
-        assert (eval_type_bound S' a = eval_type_bound S a) as Htb.
-        { destruct (eval_type_bound S a) eqn:Etb.
-          + specialize (H1 a (in_eq  _ _) Hsub Hgrow _ Etb).
-            rewrite H1...
-          + cbn in H5. rewrite Etb in H5.
-            destruct ts. cbn in H5; congruence.
-            match goal with
-            | [H : (match (match ?P with None => None | _ => _ end) with
-                      _ => _
-                    end) = Some _
-               |- _] => destruct P; cbn in H5; congruence
-            end.
-        }
-        rewrite Htb. reflexivity.
-        intuition.
-        intuition.
-
-        (* I cannot continue with H5 *)
+        generalize dependent t'.
+        induction ts; intros; cbn...
+        solveopt in H5. cbn in H3. solveopt in H3. 
+        mopo IHts.
+        {intros. apply in_cons with (a := a) in H3.  apply H0 in H3... }
+        mopo IHts by intuition.
+        erewrite <- IHts by eauto. 
+        solveopt in H6. erewrite (H1 a (in_eq _ _)); eauto.
       }
+      by rewrite Heq in H5.
+  Qed.
 
-      induction ts...
-      assert (forall t' : type, In t' ts -> well_type_bound_in env t') as HIH1.
-      { intros. apply in_cons with (a := a) in H3.  apply H0 in H3... }
-      apply IHts in HIH1... 3: exact H5.
-      cbn. rewrite Htb.
-      eapply IHts in HIH1; try intuition.
-      2: apply H5.
-      
-      
-      match goal with
-      | |- match ?P with _ => _ end =
-             match ?P' with _ => _ end =>
-          assert (P = P') as Hgoal
-      end.
-      { eapply IHts. }
 
-      (* . *)
-      match goal with
-      | [H : (match (match ?P with _ => _ end) with _ => _ end = Some _)
-         |- _] =>
-          idtac P;
-          destruct P eqn:EP
-      end; destruct (eval_type_bound S a) eqn:Htb2; inv H5.
-      eapply IHts in HIH1. 
-      cbn; rewrite Htb, Htb2. rewrite HIH1.
+  (* Stack-wellformness for parameter varaibles that's not in current
+     env/stack.
+   *)
+  
+  Fixpoint list_map_uniq {X Y} (l : list (X * Y)) : Prop :=
+    match l with
+    | [] => True
+    | (a, _) :: t =>
+      (forall b, ~ In (a, b) l) /\ list_map_uniq t
+    end.
+
+(*
+  Lemma in_eval_el : forall  S S' tvl es AS,
+      list_map_uniq tvl -> 
+      eval_el AS S tvl es S' ->
+      forall x t,
+        In (x,t) tvl ->
+        exists t' v,
+          eval_type_bound S (subst_type AS t) = Some t' /\
+            Stack.MapsTo x (v, t') S'.
+  Proof.
+    intros * Huniq Hel. induction Hel; intros * Hin. destruct Hin.
+    destruct Hin as [[=] | Hin]; subst. 
+    - inv H; exists t', n; intuition; by apply (Stack.add_1).
+    - destruct Huniq as [Hnin Huniq].
+      destruct (IHHel Huniq _ _ Hin) as (t'' & v'' & Hetb & Hstk).
+      exists t'', v''. intuition.
+      destruct (Nat.eq_dec x0 x); subst.
+      + destruct (Hnin t (in_eq _ _)). 
+      + apply Stack.add_2; auto.
+  Qed.
+ *)
+
+  Lemma in_eval_el : forall  S S' tvl es AS,
+      list_map_uniq tvl -> 
+      eval_el AS S tvl es S' ->
+      get_dept_map tvl es = Some AS ->
+      forall x t,
+        In (x,t) tvl ->
+        exists t' t'' v,
+          eval_type_bound S (subst_type AS t) = Some t' /\
+            Stack.MapsTo x (v, t') S' /\
+            eval_type_bound S' t = Some t'' /\
+            subtype D Q t' t''.
+  Proof.
+    intros * Huniq Hel. induction Hel; intros Hdept * Hin. destruct Hin.
+    destruct Hin as [[=] | Hin]; subst. 
+    - inv H; exists t', t', n; intuition.
+      + by apply (Stack.add_1).
+      +
+    - destruct Huniq as [Hnin Huniq].
+      destruct (IHHel Huniq _ _ Hin) as (t'' & v'' & Hetb & Hstk).
+      exists t'', v''. intuition.
+      destruct (Nat.eq_dec x0 x); subst.
+      + destruct (Hnin t (in_eq _ _)). 
+      + apply Stack.add_2; auto.
   Qed.
 
   (* Why is this called [trans]? Appearantly, it's more of growing. *)
@@ -230,13 +302,10 @@ Section FunctionProp.
     forall R env env' S S' AS tvl es ts,
       stack_wt D m S ->
       sub_domain env S -> stack_wf D Q env S ->
-      stack_rheap_consistent D fenv Q R S -> env_wt D m env ->
+      stack_rheap_consistent D fenv Q R S ->
+      env_wt D m env ->
       (forall a, In a tvl -> ~ Env.In (fst a) env) ->
-      (forall n n' a b,
-          n <> n' ->
-          nth_error tvl n = Some a ->
-          nth_error tvl n' = Some b ->
-          fst a <> fst b) ->
+      list_map_uniq tvl ->
       (forall x t,
           Env.MapsTo x t env' ->
           Env.MapsTo x t env \/ In (x,t) tvl) ->
@@ -260,43 +329,48 @@ Section FunctionProp.
     destruct (Hmap _ _ Hmap') as [Hmap'' | HIn].
     - specialize (Hwf _ _ Hmap'') as [v [t' [t'' [Hb [ Hs Hm]]]]].
       exists v, t', t''.
+      assert (stack_consistent_grow S S' env) as Hcst.
+      { apply (stack_env_irrelavent_grow _ _ _ tvl es AS)...
+        intros *; apply Hinnot. }
       split.
-      + 
-      + intuition; eapply stack_env_grow_irrelavent; eauto;
-          apply EnvFacts.elements_in_iff;
-          exists t; apply Env.elements_1...
-      
+      apply (stack_grow_eval_type_same env S S')...
+      { by decompose [and and] (Henv _ _ Hmap''). }
+      split...
+      apply Hcst... solveMaps.
+    - pose proof (in_eval_el S S' tvl es AS Huniq Hel x t HIn) as
+        (t2 & v2 & Hetb2 & Hmap2).
+      exists v2, t2, t2.
 
-    specialize (stack_consist_trans S S' env0 tvl es AS H1 H5 eq1 H12) as eq2.
-    specialize (stack_wf_core D Q env0 S H2) as eq3.
-    specialize (stack_wf_out tvl es D Q H env0 AS S S' H1 H0 H2 H4 H3 H5 eq3 H8 H6 H9 H10 H12) as eq4.
-    unfold stack_wf in *.
-    intros.
-    apply H7 in H13.
-    destruct H13. apply H2 in H13 as eq5. destruct eq5 as [v [ta [tb [X1 [X2 X3]]]]].
-    exists v. exists ta. exists tb.
-    split. apply stack_grow_cast_type_same with (env := env0) (S := S); try easy.
-    unfold env_wt in *.
-    apply H4 in H13. easy. split. easy.
-    unfold stack_consistent_grow in *.
-    apply eq2; try easy. exists t. easy.
-    apply eq4 in H13 as eq5.
-    destruct eq5 as [v [ta [X1 [X2 X3]]]].
-    exists v. exists ta. exists ta.
-    split.
-    apply cast_as_same with (S := S) (AS := AS) (env := env0); try easy.
-    apply (well_type_args_well_bound D Q H env0 AS es tvl) with (x := x); try easy.
-    intros.
-    apply (as_not_in_env AS tvl es env0); try easy.
-    intros.
-    apply (as_well_bound AS D Q H env0 tvl es) with (x := x0); try easy.
-    intros. 
-    apply (as_stack_in AS tvl es S S'); try easy.
-    intros.
-    apply (as_stack_in_2 AS tvl es S S') with (x := x0) (ta := ta0); try easy.
-    apply (as_stack_in AS tvl es S S'); try easy.
-    intros. 
-    apply (as_diff AS tvl es) with (n := n) (n' := n'); try easy.
-    split. constructor. easy.
-  Qed.
+  Abort.
 
+    (* specialize (stack_consist_trans S S' env0 tvl es AS H1 H5 eq1 H12) as eq2. *)
+    (* specialize (stack_wf_core D Q env0 S H2) as eq3. *)
+    (* specialize (stack_wf_out tvl es D Q H env0 AS S S' H1 H0 H2 H4 H3 H5 eq3 H8 H6 H9 H10 H12) as eq4. *)
+    (* unfold stack_wf in *. *)
+    (* intros. *)
+    (* apply H7 in H13. *)
+    (* destruct H13. apply H2 in H13 as eq5. destruct eq5 as [v [ta [tb [X1 [X2 X3]]]]]. *)
+    (* exists v. exists ta. exists tb. *)
+    (* split. apply stack_grow_cast_type_same with (env := env0) (S := S); try easy. *)
+    (* unfold env_wt in *. *)
+    (* apply H4 in H13. easy. split. easy. *)
+    (* unfold stack_consistent_grow in *. *)
+    (* apply eq2; try easy. exists t. easy. *)
+    (* apply eq4 in H13 as eq5. *)
+    (* destruct eq5 as [v [ta [X1 [X2 X3]]]]. *)
+    (* exists v. exists ta. exists ta. *)
+    (* split. *)
+    (* apply cast_as_same with (S := S) (AS := AS) (env := env0); try easy. *)
+    (* apply (well_type_args_well_bound D Q H env0 AS es tvl) with (x := x); try easy. *)
+    (* intros. *)
+    (* apply (as_not_in_env AS tvl es env0); try easy. *)
+    (* intros. *)
+    (* apply (as_well_bound AS D Q H env0 tvl es) with (x := x0); try easy. *)
+    (* intros.  *)
+    (* apply (as_stack_in AS tvl es S S'); try easy. *)
+    (* intros. *)
+    (* apply (as_stack_in_2 AS tvl es S S') with (x := x0) (ta := ta0); try easy. *)
+    (* apply (as_stack_in AS tvl es S S'); try easy. *)
+    (* intros.  *)
+    (* apply (as_diff AS tvl es) with (n := n) (n' := n'); try easy. *)
+    (* split. constructor. easy. *)
