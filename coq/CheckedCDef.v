@@ -1151,23 +1151,19 @@ Fixpoint subst_type (s: list (var*bound)) (t:type) :=
             | TFun b t tl => TFun (subst_bounds b s) (subst_type s t) (map (fun x => subst_type s x) tl)
   end.
 
-Inductive eval_arg : stack -> expression -> type -> expression -> Prop :=
-| eval_lit : forall arg_s n t t' t'',
-    eval_type_bound arg_s t = Some t'' ->
-    eval_arg arg_s (ELit n t') t (ELit n t'')
-| eval_var : forall arg_s x n t t' t'',
-    Stack.MapsTo x (n,t') arg_s ->
-    eval_type_bound arg_s t = Some t'' ->
-    eval_arg arg_s (EVar x) t (ELit n t'').
+Inductive eval_arg {S:stack} : expression -> type -> expression -> Prop :=
+| eval_lit : forall n t t',
+    eval_arg (ELit n t') t (ELit n t)
+| eval_var : forall x n t t',
+    Stack.MapsTo x (n,t') S ->
+    eval_arg (EVar x) t (ELit n t).
 
-Inductive eval_el (AS: list (var*bound))
-  : stack -> list (var * type) -> list expression -> stack -> Prop :=
-| eval_el_empty : forall s, eval_el AS s [] [] s
-| eval_el_many_2 : forall s s' e x n t t' tvl es,
-    eval_arg s e (subst_type AS t) (ELit n t') ->
-    eval_el AS s tvl es s' -> 
-    eval_el AS s ((x,t)::tvl) (e::es) (Stack.add x (n,t') s').
-
+Inductive eval_el {S:stack} : list expression -> list (var * type) -> expression -> expression -> Prop :=
+| eval_el_empty : forall e, eval_el [] [] e e
+| eval_el_many : forall e es x t tvl v ea ea',
+    @eval_arg S e t v ->
+    eval_el es tvl ea ea' -> 
+    eval_el (e::es) ((x,t)::tvl) ea (ELet x v ea').
 
 Definition is_nor_array_ptr (t:type) : Prop :=
    match t with (TPtr m (TArray x y t')) => True
@@ -1183,6 +1179,7 @@ Inductive get_root {D:structdef} : type -> type -> Prop :=
     Some (TNat) = (Fields.find 0%nat f) ->
     @get_root D (TPtr m (TStruct T)) TNat.
 
+(*
 Inductive gen_rets  (AS: list (var*bound)) (S: stack)
   : list (var * type) -> list expression -> expression -> expression -> Prop :=
   gen_rets_empty : forall e, gen_rets AS S [] [] e e
@@ -1190,7 +1187,7 @@ Inductive gen_rets  (AS: list (var*bound)) (S: stack)
     gen_rets AS S xl es e2 e' ->
     eval_arg S e1 (subst_type AS t) (ELit v t') ->
     gen_rets AS S ((x,t)::xl) (e1::es) e2 (ERet x (v,t') (Stack.find x S) e').
-
+*)
 Require Import Lists.ListSet.
 
 
@@ -1351,7 +1348,6 @@ Definition add_value (H:heap) (n:Z) (t:type) :=
               | _ => H
    end.
 
-
 (* Hint Constructors well_typed_lit. *)
 
 (** Memory, [M], is the composition of stack, checked heap and tainted heap *)
@@ -1363,6 +1359,11 @@ Inductive step
   (D : structdef) 
   (F:Z -> option (list (var * type) * type * expression * mode))
   : mem -> expression -> mem -> result -> Prop :=
+| SLit : forall s R v t t',
+      eval_type_bound s t = Some t' ->
+      step D F
+      (s, R) ((ELit v t)) 
+      (s, R) (RExpr (ELit v t')) 
 | SVar : forall s R x v t,
     (Stack.MapsTo x (v,t) s) ->
     step D F
@@ -1424,15 +1425,13 @@ Inductive step
     step D F
       (s, R) (EStrlen x)
       (s, R) RNull
-| SCallChecked : forall AS s s' R x ta ts el t tvl e e' n t1, 
+| SCallChecked : forall s R x ta ts el t tvl e e' ea n t1, 
     Heap.MapsTo x (n, t1) (fst R) ->
     F n = Some (tvl,t,e,Checked) ->
-    get_dept_map tvl el = Some AS ->
-    eval_el AS s tvl el s' -> 
-    gen_rets AS s tvl el e e' ->
+    @eval_el s el tvl (ECast t e') ea ->
     step D F
       (s, R)  (ECall (ELit x (TPtr Checked (TFun (Num n) ta ts))) el)
-      (s', R) (RExpr (ECast (subst_type AS t) e'))
+      (s, R) (RExpr (ECast t ea))
 | SCallBound : forall s R x m ta ts el n' n t1, 
     Heap.MapsTo x (n, t1) (fst R) ->
     step D F
@@ -1444,15 +1443,13 @@ Inductive step
     step D F
       (s, R) (ECall (ELit x (TPtr m (TFun (Num n') ta ts))) el)
       (s, R) RNull
-| SCallUnChecked : forall AS s s' R x ta ts el t tvl e e' n n' t1 m m', 
+| SCallUnChecked : forall s R x ta ts el t tvl e e' ea n n' t1 m m', 
     Heap.MapsTo x (n, t1) (snd R) -> m <> Checked -> m' <> Checked ->
     F n = Some (tvl,t,e,m) ->
-    get_dept_map tvl el = Some AS ->
-    eval_el AS s tvl el s' -> 
-    gen_rets AS s tvl el e e' ->
+    @eval_el s el tvl (ECast t e') ea ->
     step D F
       (s, R) (ECall (ELit x (TPtr m' (TFun (Num n') ta ts))) el)
-      (s', R) (RExpr (ECast (subst_type AS t) e'))
+      (s, R) (RExpr (ECast t ea))
 | SLet : forall s R x n t e t',
     eval_type_bound s t = Some t' ->
     step D F 
@@ -1618,7 +1615,7 @@ Inductive step
          s (H1,H2)  (EAssign (ELit n (TPtr m pm t)) (ELit n1 t1))
          s (Heap.add n (n1, ta) H1,H2) RNull
  *)
-(* Add two rules for when pm = None. *)
+(* Add two rules for RNull / RBound SAssign. *)
 
 | SAssignUnChecked : forall s H1 H2 m n t na ta tv n1 t1 tv',
     Heap.MapsTo n (na,ta) H2 -> m <> Checked ->
@@ -1627,27 +1624,25 @@ Inductive step
     step D F
       (s, (H1,H2))  (EAssign (ELit n (TPtr m t)) (ELit n1 t1))
       (s, (H1,Heap.add n (n1, ta) H2)) (RExpr (ELit n1 tv'))
-(* | SAssignHighOOB : forall s R n t t' n1 t1 h, *)
-(*     h <= n -> *)
-(*     eval_type_bound s t t' -> *)
-(*     get_high_ptr t' = Some (Num h) -> *)
-(*     step D U F *)
-(*       (s, R) (EAssign (ELit n t) (ELit n1 t1)) *)
-(*       (s, R) RBounds *)
-(* | SAssignLowOOB : forall s R n t t' n1 t1 l, *)
-(*     l > n -> *)
-(*     eval_type_bound s t t' -> *)
-(*     get_low_ptr t' = Some (Num l) -> *)
-(*     step D U F *)
-(*       (s, R) (EAssign (ELit n t) (ELit n1 t1)) *)
-(*       (s, R) RBounds *)
-(* | SAssignNull : forall s R t tv w m n n1 t' pm, *)
-(*     n1 <= 0 -> m <> Unchecked -> *)
-(*     eval_type_bound s t tv -> *)
-(*     tv = TPtr m pm w -> *)
-(*     pm = None -> *)
-(*     step D U F *)
-(*       (s, R) (EAssign (ELit n1 t) (ELit n t')) (s, R) RNull *)
+| SAssignHighOOB : forall s R n t t' n1 t1 h, 
+     h <= n -> 
+    eval_type_bound s t = Some t' ->
+     get_high_ptr t' = Some (Num h) -> 
+     step D F 
+       (s, R) (EAssign (ELit n t) (ELit n1 t1)) 
+       (s, R) RBounds 
+ | SAssignLowOOB : forall s R n t t' n1 t1 l, 
+     l > n -> 
+     eval_type_bound s t = Some t' ->
+     get_low_ptr t' = Some (Num l) -> 
+     step D F 
+       (s, R) (EAssign (ELit n t) (ELit n1 t1)) 
+       (s, R) RBounds 
+ | SAssignNull : forall s R t tv m n n1 t', 
+     n1 <= 0 -> m <> Unchecked -> 
+     eval_type_bound s t = Some tv -> 
+     step D F 
+       (s, R) (EAssign (ELit n1 t) (ELit n t')) (s, R) RNull 
 | SFieldAddrChecked : forall s R n t (fi : field) n0 t0 T fs i fi ti,
     n > 0 ->
     t = TPtr Checked (TStruct T) ->
@@ -1859,11 +1854,11 @@ Definition good_lit (H:heap) (n:Z) (t:type):=
   end.
 
 
-Inductive well_bound_vars {A:Type}: list (var * A) -> bound -> Prop :=
+Inductive well_bound_vars: list (var) -> bound -> Prop :=
   | well_bound_vars_num : forall l n, well_bound_vars l (Num n)
-  | well_bound_vars_var : forall l y n, (exists a, In (y,a) l) -> well_bound_vars l (Var y n).
+  | well_bound_vars_var : forall l y n, In y l -> well_bound_vars l (Var y n).
 
-Inductive well_bound_vars_type {A:Type}: list (var * A) -> type -> Prop :=
+Inductive well_bound_vars_type: list (var) -> type -> Prop :=
   | well_bound_vars_nat : forall l, well_bound_vars_type l (TNat)
   | well_bound_vars_ptr : forall l c t, well_bound_vars_type l t -> well_bound_vars_type l (TPtr c t)
   | well_bound_vars_struct : forall l t, well_bound_vars_type l (TStruct t)
@@ -1875,29 +1870,27 @@ Inductive well_bound_vars_type {A:Type}: list (var * A) -> type -> Prop :=
         -> (forall t', In t' ts -> well_bound_vars_type l t') -> well_bound_vars_type l (TFun b t ts).
 
 
-Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (R : real_heap)
+Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (S:stack) (R : real_heap)
   (env:env) 
   : mode -> expression -> type -> Prop :=
-| ArgLitChecked : forall n t t',
+| ArgLitChecked : forall n t t' t'',
+    eval_type_bound S t' = Some t'' ->
     simple_type t ->
-    well_typed_lit_checked D F Q (fst R) empty_scope n t' ->
-    subtype D Q t' t ->
-    well_typed_arg D F Q R env Checked (ELit n t') t
-| ArgLitUnChecked : forall n t t',
-    simple_type t ->
-    well_typed_arg D F Q R env Unchecked (ELit n t') t
+    well_typed_lit_checked D F Q (fst R) empty_scope n t'' ->
+    subtype D Q t'' t ->
+    well_typed_arg D F Q S R env Checked (ELit n t') t
 | ArgVar : forall m x t t',
     Env.MapsTo x t' env -> 
     well_type_bound_in env t ->
     subtype D Q t' t ->
-    well_typed_arg D F Q R env m (EVar x) t.
+    well_typed_arg D F Q S R env m (EVar x) t.
 
-Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {H : real_heap}: 
+Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {S:stack} {H : real_heap}: 
   env -> mode -> list expression -> list (type) -> Prop :=
 | args_empty : forall env m, well_typed_args env m [] []
 
 | args_many : forall env m e es t vl, 
-    well_typed_arg D U Q H env m e t ->
+    well_typed_arg D U Q S H env m e t ->
     well_typed_args env m es vl
     -> well_typed_args env m (e::es) (t::vl).
 
@@ -2112,8 +2105,9 @@ Definition is_off_zero (b:bound) :=
 (* The CoreChkC Type System. *)
 Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
         : env -> theta -> mode -> expression -> type -> Prop :=
-  | TyLitChecked : forall env Q n t,
-      well_typed_lit_checked D F Q (fst H) empty_scope n t ->
+  | TyLitChecked : forall env Q n t t',
+      eval_type_bound S t = Some t' ->
+      well_typed_lit_checked D F Q (fst H) empty_scope n t' ->
       well_typed env Q Checked (ELit n t) t
   | TyLitUnChecked : forall env Q n t,
       well_typed env Q Unchecked (ELit n t) t
@@ -2125,7 +2119,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       (* get_dept_map tvl es = Some s -> *)
         fun_mode_eq m' m -> is_off_zero b ->
         well_typed env Q m x (TPtr m' (TFun b t ts)) ->
-        @well_typed_args D F Q H env m es ts ->
+        @well_typed_args D F Q S H env m es ts ->
         well_typed env Q m (ECall x es) t
 
 (*
@@ -2190,15 +2184,14 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       well_typed env Q m e1 (TPtr m t) ->
       well_typed env Q m e2 (TNat) ->
       well_typed env Q m (EPlus e1 e2) (TPtr m t)
-(*
-  | TyFieldAddr : forall env U Q pm m e m' T fs i fi ti,
+
+  | TyFieldAddr : forall env Q m e m' T fs i fi ti,
         mode_leq m' m ->
-      well_typed env U Q m e (TPtr m' pm (TStruct T)) ->
+      well_typed env Q m e (TPtr m' (TStruct T)) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
-      well_typed env U Q m (EFieldAddr e fi) (TPtr m' pm ti)
-*)
+      well_typed env Q m (EFieldAddr e fi) (TPtr m' ti)
 
 (* add tainted pointer to type context here *)
   | TyMalloc : forall env x m mr Q w t e2,
@@ -2248,7 +2241,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
        \/ (t'' = TNTArray l h t' /\ word_type t') /\ type_wf D  m' t') ->
       mode_leq m' m ->
       well_typed env Q m (EDeref e) t'
-(*
+
   | TyIndex1 : forall env Q m e1 m' l h e2 t,
       word_type t -> type_wf D m' t ->
       well_typed env Q m e1 (TPtr m' (TArray l h t)) -> 
@@ -2261,7 +2254,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       well_typed env Q m e2 (TNat) ->
       mode_leq m' m ->
       well_typed env Q m (EDeref (EPlus e1 e2)) t
-*)
+
   | TyAssign1 : forall env Q m e1 e2 m' t t1,
       subtype_stack D Q S t1 t -> word_type t ->
       well_typed env Q m e1 (TPtr m' t) ->
@@ -2332,14 +2325,22 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       join_type D Q S t2 t3 t4 -> 
       well_typed env Q m (EIf e1 e2 e3) t4. 
 
+Definition depend_type (t:type) := 
+   match t with TNat => True | TPtr m (TFun p t ts) => True | _ => False end.
+
+Inductive fun_arg_wf {D : structdef} {m:mode}: list var -> list (var * type) -> Prop :=
+   fun_arg_empty : forall AS, fun_arg_wf AS nil
+  | fun_arg_many_1 : forall AS x t tvl, ~ depend_type t -> fun_arg_wf AS tvl ->
+     word_type t -> type_wf D m t -> well_bound_vars_type AS t 
+            -> fun_arg_wf AS ((x,t)::tvl).
+
 
 Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
   forall env env' f tvl t e m,
     F f = Some (tvl,t,e,m) -> 
-    gen_arg_env env tvl env' ->
-    (forall x t', In (x,t') tvl -> word_type t' /\ type_wf D m t' /\ well_bound_vars_type tvl t') /\
+    gen_arg_env env tvl env' -> @fun_arg_wf D m [] tvl /\
       (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) /\
-      word_type t /\ type_wf D m t /\ well_bound_vars_type tvl t /\ expr_wf D e
+      word_type t /\ type_wf D m t /\ well_bound_vars_type (fst (List.split tvl)) t /\ expr_wf D e
     /\ @well_typed D (F) S H env' empty_theta m e t.
 
 
