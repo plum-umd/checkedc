@@ -110,6 +110,44 @@ Inductive type : Type :=
   | TFun : bound -> type -> list type -> type. (* bound refers to the function name. *)
 
 (*
+Fixpoint All {A} (P : A -> Prop) (l : list A) : Prop :=
+  match l with
+  | [] => True
+  | x :: xs => P x  /\ All P xs
+  end.
+ *)
+
+Definition type_ind'
+  : forall P : type -> Prop,
+    P TNat ->
+    (forall (m : mode) (t : type), P t -> P (TPtr m t)) ->
+    (forall s : struct, P (TStruct s)) ->
+    (forall (b b0 : bound) (t : type), P t -> P (TArray b b0 t)) ->
+    (forall (b b0 : bound) (t : type), P t -> P (TNTArray b b0 t)) ->
+    (forall (b : bound) (t : type),
+        P t ->
+        (forall l, Forall P l -> P (TFun b t l))) ->
+    forall t : type, P t. 
+Proof.
+  intros P HTNat HTPtr HTStruct HTArray HTNTArray HTFun.
+  refine
+    (fix F t :=
+       match t with
+       | TNat => HTNat
+       | TPtr m t => HTPtr m t (F t)
+       | TStruct s => HTStruct s
+       | TArray b1 b2 t => HTArray b1 b2 t (F t)
+       | TNTArray b1 b2 t => HTNTArray b1 b2 t (F t)
+       | TFun b t ts =>
+           HTFun b t (F t) ts _
+       end).
+  induction ts.
+  - exact (Forall_nil P).
+  - exact (Forall_cons _ (F a) IHts).
+Defined.
+
+
+(*
 Definition ptrMode_dec (p1 p2: ptrMode): {p1 = p2} + {~ p1 = p2}.
   repeat decide equality.
 Defined.
@@ -420,27 +458,6 @@ with subtype_list (D : structdef) (Q:theta) : list type -> list type -> Prop :=
     subtype_list D Q (a::al) (b::bl).
 
 (* Subtyping transitivity. *)
-Fixpoint type_ind'
-         (P: type -> Prop)
-         (H_TNat: P TNat)
-         (H_TPtr: forall m t, P t -> P (TPtr m t))
-         (H_TStruct: forall (T: struct), P (TStruct T))
-         (H_TArray: forall l h t, P t -> P (TArray l h t))
-         (H_TNTArray: forall l h t, P t -> P (TNTArray l h t))
-         (H_TFun: forall b t tl, P t -> (Forall P tl) -> P (TFun b t tl))
-         (t : type) {struct t}
-  : P t.
-Proof.
-  destruct t. auto.
-  -  apply H_TPtr. apply type_ind'; auto.
-  -  apply H_TStruct.
-  -  apply H_TArray. apply type_ind'; auto.
-  -  apply H_TNTArray. apply type_ind'; auto.
-  -  apply H_TFun. apply type_ind'; auto.
-     induction l as [| l' IHl]; constructor; auto; apply type_ind'; auto.
-Qed.
-
-
 Lemma subtype_trans : forall D Q t t' m w,
     subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'.
 Admitted.
@@ -611,9 +628,10 @@ Inductive expression : Type :=
 
 Definition funElem : Type := (list (var * type) * type * expression * mode).
 
-(*Parameter fenv : Z -> option funElem.*)
 
 Definition FEnv : Type := Z -> Z -> option funElem. (* first Z is a permission and second z is address *)
+
+(* Parameter fenv : FEnv. *)
 
 Definition Ffield : Type := Z -> option Z.
 
@@ -1138,13 +1156,18 @@ Definition change_strlen_stack (s:stack) (x : var) (m:mode) (t:type) (l n n' h:Z
      if n' <=? h then s else @Stack.add (Z * type) x (n,TPtr m (TNTArray (Num l) (Num n') t)) s.
 
 Fixpoint gen_stack (vl:list var)  (es:list expression) (e:expression) : option expression :=
-   match vl with [] => Some e
-              | (v::vl') => match es with [] => None | e1::el =>
-                                    match gen_stack vl' el e with None => None
-                                                    | Some new_e => Some (ELet v e1 new_e)
-                                    end
-                              end
-   end.
+  match vl with
+    [] => Some e
+  | (v::vl') =>
+      match es with
+        [] => None
+      | e1::el =>
+          match gen_stack vl' el e with
+            None => None
+          | Some new_e => Some (ELet v e1 new_e)
+          end
+      end
+  end.
 
 
 Definition get_high_ptr (t : type) :=
@@ -1230,19 +1253,22 @@ Fixpoint subst_type (s: list (var*bound)) (t:type) :=
             | TFun b t tl => TFun (subst_bounds b s) (subst_type s t) (map (fun x => subst_type s x) tl)
   end.
 
-Inductive eval_arg {S:stack} : expression -> type -> expression -> Prop :=
-| eval_lit : forall n t t',
-    eval_arg (ELit n t') t (ELit n t)
-| eval_var : forall x n t t',
-    Stack.MapsTo x (n,t') S ->
-    eval_arg (EVar x) t (ELit n t).
+Section EvalArg.
+  Variable S : stack. 
+  Inductive eval_arg : expression -> type -> expression -> Prop :=
+  | eval_lit : forall n t t',
+      eval_arg (ELit n t') t (ELit n t)
+  | eval_var : forall x n t t',
+      Stack.MapsTo x (n,t') S ->
+      eval_arg (EVar x) t (ELit n t).
 
-Inductive eval_el {S:stack} : list expression -> list (var * type) -> expression -> expression -> Prop :=
-| eval_el_empty : forall e, eval_el [] [] e e
-| eval_el_many : forall e es x t tvl v ea ea',
-    @eval_arg S e t v ->
-    eval_el es tvl ea ea' ->
-    eval_el (e::es) ((x,t)::tvl) ea (ELet x v ea').
+  Inductive eval_el : list expression -> list (var * type) -> expression -> expression -> Prop :=
+  | eval_el_empty : forall e, eval_el [] [] e e
+  | eval_el_many : forall e es x t tvl v ea ea',
+      eval_arg e t v ->
+      eval_el es tvl ea ea' ->
+      eval_el (e::es) ((x,t)::tvl) ea (ELet x v ea').
+End EvalArg.
 
 Definition is_nor_array_ptr (t:type) : Prop :=
    match t with (TPtr m (TArray x y t')) => True
@@ -1913,38 +1939,13 @@ Inductive reduce
 
 Hint Constructors reduce.
 
-Definition reduces (D : structdef)
-  (F:FEnv)
-  (M : mem) (e : expression) : Prop :=
+Definition reduces (D : structdef) (F:FEnv) (M : mem) (e : expression) : Prop :=
   exists (m : mode) (M' : mem) (r : result), reduce D F M e m M' r.
 
 Hint Unfold reduces.
 
-
 (* Defining function calls. *)
-
 (** * Static Semantics *)
-Section HeapWt.
-  (** Well-typedness of Heaps *)
-  (* MZ:
-     Implicit abstraction here.
-     Well-typeness requires assumptions on the mode when mallocing?
-   *)
-  Variable D : structdef.
-  Variable F : FEnv.
-  Variable m : mode.
-
-End HeapWt.
-
-Section RHeapWt.
-(** Well-typedness of Real Heaps:
-
-    One is in checked mode, another one is in tainted mode?
- *)
-
-End RHeapWt.
-
-
 Definition is_nt_ptr (t : type) : Prop :=
   match t with
   | TPtr m (TNTArray l h t') => True
@@ -1959,11 +1960,14 @@ Inductive type_eq (S : stack) : type -> type -> Prop :=
 
 (* subtyping relation based on types. *)
 Inductive subtype_stack (D: structdef) (Q:theta) (S:stack) : type -> type -> Prop :=
-| subtype_same : forall t t', subtype D Q t t' -> subtype_stack D Q S t t'
-| subtype_left : forall t1 t2 t2', simple_type t1 -> eval_type_bound S t2 = Some t2'
-                                   -> subtype D Q t1 t2' -> subtype_stack D Q S t1 t2
-| subtype_right : forall t1 t1' t2, simple_type t2 -> eval_type_bound S t1 = Some t1'
-                                    -> subtype D Q t1' t2 -> subtype_stack D Q S t1 t2.
+| subtype_same : forall t t',
+    subtype D Q t t' -> subtype_stack D Q S t t'
+| subtype_left : forall t1 t2 t2',
+    simple_type t1 -> eval_type_bound S t2 = Some t2' -> subtype D Q t1 t2' ->
+    subtype_stack D Q S t1 t2
+| subtype_right : forall t1 t1' t2,
+    simple_type t2 -> eval_type_bound S t1 = Some t1' -> subtype D Q t1' t2 ->
+    subtype_stack D Q S t1 t2.
 
 (* The join opeartions. *)
 Inductive join_type (D : structdef) (Q:theta) (S:stack) : type -> type -> type -> Prop :=
@@ -1978,20 +1982,25 @@ Definition good_lit (H:heap) (n:Z) (t:type):=
 
 
 Inductive well_bound_vars: list (var) -> bound -> Prop :=
-  | well_bound_vars_num : forall l n, well_bound_vars l (Num n)
-  | well_bound_vars_var : forall l y n, In y l -> well_bound_vars l (Var y n).
+| well_bound_vars_num : forall l n, well_bound_vars l (Num n)
+| well_bound_vars_var : forall l y n, In y l -> well_bound_vars l (Var y n).
 
 Inductive well_bound_vars_type: list (var) -> type -> Prop :=
-  | well_bound_vars_nat : forall l, well_bound_vars_type l (TNat)
-  | well_bound_vars_ptr : forall l c t, well_bound_vars_type l t -> well_bound_vars_type l (TPtr c t)
-  | well_bound_vars_struct : forall l t, well_bound_vars_type l (TStruct t)
-  | well_bound_vars_array : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
-                        -> well_bound_vars_type l t -> well_bound_vars_type l (TArray b1 b2 t)
-  | well_bound_vars_ntarray : forall l b1 b2 t, well_bound_vars l b1 -> well_bound_vars l b2
-                        -> well_bound_vars_type l t -> well_bound_vars_type l (TNTArray b1 b2 t)
-  | well_bound_vars_tfun : forall l b t ts, well_bound_vars l b -> well_bound_vars_type l t
-        -> (forall t', In t' ts -> well_bound_vars_type l t') -> well_bound_vars_type l (TFun b t ts).
-
+| well_bound_vars_nat : forall l, well_bound_vars_type l (TNat)
+| well_bound_vars_ptr : forall l c t,
+    well_bound_vars_type l t -> well_bound_vars_type l (TPtr c t)
+| well_bound_vars_struct : forall l t,
+    well_bound_vars_type l (TStruct t)
+| well_bound_vars_array : forall l b1 b2 t,
+    well_bound_vars l b1 -> well_bound_vars l b2 -> well_bound_vars_type l t ->
+    well_bound_vars_type l (TArray b1 b2 t)
+| well_bound_vars_ntarray : forall l b1 b2 t,
+    well_bound_vars l b1 -> well_bound_vars l b2 -> well_bound_vars_type l t ->
+    well_bound_vars_type l (TNTArray b1 b2 t)
+| well_bound_vars_tfun : forall l b t ts,
+    well_bound_vars l b -> well_bound_vars_type l t ->
+    (forall t', In t' ts -> well_bound_vars_type l t') ->
+    well_bound_vars_type l (TFun b t ts).
 
 Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (S:stack) (R : real_heap)
   (env:env)
@@ -2455,22 +2464,25 @@ Inductive fun_arg_wf {D : structdef} {m:mode}: list var -> list (var * type) -> 
 Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
   (forall n n' f, n <> n' -> F n f = None \/ F n' f = None)
   /\
-  (forall env env' n f tvl t e m,
-    F n f = Some (tvl,t,e,m) ->
-    gen_arg_env env tvl env' -> @fun_arg_wf D m [] tvl /\
-      (forall n n' a b, n <> n' -> nth_error tvl n = Some a -> nth_error tvl n' = Some b -> fst a <> fst b) /\
-      word_type t /\ type_wf D m t /\ well_bound_vars_type (fst (List.split tvl)) t /\ expr_wf D e
-    /\ @well_typed D (F) S H env' empty_theta m e t).
+    (forall env env' n f tvl t e m,
+        F n f = Some (tvl,t,e,m) ->
+        gen_arg_env env tvl env' ->
+        @fun_arg_wf D m [] tvl /\
+          (forall n n' a b,
+              n <> n' -> nth_error tvl n = Some a ->
+              nth_error tvl n' = Some b -> fst a <> fst b) /\
+          word_type t /\
+          type_wf D m t /\
+          well_bound_vars_type (fst (List.split tvl)) t /\
+          expr_wf D e /\
+          @well_typed D (F) S H env' empty_theta m e t).
 
 
 Definition sub_domain (env: env) (S:stack) := forall x,
     Env.In x env -> Stack.In x S.
 
-
 Local Close Scope Z_scope.
-
 Local Open Scope nat_scope.
-
 Hint Constructors well_typed.
 
 (*Hint Constructors ty_ssa.*)

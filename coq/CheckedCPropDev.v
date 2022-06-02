@@ -69,68 +69,6 @@ Section FunctionProp.
   Qed.
 
 
-  Ltac solveOptBoth :=
-    match goal with
-    | [H : match ?P with | _ => _ end = Some _ |-
-         match ?P' with | _ => _ end = Some _] =>
-        let H' := fresh H in
-        destruct P eqn:H'; inv H; auto;
-        let H' := fresh H in
-        destruct P' eqn:H'
-    end; auto.
-
-  Ltac solveOptBothIn H :=
-    match type of H with
-    | match ?P with | _ => _ end = Some _ =>
-        match goal with
-        | [H : match P with | _ => _ end = Some _ |-
-             match ?P' with | _ => _ end = Some _] =>
-            let H' := fresh H in
-            destruct P eqn:H'; inv H; auto;
-            let H' := fresh H in
-            destruct P' eqn:H'
-        end; auto
-    end.
-
-  Ltac solveOptIn H :=
-    match type of H with
-    | match ?X with |_ => _ end = Some _ =>
-        match goal with
-        | [H : match X with | _ => _ end = Some _ |- _] =>
-            let H' := fresh H in
-            destruct X eqn:H'; inv H
-        end; auto
-    end.
-
-  Ltac solveOptTop :=
-    match goal with
-    | [H : match ?P with | _ => _ end = Some _ |- _] =>
-        let H' := fresh H in
-        destruct P eqn:H'; inv H
-    end; auto.
-
-  Ltac solveOptGoal :=
-    match goal with
-    | |- match ?P' with | _ => _ end = Some _ =>
-        let H' := fresh "Hgoal" in
-        destruct P' eqn:H'
-    end; auto.
-
-  Ltac invOpt :=
-    match goal with
-    | [H : Some _ = Some _ |- _ ] => inv H
-    | [H : Some _ = None |- _ ] => inv H
-    | [H : None = Some _ |- _ ] => inv H
-    | [H : None = None |- _ ] => clear H
-    end; auto.
-
-
-  Tactic Notation "solveopt" := solveOptGoal.
-  Tactic Notation "solveopt" "in" hyp(H) := solveOptIn H.
-  Tactic Notation "solveopt2" := solveOptBoth.
-  Tactic Notation "solveopt2" "with" hyp(H) := solveOptBothIn H.
-  
-  
   Lemma stack_find_none : forall x S,
       Stack.find x S = None ->
       (forall (t : Z * type), ~ @Stack.In (Z * type) x S).
@@ -145,16 +83,6 @@ Section FunctionProp.
   Qed.
 
 
-  Ltac solveMaps :=
-    match goal with
-    | |- Env.In ?x ?m =>
-        unfold Env.In, Env.Raw.PX.In; eexists; eauto
-    | |- Stack.In ?x ?m =>
-        unfold Stack.In, Stack.Raw.PX.In; eexists; eauto
-    | |- Heap.In ?x ?m =>
-        unfold Heap.In, Heap.Raw.PX.In; eexists; eauto
-    end; auto.
-  
 
   Lemma same_eval_bound_in_consistent_stack : forall env S S' l, 
       well_bound_in env l -> 
@@ -176,20 +104,6 @@ Section FunctionProp.
   Qed.
   
 
-  Ltac focusCut H tac :=
-    match type of H with
-    | (?P -> _) =>
-        match goal with
-        | [H : P -> _ |- _] =>
-            let Htmp := fresh "Hcut" in
-            assert P as Htmp; [tac | specialize (H Htmp)]
-        end
-    end.
-
-  (* Modus Ponens but on the subgoal *)
-  Tactic Notation "mopo" hyp(H) := focusCut H idtac.
-  Tactic Notation "mopo" hyp(H) "by" tactic(tac) := focusCut H tac.
-  
   Lemma stack_grow_eval_type_same : forall env S S' t,
       well_type_bound_in env t ->
       sub_domain env S ->
