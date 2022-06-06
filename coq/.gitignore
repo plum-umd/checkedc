@@ -9,5 +9,7 @@
 *.vos
 .lia.cache
 
-note.md
+notes.md
 html/
+.DS_Store
+.*

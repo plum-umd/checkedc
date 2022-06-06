@@ -9,6 +9,16 @@ From CHKC Require Import
 
 Create HintDb Preservation.
 
+Ltac solveMaps :=
+  match goal with
+  | |- Env.In ?x ?m =>
+      unfold Env.In, Env.Raw.PX.In; eexists; eauto
+  | |- Stack.In ?x ?m =>
+      unfold Stack.In, Stack.Raw.PX.In; eexists; eauto
+  | |- Heap.In ?x ?m =>
+      unfold Heap.In, Heap.Raw.PX.In; eexists; eauto
+  end; auto.
+
 
 Section HeapProp.
   Local Open Scope Z_scope.
@@ -99,6 +109,12 @@ Section RealHeapProp.
       R' = (Hchk', Htnt') -> R = (Hchk, Htnt) -> 
       heap_consistent_checked D F Q Hchk' Hchk.
 
+  Lemma rheap_consistent_refl : forall R, rheap_consistent R R.
+  Proof.
+    unfold rheap_consistent. intros [H1 H2] * E1 E2.  inv E1. inv E2.
+    unfold heap_consistent_checked. intuition.
+  Qed.
+  
   Hint Unfold rheap_consistent : Preservation.
 
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
@@ -132,14 +148,17 @@ Ltac find_Hstep :=
 Section GeneralProp.
   Variable D : structdef.
   Variable F : FEnv.
+
   Lemma lit_are_nf : forall R s n t,
       ~ exists R' s' m r, reduce D F (s, R) (ELit n t) m (s', R') r.
   Proof.
-    intros R s n t Contra.
-    destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ].
-    inv Contra; find_Hstep; destruct E; cbn in *; subst; inv Hstep;
-      try congruence.
-  Qed.
+  Abort.
+  (* intros R s n t Contra. *)
+  (* destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ]. *)
+  (* inv Contra; find_Hstep; destruct E; cbn in *; subst; *)
+  (*   try solve [inv Hstep; congruence]. *)
+  (*  inv Hstep. *)
+  (* Qed. *)
 
 End GeneralProp.
 
@@ -180,12 +199,47 @@ Section FunctionProp.
       apply Stack.add_2...
   Qed.
 
-  Lemma sub_domain_grows : forall tvl es env env' s s' AS,
-      gen_arg_env env tvl env' -> eval_el AS s tvl es s' -> sub_domain env s ->
+  Lemma sub_domain_grows : forall tvl es env env' s s' e e',
+      gen_arg_env env tvl env' -> eval_el s es tvl e e' -> sub_domain env s ->
       sub_domain env' s'.
-  Proof with auto.
-    induction tvl; intros; inv H0; inv H...
-    apply sub_domain_grow.
-    exact (IHtvl _ env env'0 s s'0 AS H7 H8 H1) .
-  Qed.
+  Abort.
+  (* Proof with auto. *)
+  (*   induction tvl; intros * Henv Heval Hsub. *)
+  (*   + inv Heval. inv Henv. *)
+  (*   induction tvl; intros; inv H0; inv H... *)
+  (*   apply sub_domain_grow. *)
+  (*   exact (IHtvl _ env env'0 s s'0 AS H7 H8 H1) . *)
+  (* Qed. *)
 End FunctionProp.
+
+
+Section TypeProp.
+  Lemma eval_bound_idempotent : forall s b b', 
+      eval_bound s b = Some b' ->
+      eval_bound s b' = Some b'.
+  Proof with auto.
+    induction b; intros b' Hbound; inv Hbound; try solve [cbn; auto].
+    cbn. solveopt in *. destruct p. inv H2. cbn...
+  Qed.
+
+  Lemma eval_type_bound_idempotent : forall s t t',
+      eval_type_bound s t = Some t' ->
+      eval_type_bound s t' = Some t'.
+  Proof with auto.
+    induction t using type_ind'; intros * Hbound; inv Hbound; try solve [cbn; auto].
+    + solveopt in H0. cbn; rewrite (IHt t0)...
+    + repeat solveopt in *. cbn. rewrite IHt...
+      do 2 erewrite (eval_bound_idempotent); eauto.
+    + repeat solveopt in *. cbn. rewrite (IHt t0)...
+      do 2 erewrite (eval_bound_idempotent); eauto.
+    + repeat solveopt in *. cbn. rewrite (IHt t0)...
+      erewrite (eval_bound_idempotent); eauto.
+      generalize dependent l0; induction l; intros l' Hfold.
+      * inv Hfold...
+      * cbn in Hfold. solveopt in Hfold. solveopt in H3.
+        inv H as [| _a _l Hcons HAll].
+        specialize (IHl HAll l0 eq_refl). solveopt in IHl.
+        specialize (Hcons t1 H2).
+        cbn. rewrite IHl0. rewrite Hcons. reflexivity.
+  Qed.
+End TypeProp.

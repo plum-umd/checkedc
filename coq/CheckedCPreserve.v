@@ -4,8 +4,8 @@ From CHKC Require Import
   ListUtil
   Map
   CheckedCDef
-  CheckedCProp
-  CheckedCPropDev.
+  CheckedCProp.
+  (* CheckedCPropDev. *)
 
 #[global]
 Hint Unfold rheap_consistent : Preservation.
@@ -29,10 +29,11 @@ Ltac solve_ctxt :=
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
+  Variable F : FEnv. 
   Lemma preservation : forall s R env Q e t s' R' e',
       structdef_wf D ->
       rheap_wf R ->
-      rheap_wt_all D fenv Q Checked R ->
+      rheap_wt_all D F Q Checked R ->
       (* fun_wf D s' R' -> *)
       expr_wf D e ->
       stack_wt D Checked s ->
@@ -40,21 +41,21 @@ Section Preservation.
       theta_wt Q env s ->
       sub_domain env s ->
       stack_wf D Q env s ->
-      stack_rheap_consistent D fenv Q R s ->
-      @well_typed D fenv s R env Q Checked e t ->
-      reduce D fenv
+      stack_rheap_consistent D F Q R s ->
+      @well_typed D F s R env Q Checked e t ->
+      reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
       exists env' Q',
         sub_domain env' s'
         /\ stack_wf D Q' env' s'
-        /\ stack_rheap_consistent D fenv Q' R s'
-        /\ rheap_consistent D fenv Q' R' R
-        /\ (@well_typed D fenv s' R' env' Q' Checked e' t
+        /\ stack_rheap_consistent D F Q' R s'
+        /\ rheap_consistent D F Q' R' R
+        /\ (@well_typed D F s' R' env' Q' Checked e' t
             \/ (exists t' t'',
                    eval_type_bound s' t = Some t'
                    /\ subtype D Q' t'' t'
-                   /\ @well_typed D fenv s' R' env' Q' Checked e' t'')).
+                   /\ @well_typed D F s' R' env' Q' Checked e' t'')).
   Proof with eauto 20 with Preservation.
     intros s R env Q e t s' R' e'
       HDwf HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
@@ -62,7 +63,7 @@ Section Preservation.
     remember Checked as m.
     induction Hwt as
       [
-        env Q n t HTyLit                                           | (* Literals *)
+        env Q n t t' Hbound HTyLit                                 | (* Literals *)
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
         env Q m m' b es x ts t HMode HZero HTyf IH1 HArgs          | (* Call *)
@@ -74,7 +75,7 @@ Section Preservation.
         env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
         env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
         env Q m t e1 e2 HTyfun HTy1 IH1 HTy2 IH2                   | (* Addition Index *)
-        (* env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *) *)
+        env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
         env Q m w Wb                                               | (* Malloc *)
         env Q m e t HTy IH                                         | (* Unchecked *)
         env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
@@ -83,8 +84,8 @@ Section Preservation.
         env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
         env Q m e m' t l h t' t'' HTy IH HSub HPtrType HMode       | (* Deref *)
-        (* env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *) *)
-        (* env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *) *)
+        env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
+        env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
         env Q m e1 e2 m' t t1 HSub WT HTy1 IH1 HTy2 IH2 HMode                      | (* Assign normal *)
         env Q m e1 e2 m' t ts HTy1 IH1 HTy2 IH2 HMode HZero                        | (* Assign function *)
         env Q m e1 e2 m' l h t t' WT Twf HSub HTy1 IH1 HTy2 IH2 HMode              | (* Assign array *)
@@ -94,10 +95,16 @@ Section Preservation.
         env Q m e1 e2 e3 m' l h t t' WT Twf TSub HTy1 IH1 HTy2 IH2 HTy3 IH3 HMode      |  (* IndAssign for ntarray pointers *)
         env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
         env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
-        env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin (* If *)
+        env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin                       (* If *)
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
-    - exfalso. eapply lit_are_nf...
+    - inv Hreduces; solve_ctxt. exists env, Q. intuition.
+      apply rheap_consistent_refl.
+      right. rewrite H4 in Hbound. inv Hbound. exists t', t'.
+      intuition. apply SubTyRefl. eapply TyLitChecked; eauto.
+      destruct t'; intuition.
+
+exfalso. eapply lit_are_nf...
     (* T-LitUnchecked *)
     - exfalso. eapply lit_are_nf...
     (* T-Var *)
