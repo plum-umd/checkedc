@@ -296,8 +296,38 @@ Inductive simple_type : type -> Prop :=
     simple_type t -> simple_type (TNTArray (Num l) (Num h) t)
 | SPTFun: forall l t ts,
     simple_type t ->
-    (forall t', In t' ts -> simple_type t') ->
+    Forall simple_type ts ->
     simple_type (TFun (Num l) t ts).
+
+
+(* unproceedable because of ill-formed ind *)
+Definition simple_type_ind' :
+  forall P : type -> Prop,
+    P TNat ->
+    (forall (m : mode) (w : type), simple_type w -> P w -> P (TPtr m w)) ->
+    (forall t : struct, P (TStruct t)) ->
+    (forall (l h : Z) (t : type), simple_type t -> P t -> P (TArray (Num l) (Num h) t)) ->
+    (forall (l h : Z) (t : type), simple_type t -> P t -> P (TNTArray (Num l) (Num h) t)) ->
+    (forall (l : Z) (t : type) (ts : list type),
+        simple_type t -> P t ->
+        Forall (fun x => simple_type x /\ P x) ts -> 
+        P (TFun (Num l) t ts)) ->
+    forall t : type, simple_type t -> P t.
+Proof.
+  intros P HNat HPtr HTStruct HArr HNTArr HFun.
+  refine
+    (fix F t s :=
+       match s in (simple_type t0) return (P t0) with
+       | SPTNat => HNat
+       | SPTPtr m w s0 => HPtr m w s0 (F w s0)
+       | SPTStruct t0 => HTStruct t0
+       | SPTArray l h t0 s0 => HArr l h t0 s0 (F t0 s0)
+       | SPTNTArray l h t0 s0 => HNTArr l h t0 s0 (F t0 s0)
+       | SPTFun l t0 ts s0 Fts=> _ 
+       end).
+  induction ts.
+  - apply HFun; try assumption. exact (F t0 s0). constructor.
+Abort.
 
 (*
 Inductive ext_bound_in : list var -> bound -> Prop :=
@@ -684,7 +714,7 @@ with subst_fun_type_list : bn_env -> list type -> list type -> Prop :=
                    -> subst_fun_type_list env (t1::ts1) (t2::ts2).
 
 Definition eq_types (ts1 ts2: list type) :=
-          exists env, gen_sub_type_list empty_bn_env ts1 ts2 env /\ subst_fun_type_list env ts1 ts2.
+  exists env, gen_sub_type_list empty_bn_env ts1 ts2 env /\ subst_fun_type_list env ts1 ts2.
 
 Definition to_tfun (b:bound) (tvl: list (var * type)) (t:type) := TFun b t (snd (List.split tvl)).
 

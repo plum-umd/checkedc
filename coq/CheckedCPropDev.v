@@ -20,28 +20,29 @@ Section FunctionProp.
       Stack.MapsTo x (v,t) S ->
       Stack.MapsTo x (v,t) S'.
 
-  Lemma eval_el_same_length : forall AS S tvl es S',
-      eval_el AS S tvl es S' -> length es = length tvl.
-  Proof.
-    intros * H. induction H; cbn; auto.
-  Qed.
+  (* Lemma eval_el_same_length : forall AS S tvl es S', *)
+  (*     eval_el AS S tvl es S' -> length es = length tvl. *)
+  (* Proof. *)
+  (*   intros * H. induction H; cbn; auto. *)
+  (* Qed. *)
   
 
   (* what's in the arguments will not affact what was in the stack
      Q: why is this useful?
    *)
-  Lemma stack_env_irrelavent_grow : forall S S' env tvl es AS,
+  Lemma stack_env_irrelavent_grow : forall S S' env tvl es e e',
       (forall x t, In (x, t) tvl -> ~ Env.In x env) ->
-      eval_el AS S tvl es S' -> stack_consistent_grow S S' env.
+      eval_el S es tvl e e' -> stack_consistent_grow S S' env.
   Proof.
-    intros * Hnotin Hel x v t Henv Hsubdom Hmap.
-    induction Hel. assumption.
-    destruct (Nat.eq_dec x0 x). 
-    { subst. specialize (Hnotin x t0 (in_eq _ tvl)) as Contra.
-      destruct (Contra Henv). }
-    apply Stack.add_2; [exact n0 | apply IHHel]; auto.
-    intros. apply (Hnotin x1 t1). unfold In. right. assumption.
-  Qed.
+  Abort.
+  (*   intros * Hnotin Hel x v t Henv Hsubdom Hmap. *)
+  (*   induction Hel. 2: assumption. *)
+  (*   destruct (Nat.eq_dec x0 x).  *)
+  (*   { subst. specialize (Hnotin x t0 (in_eq _ tvl)) as Contra. *)
+  (*     destruct (Contra Henv). } *)
+  (*   apply Stack.add_2; [exact n0 | apply IHHel]; auto. *)
+  (*   intros. apply (Hnotin x1 t1). unfold In. right. assumption. *)
+  (* Qed. *)
   
   (* Q: what's the purpose of reasoning about the length *)
   Lemma well_typed_arg_same_length : forall R env AS es tvl,
