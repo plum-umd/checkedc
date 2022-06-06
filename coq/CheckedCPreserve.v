@@ -102,33 +102,37 @@ Section Preservation.
       apply rheap_consistent_refl.
       right. rewrite H4 in Hbound. inv Hbound. exists t', t'.
       intuition. apply SubTyRefl. eapply TyLitChecked; eauto.
-      destruct t'; intuition.
-
-exfalso. eapply lit_are_nf...
+      apply (eval_type_bound_idempotent _ _ _ H4).
     (* T-LitUnchecked *)
-    - exfalso. eapply lit_are_nf...
+    - inv Hreduces; solve_ctxt.
     (* T-Var *)
     - inv Hreduces; solve_ctxt. 
       inv H5. exists env. exists Q. 
-      destruct R' as [Hchk Htnt]; subst.
-      split. easy.
-      split. assumption.
-      split. easy.
-      split.
+      destruct R' as [Hchk Htnt]; subst; intuition.
       unfold rheap_consistent. intros * HR1 HR2. inv HR1; inv HR2...
       right.
       specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
-      exists t', t''. intuition.
       specialize (Stack.mapsto_always_same _ _ _ _ _ H4 Hrst) as Heq; inv Heq.
-      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt];
-        apply TyLitChecked; cbn; [ assumption
-                                 | inv Etnt; cbn; constructor; congruence].
-
+      clear H4.
+      exists t', t''; intuition.
+      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt]; cbn.
+      admit. admit.
     (*T-Call*)
     - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst. 
       inv Hreduces. solve_ctxt.
       (* SCallChecked *)
-      + specialize (gen_arg_env_good tvl env) as [env' HGen].
+      + inv HEwf. intuition.
+        inv HTyf as []. cbn in H. repeat solveopt in *.
+
+
+        intuition. 1: apply rheap_consistent_refl.
+        induction H11.
+        * inv HArgs. inv HTyf. cbn in H7.
+
+
+
+          (* **************************************** *)
+specialize (gen_arg_env_good tvl env) as [env' HGen].
         exists env', Q. 
         split.
         { exact (sub_domain_grows tvl es env env' s s' AS HGen H11 HsubDom). }

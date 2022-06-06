@@ -296,8 +296,38 @@ Inductive simple_type : type -> Prop :=
     simple_type t -> simple_type (TNTArray (Num l) (Num h) t)
 | SPTFun: forall l t ts,
     simple_type t ->
-    (forall t', In t' ts -> simple_type t') ->
+    Forall simple_type ts ->
     simple_type (TFun (Num l) t ts).
+
+
+(* unproceedable because of ill-formed ind *)
+Definition simple_type_ind' :
+  forall P : type -> Prop,
+    P TNat ->
+    (forall (m : mode) (w : type), simple_type w -> P w -> P (TPtr m w)) ->
+    (forall t : struct, P (TStruct t)) ->
+    (forall (l h : Z) (t : type), simple_type t -> P t -> P (TArray (Num l) (Num h) t)) ->
+    (forall (l h : Z) (t : type), simple_type t -> P t -> P (TNTArray (Num l) (Num h) t)) ->
+    (forall (l : Z) (t : type) (ts : list type),
+        simple_type t -> P t ->
+        Forall (fun x => simple_type x /\ P x) ts -> 
+        P (TFun (Num l) t ts)) ->
+    forall t : type, simple_type t -> P t.
+Proof.
+  intros P HNat HPtr HTStruct HArr HNTArr HFun.
+  refine
+    (fix F t s :=
+       match s in (simple_type t0) return (P t0) with
+       | SPTNat => HNat
+       | SPTPtr m w s0 => HPtr m w s0 (F w s0)
+       | SPTStruct t0 => HTStruct t0
+       | SPTArray l h t0 s0 => HArr l h t0 s0 (F t0 s0)
+       | SPTNTArray l h t0 s0 => HNTArr l h t0 s0 (F t0 s0)
+       | SPTFun l t0 ts s0 Fts=> _ 
+       end).
+  induction ts.
+  - apply HFun; try assumption. exact (F t0 s0). constructor.
+Abort.
 
 (*
 Inductive ext_bound_in : list var -> bound -> Prop :=
@@ -415,50 +445,216 @@ Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop 
   | SubTyReflNat :  subtypeRef D U Q TNat TNat
   | SubTypeReflPtr : forall pm pm' m t t', ptr_mode_same U pm pm'
        -> subtypeRef D U Q t t' -> subtypeRef D U Q (TPtr m pm t) (TPtr m pm' t').
-*)
-Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
-| SubTypeFunChecked : forall b t tl tl',
-     word_type t ->
-     subtype_list D Q tl tl' ->
-    subtype D Q (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t tl'))
-| SubTypeFunTainted : forall m b b' t tl tl',
-    m <> Checked ->
-    nat_leq Q b b' ->
-    word_type t -> 
-    subtype_list D Q tl tl' ->
-    subtype D Q (TPtr m (TFun b t tl)) (TPtr m (TFun b' t tl'))
-| SubTyRefl : forall t, subtype D Q t t
-| SubTyTainted : forall t t', subtype D Q (TPtr Tainted t) (TPtr Unchecked t')
-| SubTyBot : forall m l h t, word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1)
-                             -> subtype D Q (TPtr m t) (TPtr m (TArray l h t))
-| SubTyOne : forall m l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
-                             -> subtype D Q (TPtr m (TArray l h t)) (TPtr m t)
-| SubTyOneNT : forall m l h t, word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h
-                               -> subtype D Q (TPtr m (TNTArray l h t)) (TPtr m t)
-| SubTySubsume : forall l h l' h' t m,
-    nat_leq Q l l' -> nat_leq Q h' h ->
-    subtype D Q (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
-| SubTyNtArray : forall l h l' h' t m,
-    nat_leq Q l l' -> nat_leq Q h' h ->
-    subtype D Q (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
-| SubTyNtSubsume : forall l h l' h' t m,
-    nat_leq Q l l' -> nat_leq Q h' h ->
-    subtype D Q (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
-| SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
-    StructDef.MapsTo T fs D ->
-    Some (TNat) = (Fields.find 0%nat fs) ->
-    subtype D Q (TPtr m (TStruct T)) (TPtr m (TNat))
-| SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
-    StructDef.MapsTo T fs D ->
-    Some (TNat) = (Fields.find 0%nat fs) -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-    subtype D Q (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat)))
+ *)
 
-with subtype_list (D : structdef) (Q:theta) : list type -> list type -> Prop :=
-| subtype_empty : subtype_list D Q [] []
-| subtype_many : forall a b al bl,
-    word_type a -> word_type b ->
-    subtype D Q a b -> subtype_list D Q al bl ->
-    subtype_list D Q (a::al) (b::bl).
+Section Subtype. 
+  Variable D : structdef.
+  Variable Q : theta. 
+
+  Inductive All2 {X : Type} (P : X -> X -> Prop) : list X -> list X -> Prop := 
+  | Allnil : All2 P [] []
+  | Allcons : forall h1 h2 t1 t2,
+      P h1 h2 ->
+      All2 P t1 t2 ->
+      All2 P (h1 :: t1) (h2 :: t2).
+
+  Inductive subtype : type -> type -> Prop :=
+  | SubTypeFunChecked : forall b t t' tl tl',
+      word_type t ->
+      subtype t' t ->
+      All2 subtype tl tl' ->
+      subtype (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))
+  | SubTypeFunTainted : forall m b b' t t' tl tl',
+      m <> Checked ->
+      nat_leq Q b b' ->
+      word_type t -> 
+      subtype t' t ->
+      All2 subtype tl tl' ->
+      subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))
+  | SubTyRefl : forall t, subtype t t
+  | SubTyTainted : forall t t', subtype (TPtr Tainted t) (TPtr Unchecked t')
+  | SubTyBot : forall m l h t,
+      word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype (TPtr m t) (TPtr m (TArray l h t))
+  | SubTyOne : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype (TPtr m (TArray l h t)) (TPtr m t)
+  | SubTyOneNT : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m t)
+  | SubTySubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtArray : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtSubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
+  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      subtype (TPtr m (TStruct T)) (TPtr m (TNat))
+  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
+
+
+  Section SubtypeInd.
+    Variable P : type -> type -> Prop.
+    Definition subtype_ind' :
+      (forall (b : bound) (t t' : type) (tl tl' : list type),
+          word_type t ->
+          subtype t' t -> P t' t -> 
+          All2 subtype tl tl' -> All2 P tl tl' ->
+          P (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))) ->
+      (forall (m : mode) (b b' : bound) (t t' : type) (tl tl' : list type),
+          m <> Checked ->
+          nat_leq Q b b' ->
+          word_type t ->
+          subtype t' t -> P t' t -> 
+          All2 subtype tl tl' ->
+          All2 P tl tl' ->
+          P (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))) ->
+      (forall t : type, P t t) ->
+      (forall t t' : type, P (TPtr Tainted t) (TPtr Unchecked t')) ->
+      (forall (m : mode) (l h : bound) (t : type),
+          word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) -> P (TPtr m t) (TPtr m (TArray l h t))) ->
+      (forall (m : mode) (l h : bound) (t : type),
+          word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h -> P (TPtr m (TArray l h t)) (TPtr m t)) ->
+      (forall (m : mode) (l h : bound) (t : type),
+          word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h -> P (TPtr m (TNTArray l h t)) (TPtr m t)) ->
+      (forall (l h l' h' : bound) (t : type) (m : mode),
+          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))) ->
+      (forall (l h l' h' : bound) (t : type) (m : mode),
+          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))) ->
+      (forall (l h l' h' : bound) (t : type) (m : mode),
+          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))) ->
+      (forall (T : struct) (fs : fields) (m : mode),
+          StructDef.MapsTo T fs D ->
+          Some TNat = Fields.find (elt:=type) 0%nat fs -> P (TPtr m (TStruct T)) (TPtr m TNat)) ->
+      (forall (T : struct) (fs : fields) (m : mode) (l h : bound),
+          StructDef.MapsTo T fs D ->
+          Some TNat = Fields.find (elt:=type) 0%nat fs ->
+          nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) -> P (TPtr m (TStruct T)) (TPtr m (TArray l h TNat))) ->
+      forall t t0 : type, subtype t t0 -> P t t0.
+    Proof.
+      intros until t. move: t. 
+      refine (
+          fix F t t0 (Hsub : subtype t t0) {struct Hsub} :=
+            match Hsub in (subtype t1 t2) return (P t1 t2) with
+            | SubTypeFunChecked b t1 t' tl tl' w s' a => _
+            | SubTypeFunTainted m b b' t1 t' tl tl' n n0 w s' a =>  _
+            | SubTyRefl t1 => H1 t1
+            | SubTyTainted t1 t' => H2 t1 t'
+            | SubTyBot m l h t1 w n n0 => H3 m l h t1 w n n0
+            | SubTyOne m l h t1 w n n0 => H4 m l h t1 w n n0
+            | SubTyOneNT m l h t1 w n n0 => H5 m l h t1 w n n0
+            | SubTySubsume l h l' h' t1 m n n0 => H6 l h l' h' t1 m n n0
+            | SubTyNtArray l h l' h' t1 m n n0 => H7 l h l' h' t1 m n n0
+            | SubTyNtSubsume l h l' h' t1 m n n0 => H8 l h l' h' t1 m n n0
+            | SubTyStructArrayField_1 T Hs m m0 e => H9 T Hs m m0 e
+            | SubTyStructArrayField_2 T Hs m l h m0 e n n0 => H10 T Hs m l h m0 e n n0
+            end).
+      (* SubTypeFunChecked *)
+      - apply H; auto.
+        induction a.
+        + constructor.
+        + constructor. exact (F h1 h2 H11). exact IHa.
+      - apply H0; auto.
+        induction a.
+        + constructor.
+        + constructor. exact (F h1 h2 H11). exact IHa.
+    Defined. 
+  End SubtypeInd.
+
+
+  Lemma subtype_trans : forall t1 t2 t3,
+      word_type t2 ->
+      subtype t1 t2 -> subtype t2 t3 -> subtype t1 t3.
+  Proof with (auto with subtype).
+    intros t1 t2 t3 Hw1 Hsub1.
+    generalize dependent t3. 
+    induction Hsub1 using subtype_ind'; intros t3 Hsub2; intuition. 
+    - induction Hsub2.
+      +
+  Admitted.
+
+End Subtype.
+
+Section OldSubtype.
+  Variable D : structdef.
+  Variable Q : theta. 
+  Inductive subtype : type -> type -> Prop :=
+  | SubTypeFunChecked : forall b t tl tl',
+      word_type t ->
+      subtype_list tl tl' ->
+      subtype (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t tl'))
+  | SubTypeFunTainted : forall m b b' t tl tl',
+      m <> Checked ->
+      nat_leq Q b b' ->
+      word_type t -> 
+      subtype_list tl tl' ->
+      subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t tl'))
+  | SubTyRefl : forall t, subtype t t
+  | SubTyTainted : forall t t', subtype (TPtr Tainted t) (TPtr Unchecked t')
+  | SubTyBot : forall m l h t,
+      word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype (TPtr m t) (TPtr m (TArray l h t))
+  | SubTyOne : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype (TPtr m (TArray l h t)) (TPtr m t)
+  | SubTyOneNT : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m t)
+  | SubTySubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtArray : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtSubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
+  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      subtype (TPtr m (TStruct T)) (TPtr m (TNat))
+  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat)))
+  with subtype_list : list type -> list type -> Prop :=
+  | subtype_empty : subtype_list [] []
+  | subtype_many : forall a b al bl,
+      word_type a -> word_type b ->
+      subtype a b -> subtype_list al bl ->
+      subtype_list (a::al) (b::bl).
+
+  Scheme subtype_mut := Induction for subtype Sort Prop
+      with subtype_list_mut := Induction for subtype_list Sort Prop.
+
+  Check subtype_mut.
+
+  Create HintDb subtype.
+  Hint Constructors subtype : subtype.
+  Hint Constructors subtype_list : subtype.
+
+
+  Ltac solveWord :=
+    repeat match goal with
+      | [H : word_type ?T |- _ ] =>
+          match T with
+          | TNat => fail
+          | TPtr _ _ => fail
+          | _ => inv H
+          end
+      end.
+End Subtype.
+
 
 (* Subtyping transitivity. *)
 Lemma subtype_ptr : forall D Q t m w, subtype D Q (TPtr m w) t -> (exists m' w', t = TPtr m' w').
@@ -506,11 +702,11 @@ Proof.
  intros. inv H0. inv H. easy.
  apply subtype_ptr_1 in H. destruct H. destruct H. subst. easy.
 Qed.
+  
 
 Lemma subtype_trans : forall D Q t t1 t',
     word_type t1 ->
     subtype D Q t t1 -> subtype D Q t1 t' -> subtype D Q t t'
-
 with subtype_trans_list : forall D Q tl tl' tl'',
     subtype_list D Q tl tl' -> subtype_list D Q tl' tl'' -> subtype_list D Q tl tl''.
 Proof. 
@@ -836,7 +1032,7 @@ with subst_fun_type_list : bn_env -> list type -> list type -> Prop :=
                    -> subst_fun_type_list env (t1::ts1) (t2::ts2).
 
 Definition eq_types (ts1 ts2: list type) :=
-          exists env, gen_sub_type_list empty_bn_env ts1 ts2 env /\ subst_fun_type_list env ts1 ts2.
+  exists env, gen_sub_type_list empty_bn_env ts1 ts2 env /\ subst_fun_type_list env ts1 ts2.
 
 Definition to_tfun (b:bound) (tvl: list (var * type)) (t:type) := TFun b t (snd (List.split tvl)).
 
