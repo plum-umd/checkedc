@@ -418,10 +418,12 @@ Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop 
 *)
 Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
 | SubTypeFunChecked : forall b t t' tl tl',
+    word_type t -> word_type t' ->
     subtype D Q t' t -> subtype_list D Q tl tl' ->
     subtype D Q (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))
 | SubTypeFunTainted : forall m b b' t t' tl tl',
     m <> Checked ->
+    word_type t -> word_type t' ->
     nat_leq Q b b' ->
     subtype D Q t' t -> subtype_list D Q tl tl' ->
     subtype D Q (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))
@@ -454,13 +456,113 @@ Inductive subtype (D : structdef) (Q:theta) : type -> type -> Prop :=
 with subtype_list (D : structdef) (Q:theta) : list type -> list type -> Prop :=
 | subtype_empty : subtype_list D Q [] []
 | subtype_many : forall a b al bl,
+    word_type a -> word_type b ->
     subtype D Q a b -> subtype_list D Q al bl ->
     subtype_list D Q (a::al) (b::bl).
 
 (* Subtyping transitivity. *)
 Lemma subtype_trans : forall D Q t t' m w,
-    subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'.
-Admitted.
+    subtype D Q t (TPtr m w) -> subtype D Q (TPtr m w) t' -> subtype D Q t t'
+
+with subtype_trans_list : forall D Q tl tl' tl'',
+    subtype_list D Q tl tl' -> subtype_list D Q tl' tl'' -> subtype_list D Q tl tl''.
+Proof. 
+ - intros.
+   inv H; inv H0.
+   eapply SubTypeFunChecked; try easy.
+   inv H4. inv H10. inv H6. constructor.
+   apply subtype_trans with (m := m) (w := w); try easy.
+   apply subtype_trans_list with (tl' := tl'); try easy.
+   contradiction H8. easy.
+   eapply SubTypeFunChecked; try easy.
+   inv H2. easy.
+   eapply SubTypeFunTainted; try easy.
+   eapply nat_leq_trans. apply H6. easy.
+   inv H5. inv H8. inv H15. constructor.
+   apply subtype_trans with (m := m0) (w := w); try easy.
+   apply subtype_trans_list with (tl' := tl'); try easy.
+   eapply SubTypeFunTainted; try easy.
+   eapply SubTyTainted.
+   inv H2.
+   eapply SubTypeFunChecked; try easy.
+   eapply SubTypeFunTainted; try easy.
+   apply SubTyRefl.
+   eapply SubTyTainted.
+   apply SubTyBot; try easy.
+   apply SubTyOne; try easy.
+   apply SubTyOneNT; try easy.
+   apply SubTySubsume; try easy.
+   apply SubTyNtArray; try easy. 
+   apply SubTyNtSubsume; try easy. 
+   eapply SubTyStructArrayField_1; try easy. apply H2. easy.
+   eapply SubTyStructArrayField_2; try easy. apply H2. easy.
+   1-10:eapply SubTyTainted.
+   apply SubTyBot; try easy.
+   eapply SubTyTainted.
+   inv H2.
+   apply SubTyRefl.
+   apply SubTyBot; try easy.
+   eapply nat_leq_trans. apply H5. easy.
+   eapply nat_leq_trans. apply H9. easy.
+   inv H3. inv H3.
+   apply SubTyOne; try easy.
+   eapply SubTyTainted.
+   apply SubTySubsume; try easy.
+   eapply nat_leq_trans. apply H5. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   1-9: inv H3.
+   apply SubTyOneNT; try easy.
+   eapply SubTyTainted.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H5. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   1-7: inv H3.
+   apply SubTySubsume; try easy.
+   eapply SubTyTainted.
+   inv H2.
+   apply SubTyOne; try easy.
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H9. easy.
+   apply SubTySubsume; try easy.
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   apply SubTyNtArray; try easy. 
+   eapply SubTyTainted.
+   inv H2.
+   apply SubTyOneNT; try easy.
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H9. easy.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   apply SubTyNtSubsume; try easy. 
+   eapply SubTyTainted.
+   inv H2.
+   apply SubTyOneNT; try easy.
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H9. easy.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   apply SubTyNtSubsume; try easy. 
+   eapply nat_leq_trans. apply H4. easy.
+   eapply nat_leq_trans. apply H8. easy.
+   eapply SubTyStructArrayField_1; try easy. apply H4. easy.
+   eapply SubTyTainted.
+   eapply SubTyStructArrayField_2; try easy. apply H4. easy.
+   eapply SubTyStructArrayField_2; try easy. apply H3. easy.
+   eapply SubTyTainted.
+   inv H2.
+   eapply SubTyStructArrayField_1; try easy. apply H3. easy.
+   eapply SubTyStructArrayField_2; try easy. apply H3. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   eapply nat_leq_trans. apply H10. easy.
+- intros. induction H. inv H0. constructor.
+  inv H0. constructor; try easy.
+  inv H1. inv H2. inv H8. constructor.
+  apply subtype_trans with (m := m) (w := w); try easy.
+  apply subtype_trans_list with (tl' := bl); try easy.
+Qed.
 (*
 Proof.
  intros. inv H; inv H0.
