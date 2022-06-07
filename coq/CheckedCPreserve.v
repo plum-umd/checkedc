@@ -121,7 +121,18 @@ Section Preservation.
     - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst. 
       inv Hreduces. solve_ctxt.
       (* SCallChecked *)
-      + specialize (gen_arg_env_good tvl env) as [env' HGen].
+      + inv HEwf. intuition.
+        inv HTyf as []. cbn in H. repeat solveopt in *.
+
+
+        intuition. 1: apply rheap_consistent_refl.
+        induction H11.
+        * inv HArgs. inv HTyf. cbn in H7.
+
+
+
+          (* **************************************** *)
+specialize (gen_arg_env_good tvl env) as [env' HGen].
         exists env', Q. 
         split.
         { exact (sub_domain_grows tvl es env env' s s' AS HGen H11 HsubDom). }
