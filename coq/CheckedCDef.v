@@ -458,7 +458,139 @@ Section Subtype.
       All2 P t1 t2 ->
       All2 P (h1 :: t1) (h2 :: t2).
 
+ Inductive subtype_core : type -> type -> Prop :=
+  | SubTyRefl : forall t, subtype_core t t
+  | SubTyTainted : forall t t', subtype_core (TPtr Tainted t) (TPtr Unchecked t')
+  | SubTyBot : forall m l h t,
+      word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype_core (TPtr m t) (TPtr m (TArray l h t))
+  | SubTyOne : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype_core (TPtr m (TArray l h t)) (TPtr m t)
+  | SubTyOneNT : forall m l h t,
+      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
+      subtype_core (TPtr m (TNTArray l h t)) (TPtr m t)
+  | SubTySubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype_core (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtArray : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype_core (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
+  | SubTyNtSubsume : forall l h l' h' t m,
+      nat_leq Q l l' -> nat_leq Q h' h ->
+      subtype_core (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
+  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      subtype_core (TPtr m (TStruct T)) (TPtr m (TNat))
+  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
+      StructDef.MapsTo T fs D ->
+      Some (TNat) = (Fields.find 0%nat fs) ->
+      nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
+      subtype_core (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
+
+Lemma subtype_core_word_type : forall t1 t2,
+     subtype_core t1 t2 -> word_type t1 -> word_type t2.
+Proof.
+ intros. inv H0. inv H. easy.
+ inv H; try easy.
+Qed.
+
+Lemma subtype_core_word_type_1 : forall t1 t2, subtype_core t1 t2 -> word_type t2 -> word_type t1.
+Proof.
+ intros. inv H0. inv H. easy.
+  inv H; try easy.
+Qed.
+  
+
+Lemma subtype_core_trans : forall t t1 t',
+    word_type t1 ->
+    subtype_core t t1 -> subtype_core t1 t' -> subtype_core t t'.
+Proof. 
+ - intros. apply subtype_core_word_type_1 in H0 as X1; try easy.
+   apply subtype_core_word_type in H1 as X2; try easy.
+    inv H. inv H1. inv H0. constructor.
+   inv X1. inv H0. inv X2. inv H1.
+   inv H1; inv H0.
+   apply SubTyRefl.
+   eapply SubTyTainted.
+   apply SubTyBot; try easy.
+   apply SubTyOne; try easy.
+   apply SubTyOneNT; try easy.
+   apply SubTySubsume; try easy.
+   apply SubTyNtArray; try easy. 
+   apply SubTyNtSubsume; try easy. 
+   eapply SubTyStructArrayField_1; try easy. apply H3. easy.
+   eapply SubTyStructArrayField_2; try easy. apply H4. easy.
+   1-9:eapply SubTyTainted. 
+   apply SubTyBot; try easy.
+   eapply SubTyTainted.
+   inv H5.
+   apply SubTySubsume; try easy.
+   eapply nat_leq_trans. apply H8. easy.
+   eapply nat_leq_trans. apply H7. easy.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H8. easy.
+   eapply nat_leq_trans. apply H7. easy.
+   1-7: inv H5.
+   eapply SubTyStructArrayField_2; try easy. apply H3. easy.
+   apply SubTyOne; try easy.
+   apply SubTyOne; try easy.
+   eapply SubTyTainted.
+   eapply SubTyTainted.
+   apply SubTyRefl.
+   1-2:inv H4.
+   apply SubTyOne; try easy.
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H7. easy.
+   apply SubTyOneNT; try easy.
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H7. easy.
+   eapply SubTyStructArrayField_1; try easy. apply H8. easy.
+   apply SubTyOneNT; try easy.
+   eapply SubTyTainted.
+   1-2:inv H4.
+   apply SubTyOneNT; try easy.
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H7. easy.
+   apply SubTySubsume; try easy.
+   eapply SubTyTainted.
+   apply SubTyBot; try easy.
+   eapply nat_leq_trans. apply H9. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   1-2:inv H5.
+   apply SubTySubsume; try easy.
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   eapply SubTyStructArrayField_2; try easy. apply H7. easy.
+   eapply nat_leq_trans. apply H10. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   apply SubTyNtArray; try easy. 
+   eapply SubTyTainted.
+   1-2:inv H5.
+   apply SubTyNtArray; try easy. 
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   apply SubTyNtSubsume; try easy. 
+   eapply SubTyTainted.
+   1-2:inv H5.
+   apply SubTyNtSubsume; try easy. 
+   eapply nat_leq_trans. apply H3. easy.
+   eapply nat_leq_trans. apply H6. easy.
+   eapply SubTyStructArrayField_1; try easy. apply H4. easy.
+   eapply SubTyTainted.
+   1-2:inv H5.
+   eapply SubTyStructArrayField_2; try easy. apply H5. easy.
+   eapply SubTyTainted.
+   1-2:inv H4.
+Qed.
+
+
   Inductive subtype : type -> type -> Prop :=
+  | SubCore : forall t t', subtype_core t t' -> subtype t t'
   | SubTypeFunChecked : forall b t t' tl tl',
       word_type t ->
       subtype t' t ->
@@ -471,40 +603,20 @@ Section Subtype.
       subtype t' t ->
       All2 subtype tl tl' ->
       subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))
-  | SubTyRefl : forall t, subtype t t
-  | SubTyTainted : forall t t', subtype (TPtr Tainted t) (TPtr Unchecked t')
-  | SubTyBot : forall m l h t,
-      word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-      subtype (TPtr m t) (TPtr m (TArray l h t))
-  | SubTyOne : forall m l h t,
-      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
-      subtype (TPtr m (TArray l h t)) (TPtr m t)
-  | SubTyOneNT : forall m l h t,
-      word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h ->
-      subtype (TPtr m (TNTArray l h t)) (TPtr m t)
-  | SubTySubsume : forall l h l' h' t m,
-      nat_leq Q l l' -> nat_leq Q h' h ->
-      subtype (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))
-  | SubTyNtArray : forall l h l' h' t m,
-      nat_leq Q l l' -> nat_leq Q h' h ->
-      subtype (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
-  | SubTyNtSubsume : forall l h l' h' t m,
-      nat_leq Q l l' -> nat_leq Q h' h ->
-      subtype (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
-  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
-      StructDef.MapsTo T fs D ->
-      Some (TNat) = (Fields.find 0%nat fs) ->
-      subtype (TPtr m (TStruct T)) (TPtr m (TNat))
-  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
-      StructDef.MapsTo T fs D ->
-      Some (TNat) = (Fields.find 0%nat fs) ->
-      nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-      subtype (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
+  | SubTypeTrans : forall t1 t2 t3, subtype t1 t2 -> subtype t2 t3 -> subtype t1 t3.
 
+
+
+Lemma subtype_core_type_1 : forall t1 t2, subtype_core t1 t2 -> word_type t2 -> word_type t1.
+Proof.
+ intros. inv H0. inv H. easy.
+  inv H; try easy.
+Qed.
 
   Section SubtypeInd.
     Variable P : type -> type -> Prop.
     Definition subtype_ind' :
+      (forall (t t': type), subtype_core t t' -> P t t') ->
       (forall (b : bound) (t t' : type) (tl tl' : list type),
           word_type t ->
           subtype t' t -> P t' t -> 
@@ -518,69 +630,76 @@ Section Subtype.
           All2 subtype tl tl' ->
           All2 P tl tl' ->
           P (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))) ->
-      (forall t : type, P t t) ->
-      (forall t t' : type, P (TPtr Tainted t) (TPtr Unchecked t')) ->
-      (forall (m : mode) (l h : bound) (t : type),
-          word_type t -> nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) -> P (TPtr m t) (TPtr m (TArray l h t))) ->
-      (forall (m : mode) (l h : bound) (t : type),
-          word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h -> P (TPtr m (TArray l h t)) (TPtr m t)) ->
-      (forall (m : mode) (l h : bound) (t : type),
-          word_type t -> nat_leq Q l (Num 0) -> nat_leq Q (Num 1) h -> P (TPtr m (TNTArray l h t)) (TPtr m t)) ->
-      (forall (l h l' h' : bound) (t : type) (m : mode),
-          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TArray l h t)) (TPtr m (TArray l' h' t))) ->
-      (forall (l h l' h' : bound) (t : type) (m : mode),
-          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))) ->
-      (forall (l h l' h' : bound) (t : type) (m : mode),
-          nat_leq Q l l' -> nat_leq Q h' h -> P (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))) ->
-      (forall (T : struct) (fs : fields) (m : mode),
-          StructDef.MapsTo T fs D ->
-          Some TNat = Fields.find (elt:=type) 0%nat fs -> P (TPtr m (TStruct T)) (TPtr m TNat)) ->
-      (forall (T : struct) (fs : fields) (m : mode) (l h : bound),
-          StructDef.MapsTo T fs D ->
-          Some TNat = Fields.find (elt:=type) 0%nat fs ->
-          nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) -> P (TPtr m (TStruct T)) (TPtr m (TArray l h TNat))) ->
+     (forall (t1 t2 t3:type), P t1 t2 -> P t2 t3 -> P t1 t3) ->
       forall t t0 : type, subtype t t0 -> P t t0.
     Proof.
       intros until t. move: t. 
       refine (
           fix F t t0 (Hsub : subtype t t0) {struct Hsub} :=
             match Hsub in (subtype t1 t2) return (P t1 t2) with
+            | SubCore t1 t2 HCore => _
             | SubTypeFunChecked b t1 t' tl tl' w s' a => _
             | SubTypeFunTainted m b b' t1 t' tl tl' n n0 w s' a =>  _
-            | SubTyRefl t1 => H1 t1
-            | SubTyTainted t1 t' => H2 t1 t'
-            | SubTyBot m l h t1 w n n0 => H3 m l h t1 w n n0
-            | SubTyOne m l h t1 w n n0 => H4 m l h t1 w n n0
-            | SubTyOneNT m l h t1 w n n0 => H5 m l h t1 w n n0
-            | SubTySubsume l h l' h' t1 m n n0 => H6 l h l' h' t1 m n n0
-            | SubTyNtArray l h l' h' t1 m n n0 => H7 l h l' h' t1 m n n0
-            | SubTyNtSubsume l h l' h' t1 m n n0 => H8 l h l' h' t1 m n n0
-            | SubTyStructArrayField_1 T Hs m m0 e => H9 T Hs m m0 e
-            | SubTyStructArrayField_2 T Hs m l h m0 e n n0 => H10 T Hs m l h m0 e n n0
+            | SubTypeTrans t1 t1' t2 Hsub1 Hsub2 => _
             end).
       (* SubTypeFunChecked *)
       - apply H; auto.
-        induction a.
-        + constructor.
-        + constructor. exact (F h1 h2 H11). exact IHa.
       - apply H0; auto.
         induction a.
         + constructor.
-        + constructor. exact (F h1 h2 H11). exact IHa.
+        + constructor. exact (F h1 h2 H3). exact IHa.
+      - apply H1; auto.
+        induction a.
+        + constructor.
+        + constructor. exact (F h1 h2 H3). exact IHa.
+      - apply H2 with (t2 := t1').
+        exact (F t1 t1' Hsub1).
+        exact (F t1' t2 Hsub2).
     Defined. 
   End SubtypeInd.
+
+Lemma subtype_word_type : forall t1 t2,
+     subtype t1 t2 -> word_type t1 -> word_type t2.
+ Proof with (auto with subtype).
+ intros. induction H.
+ apply subtype_core_word_type with (t1 := t); try easy.
+ easy. easy.
+ apply IHsubtype2. apply IHsubtype1; easy.
+Qed.
+
+Lemma subtype_word_type_1 : forall t1 t2,
+     subtype t1 t2 -> word_type t2 -> word_type t1.
+ Proof with (auto with subtype).
+ intros. induction H.
+ apply subtype_core_word_type_1 with (t2 := t'); try easy.
+ easy. easy.
+ apply IHsubtype1. apply IHsubtype2; easy.
+Qed.
 
 
   Lemma subtype_trans : forall t1 t2 t3,
       word_type t2 ->
       subtype t1 t2 -> subtype t2 t3 -> subtype t1 t3.
+  Proof.
   Proof with (auto with subtype).
     intros t1 t2 t3 Hw1 Hsub1.
     generalize dependent t3. 
-    induction Hsub1 using subtype_ind'; intros t3 Hsub2; intuition. 
-    - induction Hsub2.
-      +
-  Admitted.
+    induction Hsub1 using subtype_ind'; intros.
+    apply SubTypeTrans with (t2 := t'); try easy.
+    apply SubCore. easy.
+    assert (subtype (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))).
+    apply SubTypeFunChecked; try easy.
+    apply SubTypeTrans with (t2 := (TPtr Checked (TFun b t' tl'))); try easy.
+    assert (subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl'))).
+    apply SubTypeFunTainted; try easy.
+    apply SubTypeTrans with (t2 := (TPtr m (TFun b' t' tl'))); try easy.
+    assert (word_type t0).
+    apply subtype_word_type with (t1 := t3); try easy.
+    apply IHHsub0 in H; try easy.
+    assert (word_type t2).
+    apply subtype_word_type_1 with (t2 := t0); try easy.
+    apply IHHsub1 in H; try easy.
+  Qed.
 
 End Subtype.
 
@@ -656,53 +775,7 @@ Section OldSubtype.
 End Subtype.
 
 
-(* Subtyping transitivity. *)
-Lemma subtype_ptr : forall D Q t m w, subtype D Q (TPtr m w) t -> (exists m' w', t = TPtr m' w').
-Proof.
- intros. inv H; simpl in *.
- exists Checked. exists (TFun b t0 tl'). easy.
- exists m. exists (TFun b' t0 tl'). easy.
- exists m. exists w. easy.
- exists Unchecked. exists t'. easy.
- exists m. exists (TArray l h w). easy.
- exists m. exists t0. easy.
- exists m. exists t0. easy.
- exists m. exists (TArray l' h' t0). easy.
- exists m. exists (TArray l' h' t0). easy.
- exists m. exists (TNTArray l' h' t0). easy.
- exists m. exists TNat. easy.
- exists m. exists (TArray l h TNat). easy.
-Qed.
 
-Lemma subtype_ptr_1 : forall D Q t m w, subtype D Q t (TPtr m w) -> (exists m' w', t = TPtr m' w').
-Proof.
- intros. inv H; simpl in *.
- exists Checked. exists (TFun b t0 tl). easy.
- exists m. exists (TFun b t0 tl). easy.
- exists m. exists w. easy.
- exists Tainted. exists t0. easy.
- exists m. exists t0. easy.
- exists m. exists (TArray l h w). easy.
- exists m. exists (TNTArray l h w). easy.
- exists m. exists (TArray l h t0). easy.
- exists m. exists (TNTArray l h t0). easy.
- exists m. exists (TNTArray l h t0). easy.
- exists m. exists (TStruct T). easy.
- exists m. exists (TStruct T). easy.
-Qed.
-
-Lemma subtype_word_type : forall D Q t1 t2, subtype D Q t1 t2 -> word_type t1 -> word_type t2.
-Proof.
- intros. inv H0. inv H. easy.
- apply subtype_ptr in H. destruct H. destruct H. subst. easy.
-Qed.
-
-Lemma subtype_word_type_1 : forall D Q t1 t2, subtype D Q t1 t2 -> word_type t2 -> word_type t1.
-Proof.
- intros. inv H0. inv H. easy.
- apply subtype_ptr_1 in H. destruct H. destruct H. subst. easy.
-Qed.
-  
 
 Lemma subtype_trans : forall D Q t t1 t',
     word_type t1 ->
