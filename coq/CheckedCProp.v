@@ -214,6 +214,10 @@ End FunctionProp.
 
 
 Section TypeProp.
+  Variable D : structdef.
+  Variable F : FEnv.
+  Variable Q : theta.
+
   Lemma eval_bound_idempotent : forall s b b', 
       eval_bound s b = Some b' ->
       eval_bound s b' = Some b'.
@@ -242,4 +246,48 @@ Section TypeProp.
         specialize (Hcons t1 H2).
         cbn. rewrite IHl0. rewrite Hcons. reflexivity.
   Qed.
+
+  Lemma simple_eval_bound : forall s b,
+      eval_bound s b = Some b -> exists n, b = Num n.
+  Proof.
+    destruct b; intros; eauto.
+    inv H. solveopt in *. destruct p. congruence.
+  Qed.
+
+  Lemma simple_eval_type_bound : forall s t,
+      eval_type_bound s t = Some t <-> simple_type t.
+  Proof with (cbn; auto).
+    intros s t. split.
+    - Ltac solveleft :=
+        cbn in *; repeat solveopt in *;
+        repeat
+          (match goal with
+           | [H : eval_bound _ ?b = Some ?b |- _] =>
+               let n := fresh "n" in
+               let H' := fresh "Hbd" in
+               destruct (simple_eval_bound _ _ H) as [n [=]]; clear H; subst
+           end); constructor; intuition.
+      intros Hbd. induction t using type_ind'; solveleft.
+      induction l; constructor; inv H; solveleft.
+    - Ltac solveright :=
+        cbn in *; auto;
+        repeat (match goal with
+                | [ H : _ = Some ?b |- _] =>
+                    rewrite H
+                end);
+        auto.
+      intros. induction t using type_ind'; inv H; intuition; solveright.
+      induction l... inv H0; inv H5; intuition.
+      solveopt in *.  solveright.
+  Qed.
+
+  Lemma well_typed_lit_subtype : forall t t' t'' s,
+      eval_type_bound s t = Some t' ->
+      subtype D Q t' t'' -> 
+      eval_type_bound s t'' = Some t''.
+  Proof.
+    intros * Hbd Hsub. induction Hsub.
+    + cbn. 
+  Admitted.
+    
 End TypeProp.
