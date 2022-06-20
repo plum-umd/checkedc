@@ -35,12 +35,14 @@ From CHKC Require Import
     respectively. They are all implemented concretely as natural numbers. Each
     is a distinguished class of identifier in the syntax of the language. *)
 
+Create HintDb ty.
+
 Local Open Scope Z_scope.
 
 Definition var    := nat.
 Definition field  := nat.
 Definition struct := nat.
-Definition funid := nat.
+Definition funid  := nat.
 
 (* Useful shorthand in case we ever change representation. *)
 Definition var_eq_dec := Nat.eq_dec.
@@ -410,6 +412,9 @@ Proof.
   constructor. lia.
 Qed.
 
+Hint Resolve nat_leq_refl : ty.
+Hint Resolve nat_leq_trans : ty.
+
 (*
 Definition union := list (list var).
 
@@ -458,7 +463,7 @@ Section Subtype.
   Variable D : structdef.
   Variable Q : theta. 
 
- Inductive subtype_core : type -> type -> Prop :=
+  Inductive subtype_core : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype_core t t
   | SubTyTainted : forall t t', subtype_core (TPtr Tainted t) (TPtr Unchecked t')
   | SubTyBot : forall m l h t,
@@ -489,288 +494,226 @@ Section Subtype.
       nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
       subtype_core (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
 
- Lemma subtype_core_word_type : forall t1 t2,
-     subtype_core t1 t2 -> word_type t1 -> word_type t2.
- Proof.
-   intros. inv H0. inv H. easy.
-   inv H; try easy.
- Qed.
+  Hint Constructors subtype_core : ty.
 
- Lemma subtype_core_word_type_1 : forall t1 t2, subtype_core t1 t2 -> word_type t2 -> word_type t1.
- Proof.
-   intros. inv H0. inv H. easy.
-   inv H; try easy.
- Qed.
+  Lemma subtype_core_word_type : forall t1 t2,
+      subtype_core t1 t2 -> word_type t1 -> word_type t2.
+  Proof.
+    intros. inv H0. inv H. easy.
+    inv H; try easy.
+  Qed.
+
+  Lemma subtype_core_word_type_1 : forall t1 t2,
+      subtype_core t1 t2 -> word_type t2 -> word_type t1.
+  Proof.
+    intros. inv H0. inv H. easy.
+    inv H; try easy.
+  Qed.
  
+  Lemma subtype_core_trans : forall t t1 t',
+      word_type t1 ->
+      subtype_core t t1 -> subtype_core t1 t' -> subtype_core t t'.
+  Proof with (eauto with ty; try easy). 
+    intros. apply subtype_core_word_type_1 in H0 as X1; try easy.
+    apply subtype_core_word_type in H1 as X2; try easy.
+    inv H; inv H1; inv H0...
+  Qed.
 
- Lemma subtype_core_trans : forall t t1 t',
-     word_type t1 ->
-     subtype_core t t1 -> subtype_core t1 t' -> subtype_core t t'.
- Proof. 
-   - intros. apply subtype_core_word_type_1 in H0 as X1; try easy.
-     apply subtype_core_word_type in H1 as X2; try easy.
-     inv H. inv H1. inv H0. constructor.
-     inv X1. inv H0. inv X2. inv H1.
-     inv H1; inv H0.
-     apply SubTyRefl.
-     eapply SubTyTainted.
-     apply SubTyBot; try easy.
-     apply SubTyOne; try easy.
-     apply SubTyOneNT; try easy.
-     apply SubTySubsume; try easy.
-     apply SubTyNtArray; try easy. 
-     apply SubTyNtSubsume; try easy. 
-     eapply SubTyStructArrayField_1; try easy. apply H3. easy.
-     eapply SubTyStructArrayField_2; try easy. apply H4. easy.
-     1-9:eapply SubTyTainted. 
-     apply SubTyBot; try easy.
-     eapply SubTyTainted.
-     inv H5.
-     apply SubTySubsume; try easy.
-     eapply nat_leq_trans. apply H8. easy.
-     eapply nat_leq_trans. apply H7. easy.
-     apply SubTyNtArray; try easy. 
-     eapply nat_leq_trans. apply H8. easy.
-     eapply nat_leq_trans. apply H7. easy.
-     1-7: inv H5.
-     eapply SubTyStructArrayField_2; try easy. apply H3. easy.
-     apply SubTyOne; try easy.
-     apply SubTyOne; try easy.
-     eapply SubTyTainted.
-     eapply SubTyTainted.
-     apply SubTyRefl.
-     1-2:inv H4.
-     apply SubTyOne; try easy.
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H7. easy.
-     apply SubTyOneNT; try easy.
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H7. easy.
-     eapply SubTyStructArrayField_1; try easy. apply H8. easy.
-     apply SubTyOneNT; try easy.
-     eapply SubTyTainted.
-     1-2:inv H4.
-     apply SubTyOneNT; try easy.
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H7. easy.
-     apply SubTySubsume; try easy.
-     eapply SubTyTainted.
-     apply SubTyBot; try easy.
-     eapply nat_leq_trans. apply H9. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     1-2:inv H5.
-     apply SubTySubsume; try easy.
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     apply SubTyNtArray; try easy. 
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     eapply SubTyStructArrayField_2; try easy. apply H7. easy.
-     eapply nat_leq_trans. apply H10. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     apply SubTyNtArray; try easy. 
-     eapply SubTyTainted.
-     1-2:inv H5.
-     apply SubTyNtArray; try easy. 
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     apply SubTyNtSubsume; try easy. 
-     eapply SubTyTainted.
-     1-2:inv H5.
-     apply SubTyNtSubsume; try easy. 
-     eapply nat_leq_trans. apply H3. easy.
-     eapply nat_leq_trans. apply H6. easy.
-     eapply SubTyStructArrayField_1; try easy. apply H4. easy.
-     eapply SubTyTainted.
-     1-2:inv H5.
-     eapply SubTyStructArrayField_2; try easy. apply H5. easy.
-     eapply SubTyTainted.
-     1-2:inv H4.
- Qed.
+  Inductive subtype : type -> type -> Prop :=
+  | SubCore : forall t t', subtype_core t t' -> subtype t t'
+  | SubTypeFunChecked : forall b t t' tl tl',
+      word_type t ->
+      Forall word_type tl ->
+      subtype t' t ->
+      Forall2 subtype tl tl' ->
+      subtype (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))
+  | SubTypeFunTainted : forall m b b' t t' tl tl',
+      m <> Checked ->
+      nat_leq Q b b' ->
+      word_type t -> 
+      Forall word_type tl ->
+      subtype t' t ->
+      Forall2 subtype tl tl' ->
+      subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl')).
 
+  Hint Constructors subtype : ty.
 
- Inductive subtype : type -> type -> Prop :=
- | SubCore : forall t t', subtype_core t t' -> subtype t t'
- | SubTypeFunChecked : forall b t t' tl tl',
-     word_type t ->
-     Forall word_type tl ->
-     subtype t' t ->
-     Forall2 subtype tl tl' ->
-     subtype (TPtr Checked (TFun b t tl)) (TPtr Checked (TFun b t' tl'))
- | SubTypeFunTainted : forall m b b' t t' tl tl',
-     m <> Checked ->
-     nat_leq Q b b' ->
-     word_type t -> 
-     Forall word_type tl ->
-     subtype t' t ->
-     Forall2 subtype tl tl' ->
-     subtype (TPtr m (TFun b t tl)) (TPtr m (TFun b' t' tl')).
+  Lemma subtype_core_type_1 : forall t1 t2, subtype_core t1 t2 -> word_type t2 -> word_type t1.
+  Proof.
+    intros. inv H0. inv H. easy.
+    inv H; try easy.
+  Qed.
 
+  Lemma subtype_word_type : forall t1 t2,
+      subtype t1 t2 -> word_type t1 -> word_type t2.
+  Proof.
+    intros. induction H; try easy.
+    apply subtype_core_word_type with (t1 := t); auto.
+  Qed.
 
- Lemma subtype_core_type_1 : forall t1 t2, subtype_core t1 t2 -> word_type t2 -> word_type t1.
- Proof.
-   intros. inv H0. inv H. easy.
-   inv H; try easy.
- Qed.
- Lemma subtype_word_type : forall t1 t2,
-     subtype t1 t2 -> word_type t1 -> word_type t2.
- Proof with (auto with subtype).
-   intros. induction H.
-   apply subtype_core_word_type with (t1 := t); try easy.
-   easy. easy.
- Qed.
+  Lemma subtype_word_type_1 : forall t1 t2,
+      subtype t1 t2 -> word_type t2 -> word_type t1.
+  Proof with (auto with subtype).
+    intros. induction H; try easy.
+    apply subtype_core_word_type_1 with (t2 := t'); auto.
+  Qed.
 
- Lemma subtype_word_type_1 : forall t1 t2,
-     subtype t1 t2 -> word_type t2 -> word_type t1.
- Proof with (auto with subtype).
-   intros. induction H.
-   apply subtype_core_word_type_1 with (t2 := t'); try easy.
-   easy. easy.
- Qed.
+  Lemma subtype_word_type_list : forall t1 t2,
+      Forall2 subtype t1 t2 -> Forall word_type t1 -> Forall word_type t2.
+  Proof.
+    intros. induction H. constructor.
+    constructor. inv H0.
+    eapply subtype_word_type. apply H. easy.
+    apply IHForall2. inv H0. easy.
+  Qed.
 
- Lemma subtype_word_type_list : forall t1 t2,
-     Forall2 subtype t1 t2 -> Forall word_type t1 -> Forall word_type t2.
- Proof.
-   intros. induction H. easy.
-   constructor. inv H0.
-   eapply subtype_word_type. apply H. easy.
-   apply IHForall2. inv H0. easy.
- Qed.
+  Definition is_fun_ptr (t:type) :=
+    match t with TPtr m (TFun b t l) => True | _ => False end.
 
- Definition is_fun_ptr (t:type) :=
-   match t with TPtr m (TFun b t l) => True | _ => False end.
+  Inductive word_type_sub : type -> Prop :=
+    word_type_sub_nat: word_type_sub (TNat)
+  | word_type_sub_ptr: forall m t, word_type t -> word_type_sub (TPtr m t)
+  | word_type_sub_struct: forall m T, word_type_sub (TPtr m (TStruct T))
+  | word_type_sub_array: forall m b1 b2 t, word_type t -> word_type_sub (TPtr m (TArray b1 b2 t))
+  | word_type_sub_ntarray: forall m b1 b2 t, word_type t -> word_type_sub (TPtr m (TNTArray b1 b2 t))
+  | word_type_sub_fun: forall m b t l,
+      word_type_sub t -> Forall word_type_sub l -> word_type_sub (TPtr m (TFun b t l)).
 
- Inductive word_type_sub : type -> Prop :=
-   word_type_sub_nat: word_type_sub (TNat)
- | word_type_sub_ptr: forall m t, word_type t -> word_type_sub (TPtr m t)
- | word_type_sub_struct: forall m T, word_type_sub (TPtr m (TStruct T))
- | word_type_sub_array: forall m b1 b2 t, word_type t -> word_type_sub (TPtr m (TArray b1 b2 t))
- | word_type_sub_ntarray: forall m b1 b2 t, word_type t -> word_type_sub (TPtr m (TNTArray b1 b2 t))
- | word_type_sub_fun: forall m b t l, word_type_sub t -> Forall word_type_sub l -> word_type_sub (TPtr m (TFun b t l)).
+  Lemma subtype_core_fun_1 : forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3, 
+      subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) ->
+      subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3)) ->
+      subtype t1 (TPtr m3 (TFun b3 t3 tl3)).
+  Proof.
+    intros. inv H0. constructor.
+    apply subtype_core_trans with (t1 := (TPtr m2 (TFun b2 t2 tl2))); try easy.
+    inv H.
+    apply SubTypeFunChecked; try easy. inv H2. inv H2.
+    inv H.
+    apply SubTypeFunTainted; try easy.
+    constructor. constructor. inv H2. inv H2.
+  Qed.
 
- Lemma subtype_core_fun_1 : forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3, 
-     subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) -> subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-     -> subtype t1 (TPtr m3 (TFun b3 t3 tl3)).
- Proof.
-   intros. inv H0. constructor.
-   apply subtype_core_trans with (t1 := (TPtr m2 (TFun b2 t2 tl2))); try easy.
-   inv H.
-   apply SubTypeFunChecked; try easy. inv H2. inv H2.
-   inv H.
-   apply SubTypeFunTainted; try easy.
-   constructor. constructor. inv H2. inv H2.
- Qed.
+  Lemma subtype_core_fun_2 : forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3, 
+      subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+      -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t1
+      -> subtype (TPtr m2 (TFun b2 t2 tl2)) t1.
+  Proof.
+    intros. inv H. constructor.
+    apply subtype_core_trans with (t1 := (TPtr m3 (TFun b3 t3 tl3))); try easy.
+    inv H0.
+    apply SubTypeFunChecked; try easy. inv H2. 
+    inv H0.
+    apply SubTypeFunTainted; try easy.
+    constructor. constructor. inv H2.
+  Qed.
 
- Lemma subtype_core_fun_2 : forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3, 
-     subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-     -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t1
-     -> subtype (TPtr m2 (TFun b2 t2 tl2)) t1.
- Proof.
-   intros. inv H. constructor.
-   apply subtype_core_trans with (t1 := (TPtr m3 (TFun b3 t3 tl3))); try easy.
-   inv H0.
-   apply SubTypeFunChecked; try easy. inv H2. 
-   inv H0.
-   apply SubTypeFunTainted; try easy.
-   constructor. constructor. inv H2.
- Qed.
+  Inductive Forall3 {A B C: Type} (R : A -> B -> C -> Prop): list A -> list B -> list C -> Prop :=
+  | Forall3_nil : Forall3 R [] [] []
+  | Forall3_cons : forall x y z l l' l'',
+      R x y z -> Forall3 R l l' l'' -> Forall3 R (x::l) (y::l') (z::l'').
 
- Inductive Forall3 {A B C: Type} (R : A -> B -> C -> Prop): list A -> list B -> list C -> Prop :=
- | Forall3_nil : Forall3 R [] [] []
- | Forall3_cons : forall x y z l l' l'',
-     R x y z -> Forall3 R l l' l'' -> Forall3 R (x::l) (y::l') (z::l'').
-
- Inductive subtype_order : type -> type -> type -> Prop :=
-   subtype_order_1: forall t1 t2 t3,
-       word_type t1 -> subtype_core t1 t2 -> subtype_core t2 t3 -> subtype_order t1 t2 t3
- | subtype_order_2 : forall  t1 m2 b2 t2 tl2 m3 b3 t3 tl3,
-     subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) 
-     -> subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-     -> subtype_order t1 (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
- | subtype_order_3 : forall m2 b2 t2 tl2 m3 b3 t3 tl3 t4,
-     subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-     -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t4
-     -> subtype_order (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3)) t4
- | subtype_order_4: forall m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3,
-     word_type_sub t1 -> word_type_sub t2 -> word_type_sub t3 ->
-     Forall word_type_sub tl1 -> Forall word_type_sub tl2 -> Forall word_type_sub tl3 -> 
-     subtype_order t3 t2 t1 -> Forall3 subtype_order tl1 tl2 tl3 ->
-     subtype_order (TPtr m (TFun b1 t1 tl1)) (TPtr m (TFun b2 t2 tl2)) (TPtr m (TFun b3 t3 tl3)).
+  Inductive subtype_order : type -> type -> type -> Prop :=
+    subtype_order_1: forall t1 t2 t3,
+        word_type t1 -> subtype_core t1 t2 -> subtype_core t2 t3 -> subtype_order t1 t2 t3
+  | subtype_order_2 : forall  t1 m2 b2 t2 tl2 m3 b3 t3 tl3,
+      subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) 
+      -> subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+      -> subtype_order t1 (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+  | subtype_order_3 : forall m2 b2 t2 tl2 m3 b3 t3 tl3 t4,
+      subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+      -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t4
+      -> subtype_order (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3)) t4
+  | subtype_order_4: forall m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3,
+      word_type_sub t1 -> word_type_sub t2 -> word_type_sub t3 ->
+      Forall word_type_sub tl1 -> Forall word_type_sub tl2 -> Forall word_type_sub tl3 -> 
+      subtype_order t3 t2 t1 -> Forall3 subtype_order tl1 tl2 tl3 ->
+      subtype_order (TPtr m (TFun b1 t1 tl1)) (TPtr m (TFun b2 t2 tl2)) (TPtr m (TFun b3 t3 tl3)).
 
 
- Definition subtype_type_ind3
-   : forall P : type -> type -> type -> Prop,
-     (forall t1 t2 t3, 
-         word_type t1 -> subtype_core t1 t2 -> subtype_core t2 t3 -> P t1 t2 t3) ->
-     (forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3,
-         subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) 
-         -> subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-         -> P t1 (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))) ->
-     (forall m2 b2 t2 tl2 m3 b3 t3 tl3 t4,
-         subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
-         -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t4
-         -> P (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3)) t4) ->
-     (forall m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3,
-         word_type_sub t1 -> word_type_sub t2 -> word_type_sub t3 ->
-         Forall word_type_sub tl1 -> Forall word_type_sub tl2 -> Forall word_type_sub tl3 -> 
-         subtype_order t3 t2 t1 -> P t3 t2 t1 
-         -> Forall3 subtype_order tl1 tl2 tl3 -> Forall3 P tl1 tl2 tl3 ->
-         P (TPtr m (TFun b1 t1 tl1)) (TPtr m (TFun b2 t2 tl2)) (TPtr m (TFun b3 t3 tl3))) ->
-     forall (t1 t2 t3:type), subtype_order t1 t2 t3 -> P t1 t2 t3.
- Proof.
-   intros P ST1 ST2 ST3 ST4.
-   refine
-     (fix F t1 t2 t3 (Hw : subtype_order t1 t2 t3) {struct Hw} :=
-        match Hw with
-        | subtype_order_1 t1 t2 t3 Hw Hs1 Hs2 => ST1 t1 t2 t3 Hw Hs1 Hs2
-        | subtype_order_2 t1 m2 b2 t2 tl2 m3 b3 t3 tl3 Hs1 Hs2
-          => ST2 t1 m2 b2 t2 tl2 m3 b3 t3 tl3 Hs1 Hs2
-        | subtype_order_3 m2 b2 t2 tl2 m3 b3 t3 tl3 t4 Hs1 Hs2
-          => ST3 m2 b2 t2 tl2 m3 b3 t3 tl3 t4 Hs1 Hs2
-        | subtype_order_4 m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3 Hw1 Hw2 Hw3 Hl1 Hl2 Hl3 Hs Hl
-          => ST4 m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3 Hw1 Hw2 Hw3 Hl1 Hl2 Hl3 Hs _ Hl _
-        end).
-   exact (F t3 t2 t1 Hs).
-   induction Hl. constructor.
-   constructor.
-   exact (F x y z H).
-   inv Hl1. inv Hl2. inv Hl3.
-   apply IHHl; try easy.
- Qed.
+  Definition subtype_type_ind3
+    : forall P : type -> type -> type -> Prop,
+      (forall t1 t2 t3, 
+          word_type t1 -> subtype_core t1 t2 -> subtype_core t2 t3 -> P t1 t2 t3) ->
+      (forall t1 m2 b2 t2 tl2 m3 b3 t3 tl3,
+          subtype_core t1 (TPtr m2 (TFun b2 t2 tl2)) 
+          -> subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+          -> P t1 (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))) ->
+      (forall m2 b2 t2 tl2 m3 b3 t3 tl3 t4,
+          subtype (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3))
+          -> subtype_core (TPtr m3 (TFun b3 t3 tl3)) t4
+          -> P (TPtr m2 (TFun b2 t2 tl2)) (TPtr m3 (TFun b3 t3 tl3)) t4) ->
+      (forall m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3,
+          word_type_sub t1 -> word_type_sub t2 -> word_type_sub t3 ->
+          Forall word_type_sub tl1 -> Forall word_type_sub tl2 -> Forall word_type_sub tl3 -> 
+          subtype_order t3 t2 t1 -> P t3 t2 t1 
+          -> Forall3 subtype_order tl1 tl2 tl3 -> Forall3 P tl1 tl2 tl3 ->
+          P (TPtr m (TFun b1 t1 tl1)) (TPtr m (TFun b2 t2 tl2)) (TPtr m (TFun b3 t3 tl3))) ->
+      forall (t1 t2 t3:type), subtype_order t1 t2 t3 -> P t1 t2 t3.
+  Proof.
+    intros P ST1 ST2 ST3 ST4.
+    refine
+      (fix F t1 t2 t3 (Hw : subtype_order t1 t2 t3) {struct Hw} :=
+         match Hw with
+         | subtype_order_1 t1 t2 t3 Hw Hs1 Hs2 => ST1 t1 t2 t3 Hw Hs1 Hs2
+         | subtype_order_2 t1 m2 b2 t2 tl2 m3 b3 t3 tl3 Hs1 Hs2
+           => ST2 t1 m2 b2 t2 tl2 m3 b3 t3 tl3 Hs1 Hs2
+         | subtype_order_3 m2 b2 t2 tl2 m3 b3 t3 tl3 t4 Hs1 Hs2
+           => ST3 m2 b2 t2 tl2 m3 b3 t3 tl3 t4 Hs1 Hs2
+         | subtype_order_4 m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3 Hw1 Hw2 Hw3 Hl1 Hl2 Hl3 Hs Hl
+           => ST4 m b1 t1 tl1 b2 t2 tl2 b3 t3 tl3 Hw1 Hw2 Hw3 Hl1 Hl2 Hl3 Hs _ Hl _
+         end).
+    - exact (F t3 t2 t1 Hs).
+    - induction Hl; constructor.
+      exact (F x y z H).
+      inv Hl1. inv Hl2. inv Hl3.
+      apply IHHl; try easy.
+  Qed.
 
- Lemma subtype_trans : forall t1 t2 t3,
-     subtype_order t1 t2 t3 ->
-     subtype t1 t2 -> subtype t2 t3 -> subtype t1 t3.
- Proof.
-   intros. induction H using subtype_type_ind3.
-   constructor.
-   apply subtype_core_trans with (t1 := t2); try easy.
-   apply subtype_core_word_type with (t1 := t1); try easy.
-   apply subtype_core_fun_1 with (m2 := m2) (b2 := b2) (t2 := t2) (tl2 := tl2); try easy.
-   apply subtype_core_fun_2 with (m3 := m3) (b3 := b3) (t3 := t3) (tl3 := tl3); try easy.
-   inv H0. inv H10. easy. inv H1. inv H0.
-   apply SubTypeFunChecked; try easy.
-   apply SubTypeFunChecked; try easy. apply IHsubtype_order; try easy.
-   induction H9. constructor.
-   inv H4. inv H5. inv H6.
-   inv H20. inv H22. constructor.
-   apply H0; try easy.
-   inv H8. inv H18. inv H17.
-   apply IHForall3; try easy. easy.
-   inv H1.
-   apply subtype_core_fun_2 with (m3 := m) (b3:=b2) (t3:=t2) (tl3:=tl2); try easy.
-   apply SubTypeFunTainted; try easy.
-   easy.
-   apply SubTypeFunTainted; try easy.
-   apply nat_leq_trans with (b := b2); try easy.
-   apply IHsubtype_order; try easy.
-   induction H9. constructor.
-   inv H4. inv H5. inv H6. inv H8.
-   inv H20. inv H22. inv H25. inv H27. constructor.
-   apply H0; try easy.
-   apply IHForall3; try easy.
- Qed.
+  Lemma subtype_trans : forall t1 t2 t3,
+      subtype_order t1 t2 t3 ->
+      subtype t1 t2 -> subtype t2 t3 -> subtype t1 t3.
+  Proof with (eauto with ty; try easy).
+    intros. induction H using subtype_type_ind3.
+    - constructor.
+      apply subtype_core_trans with (t1 := t2); try easy.
+      apply subtype_core_word_type with (t1 := t1); try easy.
+    - apply subtype_core_fun_1 with (m2 := m2) (b2 := b2) (t2 := t2) (tl2 := tl2); try easy.
+    - apply subtype_core_fun_2 with (m3 := m3) (b3 := b3) (t3 := t3) (tl3 := tl3); try easy.
+    - inv H0. inv H10. easy. inv H1... inv H0...
+      apply SubTypeFunChecked; try easy. apply IHsubtype_order; try easy.
+      induction H9. constructor.
+      inv H4. inv H5. inv H6.
+      inv H20. inv H22. constructor.
+      apply H0; try easy.
+      inv H8. inv H18. inv H17.
+      apply IHForall3; try easy. 
+      inv H1.
+      apply subtype_core_fun_2 with (m3 := m) (b3:=b2) (t3:=t2) (tl3:=tl2); try easy.
+      apply SubTypeFunTainted; try easy.
+      easy.
+      apply SubTypeFunTainted; try easy.
+      apply nat_leq_trans with (b := b2); try easy.
+      apply IHsubtype_order; try easy.
+      induction H9. constructor.
+      inv H4. inv H5. inv H6. inv H8.
+      inv H20. inv H22. inv H25. inv H27. constructor.
+      apply H0; try easy.
+      apply IHForall3; try easy.
+  Qed.
+
+  Lemma subtype_refl : forall t,
+      subtype t t.
+  Proof.
+    auto with ty.
+  Qed.
+
+  Hint Resolve subtype_refl : ty.
 End Subtype.
+
+#[export] Hint Constructors subtype_core : ty.
+#[export] Hint Constructors subtype : ty.
+#[export] Hint Resolve subtype_refl : ty.
+
 
 (* Defining stack. *)
 Module Stack := Map.Make Nat_as_OT.
@@ -877,29 +820,48 @@ with gen_sub_type_list : bn_env -> list type -> list type -> bn_env -> Prop :=
                    -> gen_sub_type_list env (t1::ts1) (t2::ts2) env2.
 
 Definition subst_fun_bound (bv:bn_env) (b:bound) :=
-   match b with Num n => (Num n)
-           | Var y n => match Env.find y bv with None => Var y n
-              | Some b1 => match b1 with Num m => Num (m+n)
-                                 | Var x m => Var x (m + n)
-                          end
-                        end
+  match b with
+    Num n => (Num n)
+  | Var y n =>
+      match Env.find y bv with
+        None => Var y n
+      | Some b1 =>
+          match b1 with
+            Num m => Num (m+n)
+          | Var x m => Var x (m + n)
+          end
+      end
   end.
 
 Inductive subst_fun_type : bn_env -> type -> type -> Prop :=
-   subst_fun_nat : forall env, subst_fun_type env TNat TNat
- | subst_fun_ptr : forall env m t t', subst_fun_type env t t' -> subst_fun_type env (TPtr m t) (TPtr m t')
- | subst_fun_struct : forall env T, subst_fun_type env (TStruct T) (TStruct T)
- | subst_fun_array : forall env b1 b2 c1 c2 t t', subst_fun_bound env b1 = c1 -> subst_fun_bound env b2 = c2 ->
-                       subst_fun_type env t t' -> subst_fun_type env (TArray b1 b2 t) (TArray c1 c2 t')
- | subst_fun_ntarray : forall env b1 b2 c1 c2 t t', subst_fun_bound env b1 = c1 -> subst_fun_bound env b2 = c2 ->
-                       subst_fun_type env t t' -> subst_fun_type env (TNTArray b1 b2 t) (TNTArray c1 c2 t')
- | subst_fun_fun : forall env b c ts1 ts2 t1 t2, subst_fun_bound env b = c ->
-              subst_fun_type_list env ts1 ts2 -> subst_fun_type env t1 t2 -> subst_fun_type env (TFun b t1 ts1) (TFun c t2 ts2)
+  subst_fun_nat : forall env, subst_fun_type env TNat TNat
+| subst_fun_ptr : forall env m t t',
+    subst_fun_type env t t' ->
+    subst_fun_type env (TPtr m t) (TPtr m t')
+| subst_fun_struct : forall env T,
+    subst_fun_type env (TStruct T) (TStruct T)
+| subst_fun_array : forall env b1 b2 c1 c2 t t',
+    subst_fun_bound env b1 = c1 ->
+    subst_fun_bound env b2 = c2 ->
+    subst_fun_type env t t' ->
+    subst_fun_type env (TArray b1 b2 t) (TArray c1 c2 t')
+| subst_fun_ntarray : forall env b1 b2 c1 c2 t t',
+    subst_fun_bound env b1 = c1 ->
+    subst_fun_bound env b2 = c2 ->
+    subst_fun_type env t t' ->
+    subst_fun_type env (TNTArray b1 b2 t) (TNTArray c1 c2 t')
+| subst_fun_fun : forall env b c ts1 ts2 t1 t2, 
+    subst_fun_bound env b = c ->
+    subst_fun_type_list env ts1 ts2 ->
+    subst_fun_type env t1 t2 ->
+    subst_fun_type env (TFun b t1 ts1) (TFun c t2 ts2)
 
 with subst_fun_type_list : bn_env -> list type -> list type -> Prop :=
  | subst_fun_empty : forall env, subst_fun_type_list env [] []
- | subst_fun_many : forall env t1 ts1 t2 ts2, subst_fun_type env t1 t2 -> subst_fun_type_list env ts1 ts2
-                   -> subst_fun_type_list env (t1::ts1) (t2::ts2).
+| subst_fun_many : forall env t1 ts1 t2 ts2,
+    subst_fun_type env t1 t2 ->
+    subst_fun_type_list env ts1 ts2 ->
+    subst_fun_type_list env (t1::ts1) (t2::ts2).
 
 Definition eq_types (ts1 ts2: list type) :=
   exists env, gen_sub_type_list empty_bn_env ts1 ts2 env /\ subst_fun_type_list env ts1 ts2.
@@ -1018,7 +980,7 @@ Inductive value (D : structdef) : expression -> Prop :=
     simple_type t ->
     value D (ELit n t).
 
-Hint Constructors value.
+#[export] Hint Constructors value.
 
 (** Note: Literal is a less strong version of value that doesn't
     enforce the syntactic constraints on the literal type. *)
@@ -1027,7 +989,7 @@ Inductive literal : expression -> Prop :=
   Lit : forall (n : Z) (t : type),
     literal (ELit n t).
 
-Hint Constructors literal.
+#[export] Hint Constructors literal.
 
 (** * Dynamic Semantics *)
 
@@ -1575,6 +1537,9 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) (Q:theta) H
             well_typed_lit_checked D F Q H (scope_set_add n (TPtr Checked w) sc) n' t') ->
     well_typed_lit_checked D F Q H sc n (TPtr Checked t).
 
+#[export] Hint Constructors well_typed_lit_checked : ty.
+
+
 (** Typing of literals on Tainted heaps *)
 Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) (Q:theta) H
   : scope -> Z -> type -> Prop :=
@@ -1603,6 +1568,8 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) (Q:theta) H
             Heap.MapsTo (n + k) (n', t') H /\
             well_typed_lit_tainted D F Q H (scope_set_add n (TPtr Tainted w) sc) n' t') ->
     well_typed_lit_tainted D F Q H sc n (TPtr Tainted t).
+
+#[export] Hint Constructors well_typed_lit_tainted : ty.
 
 
 Definition well_typed_lit D F Q R Theta n t := forall H1 H2,
@@ -1685,6 +1652,9 @@ Definition add_value (H:heap) (n:Z) (t:type) :=
 Definition mem : Type := stack * real_heap.
 
 (** ** Checked C Semantics *)
+
+Create HintDb sem.
+
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 Inductive step
   (D : structdef)
@@ -1756,13 +1726,13 @@ Inductive step
     step D F
       (s, R) (EStrlen x)
       (s, R) RNull
-| SCallChecked : forall s R x ta ts el t tvl e e' ea n,
+| SCallChecked : forall s R x ta ts el t tvl e ea n,
     n = -1 ->
     F n x = Some (tvl,t,e,Checked) ->
-    eq_types ((snd (List.split tvl))++[t]) (ts++[ta]) ->
-    @eval_el s el tvl (ECast t e') ea ->
+    eq_types (t :: (snd (List.split tvl))) (ta :: ts) ->
+    @eval_el s el tvl e ea ->
     step D F
-      (s, R)  (ECall (ELit x (TPtr Checked (TFun (Num n) ta ts))) el)
+      (s, R) (ECall (ELit x (TPtr Checked (TFun (Num n) ta ts))) el)
       (s, R) (RExpr (ECast t ea))
 | SCallCheckedBound : forall s R x ta ts el n,
     n <> -1 ->
@@ -2126,7 +2096,7 @@ Inductive step
            step D F s H (EIfPtrLt (ELit n t) (ELit n' t') e1 e2) s H (RExpr e2).
 *)
 
-Hint Constructors step.
+#[export] Hint Constructors step : sem.
 
 (** ** Reduction *)
 Inductive reduce
@@ -2155,12 +2125,12 @@ Inductive reduce
         m
         M' RBounds.
 
-Hint Constructors reduce.
+#[export] Hint Constructors reduce : sem.
 
 Definition reduces (D : structdef) (F:FEnv) (M : mem) (e : expression) : Prop :=
   exists (m : mode) (M' : mem) (r : result), reduce D F M e m M' r.
 
-Hint Unfold reduces.
+#[export] Hint Unfold reduces : sem.
 
 (* Defining function calls. *)
 (** * Static Semantics *)
@@ -2448,8 +2418,13 @@ Definition is_off_zero (b:bound) :=
 
 
 (* The CoreChkC Type System. *)
-Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
-        : env -> theta -> mode -> expression -> type -> Prop :=
+Section Typing. 
+  Variable D : structdef.
+  Variable F : FEnv.
+  Variable S : stack. 
+  Variable H : real_heap.
+  Inductive well_typed
+    : env -> theta -> mode -> expression -> type -> Prop :=
   | TyLitChecked : forall env Q n t t',
       eval_type_bound S t = Some t' ->
       well_typed_lit_checked D F Q (fst H) empty_scope n t' ->
@@ -2462,12 +2437,12 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
 
   | TyCall : forall env Q m m' b es x ts t,
       (* get_dept_map tvl es = Some s -> *)
-        fun_mode_eq m' m -> is_off_zero b ->
-        well_typed env Q m x (TPtr m' (TFun b t ts)) ->
-        @well_typed_args D F Q S H env m es ts ->
-        well_typed env Q m (ECall x es) t
+      fun_mode_eq m' m -> is_off_zero b ->
+      well_typed env Q m x (TPtr m' (TFun b t ts)) ->
+      @well_typed_args D F Q S H env m es ts ->
+      well_typed env Q m (ECall x es) t
 
-(*
+  (*
   | TyCallHeap : forall env U Q pm m m' es x tvl t,
       (* get_dept_map tvl es = Some s -> *)
         pm = HeapType ->
@@ -2475,7 +2450,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
         Env.MapsTo x (TPtr m' pm (TFun t tvl)) env ->
         @well_typed_args D U Q H env m es tvl ->
         well_typed env U Q m (ECall x es) t.
-*)
+   *)
 
   | TyStrlen : forall env Q x m m' h l t,
       Env.MapsTo x (TPtr m' (TNTArray h l t)) env ->
@@ -2531,14 +2506,14 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       well_typed env Q m (EPlus e1 e2) (TPtr m t)
 
   | TyFieldAddr : forall env Q m e m' T fs i fi ti,
-        mode_leq m' m ->
+      mode_leq m' m ->
       well_typed env Q m e (TPtr m' (TStruct T)) ->
       StructDef.MapsTo T fs D ->
       Fields.MapsTo fi ti fs ->
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
       well_typed env Q m (EFieldAddr e fi) (TPtr m' ti)
 
-(* add tainted pointer to type context here *)
+  (* add tainted pointer to type context here *)
   | TyMalloc : forall env x m mr Q w t e2,
       mode_comp m mr ->
       well_type_bound_in env w ->
@@ -2620,7 +2595,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       well_typed env Q m (EAssign e1 e2) t
   | TyAssign3 : forall env Q m e1 e2 m' l h t t',
       word_type t -> type_wf D m' t ->
-     subtype_stack D Q S t' t  ->
+      subtype_stack D Q S t' t  ->
       well_typed env Q m e1 (TPtr m' (TNTArray l h t)) ->
       well_typed env Q m e2 t' ->
       mode_leq m' m ->
@@ -2647,8 +2622,8 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       Env.MapsTo x t env ->
       subtype D Q t (TPtr m' t1) ->
       (exists l h t', (word_type t1 /\ t1 = t')
-         \/ (t1 = TArray l h t' /\ word_type t' /\ type_wf D m' t')
-       \/ (t1 = TNTArray l h t' /\ word_type t' /\ type_wf D m' t')) ->
+                      \/ (t1 = TArray l h t' /\ word_type t' /\ type_wf D m' t')
+                      \/ (t1 = TNTArray l h t' /\ word_type t' /\ type_wf D m' t')) ->
       well_typed env Q m e1 t2 -> well_typed env Q m e2 t3 ->
       join_type D Q S t2 t3 t4 ->
       mode_leq m' m ->
@@ -2657,7 +2632,7 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
   | TyIfDefNT : forall env Q m m' x l t e1 e2 t2 t3 t4,
       Env.MapsTo x (TPtr m' (TNTArray l (Var x 0) t)) env ->
       well_typed (Env.add x (TPtr m' (TNTArray l (Var x 1) t)) env) Q m e1 t2
-        -> well_typed env Q m e2 t3 ->
+      -> well_typed env Q m e2 t3 ->
       join_type D Q S t2 t3 t4 ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env Q m (EIfDef x e1 e2) t4
@@ -2669,14 +2644,15 @@ Inductive well_typed { D : structdef } {F:FEnv} {S:stack} {H:real_heap}
       well_typed env Q m e3 t3 ->
       join_type D Q S t2 t3 t4 ->
       well_typed env Q m (EIf e1 e2 e3) t4.
-
+End Typing.
+#[export] Hint Constructors well_typed : ty.
 
 Inductive fun_arg_wf {D : structdef} {m:mode}: list var -> list (var * type) -> Prop :=
-   fun_arg_empty : forall AS, fun_arg_wf AS nil
-  | fun_arg_many_1 : forall AS x t tvl, t <> TNat -> fun_arg_wf AS tvl ->
-     word_type t -> type_wf D m t -> well_bound_vars_type AS t
-            -> fun_arg_wf AS ((x,t)::tvl)
-  | fun_arg_many_2 : forall AS x tvl, fun_arg_wf (x::AS) tvl -> fun_arg_wf AS ((x,TNat)::tvl).
+  fun_arg_empty : forall AS, fun_arg_wf AS nil
+| fun_arg_many_1 : forall AS x t tvl, t <> TNat -> fun_arg_wf AS tvl ->
+                                      word_type t -> type_wf D m t -> well_bound_vars_type AS t
+                                      -> fun_arg_wf AS ((x,t)::tvl)
+| fun_arg_many_2 : forall AS x tvl, fun_arg_wf (x::AS) tvl -> fun_arg_wf AS ((x,TNat)::tvl).
 
 
 Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
@@ -2701,4 +2677,3 @@ Definition sub_domain (env: env) (S:stack) := forall x,
 
 Local Close Scope Z_scope.
 Local Open Scope nat_scope.
-Hint Constructors well_typed.

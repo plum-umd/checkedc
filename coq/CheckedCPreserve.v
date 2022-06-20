@@ -11,30 +11,32 @@ From CHKC Require Import
 Hint Unfold rheap_consistent : Preservation.
 Hint Unfold heap_consistent_checked : Preservation.
 
+Ltac solve_step :=
+  match goal with
+  | [Hstep : step _ _ _ _ _ _ |- _] =>
+      (* Leave [Hstep] there for goal information *)
+      inversion Hstep; subst; rename Hstep into _Hstep
+  end; 
+  try solve [cbn in *; subst; congruence];
+  repeat match goal with
+    | [H : in_hole _ _ = _ |- _ ] => inv H
+    end.
+
 Ltac solve_ctxt :=
   match goal with
   | [E : ctxt |- _] =>
-      destruct E;
-      match goal with
-      | [Hstep : step _ _ _ _ _ _ |- _] =>
-          (* Leave [Hstep] there for goal information *)
-          inversion Hstep; subst; rename Hstep into _Hstep
-      end; 
-      try solve [cbn in *; subst; congruence];
-      match goal with
-      | [H : in_hole _ _ = _ |- _ ] => inv H
-      end
+      destruct E; try congruence; solve_step
   end.  
-  
+         
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
-  Variable F : FEnv. 
+  Variable F : FEnv.
+  Hypothesis HDwf : structdef_wf D.
   Lemma preservation : forall s R env Q e t s' R' e',
-      structdef_wf D ->
       rheap_wf R ->
       rheap_wt_all D F Q Checked R ->
-      (* fun_wf D s' R' -> *)
       expr_wf D e ->
       stack_wt D Checked s ->
       env_wt D Checked env ->
@@ -42,7 +44,7 @@ Section Preservation.
       sub_domain env s ->
       stack_wf D Q env s ->
       stack_rheap_consistent D F Q R s ->
-      @well_typed D F s R env Q Checked e t ->
+      well_typed D F s R env Q Checked e t ->
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
@@ -51,14 +53,14 @@ Section Preservation.
         /\ stack_wf D Q' env' s'
         /\ stack_rheap_consistent D F Q' R s'
         /\ rheap_consistent D F Q' R' R
-        /\ (@well_typed D F s' R' env' Q' Checked e' t
+        /\ (well_typed D F s' R' env' Q' Checked e' t
             \/ (exists t' t'',
                    eval_type_bound s' t = Some t'
                    /\ subtype D Q' t'' t'
-                   /\ @well_typed D F s' R' env' Q' Checked e' t'')).
-  Proof with eauto 20 with Preservation.
+                   /\ well_typed D F s' R' env' Q' Checked e' t'')).
+  Proof with (eauto with ty sem heap).
     intros s R env Q e t s' R' e'
-      HDwf HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
+      HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
@@ -98,36 +100,31 @@ Section Preservation.
         env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin                       (* If *)
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
-    - inv Hreduces; solve_ctxt. exists env, Q. intuition.
-      apply rheap_consistent_refl.
-      right. rewrite H4 in Hbound. inv Hbound. exists t', t'.
-      intuition. apply SubTyRefl. eapply TyLitChecked; eauto.
-      apply (eval_type_bound_idempotent _ _ _ H4).
+    - inv Hreduces; solve_ctxt.
+      exists env, Q. intuition.
+      right. rewrite H4 in Hbound. inv Hbound. exists t', t'...
     (* T-LitUnchecked *)
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
-    - inv Hreduces; solve_ctxt. 
-      inv H5. exists env. exists Q. 
-      destruct R' as [Hchk Htnt]; subst; intuition.
-      unfold rheap_consistent. intros * HR1 HR2. inv HR1; inv HR2...
+    - inv Hreduces; solve_ctxt.
+      inv H5. exists env, Q.
+      destruct R' as [Hchk Htnt]; subst; intuition... cbn.
       right.
       specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
       specialize (Stack.mapsto_always_same _ _ _ _ _ H4 Hrst) as Heq; inv Heq.
       clear H4.
       exists t', t''; intuition.
-      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt]; cbn.
-      admit. admit.
+      specialize (Hswt _ _ _ Hrst) as (_ & _ & Hsimple)...
+      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt]...
+      eapply checked_wt_tainted_lit...
     (*T-Call*)
-    - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst. 
-      inv Hreduces. solve_ctxt.
-      (* SCallChecked *)
-      + inv HEwf. intuition.
-        inv HTyf as []. cbn in H. repeat solveopt in *.
-
-
-        intuition. 1: apply rheap_consistent_refl.
-        induction H11.
-        * inv HArgs. inv HTyf. cbn in H7.
+    - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst.
+      inv Hreduces. destruct E; try congruence; try solve [solve_step].
+      + inv HEwf. intuition. solve_step; cbn.
+        * inv HTyf. destruct H13 as (be & Ha & Hb). inv Ha. inv Hb. 
+          exists env, Q. intuition.
+          right. 
+  Abort.
 
 
 
