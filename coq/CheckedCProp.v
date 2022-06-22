@@ -7,7 +7,7 @@ From CHKC Require Import
   Map
   CheckedCDef.
 
-Create HintDb Preservation.
+Create HintDb heap.
 
 Ltac solveMaps :=
   match goal with
@@ -115,13 +115,18 @@ Section RealHeapProp.
     unfold heap_consistent_checked. intuition.
   Qed.
   
-  Hint Unfold rheap_consistent : Preservation.
-
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
     heap_wt_all D F Q m Hchk.
 
 End RealHeapProp.
+
+#[export] Hint Unfold rheap_wf : heap.
+#[export] Hint Unfold stack_rheap_consistent : heap.
+#[export] Hint Unfold rheap_consistent : heap.
+#[export] Hint Unfold rheap_wt_all : heap.
+#[export] Hint Resolve rheap_consistent_refl : heap.
+
   
 Section StackProp.
   Variable D : structdef.
@@ -281,13 +286,17 @@ Section TypeProp.
       solveopt in *.  solveright.
   Qed.
 
-  Lemma well_typed_lit_subtype : forall t t' t'' s,
-      eval_type_bound s t = Some t' ->
-      subtype D Q t' t'' -> 
-      eval_type_bound s t'' = Some t''.
+  Lemma checked_wt_tainted_lit : forall R S Htnt t v env,
+      simple_type t ->  
+      well_typed_lit_tainted D F Q Htnt empty_scope v t ->
+      well_typed D F S R env Q Checked (ELit v t) t.
   Proof.
-    intros * Hbd Hsub. induction Hsub.
-    + cbn. 
-  Admitted.
-    
+    intros * Hsimple Hwt; eapply TyLitChecked.
+    apply simple_eval_type_bound; assumption.
+    inv Hwt; constructor; congruence.
+  Qed.
 End TypeProp.
+
+#[export] Hint Resolve eval_type_bound_idempotent : ty.
+#[export] Hint Resolve <- simple_eval_type_bound : ty.
+#[export] Hint Resolve -> simple_eval_type_bound : ty.
