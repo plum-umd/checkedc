@@ -34,24 +34,24 @@ Section Preservation.
   Variable D : structdef.
   Variable F : FEnv.
   Hypothesis HDwf : structdef_wf D.
-  Lemma preservation : forall s R env Q e t s' R' e',
+  Lemma preservation : forall vars s R env Q e t s' R' e',
       rheap_wf R ->
       rheap_wt_all D F Q Checked R ->
       expr_wf D e ->
       stack_wt D Checked s ->
       env_wt D Checked env ->
       theta_wt Q env s ->
-      sub_domain env s ->
+      sub_domain env vars ->
       stack_wf D Q env s ->
-      stack_rheap_consistent D F Q R s ->
+      stack_rheap_consistent D F Q R vars s ->
       well_typed D F s R env Q Checked e t ->
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
-      exists env' Q',
-        sub_domain env' s'
+      exists vars' env' Q',
+        sub_domain env' vars'
         /\ stack_wf D Q' env' s'
-        /\ stack_rheap_consistent D F Q' R s'
+        /\ stack_rheap_consistent D F Q' R vars' s'
         /\ rheap_consistent D F Q' R' R
         /\ (well_typed D F s' R' env' Q' Checked e' t
             \/ (exists t' t'',
@@ -59,7 +59,7 @@ Section Preservation.
                    /\ subtype D Q' t'' t'
                    /\ well_typed D F s' R' env' Q' Checked e' t'')).
   Proof with (eauto with ty sem heap).
-    intros s R env Q e t s' R' e'
+    intros vars s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
@@ -69,7 +69,7 @@ Section Preservation.
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
         env Q m m' b es x ts t HMode HZero HTyf IH1 HArgs          | (* Call *)
-        env Q m x h l t Wb                                         | (* Strlen *)
+        env Q m n' x h l t Wb HMode                                | (* Strlen *)
         env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
         env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hx Hdept             | (* Let-Nat-Expr *)
         env Q m x e1 t1 e2 t HTy1 IH1 HTy2 IH2 Hx                  | (* Let-Expr *)
@@ -101,13 +101,13 @@ Section Preservation.
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - inv Hreduces; solve_ctxt.
-      exists env, Q. intuition.
+      exists vars, env, Q. intuition.
       right. rewrite H4 in Hbound. inv Hbound. exists t', t'...
     (* T-LitUnchecked *)
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
     - inv Hreduces; solve_ctxt.
-      inv H5. exists env, Q.
+      inv H5. exists vars,env, Q.
       destruct R' as [Hchk Htnt]; subst; intuition... cbn.
       right.
       specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
@@ -115,14 +115,17 @@ Section Preservation.
       clear H4.
       exists t', t''; intuition.
       specialize (Hswt _ _ _ Hrst) as (_ & _ & Hsimple)...
-      specialize (HsHwf Hchk Htnt x  _ _ eq_refl Hrst) as [Echk | Etnt]...
-      eapply checked_wt_tainted_lit...
+      specialize (HsHwf Hchk).
+      Check eq_refl.
+      assert (In x vars) as X1. apply HsubDom.
+      exists t; try easy.
+      specialize (HsHwf Htnt x _ _ eq_refl X1 Hrst) as Echk...
     (*T-Call*)
     - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst.
       inv Hreduces. destruct E; try congruence; try solve [solve_step].
       + inv HEwf. intuition. solve_step; cbn.
         * inv HTyf. destruct H13 as (be & Ha & Hb). inv Ha. inv Hb. 
-          exists env, Q. intuition.
+          exists vars,env, Q. intuition.
           right. 
   Abort.
 

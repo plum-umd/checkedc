@@ -79,6 +79,11 @@ Section HeapProp.
       word_type t /\ type_wf D m t /\ simple_type t
       /\ well_typed_lit_checked D F Q H empty_scope n t.
 
+  Definition heap_wt_tainted (H : heap) :=
+    forall x n t,
+      Heap.MapsTo x (n,t) H ->
+      word_type t /\ type_wf D m t /\ simple_type t.
+
   Local Close Scope Z_scope.
 End HeapProp.
 
@@ -92,15 +97,15 @@ Section RealHeapProp.
   Variable m : mode.
 
   Definition rheap_wf (R : real_heap) : Prop := forall Hchk Htnt,
-      R = (Hchk, Htnt) -> heap_wf Hchk /\ heap_wf Htnt.
+      R = (Hchk, Htnt) -> heap_wf Hchk.
+
+  Definition is_checked (t:type) := match t with TNat => True | TPtr m w => (m = Checked) | _ => False end.
 
   (** Types on the stack agree with those on the rheap. *)
-  Definition stack_rheap_consistent (R : real_heap) S :=
+  Definition stack_rheap_consistent (R : real_heap) l S :=
     forall Hchk Htnt x n t,
       R = (Hchk, Htnt) ->
-      Stack.MapsTo x (n,t) S ->
-      (well_typed_lit_checked D F Q Hchk empty_scope n t
-       \/ well_typed_lit_tainted D F Q Htnt empty_scope n t).
+      In x l -> Stack.MapsTo x (n,t) S -> well_typed_lit_checked D F Q Hchk empty_scope n t.
 
 
   (* FIXME: hold the definition for now *)
@@ -117,7 +122,7 @@ Section RealHeapProp.
   
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
-    heap_wt_all D F Q m Hchk.
+    heap_wt_all D F Q m Hchk /\ heap_wt_tainted D m Htnt.
 
 End RealHeapProp.
 
@@ -180,8 +185,8 @@ Section FunctionProp.
   Qed.
 
 
-  Lemma sub_domain_grow : forall env S x v t,
-      sub_domain env S -> sub_domain (Env.add x t env) (Stack.add x v S).
+  Lemma sub_domain_grow : forall env S x t,
+      sub_domain env S -> sub_domain (Env.add x t env) (x::S).
   Proof with auto.
     intros.
     unfold sub_domain in *.
@@ -190,24 +195,19 @@ Section FunctionProp.
     destruct H0.
     unfold Stack.In,Stack.Raw.PX.In.
     destruct (Nat.eq_dec x x0).
-    + subst.
-      exists v.
-      apply Stack.add_1...
+    + subst. simpl. left. easy.
     + apply Env.add_3 in H0...
       assert (Env.In x0 env)... 
       unfold Env.In,Env.Raw.PX.In.
       exists x1...
-      apply H in H1.
-      unfold Stack.In,Stack.Raw.PX.In in H1.
-      destruct H1.
-      exists x2.
-      apply Stack.add_2...
+      apply H in H1. simpl. right. easy.
   Qed.
-
+(*
   Lemma sub_domain_grows : forall tvl es env env' s s' e e',
       gen_arg_env env tvl env' -> eval_el s es tvl e e' -> sub_domain env s ->
       sub_domain env' s'.
   Abort.
+*)
   (* Proof with auto. *)
   (*   induction tvl; intros * Henv Heval Hsub. *)
   (*   + inv Heval. inv Henv. *)
