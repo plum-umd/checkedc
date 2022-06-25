@@ -54,7 +54,7 @@ Section Preservation.
         /\ stack_rheap_consistent D F Q' R vars' s'
         /\ rheap_consistent D F Q' R' R
         /\ well_typed D F s' R' env' Q' Checked e' t'
-        /\ type_eq Q t t'.
+        /\ eq_subtype_core D Q t t'.
   Proof with (eauto with ty sem heap).
     intros vars s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
@@ -79,7 +79,6 @@ Section Preservation.
         env Q m e t HTy IH                                         | (* Unchecked *)
         env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
         env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
-        env Q m t e t' Wb HTy IH HSub                              | (* Cast - type_eq *)
         env Q m e x y u v t t' Wb HTy IH Teq                       | (* DynCast - ptr array *)
         env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
@@ -99,13 +98,11 @@ Section Preservation.
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - inv Hreduces; solve_ctxt.
-      exists vars, env, Q, t. intuition.
-      rewrite H4 in Hbound. inv Hbound. exists t', t'...
     (* T-LitUnchecked *)
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
     - inv Hreduces; solve_ctxt.
-      inv H5. exists vars,env, Q.
+      inv H5. exists vars,env, Q, t0.
       destruct R' as [Hchk Htnt]; subst; intuition... cbn.
       right.
       specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].

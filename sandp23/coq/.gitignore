@@ -1,0 +1,7 @@
+*.v.d
+*.glob
+*.vo
+*.bak
+*.conf
+*.aux
+*.d

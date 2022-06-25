@@ -1,0 +1,1140 @@
+\section{Appendix}
+
+\subsection{Differences with the Coq and Redex Models}\label{app:model-diffs}
+
+% \begin{figure}[h]
+% {\small
+% {\captionsetup[lstlisting]{margin = 8 mm}
+%   \begin{lstlisting}[xleftmargin=8 mm]
+% Inductive expression : Type :=
+%   | ELit : Z -> type -> expression
+%   | EVar : var -> expression
+%   | EStrlen : var -> expression
+%   | ECall : funid -> list expression -> expression
+%   | ERet : var -> Z* type -> expression -> expression
+%   | EDynCast : type -> expression -> expression
+%   | ELet : var -> expression -> expression -> expression
+%   | EMalloc : type -> expression
+%   | ECast : type -> expression -> expression
+%   | EPlus : expression -> expression -> expression
+%   | EFieldAddr : expression -> field -> expression
+%   | EDeref : expression -> expression (*  * e *)
+%   | EAssign : expression -> expression -> expression (* *e = e *)
+%   | EIfDef : var -> expression -> expression -> expression (* if *x then e1 else e2. *)
+%   | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
+%   | EUnchecked : expression -> expression.
+%   \end{lstlisting}
+% }
+% }
+% \caption{Expression Syntax in Coq}
+% \label{fig:coq-syntax}
+% \end{figure}
+
+The Coq and Redex models of \lang may be found at \url{https://github.com/plum-umd/checkedc}.
+The Coq model's syntax is slightly different from that in
+Fig.~\ref{fig:checkc-syn}. In particular, the arguments in a function call
+are restricted to variables and constants, according to
+a separate well-formedness condition. A function call \code{f(e)} can
+always be written in \code{let x = e in f(x)} to cope.
+% In the Coq model, we do not restrict the function argument syntax. Instead, we achieve the restriction
+% by restricting the type rule for each function argument element to only deal with constants and variables. 
+% To avoid recursive inductive relations and simplify proofs, we define different inductive relations for typing function argument lists and elements. In the inductive relation of function argument elements, we only define rules for typing constants and variables, and the rules are copied from the main inductive type rules for constants and variables. 
+%MWH: The above is nonsensical. The answer is: We have an expresion
+%well-formedness condition that restricts this syntax, among other things.
+In addition,
+conditionals have two syntactic forms: \code{EIf} is a normal
+conditional, and \code{EIfDef} is one whose boolean guard is of the
+form \estar{x}. By syntactically distinguishing these two
+cases, the Coq model does not need the \emph{[prefer]} rule for
+\code{if (*x)}$...$ forms as in
+Fig.~\ref{fig:c-context}. The Redex model \emph{does} prioritize such
+forms but not the same way as in the figure. It uses a variation of
+the \textsc{S-Var} rule: The 
+modified rule is equipped with a precondition that is false whenever
+\textsc{S-IfNTT} is applicable.
+% \mwh{Do we need
+%   to talk about other semantic judgments that are not in the paper,
+%   e.g., well-formedness? Maybe not, but should make sure the code is
+%   commented to clarify that these things are not strictly needed --
+%   well-formedness is subsumed by well typing (if that's true)?} \liyi{I will add comments to make sure it is clear in Coq.}
+% \yiyun{No, well-formedness is not subsumed by the typing relation in
+%   the Coq model. I
+%   checked the latest coq code; they must be explicitly stated in the theorems.}
+% \mwh{I mean: We might have it in the coq model, but I suspect it is
+%   not necessary. If it is, we should be saying something in the main
+%   paper. 
+
+The Coq model uses a runtime stack $\varphi$ as described at the start
+of Sec.~\ref{sec:semantics}.
+The Redex model introduces let bindings during evaluation to
+simulate a runtime stack. For example, consider the expression 
+$e \equiv \elet{x}{(\evalue{5}{\tint})}{\ebinop{x}{x}}$. Expression $e$ first steps to
+$\elet{x}{(\evalue{5}{\tint})}{\ebinop{(\evalue{5}{\tint})}{x}}$, which in
+turns steps to
+$\elet{x}{(\evalue{5}{\tint})}{\ebinop{(\evalue{5}{\tint})}{(\evalue{5}{\tint})}}$. Since
+the rhs of $x$ is a value, the let binding in $e$ effectively
+functions as a stack that maps from $x$ to $\evalue{5}{\tint}$. The
+let form remains in the expression and lazily replaces the variables
+in its body. The let form can be removed from the expression only if its
+body is evaluated to a value, e.g., 
+$\elet{x}{(\evalue{5}{\tint})}{(\evalue{10}{\tint})}$
+steps to 
+$\evalue{10}{\tint}$. The rule for popping let bindings in this manner
+corresponds to the \textsc{S-Ret} rule in Fig.~\ref{fig:semantics}.
+Leveraging let bindings adds complexity to the semantics but
+simplifies typing/consistency and term generation during randomized testing.
+%  \mwh{I don't understand the last sentence. Nowhere in the
+%   paper do we talk about ANF. Also: Isn't it the case that there are
+%   rules for let bindings do not use substitution, but rather ``look
+%   up'' the binding on the definition chain? E.g.,
+%   \code{let x=5 in x+x} does not step to \code{5+5} but instead steps
+%   to \code{let x=5 in 5+5} and then to \code{let x=5 in 10} ? }
+% \liyi{Yiyun: please see here. If you do not know, please explain to me and then we can make a correct statement. }
+% \yiyun{It is supposed to refer to the ANF transformation of the erased language, not the source
+%   language. I moved it to the discussion of ANF form below in \ref{appx:comp1}. }
+
+\subsection{Typing Rules for Literal Pointers}\label{sec:literal-pointer-typing}
+
+The typing of integer literals, which can also be pointers to the
+heap, was presented in Sec.~\ref{sec:theorem} in Fig.~\ref{fig:const-type}. Here
+we describe these rules further.
+
+The variable type rule
+($\textsc{T-Var}$) simply checks if a given variable has the defined
+type in $\Gamma$; the constant rule ($\textsc{T-Const}$) is slightly
+more involved.  First, it ensures that the type annotation $\tau$ does
+not contain any free variables. More importantly, it ensures that the
+literal itself is well typed using an auxilliary typing relation
+$\heap;\sigma \vdash n : \tau$.
+
+If the literal's type is an integer, an unchecked pointer, or a null
+pointer, it is well typed, as shown by the top three rules in
+Fig.~\ref{fig:const-type}. However, if it is a checked pointer
+$\tptr{\omega}{\cmode}$, we need to ensure that what it points to in
+the heap is of the appropriate pointed-to type ($\omega$), and also
+recursively ensure that any literal pointers reachable this way are
+also well-typed. This is captured by the bottom rule in the figure,
+which states that for every location $n+i$ in the pointers' range
+%
+$[n, n+\size(\omega))$, where $\size$ yields the size of its argument,
+  then the value at the location $\heap(n+i)$ is also well-typed.
+  However, as heap snapshots can contain cyclic structures (which
+  would lead to infinite typing deriviations), we use a scope $\sigma$
+  to assume that the original pointer is well-typed when checking the
+  types of what it points to. The middle rule then accesses the scope
+  to tie the knot and keep the derivation finite, just like in
+  \citet{ruef18checkedc-incr}.
+
+\subsection{Other Semantic Rules}\label{sec:rem-semantics}
+
+Fig.~\ref{fig:rem-semantics} shows the remaining semantic rules for
+$\lang$. We explain a selected few rules in this subsection.
+% other few low-level semantic rules for variable and dereference and $\emalloctext$ operations in \checkedc. Other operations are defined in the same manner.
+
+\begin{figure*}[t]
+{\small
+\begin{mathpar}
+
+\inferrule [S-Var]{} {(\varphi,\heap,x)\longrightarrow (\varphi,\heap,\varphi(x))}
+
+    \inferrule[S-DefArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+
+    \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
+     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+    \inferrule[S-DefNTArrayBound]{0 \notin [n_l,n_h]}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+
+    \inferrule[S-Assign]{\heap(n)=\evalue{n_a}{\tau_a} }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tptr{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+
+    \inferrule[S-AssignNull]{}
+      {(\varphi,\heap,\eassign{\evalue{0}{\tptr{\omega}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\enull)}
+
+    \inferrule[S-AssignArrBound]{0 \not\in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+  \inferrule[S-Malloc]{\varphi(\omega)=\omega_a \\ \mathtt{alloc}(\heap,\omega_a)=(n,\heap')}
+   { (\varphi,\heap,\emalloc{\omega}) \longrightarrow (\varphi,\heap',\evalue{n}{\tptr{\omega_a}{\cmode}})}
+
+  \inferrule[S-MallocBound]{\varphi(\omega)=\tallarray{n_l}{n_h}{\tau}\\ (n_l \neq 0 \vee n_h \le 0)}
+    { (\varphi,\heap,\emalloc{\omega}) \longrightarrow (\varphi,\heap',\ebounds)}
+
+    \inferrule[S-IfT]{n \neq 0 }
+    {(\varphi,\heap,\eif{\evalue{n}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
+
+    \inferrule[S-IfF]{}
+    {(\varphi,\heap,\eif{\evalue{0}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
+
+    \inferrule[S-Unchecked]{}
+    {(\varphi,\heap,\eunchecked{\evalue{n}{\tau}} \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+
+    \inferrule[S-Str]{
+        0 \in [n_l,n_h]
+\\ n_a \le n_h
+\\ \heap(n+n_a) = 0 
+\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
+    {(\varphi,\heap,\estrlen{\evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tint})}
+
+    \inferrule[S-StrBounds]{
+        0 \notin [n_l,n_h]
+}
+    {(\varphi,\heap,\estrlen{\evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+    \inferrule[S-StrNull]{}
+    {(\varphi,\heap,\estrlen{\evalue{0}{\tarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+    \inferrule[S-Add]{n = n_1 + n_2}
+    {(\varphi,\heap,\evalue{n_1}{\tint} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, n)}
+
+    \inferrule[S-AddArr]{n = n_1 + n_2\\ n_l' = n_l - n_2 \\ n_h' = n_h - n_2}
+    {(\varphi,\heap,\evalue{n_1}{\tallarrayptr{n_l}{n_h}{\tau}{m}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau}{m}})}
+
+n    \inferrule[S-AddArrNull]{}
+    {(\varphi,\heap,\evalue{0}{\tallarrayptr{n_l}{n_h}{\tau}{c}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \enull)}
+
+\end{mathpar}
+
+}
+\caption{Remaining \lang Semantics Rules (extends Fig.~\ref{fig:semantics})}
+\label{fig:rem-semantics}
+\end{figure*}
+
+Rule \textsc{S-Var} loads the value for $x$ in stack $\varphi$.
+Rule \textsc{S-DefArray} dereferences an array pointer, which is similar to the Rule \textsc{S-DefNTArray} in Fig.~\ref{fig:semantics} (dealing with null-terminated array pointers).
+The only difference is that the range of $0$ is at $[n_l,n_h)$ not $[n_l,n_h]$, meaning that one cannot dereference the upper-bound position in an array.
+Rules \textsc{DefArrayBound} and \textsc{DefNTArrayBound} describe an error case for a dereference operation.
+If we are dereferencing an array/NT-array pointer and the mode is $\cmode$, $0$ must be in the range from $n_l$ to $n_h$ (meaning that the dereference is in-bound); if not, the system results in a $\ebounds$ error. Obviously, the dereference of an array/NT-array pointer also experiences a $\enull$ state transition if $n\le 0$.
+
+Rules \textsc{S-Malloc} and \textsc{S-MallocBound} describe the $\emalloctext$ semantics. Given a valid type $\omega_a$ that contains no free variables, $\mathtt{alloc}$ function returns an address pointing at the first position of an allocated space whose size is equal to the size of $\omega_a$, and a new heap snapshot $\heap'$ that marks the allocated space for the new allocation. The $\emalloctext$ is transitioned to the address $n$ with the type ${\tptr{\omega_a}{\cmode}}$ and new updated heap. It is possible for $\emalloctext$ to transition to a $\ebounds$ error if the $\omega_a$ is an array/NT-array type $\tallarray{n_l}{n_h}{\tau}$, and either $n_l \neq 0$ or $n_h \le 0$. This can happen when the bound variable is evaluated to a bound constant that is not desired. 
+
+
+\subsection{Subtyping for dependent types}
+\label{app:le}
+  
+The subtyping relation given in Fig.~\ref{fig:checkc-subtype} involves
+dependent bounds, i.e., bounds that may refer to variables. To decide
+premises $b \leq b'$, we need a decision procedure that accounts for
+the possible values of these variables. This process considers
+$\Theta$, tracked by the typing judgment, and $\varphi$, the current
+stack snapshot (when performing subtyping as part of the type
+preservation proof).
+
+\begin{defi}[Inequality]
+
+\begin{itemize}
+
+\item $n \le m$ if $n$ is less than or equal to $m$.
+\item $x+n \le x + m$ if $n$ is less than or equal to $m$.
+\item All other cases result in $\efalse$.
+
+\end{itemize}
+\end{defi}
+
+To capture bound variables in dependent types, the \checkedc subtyping
+relation ($\sqsubseteq$) is parameterized by a restricted stack
+snapshot $\varphi|_{\rho}$ and the predicate map $\Theta$, where
+$\varphi$ is a stack and $\rho$ is a set of
+variables. $\varphi|_{\rho}$ means to restrict the domain of $\varphi$
+to the variable set $\rho$. Clearly, we have the relation:
+$\varphi|_{\rho} \subseteq \varphi$. $\sqsubseteq$
+being parameterized by $\varphi|_{\rho}$ refers to that when we
+compare two bounds $b \le b'$, we actually do
+$\varphi|_{\rho}(b) \le \varphi|_{\rho}(b')$ by interpreting the
+variables in $b$ and $b'$ with possible values in $\varphi|_{\rho}$.
+Let's define a subset relation $\preceq$ for two restricted stack
+snapshot $\varphi|_{\rho}$ and $\varphi'|_{\rho}$:
+
+\begin{defi}[Subset of Stack Snapshots]
+  Given two $\varphi|_{\rho}$ and $\varphi'|_{\rho}$,
+  $\varphi|_{\rho} \preceq \varphi'|_{\rho}$, iff for $x\in\rho$ and
+  $y$,
+  $(x,y) \in \varphi|_{\rho} \Rightarrow (x,y) \in \varphi'|_{\rho}$.
+\end{defi}
+
+For every two restricted stack snapshots $\varphi|_{\rho}$ and
+$\varphi'|_{\rho}$, such that
+$\varphi|_{\rho} \preceq \varphi'|_{\rho}$, we have the following
+theorem in \checkedc (proved in Coq):
+
+\begin{thm}[Stack Snapshot Theorem]
+  Given two types $\tau$ and $\tau'$, two restricted stack snapshots
+  $\varphi|_{\rho}$ and $\varphi'|_{\rho}$, if
+  $\varphi|_{\rho}\preceq \varphi'|_{\rho}$, and
+  $\tau \sqsubseteq \tau'$ under the parameterization of
+  $\varphi|_{\rho}$, then $\tau \sqsubseteq \tau'$ under the
+  parameterization of $\varphi'|_{\rho}$.
+\end{thm}
+
+Clearly, for every $\varphi|_{\rho}$, we have
+$\emptyset \preceq \varphi|_{\rho}$. The type checking stage is a
+compile-time process, so $\varphi|_{\rho}$
+is $\emptyset$ at the type checking stage. Stack snapshots are needed
+for proving type preserving, as variables in bounds expressions are
+evaluated away.
+
+
+\begin{figure}[h!]
+{\small
+  \begin{mathpar}
+    \inferrule[T-Def]
+              {\Gamma;\Theta \vdash_m e : \tptr{\tau}{m'} \\
+                m \leq m'}
+              {\Gamma;\Theta \vdash_m \estar{e} : \tau}
+
+    \inferrule[T-Mac]
+              {}
+              {\Gamma; \Theta \vdash_m \emalloc{\omega} : \tptr{\omega}{\cmode}}
+
+    \inferrule[T-Add]
+              {\Gamma; \Theta \vdash_m e_1 : \tint \\
+                \Gamma; \Theta \vdash_m e_2 : \tint}
+              {\Gamma; \Theta \vdash_m (e_1 \plus e_2) : \tint }
+
+    \inferrule[T-Ind] 
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'} \\
+                \Gamma; \Theta \vdash_m e_2 : \tint \\
+                m \leq m'}              
+              {\Gamma; \Theta \vdash_m \estar{(\ebinop{e_1}{e_2})} : \tau}
+
+    \inferrule[T-Assign]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tau}{m'} \\
+                \Gamma; \Theta \vdash_m e_2 : \tau' \\
+                \tau'\sqsubseteq \tau \\
+                m \leq m'}
+              {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}
+
+   \inferrule[T-IndAssign]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\
+                \Gamma; \Theta \vdash_m e_2 : \tint \\
+                \Gamma; \Theta \vdash_m e_3 : \tau' \\
+                \tau'\sqsubseteq \tau \\
+                m \leq m'}
+              {\Gamma; \defscope \vdash_m \eassign{(e_1 \plus e_2)}{e_3} : \tau}
+
+  \end{mathpar}
+}
+\caption{Remaining \lang Type Rules (extends Fig.~\ref{fig:type-system-1})}
+\label{fig:rem-type-system}
+\end{figure}
+
+As mentioned in the main text, $\sqsubseteq$ is also parameterized by
+$\Theta$, which provides the range of allowed values for a bound
+variable; thus, more $\sqsubseteq$ relation is provable. For example,
+in Fig.~\ref{fig:strcat-ex}, the \code{strlen} operation in line 4
+turns the type of \code{dst} to be $\tntarrayptr{0}{x}{\tint}{\cmode}$
+and extends the upper bound to \code{x}. In the \code{strlen} type
+rule, it also inserts a predicate \code{x}$\ge 0$ in $\Theta$; thus,
+the cast operation in line 16 is valid because
+$\tntarrayptr{0}{x}{\tint}{\cmode} \sqsubseteq
+\tntarrayptr{0}{0}{\tint}{\cmode}$ is provable when we know
+\code{x}$\ge 0$.
+
+
+Note that if $\varphi$ and $\Theta$ are $\emptyset$, we do only the
+syntactic $\le$ comparison; otherwise, we apply $\varphi$ to both
+sides of $\sqsubseteq$, and then determine the $\le$ comparasion based
+on a Boolean predicate decision procedure on top of $\Theta$. This
+process allows us to type check both an input expression and the
+intermediate expression after evaluating an expression. 
+
+\subsection{Other Type Rules}\label{rem-type}
+
+Here we show the type rules for other \checkedc operations in Fig.~\ref{fig:rem-type-system}.
+Rule \textsc{T-Def} is for dereferencing a non-array pointer. 
+The statement $m \leq m'$ ensures that no unchecked pointers are used in checked regions.
+Rule \textsc{T-Mac} deals with
+$\emalloctext$ operations. There is a well-formedness check to require
+that the possible bound variables in $\omega$ must be in the domain of
+$\Gamma$ (see Fig.~\ref{fig:wftypesandbounds}). This is similar to the well-formedness assumption of the type environment (Definition~\ref{type-wellformed}) Rule \textsc{T-Add} deals with binary operations whose sub-terms are integer expressions, while rule \textsc{T-Ind} serves the case for pointer arithmetic. For simplicity, in the \checkedc formalization, we do not allow arbitrary pointer arithmetic. The only pointer arithmetic operations allowed are the forms shown in rules \textsc{T-Ind} and \textsc{T-IndAssign} in Fig.~\ref{fig:rem-type-system}. Rule \textsc{T-Assign} assigns a value to a non-array pointer location. The predicate $\tau'\sqsubseteq \tau$ requires that the value being assigned is a subtype of the pointer type.
+The \textsc{T-IndAssign} rule is an extended assignment operation for handling assignments for array/NT-array pointers with pointer arithmetic. Rule \textsc{T-Unchecked} type checks \code{unchecked} blocks.
+
+\subsection{Struct Pointers}\label{appx:struct}
+
+\checkedc has \kw{struct} types and \kw{struct} pointers. Fig.~\ref{fig:checkc-struct} contains the syntax of \kw{struct} types as well as new subtyping relations built on the \kw{struct} values.
+For a \kw{struct} typed value, \checkedc has a special operation for it, which is $\eamper{e}{f}$. This operation indexes the $f$-th position \kw{struct}~$T$ item, if the expression $e$ is evaluated to a \kw{struct} pointer $\tptr{\tstruct{T}}{m}$. Rule \textsc{T-Struct} in Fig.~\ref{fig:checkc-struct} describes its typing behavior.
+Rules \textsc{S-StructChecked} and \textsc{S-StructUnChecked} describe the semantic behaviors of $\eamper{e}{f}$ on a given \kw{struct} \code{checked}/\code{unchecked} pointers, while rule \textsc{S-StructNull} describes a \code{checked} \kw{struct} null-pointer case.
+In our Coq/Redex formalization, we include the \kw{struct} values and the operation $\eamper{e}{f}$. We omit it in the main text due to the paper length limitation.
+
+\begin{figure}
+{\small
+$\begin{array}{l}
+\text{  Struct Syntax: }\\[0.5em]
+  \begin{array}{ll}
+ \mathtt{Type} & \tstruct{T}
+\\[0.2em]
+     \text{Structdefs} & D \; \in \; T \rightharpoonup fs \\[0.2em]
+      \text{Fields} & fs \; ::= \; \tau~\mathtt{f} \mid \tau~\mathtt{f}; fs 
+    \end{array}\\[2em]
+\text{  Struct Subtype: }\\[0.5em]
+\begin{array}{l}
+    D(T) = fs \wedge fs(0) = \tnat \Rightarrow  \tptr{\tstruct{T}}{m} \sqsubseteq \tptr{\tnat}{m}\\[0.5em]
+    D(T) = fs \wedge fs(0) = \tnat \wedge 0 \le b_l \wedge b_h \le 1 \\[0.2em]
+ \qquad\qquad \Rightarrow 
+       \tptr{\tstruct{T}}{m} \sqsubseteq \tarrayptr{b_l}{b_h}{\tnat}{m}
+    \end{array}
+\\[3em]
+\text{  Struct Type Rule: }\\[0.5em]
+    \end{array}
+$
+
+{
+\begin{mathpar}
+  \inferrule [T-Struct]
+  {\Gamma; \Theta \vdash_m e :  {\tptr{\tstruct{T}}{m}} \\
+    D(T) = fs \\ fs(f)=\tau_f}
+  {\Gamma; \Theta \vdash_m \eamper{e}{f} : \tptr{\tau_f}{m}}
+
+\end{mathpar}
+}
+{
+$\begin{array}{l}
+\text{Struct Semantics: }
+\end{array}
+$
+}
+{
+\begin{mathpar}
+  \inferrule [S-StructChecked]
+  {n > 0 \\ D(T) = fs \\ fs(f)=\tau_a \\ n_a=\mathtt{index}(fs,f)}
+  {(\varphi,\heap,\eamper{\evalue{n}{\tptr{\tstruct{T}}{\cmode}}}{f}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tptr{\tau_a}{\cmode}})}
+
+  \inferrule [S-StructNull]
+  {n = 0}
+  {(\varphi,\heap,\eamper{\evalue{n}{\tptr{\tstruct{T}}{\cmode}}}{f}) \longrightarrow (\varphi,\heap,\enull)}
+
+  \inferrule [S-StructUnChecked]
+  {D(T) = fs \\ fs(f)=\tau_a \\ n_a=\mathtt{index}(fs,f)}
+  {(\varphi,\heap,\eamper{\evalue{n}{\tptr{\tstruct{T}}{\umode}}}{f}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tptr{\tau_a}{\umode}})}
+
+\end{mathpar}
+}
+}
+  \caption{\lang Struct Definitions}
+  \label{fig:checkc-struct}
+\end{figure}
+
+\begin{figure}[t]
+{\small
+  \begin{mathpar}
+
+    \inferrule[]
+    {}
+    {\Gamma \vdash n}
+
+    \inferrule[]
+    {x:\tint \in \Gamma}
+    {\Gamma \vdash x + n}
+
+    \inferrule[]
+    {\Gamma \vdash b_l\\
+    \Gamma \vdash b_h}
+  {\Gamma \vdash (b_l,b_h)}
+
+  \inferrule[]
+  {}
+  {\Gamma \vdash \tint}
+
+  \inferrule[]
+  {\Gamma \vdash \bvar \\
+  \Gamma \vdash \tau}
+  {\Gamma \vdash \tptr{\tallarrayb{\bvar}{\tau}}{m}}
+
+  \inferrule[]
+  {\Gamma \vdash \tau}
+  {\Gamma \vdash \tptr{\tau}{m}}
+
+  \inferrule[]
+  {T \in D}
+  {\Gamma \vdash \tptr{\tstruct{T}}{m}}
+  \end{mathpar}
+}
+ \caption{Well-formedness for Types and Bounds}
+\label{fig:wftypesandbounds}
+\end{figure}
+
+
+% \inferrule[T-Fun]
+%     {\Xi(f) = \tau\;(\overline{x}:\overline{\tau})\;e \\\\
+%         \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
+%              \overline{\tau'} \sqsubseteq 
+%                \overline{\tau}[\overline{e} / \overline{x}]}
+%     {\Gamma; \Theta \vdash_m f(\overline{e}) : \tau[\overline{e} / \overline{x}]}
+
+
+\begin{figure}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[]
+    {\Gamma \vdash \overline{x}:\overline{\tau} \\
+      \Gamma[\overline{x} \mapsto \overline{\tau}] \vdash \tau \\
+    \Gamma[\overline{x} \mapsto \overline{\tau}]; \Theta  \vdash_{\cmode} e : \tau}
+    {\Gamma \vdash \tau\;(\overline{x}:\overline{\tau})\;e}
+
+    \inferrule[]
+    {}
+    {\Gamma \vdash \cdot}
+
+    \inferrule[]
+    {\Gamma \vdash \tau \\
+    \Gamma[x \mapsto \tau] \vdash \overline{x}:\overline{\tau}}
+    {\Gamma \vdash x:\tau, \overline{x}:\overline{\tau}}
+  \end{mathpar}
+}
+ \caption{Well-formedness for functions}
+\label{fig:wffunctions}
+\end{figure}
+
+
+\begin{figure}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[]
+    {\Gamma \vdash \tau}
+    {\Gamma \vdash \tau~\mathtt{f} }
+
+    \inferrule[]
+    {\Gamma \vdash \tau\\
+     \Gamma \vdash fs}
+    {\Gamma \vdash \tau~\mathtt{f}; fs }
+
+  \end{mathpar}
+}
+ \caption{Well-formedness for structs}
+\label{fig:wfstructs}
+
+{\small
+  \begin{mathpar}
+
+    \inferrule[]
+    {\Gamma[\overline{x} \mapsto \overline{\tau}]; \emptyset  \vdash
+      e \gg \dot e : \tau}
+    {\Gamma \vdash \tau\;(\overline{x}:\overline{\tau})\;e \gg
+      (\overline{x})\;\dot e}
+  \end{mathpar}
+}
+ \caption{Compilation Rules for Functions}
+\label{fig:compilefunctions}
+\end{figure}
+
+\subsection{The Compilation Rules}\label{appx:comp1}
+Fig.~\ref{fig:syntaxerased} and Fig.~\ref{fig:semanticserased} shows
+the syntax for $\elang$, the target language for compilation. We syntactically
+restrict the expressions to be in A-normal form to simplify the
+presentation of the compilation rules. In the Redex model, we
+occasionally break this constraint to speed up the performance of
+random testing by removing unnecessary let bindings.
+To allow explicit runtime
+checks, we include $\ebounds$ and $\enull$ as part of $\elang$
+expressions which, once evaluated, result in an corresponding error state. $\eassignstack{x}{\dot a}$ is a new syntactic form that
+modifies the stack variable $x$ with the result of $\dot a$. It is
+essential for bounds widening. $\leq$ and $-$ are introduced
+to operate on bounds and decide whether we need to halt with a bounds error
+or widen a null-terminated string.
+
+\begin{figure}[h]
+{\small
+  \[\begin{array}{llcl}
+      \text{Atoms}       & \dot a & ::= & n \mid x \\
+      
+      \text{C-Expressions} & \dot c & ::= & \dot a \mid \estrlen{\dot a}  \mid \emalloc {\dot  a}  \mid \ecall{f} {\overline{\dot a}}  \\
+                         & & \mid &  \mid  \dot a \circ \dot a \mid \estar{\dot a} \\
+                         & & \mid & \eassign{\dot a}{\dot a} \mid \eassignstack{x}{\dot a}  \mid \eif{\dot a}{\dot e}{\dot e} \\
+                         & & \mid & \ebounds \mid \enull \\
+      \text{Expressions}  & \dot e & ::= & \dot c \mid \elet{x}{\dot c}{\dot e}\\
+      \text{Binops} & \circ & ::= & + \mid - \mid \leq  \\
+      \text{Closure} & \dot C & ::= & \hole \mid \elet{x}{\dot a}{\dot C} \\
+       & & \mid & \eif{\dot a}{\dot e}{\dot C} \mid \eif{\dot a}{\dot    C}{\dot e} \\
+      \text{Bounds Map} & \rho & \in & \texttt{Var} \rightharpoonup \texttt{Var} \times \texttt{Var}
+  \end{array}
+  \]
+}
+  \caption{\elang{} Syntax}
+  \label{fig:syntaxerased}
+{\small
+  \[\begin{array}{lll}
+    \dot \mu & ::= & n \mid \bot \\
+    \dot c & ::= & \ldots  \mid \eret{x}{\dot \mu}{\dot e} \\
+    \dot H & \in & \mathbb{Z} \rightharpoonup \mathbb{Z} \\
+    \dot r & ::= & \dot e \mid \enull \mid \ebounds \\
+    \dot E & ::= & \hole \mid  \elet{x}{\dot E}{\dot e}  \mid \eret{x}{i}{\dot E} \\
+             & \mid & \eif{\dot E}{\dot e}{\dot e} \mid \estrlen{\dot E} \\
+             & \mid & \emalloc{\dot E} \mid \ecall{f}{\overline{\dot
+                      E}} \mid \dot E \circ \dot a \mid n \circ \dot E \\
+             & \mid & \estar{\dot E} \mid \eassign{\dot E}{\dot a}
+                      \mid \eassign{n}{\dot E} \mid
+                      \eassignstack{x}{\dot E} \\
+      \overline{\dot E } & ::= & \dot E \mid n,\overline{\dot E} \mid
+                                 \overline{\dot E}, \dot a
+                      
+  \end{array} \]
+}
+  \caption{\elang Semantic Defs}
+  \label{fig:semanticserased}
+\end{figure}
+
+
+$\elang$ does not include any annotations. We remove structs from
+$\elang$ because we can always statically convert expressions of the form
+$\eamper{n:\tau}{f}$ into $n + n_f$, where $n_f$ is the statically
+determined offset of $f$ within the struct. We ellide the semantics of
+$\elang$ because it is self-evident and mirrors the semantics
+$\lang$. The difference is that in $\elang$, only $\ebounds$ and
+$\enull$ can step into an error state. All failed dereferences and
+assignments would result in a stuck state and therefore we rely on the
+compiler to explicitly insert checks for checked pointers.
+
+
+Fig.~\ref{fig:compilation} and Fig.~\ref{fig:compilation2}
+ shows the rules for the compilation judgment for expressions,
+\[\Gamma;\rho \vdash e \gg \dot C, \dot a\]
+The judgment is presented differently from the one in
+Sec.~\ref{sec:compilation}, which was simplified for presentation purposes. First,
+we remove $\Theta$ and $m$ because these
+parameters are only used for checking and have no
+impact on compilation. Second, the judgment includes two
+outputs, a closure $\dot C$ and an atom expression $\dot a$, instead of
+a single $\elang$ expression $\dot e$. $\dot C$ can be intuitively understood as a
+partially constructed program or context. Whereas $\dot E$ is used for
+evaluation, $\dot C$
+is used purely as a device for compilation. As an example,
+when compiling $(1 : \tint) \plus (2 : \tint)$, 
+we would first create a fresh variable $x$, and then produce two outputs:
+\[    \dot C = \elet{x}{1 \plus 2}{\hole}\]
+\[    \dot a = x\]
+To obtain the compiled expression $\dot e$, we plug $\dot a$ into
+$\dot C$ using the usual notation $\dot C[\dot a]$. We can also use $\dot C$ to represent runtime checks, which
+usually take the form $\elet{x}{\dot c}{\hole}$, where $\dot c$
+contains the check whose evaluation must not trigger $\ebounds$ or $\enull$ for the program to
+continue (see Fig.~\ref{fig:compilationhelpers} for the metafunctions that create
+those checks). 
+
+This unconventional output format enables us to separate the
+evaluation of the term and the computation that relies on the term's
+evaluated result. Since effects and reduction (except for variables) happen only
+within closures, we can precisely control the order in which effects
+and evaluation happen by composing the contexts in a specific order.
+Given two closures $\dot C_1$
+and $\dot C_2$, we write $\dot C_1[\dot C_2]$ to denote the meta
+operation of plugging $\dot C_2$ into $\dot C_1$. We also use
+$\dot C_{a;b;c}$ as a shorthand for $\dot C_a[\dot C_b[\dot C_c]]$. In
+the \textsc{C-Ind} rule,
+we first evaluate the expressions that correspond to $e_1$ and $e_2$
+through $\dot C_1$ and $\dot C_2$, and then perform a null check and
+an addition through $\dot C_n$ and $\dot C_3$. Finally, we dereference
+the result through $\dot C_4$ before returning the pair $\dot C_4,\dot
+x_4$, propagating the flexibility to the compilation rule that recursively
+calls \textsc{C-Ind}.
+
+Fig.~\ref{fig:compilationhelpers} shows the metafunctions that create
+closures representing dynamic checks. These functions first examine
+whether the pointer is a checked. If the pointer is unchecked, an empty closure $\hole$
+will be returned, because there is no need to perform a check. For bounds
+checking, there is a special case for NT-array pointers, where the
+bounds are retrived from the \textcolor{purple}{shadow} variables (found by
+looking up $\rho$) on the stack  rather than
+using the bounds specified in the type annotation. This is how we
+achieve the same precise runtime behavior as $\lang$ in our compiled expressions.
+
+
+Fig.~\ref{fig:compilationhelpers2} shows the metafunctions related to
+bounds widening. $\vdash_{extend}$ takes $\rho$,
+a checked NT-array pointer variable $x$, and its bounds $(b_l,b_h)$ as inputs, and returns an
+extended $\rho'$ that maps $x$ to two fresh variables $x_l$, $x_h$,
+together with a closure $\dot C$ that initializes $x_l$ and $x_h$ to
+$b_l$ and $b_h$ respectively. This function is used in the
+\textsc{C-Let} rule to extend $\rho$ before compiling the body of the
+$\elettext$ binding. The updated $\rho'$ can be used for generating
+precise bounds checks, and for inserting expressions that can potentially
+widen the upper bounds, as seen in the $\vdash_{widenstr}$
+metafunction used in the \textsc{C-Str} compilation rule.
+
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[]
+    { x_l, x_h = \fresh \\
+      \rho' = \rho[x \mapsto (x_l, x_h)]\\
+    \dot C = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}}
+  {\cextend{\rho}{x}{\tntarrayptr{b_l}{b_h}{\tau}{c}}{\dot C, \rho'}\\}
+
+
+  \inferrule[]
+  {x_l,x_h = \rho(x) \\
+    x_w = \fresh \\
+  \dot C = \elet{x_w}{\eif{x_h}{0}{\eassignstack{x_h}{1}}}{\hole}}
+{\ewidenderef{\rho}{x}{\tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c}}{\dot C}}
+
+
+\inferrule[]
+{e \notin dom(\rho)}
+{\ewidenstrlen{\rho}{e}{\dot a}{\tptr{\tntarrayb{\bvar}{\tau}}{m}}{\hole}}
+
+\inferrule[]
+{x_l,x_h = \rho(e) \\
+  x_a = \fresh \\
+  \dot C = \elet{x_a}{\eif{\dot a \leq x_h}{0}{\eassignstack{x_h}{\dot a}}}{\hole}}
+{\ewidenstrlen{\rho}{e}{\dot a}{\tptr{\tntarrayb{\bvar}{\tau}}{\cmode}}{\dot C}}
+
+
+
+  \end{mathpar}
+
+}
+ \caption{Metafunctions for Widening}
+\label{fig:compilationhelpers2}
+\end{figure*}
+
+
+
+\begin{figure*}[h]
+{\small
+  \begin{mathpar}
+    \inferrule[]
+    {x = \fresh \\
+      \dot C = \elet{x}{\eif{\dot a}{0}{\enull}}{\hole}}
+    {\echecknull{\dot a}{c}{\dot C}}
+
+    \inferrule[]
+    {}
+    {\echecknull{\dot a}{u}{\hole}} \\
+
+    \inferrule[]
+    {}
+    {\echeckbounds{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{u}}{\dot a}{\hole}} 
+
+    \inferrule[]
+    { x_l,x_h = \rho(e) \\
+      x_{cl},x_{ch} = \fresh\\
+      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
+      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
+    }
+    {\echeckbounds{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{c}}{\dot a}{\dot C_{cl;ch}}}
+
+    \inferrule[]
+    { e \notin dom(\rho) \\
+      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
+      \dot C_l = \elet{x_l}{b_l}{\hole}\\
+      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
+      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
+      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
+    }
+    {\echeckbounds{\rho}{e}{\tntarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
+
+    \inferrule[]
+    { e \notin dom(\rho) \\
+      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
+      \dot C_l = \elet{x_l}{b_l}{\hole}\\
+      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
+      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
+      \dot C_{ch} = \elet{x_{ch}}{\eif{x_h \leq \dot a}{\ebounds}{0}}{\hole}
+    }
+    {\echeckbounds{\rho}{e}{\tarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
+
+
+    \inferrule[]
+    {}
+    {\echeckboundsw{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{u}}{\dot a}{\hole}} 
+
+    \inferrule[]
+    { x_l,x_h = \rho(e) \\
+      x_{cl},x_{ch} = \fresh\\
+      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
+      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
+    }
+    {\echeckboundsw{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{c}}{\dot a}{\dot C_{cl;ch}}}
+
+
+    \inferrule[]
+    { e \notin dom(\rho) \\
+      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
+      \dot C_l = \elet{x_l}{b_l}{\hole}\\
+      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
+      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
+      \dot C_{ch} = \elet{x_{ch}}{\eif{x_h \leq \dot a}{\ebounds}{0}}{\hole}
+    }
+    {\echeckboundsw{\rho}{e}{\tallarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
+
+\inferrule[]
+{e \notin dom(\rho) \\
+  x_l,x_l',x_h,x_h' = \fresh \\
+  \dot C_1 = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}\\
+  \dot C_2 = \elet{x_l'}{b_l'}{\elet{x_h'}{b_h'}{\hole}}\\
+  \dot C_3 = \eif{x_l' \leq x_l}{\hole}{\ebounds} \\
+  \dot C_4 = \eif{x_h \leq x_h'}{\hole}{\ebounds}
+}
+{\echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{(b_l,b_h)}{\tau}}{m}}{\tptr{\tallarrayb{(b_l',b_h')}{\tau}}{m}}{\dot C_{1;2;3;4}}}
+
+\inferrule[]
+{x_l',x_h' =\rho(e) \\
+  x_l,x_h = \fresh \\
+  \dot C_1 = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}\\
+  \dot C_2 = \eif{x_l' \leq x_l}{\hole}{\ebounds} \\
+  \dot C_3 = \eif{x_h \leq x_h'}{\hole}{\ebounds}
+}
+{\echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{(b_l,b_h)}{\tau}}{m}}{\tptr{\tallarrayb{(b_l',b_h')}{\tau}}{m}}{\dot C_{1;2;3}}}
+  \end{mathpar}
+}
+\caption{Metafunctions for Dynamic Checks}
+\label{fig:compilationhelpers}
+\end{figure*}
+
+% the closure $\dot
+% C_{1;2;n;3;b;4}$ encodes the idea that $e_1$ and $e_2$ are evaluated to values
+% before a null check (included in $\dot C_n$) is performed on
+% $\dot a_1$ , the result of evaluating $e_1$. $\dot C_3$ adds $\dot
+% a_1$ and $\dot a_2$ before a bounds check (included in $\dot C_b$) is performed on $\dot a_1$
+% with $\dot a_2$ as the index. Finally, we use $\dot C_4$ 
+% to store the result of the dereference in $x_4$ and return the pair
+% $\dot C_4,x_4$ as the result of the compilation. 
+% Further checks and
+% widening can be performed using $x_4$ and we don't have to worry about
+% the effects being triggered multiple times because the evaluation only
+% happens once in $\dot C_4$.
+
+
+% insert runtime checks and bounds widening
+% code in a straightforward way. Take the \textbf{C-Deref} rule as an example,
+% if we were to output $\dot e$ directly, we would have to rebind the
+% expression to a variable before we can perform the null check and
+% bounds check since $\dot e$ is not always a pure expression. Adding
+% $\elettext$ bindings in such an ad-hoc fashion for avoiding side
+% effects can clutter the compilation rules. Our approach of
+% outputting a context and an atom threads the ANF transformation into
+% each individual rule. Fig.~\ref{fig:compilationhelpers} shows helper
+% functions that take atom expressions and return a context that
+% contains the checks. The advantage of using explicit contexts becomes
+% evident when we start to compose them. For the simulation property to
+% hold, we want to ensure that the effects happen in the exact same
+% order.  In
+% the C-Deref rule, we first evaluate the expression that corresponds to
+% $e$ through $\dot C_1$, and then perform a bounds check followed by a
+% null check through $\dot C_b$ and $\dot C_n$. Finally, we dereference
+% the expression through $\dot C_2$, potentially widen the upper bound
+% by checking the dereferenced
+% result.
+
+
+% One big difference is that
+% our compilation strategy is not parameterized by the heap. Given a
+% literal annotated with a type, the compilation judgment simply
+% discards the type without validating whether the literal's type is
+% valid. This kind of relaxation not only makes the compilation rules
+% simpler (we no longer need to keep track of $\defscope$ and the mode),
+% but also allows us to formulate a stronger simulation theorem that
+% applies even after the program state is corrupted. More concretely,
+% the compilation judgment satisfies preservation regardless of whether
+% an unchecked step is being taken. On the other hand, if we were to
+% embed the compilation into the full-fledged typechecking rules, we
+% would not always be able to compile the expression after a step has
+% been taken.
+
+% When our source
+% program is stuck because of the execution of unchecked code, we can
+% conclude that the compiled program will also get stuck with the
+% same erased heap state. It is possible to embed our compilation
+% strategy directly into the typing judgment, but our simulation would
+% be limited to states that are not yet corrupted to be untypable.
+
+
+% Since the erased language does not have type annotations, we need
+% to explicitly represent bounds of null-terminated arrays as stack
+% variables to support bounds widening at runtime. Every time a checked
+% null-terminated array pointer is bound to a variable, we generate two
+% fresh new variables that are assigned the lower and upper bounds of
+% the array. The upper bound can be mutated into
+% a larger bound during execution. We use $\rho$ to keep track of the
+% bounds variables that belong to null-terminated array variables.
+
+
+% The compilation judgment does not produce expressions
+% directly. Instead, it outputs a tuple of a context $\dot C$ and an atom
+% expression $\dot a$ such that $\dot C[\dot a]$ corresponds to the
+% compiled target expression. In the case where the atom is a variable, $\dot
+% C$ will contain a let binding that defines the variable. This unconventional
+% output format enables us to insert runtime checks and bounds widening
+% code in a straightforward way. Take the C-Deref rule as an example,
+% if we were to output $\dot e$ directly, we would have to bind the
+% expression to a variable before we can perform the null check and
+% bounds check since $\dot e$ is not always a pure expression. Adding
+% $\kw{let}$ bindings in such an ad-hoc fashion for avoiding side
+% effects can clutter the compilation rules. Our approach of
+% outputting a context and an atom threads the ANF transformation into
+% each individual rule. Fig.~\ref{fig:compilationhelpers} shows helper
+% functions that take atom expressions and return a context that
+% contains the checks. The advantage of using explicit contexts becomes
+% evident when we start to compose them. For the simulation property to
+% hold, we want to ensure that the effects happen in the exact same
+% order. Since effects and reduction (except for variables?) happen only
+% within contexts, we can precisely control the order in which effects
+% and evaluation happen by composing the contexts in a specific order. In
+% the C-Deref rule, we first evaluate the expression that corresponds to
+% $e$ through $\dot C_1$, and then perform a bounds check followed by a
+% null check through $\dot C_b$ and $\dot C_n$. Finally, we dereference
+% the expression through $\dot C_2$, potentially widen the upper bound
+% by checking the dereferenced
+% result.
+
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+
+    \inferrule[C-Const]
+      {}
+      {\Gamma;\rho\vdash \evalue{n}{\tau} \gg \hole, n : \tau}
+
+
+    \inferrule[C-Var]
+      {x : \tau \in \Gamma}
+      {\Gamma;\rho \vdash x \gg \hole, x : \tau}
+
+      
+    \inferrule[C-Cast]
+              {\Gamma;\rho \vdash e \gg  \dot C , \dot a : \tau'}
+              {\Gamma;\rho \vdash \ecast{\tau}{e} \gg \dot C, \dot a  : \tau}
+
+      \inferrule[C-DynCast]
+      {\Gamma;\rho \vdash e \gg \dot C_1, \dot a : \tptr{\tallarrayb{\bvar'}{\tau}}{m} \\
+      \echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\tptr{\tallarrayb{\bvar'}{\tau}}{m}}{\dot C_{b}}}
+      {\Gamma;\rho \vdash \edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{e}
+            \gg \dot C_{1;b}, \dot a : \tptr{\tallarrayb{\bvar}{\tau}}{m}}
+
+
+      \inferrule[C-Str]
+      {\Gamma; \rho \vdash e \gg \dot C_1, \dot a_1 :  \tptr{\tntarrayb{\bvar}{\tau_a}}{m} \\
+        \echecknull{\dot a_1}{m}{\dot C_{n}} \\
+        \echeckbounds{\rho}{\dot a_1}{\tptr{\tntarrayb{\bvar}{\tau_a}}{m}}{0}{\dot C_{b}} \\
+        x_2 = \fresh \\
+          \dot C_2 = \elet{x_2}{\estrlen{\dot a_1}}{\hole} \\
+      \ewidenstrlen{\rho}{e}{\dot a_1}{\tptr{\tntarrayb{\bvar}{\tau_a}}{m}}{\dot C_{w}} } 
+                {\Gamma;\rho \vdash \estrlen{e} \gg \dot C_{1;n;b;2;w}, x_2 : \tint}
+
+
+      \inferrule[C-LetStr]
+      {\Gamma(y) = \tntarrayptr{b_l}{b_h}{\tau_a}{\cmode} \\ x \not\in \fv(\tau) \\
+        \Gamma; \rho \vdash \estrlen{y} \gg \dot C_1, \dot a_1 : \tint\\
+        \dot C_2 = \elet{x}{\dot a_1}{\hole} \\
+        \Gamma[x\mapsto \tint,y\mapsto [\tntarrayptr{b_l}{x}{\tau_a}{\cmode}]];\rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau}
+      %   x_3 = \fresh \\
+      %   \dot C_3 = \elet{x_3}{\dot a_2}{\hole}}
+                {\Gamma;\rho \vdash \elet{x}{\estrlen{y}}{e} \gg \dot C_{1;2;3},\dot a_3 : \tau}
+
+
+      \inferrule[C-If ]
+      {\Gamma; \rho \vdash e \gg \dot C_1, \dot a_1 : \tau \\
+        \Gamma; \rho \vdash e_1 \gg \dot C_2, \dot a_2 : \tau_2 \\
+        \Gamma; \rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau_3 \\
+        x_4 = \fresh \\
+        \dot C_4 = \elet{x_4}{\eif{\dot a_1}{\dot C_2[\dot a_2]}{\dot C_3[\dot a_3]}}{\hole}
+      }
+        {\Gamma; \rho \vdash \eif{e_1}{e_2}{e_3} \gg \dot C_{1;4}, x_4 : \tau_2 \sqcup \tau_3}
+
+
+
+        \inferrule[C-IfNT]
+        {\Gamma; \rho \vdash x : \tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c} \\
+          b_h = 0 \Rightarrow \Gamma' = \Gamma[x \mapsto \tptr{\tntarrayb{(b_l,1)}{\tau}}{c}] \\
+          b_h \neq 0 \Rightarrow \Gamma' = \Gamma \\
+          \Gamma; \rho \vdash \estar{x} \gg \dot C_1, \dot a_1 : \tau_1\\
+          \Gamma'; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau_2\\
+          \Gamma;\rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau_3 \\
+        \ewidenderef{\rho}{x}{\tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c}}{\dot C_{w}} \\
+        x_4 = \fresh \\
+        \dot C_4 = \elet{x_4}{\eif{\dot a_1}{\dot C_{2;w}[\dot a_2]}{\dot C_3[\dot a_3]}}{\hole}}
+        {\Gamma;\rho \vdash \eif{\estar{x}}{e_1}{e_2} \gg \dot C_{1;4}, x_4 : \tau_1 \sqcup \tau_2}
+
+   \inferrule[C-Let]
+    { (x\in \fv(\tau') \Rightarrow e_1 \in Bound) \\
+        \Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tau_1 \\ 
+        \cextend{\rho}{x}{\tau_1}{\dot C_2,\rho'}\\
+        \dot C_3 = \elet{x}{\dot a_1}{\hole}\\
+        \Gamma[x\mapsto \tau];\rho' \vdash e_4 \gg \dot C_4, \dot a_4  : \tau_4}
+    {\Gamma;\rho' \vdash \elet{x}{e_1}{e_4} \gg \dot C_{1;2;3;4},\dot a_4 : \tau_4[\tau_1 = \tint \Rightarrow x \mapsto e_1]}
+
+
+  \inferrule[C-Ret]
+    {\Gamma(x)\neq \bot \\
+      \Gamma;\rho \vdash e \gg \dot C_1, \dot a_1 : \tau \\
+      x_2 = \fresh \\
+      \mu \gg \dot \mu \\
+    \dot C_2 = \elet{x_2}{\eret{x}{\dot \mu}{\dot C_1[\dot a_1]}}{\hole}}
+  {\Gamma;\rho \vdash \eret{x}{\mu}{e} \gg \dot C_2, x_2 : \tau}
+
+
+    \inferrule[C-Fun]
+    {\Xi(f) = \tau\;(\overline{x}:\overline{\tau})\;e \\
+      % \dot \Xi(f) = (\overline{x})\; \dot C_f; \dot a_f \\
+      (\forall e_i\in\overline{e}\;\;\tau_i\in\overline{\tau}\;.\; \Gamma; \rho \vdash {e_i} \gg \dot C_i, \dot a_i  : \\ \tau_i' \wedge
+      \tau_i' \sqsubseteq 
+      \tau_i[\overline{e} / \overline{x}]%  \\
+      ) \\
+      x_f = \fresh \\
+      \dot C_f = \elet{x_f}{f(\overline{a})}{\hole}}
+    {\Gamma; \rho \vdash f(\overline{e}) \gg \overline{\dot C}[\dot C_f] , x_f  : \tau[\overline{e} / \overline{x}]}
+
+
+  \inferrule[C-Def]
+  {\Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tau}{m} \\
+    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+    x_2 = \fresh \\
+    \dot C_2 = \elet{x_2}{\estar{\dot a_1}}{\hole}
+   }
+   {\Gamma;\rho \vdash \estar{e_1} \gg \dot C_{1;n;2}, x_2 : \tau}
+
+   \inferrule[C-DefArr]
+   {\Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tallarrayptr{b_l}{b_h}{\tau}{m} \\
+    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+    \echeckbounds{\rho}{e_1}{\tallarrayptr{b_l}{b_h}{\tau}{m}}{0}{\dot C_{b}}\\
+    x_2 = \fresh \\
+    \dot C_2 = \elet{x_2}{\estar{\dot a_1}}{\hole}}
+   {\Gamma;\rho \vdash \estar{e_1} \gg \dot C_{1;n;b;2},x_2 : \tau} 
+
+
+    \inferrule[C-Mac]
+    {\dot C_{1}, \dot a_1 = \esizeof{\omega} \\
+      x_2 = \fresh \\
+    \dot C_2 = \elet{x_2}{\emalloc{\dot a_1}}{\hole}}
+     {\Gamma; \rho \vdash \emalloc{\omega} \gg \dot C_{1;2}, x_2 : \tptr{\omega}{\cmode}}
+
+  \end{mathpar}
+}
+\caption{Compilation}
+\label{fig:compilation}
+\end{figure*}
+
+
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[C-Add]
+              {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tint \\
+                \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint\\
+                x_3 = \fresh \\
+              \dot C_3 = \elet{x_3}{\dot a_1 \plus \dot a_2}{\hole}}
+              {\Gamma; \rho \vdash \dot C_3, x_3 : \tint }
+
+   \inferrule[C-Ind] 
+              {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m} \\
+                \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint \\
+                \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+                \echeckbounds{\rho}{e_1}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\dot a_2}{\dot C_{b}} \\
+                x_3, x_4 = \fresh\\
+                \dot C_3 = \elet{x_3}{\dot a_1 \plus \dot a_2}{\hole}\\
+                \dot C_4 = \elet{x_4}{\estar{x_3}}{\hole}
+                }
+                {\Gamma; \rho \vdash \estar{(\ebinop{e_1}{e_2})} \gg \dot C_{1;2;n;3;b;4} , x_4: \tau}
+
+
+
+
+  \inferrule[C-Assign]
+  {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tau}{m'} \\
+    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+    \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau' \\
+    \tau'\sqsubseteq \tau \\
+    x_3 = \fresh \\
+    \dot C_3 = \elet{x_3}{\eassign{\dot a_1}{\dot a_2}}{\hole} \\
+  }
+  {\Gamma; \rho \vdash \eassign{e_1}{e_2} \gg \dot C_{1;2;n;3}, x_3 : \tau}
+
+
+
+  \inferrule[C-AssignArr]
+  {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\
+    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+    \echeckboundsw{\rho}{e_1}{\tallarrayptr{b_l}{b_h}{\tau}{m}}{0}{\dot C_{b}}\\
+    \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau' \\
+    x_3 = \fresh \\
+    \dot C_3 = \elet{x_3}{\eassign{\dot a_1}{\dot a_2}}{\hole} \\
+    \tau'\sqsubseteq \tau}
+  {\Gamma; \rho \vdash \eassign{e_1}{e_2} \gg \dot C_{1;2;n;b;3},x_3 : \tau}
+
+
+
+
+    \inferrule[C-IndAssign]
+    {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m} \\
+      \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint \\
+      \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+      \echeckboundsw{\rho}{e_1}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\dot a_2}{\dot C_{b}} \\
+      \Gamma; \rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau' \\
+      x_4, x_5 = \fresh \\
+      \dot C_4 = \elet{x_4}{\dot a_1 \plus \dot a_2}{\hole}\\
+      \dot C_5 = \elet{x_5}{\eassign{x_4}{x_3}{\hole}}
+      \tau'\sqsubseteq \tau}
+    {\Gamma; \rho \vdash \eassign{(e_1 \plus e_2)}{e_3} \gg \dot C_{1;2;n;3;4;b;5} : \tau}
+
+
+    \inferrule [C-Struct]
+    {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1  :  {\tptr{\tstruct{T}}{m}} \\
+      D(T) = \tau_0~f_0\ldots; \tau_j~f; ...  \\
+      \echecknull{\dot a_1}{m}{\dot C_{n}}\\
+      x_2 = \fresh\\
+    \dot C_2 = \elet{x_2}{\dot a_1 \plus \dot j}{\hole}}
+    {\Gamma; \rho \vdash \eamper{e_1}{f} \gg \dot C_2, x_2  : \tptr{\tau_f}{m}}
+
+    \inferrule[C-Unchecked]
+              {\Gamma;\rho \vdash e \gg \dot C, \dot a : \tau}
+              {\Gamma;\rho \vdash \eunchecked{e} \gg \dot C, \dot a : \tau}
+
+  \end{mathpar}
+    % \begin{prooftree}
+    %   \hypo{
+    %     \Gamma; \rho \vdash_u e \gg \dot C, a : \tau
+    %   }
+    %   \infer1[C-Unchecked]{\Gamma; \rho \vdash \eunchecked{e} \gg \dot C, a : \tau}
+    % \end{prooftree}\\\\
+
+    % \begin{prooftree}
+    %   \hypo{
+    %     \begin{matrix}
+    %         \Gamma; \rho \vdash e \gg \dot C_1, a_1 :  {\tptr[m]{\tstruct{T}}} \\
+    %         % \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
+    %         D(T) = \tau_0\ldots; \tau_j~f; ...\\
+    %         x_2 = \fresh \\
+    %         \dot C_2 = \elet{x_2}{a_1 + j}{\hole} \\
+    %         \echecknull{a_1}{m}{\dot C_{null}}
+    %     \end{matrix}
+    %   }
+    %   \infer1[C-Amper]{\Gamma; \rho \vdash \eamper{e}{f} \gg \dot C_{1;null;2}, x_2  : \tptr[m]{\tau_f}}
+    % \end{prooftree} \\ \\
+
+    % \begin{prooftree}
+    %   \hypo{
+    %     \begin{matrix}
+    %       \Gamma; \rho \vdash e_1 \gg \dot C_1, a_1 : \tptr[m']{\omega} \\
+    %       \Gamma; \rho \vdash e_2 \gg \dot C_2, a_2 : \tau \\
+    %       m' = u \Rightarrow m = u \\
+    %       \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}\\
+    %       \echecknull{a_1}{m}{\dot C_{n}} \\
+    %       % \echeckbounds{\rho}{a_1}{\tptr[m]{(\tntarray{le}{he}{\tau})}}{\dot C_{b}} \\
+    %       x_3 = \fresh\\
+    %       \dot C_3 = \elet{x_3}{\eassign{a_1}{a_2}}{\hole} \\
+    %     \end{matrix}
+    %   }
+    %   \infer1[C-Assign]{\Gamma; \rho \vdash \dot C_{1;b;n;2;3}, x_3 : \tau}
+    % \end{prooftree}\\\\
+
+
+    % \begin{prooftree}
+    %   \hypo{
+    %     \begin{matrix}
+    %       \Gamma; \rho \vdash e_1 : \tptr[m']{\omega} \\
+    %       \Gamma; \rho \vdash e_2 : \tint \\
+    %       \Gamma; \rho \vdash e_3 : \tau \\
+    %       m' = u \Rightarrow m = u \\
+    %       \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
+    %     \end{matrix}
+    %   }
+    %   \infer1[C-IndAssign]{\Gamma; \rho \vdash \eassign{(e_1 + e_2)}{e_3} : \tau}
+    % \end{prooftree}
+}
+\caption{Compilation (Continued)}
+\label{fig:compilation2}
+\end{figure*} 
+
+
+

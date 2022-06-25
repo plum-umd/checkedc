@@ -2403,6 +2403,8 @@ Definition good_lit (H:heap) (n:Z) (t:type):=
 Definition well_bound_vars_type (l:list var) (t:type) :=
    forall x, In x (freeTypeVars t) -> In x l.
 
+Definition eq_subtype_core (D: structdef) (Q:theta) (t1 t3:type) := (exists t2, type_eq Q t1 t2 /\ subtype_core D Q t2 t3).
+
 Definition eq_subtype (D: structdef) (Q:theta) (t1 t3:type) := (exists t2, type_eq Q t1 t2 /\ subtype D Q t2 t3).
 
 Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (S:stack) (R : real_heap)

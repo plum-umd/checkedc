@@ -1,0 +1,253 @@
+\begin{thebibliography}{29}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Blazy and Leroy(2009)]{Blazy2009}
+Sandrine Blazy and Xavier Leroy.
+\newblock {Mechanized Semantics for the Clight Subset of the C Language}.
+\newblock \emph{Journal of Automated Reasoning}, 43\penalty0 (3):\penalty0
+  263--288, 2009.
+\newblock ISSN 1573-0670.
+\newblock \doi{10.1007/s10817-009-9148-3}.
+\newblock URL \url{http://dx.doi.org/10.1007/s10817-009-9148-3}.
+
+\bibitem[Condit et~al.(2007)Condit, Harren, Anderson, Gay, and
+  Necula]{Condit2007}
+Jeremy Condit, Matthew Harren, Zachary Anderson, David Gay, and George~C.
+  Necula.
+\newblock {Dependent Types for Low-Level Programming}.
+\newblock In \emph{Proceedings of European Symposium on Programming (ESOP
+  '07)}, 2007.
+
+\bibitem[Duan et~al.(2020)Duan, Yang, Zhou, and Criswell]{duanrefactoring}
+Junhan Duan, Yudi Yang, Jie Zhou, and John Criswell.
+\newblock {Refactoring the FreeBSD Kernel with Checked C}.
+\newblock In \emph{IEEE Cybersecurity Development Conference (SecDev)},
+  September 2020.
+
+\bibitem[Elliott et~al.(2018)Elliott, Ruef, Hicks, and Tarditi]{Elliott2018}
+Archibald~Samuel Elliott, Andrew Ruef, Michael Hicks, and David Tarditi.
+\newblock {Checked C: Making C Safe by Extension}.
+\newblock In \emph{2018 IEEE Cybersecurity Development (SecDev)}, pages 53--60,
+  2018.
+\newblock \doi{10.1109/SecDev.2018.00015}.
+
+\bibitem[Ellison and Rosu(2012)]{ellison-rosu-2012-popl}
+Chucky Ellison and Grigore Rosu.
+\newblock {An Executable Formal Semantics of C with Applications}.
+\newblock In \emph{Proceedings of the 39th Annual ACM SIGPLAN-SIGACT Symposium
+  on Principles of Programming Languages}, POPL '12, pages 533--544, New York,
+  NY, USA, 2012. ACM.
+\newblock ISBN 978-1-4503-1083-3.
+\newblock \doi{10.1145/2103656.2103719}.
+\newblock URL \url{http://doi.acm.org/10.1145/2103656.2103719}.
+
+\bibitem[Felleisen et~al.(2009)Felleisen, Findler, and Flatt]{pltredex}
+Matthias Felleisen, Robert~Bruce Findler, and Matthew Flatt.
+\newblock \emph{{Semantics Engineering with PLT Redex}}.
+\newblock The MIT Press, 1st edition, 2009.
+\newblock ISBN 0262062755.
+
+\bibitem[Grossman et~al.(2002)Grossman, Morrisett, Jim, Hicks, Wang, and
+  Cheney]{GrossmanMJHWC02}
+Dan Grossman, Greg Morrisett, Trevor Jim, Michael Hicks, Yanling Wang, and
+  James Cheney.
+\newblock {Region-based Memory Management in {C}yclone}.
+\newblock In \emph{PLDI}, 2002.
+
+\bibitem[Guha et~al.(2010)Guha, Saftoiu, and Krishnamurthi]{lambdajs}
+Arjun Guha, Claudiu Saftoiu, and Shriram Krishnamurthi.
+\newblock {The Essence of Javascript}.
+\newblock In \emph{Proceedings of the 24th European Conference on
+  Object-Oriented Programming}, ECOOP'10, page 126–150, Berlin, Heidelberg,
+  2010. Springer-Verlag.
+\newblock ISBN 3642141064.
+
+\bibitem[Hathhorn et~al.(2015)Hathhorn, Ellison, and
+  Ro\c{s}u]{10.1145/2813885.2737979}
+Chris Hathhorn, Chucky Ellison, and Grigore Ro\c{s}u.
+\newblock {Defining the Undefinedness of C}.
+\newblock \emph{SIGPLAN Not.}, 50\penalty0 (6):\penalty0 336–345, June 2015.
+\newblock ISSN 0362-1340.
+\newblock \doi{10.1145/2813885.2737979}.
+\newblock URL \url{https://doi.org/10.1145/2813885.2737979}.
+
+\bibitem[Jim et~al.(2002)Jim, Morrisett, Grossman, Hicks, Cheney, , and
+  Wang]{Jim2002}
+Trevor Jim, Greg Morrisett, Dan Grossman, Michael Hicks, James Cheney, , and
+  Yanling Wang.
+\newblock {Cyclone: A Safe Dialect of {C}}.
+\newblock In \emph{USENIX Annual Technical Conference}, pages 275--288,
+  Monterey, CA, 2002. {USENIX}.
+
+\bibitem[Kang et~al.(2015)Kang, Hur, Mansky, Garbuzov, Zdancewic, and
+  Vafeiadis]{Kang:2015:FCM:2813885.2738005}
+Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic,
+  and Viktor Vafeiadis.
+\newblock {A Formal C Memory Model Supporting Integer-pointer Casts}.
+\newblock \emph{SIGPLAN Not.}, 50\penalty0 (6):\penalty0 326--335, June 2015.
+\newblock ISSN 0362-1340.
+\newblock \doi{10.1145/2813885.2738005}.
+\newblock URL \url{http://doi.acm.org/10.1145/2813885.2738005}.
+
+\bibitem[Lampropoulos and Pierce(2018)]{Pierce:SF4}
+Leonidas Lampropoulos and Benjamin~C. Pierce.
+\newblock \emph{{QuickChick}: Property-Based Testing in Coq}.
+\newblock Software Foundations series, volume 4. Electronic textbook, August
+  2018.
+\newblock Version 1.0. \url{http://www.cis.upenn.edu/~bcpierce/sf}.
+
+\bibitem[Leroy(2009)]{compcert}
+Xavier Leroy.
+\newblock Formal verification of a realistic compiler.
+\newblock \emph{Communications of the ACM}, 52\penalty0 (7):\penalty0 107--115,
+  July 2009.
+\newblock ISSN 0001-0782.
+\newblock \doi{10/c9sb7q}.
+\newblock URL \url{http://doi.acm.org/10.1145/1538788.1538814}.
+
+\bibitem[Leroy et~al.(2012)Leroy, Appel, Blazy, and
+  Stewart]{leroy:hal-00703441}
+Xavier Leroy, Andrew~W. Appel, Sandrine Blazy, and Gordon Stewart.
+\newblock {The CompCert Memory Model, Version 2}.
+\newblock Research Report RR-7987, {INRIA}, June 2012.
+\newblock URL \url{https://hal.inria.fr/hal-00703441}.
+
+\bibitem[Li et~al.(2022)Li, Liu, Postol, Lampropoulos, Horn, and
+  Hicks]{checkedc-tech-report}
+Liyi Li, Yiyun Liu, Deena Postol, Leonidas Lampropoulos, David~Van Horn, and
+  Michael Hicks.
+\newblock {A Formal Model of Checked C} (extended version).
+\newblock \url{https://arxiv.org/abs/2201.13394}, 2022.
+
+\bibitem[Memarian et~al.(2016)Memarian, Matthiesen, Lingard, Nienhuis,
+  Chisnall, Watson, and Sewell]{10.1145/2980983.2908081}
+Kayvan Memarian, Justus Matthiesen, James Lingard, Kyndylan Nienhuis, David
+  Chisnall, Robert N.~M. Watson, and Peter Sewell.
+\newblock {Into the Depths of C: Elaborating the de Facto Standards}.
+\newblock \emph{SIGPLAN Not.}, 51\penalty0 (6):\penalty0 1–15, June 2016.
+\newblock ISSN 0362-1340.
+\newblock \doi{10.1145/2980983.2908081}.
+\newblock URL \url{https://doi.org/10.1145/2980983.2908081}.
+
+\bibitem[Memarian et~al.(2019)Memarian, Gomes, Davis, Kell, Richardson, Watson,
+  and Sewell]{Memarian:2019:ECS:3302515.3290380}
+Kayvan Memarian, Victor B.~F. Gomes, Brooks Davis, Stephen Kell, Alexander
+  Richardson, Robert N.~M. Watson, and Peter Sewell.
+\newblock {Exploring C Semantics and Pointer Provenance}.
+\newblock \emph{Proc. ACM Program. Lang.}, 3\penalty0 (POPL):\penalty0
+  67:1--67:32, January 2019.
+\newblock ISSN 2475-1421.
+\newblock \doi{10.1145/3290380}.
+\newblock URL \url{http://doi.acm.org/10.1145/3290380}.
+
+\bibitem[Merigoux et~al.(2021)Merigoux, Chataing, and
+  Protzenko]{merigoux2021catala}
+Denis Merigoux, Nicolas Chataing, and Jonathan Protzenko.
+\newblock {Catala: A Programming Language for the Law}.
+\newblock \emph{arXiv preprint arXiv:2103.03198}, 2021.
+
+\bibitem[Nagarakatte et~al.(2009)Nagarakatte, Zhao, Martin, and
+  Zdancewic]{softbound}
+Santosh Nagarakatte, Jianzhou Zhao, Milo~M.K. Martin, and Steve Zdancewic.
+\newblock {SoftBound: Highly Compatible and Complete Spatial Memory Safety for
+  C}.
+\newblock In \emph{Proceedings of the 30th ACM SIGPLAN Conference on
+  Programming Language Design and Implementation}, PLDI '09, page 245–258,
+  New York, NY, USA, 2009. Association for Computing Machinery.
+\newblock ISBN 9781605583921.
+\newblock \doi{10.1145/1542476.1542504}.
+\newblock URL \url{https://doi.org/10.1145/1542476.1542504}.
+
+\bibitem[{Necula} et~al.(2005){Necula}, Condit, Harren, McPeak, and
+  Weimer]{Necula2005}
+George~C. {Necula}, Jeremy Condit, Matthew Harren, Scott McPeak, and Westley
+  Weimer.
+\newblock {{CCured}: Type-Safe Retrofitting of Legacy Software}.
+\newblock \emph{{ACM} Transactions on Programming Languages and Systems
+  ({TOPLAS})}, 27\penalty0 (3), 2005.
+
+\bibitem[Pa{\l}ka et~al.(2011)Pa{\l}ka, Claessen, Russo, and
+  Hughes]{PalkaAST11}
+Micha{\l}~H. Pa{\l}ka, Koen Claessen, Alejandro Russo, and John Hughes.
+\newblock {Testing an Optimising Compiler by Generating Random Lambda Terms}.
+\newblock In \emph{Proceedings of the 6th International Workshop on Automation
+  of Software Test}, AST '11, pages 91--97, New York, NY, USA, 2011. ACM.
+\newblock ISBN 978-1-4503-0592-1.
+\newblock \doi{10.1145/1982595.1982615}.
+\newblock URL \url{http://doi.acm.org/10.1145/1982595.1982615}.
+
+\bibitem[Peña(2017)]{LiquidHaskell}
+Ricardo Peña.
+\newblock {An Introduction to Liquid Haskell}.
+\newblock \emph{Electronic Proceedings in Theoretical Computer Science},
+  237:\penalty0 68–80, Jan 2017.
+\newblock ISSN 2075-2180.
+\newblock \doi{10.4204/eptcs.237.5}.
+\newblock URL \url{http://dx.doi.org/10.4204/EPTCS.237.5}.
+
+\bibitem[Ruef et~al.(2019)Ruef, Lampropoulos, Sweet, Tarditi, and
+  Hicks]{ruef18checkedc-incr}
+Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
+  Hicks.
+\newblock {Achieving Safety Incrementally with Checked C}.
+\newblock In Flemming Nielson and David Sands, editors, \emph{Principles of
+  Security and Trust}, pages 76--98, Cham, 2019. Springer International
+  Publishing.
+\newblock ISBN 978-3-030-17138-4.
+
+\bibitem[Serebryany et~al.(2012)Serebryany, Bruening, Potapenko, and
+  Vyukov]{Serebryany2012}
+Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitry Vyukov.
+\newblock {{AddressSanitizer}: A Fast Address Sanity Checker}.
+\newblock In \emph{Proceedings of the 2012 USENIX Conference on Annual
+  Technical Conference}, 2012.
+
+\bibitem[Tarditi(2021)]{checkedc}
+David Tarditi.
+\newblock {Extending C with Bounds Safety and Improved Type Safety}, 2021.
+\newblock URL \url{https://github.com/secure-sw-dev/checkedc/}.
+
+\bibitem[Vazou et~al.(2014)Vazou, Seidel, Jhala, Vytiniotis, and
+  Peyton-Jones]{Refinementlh}
+Niki Vazou, Eric~L. Seidel, Ranjit Jhala, Dimitrios Vytiniotis, and Simon
+  Peyton-Jones.
+\newblock {Refinement Types for Haskell}.
+\newblock \emph{SIGPLAN Not.}, 49\penalty0 (9):\penalty0 269–282, August
+  2014.
+\newblock ISSN 0362-1340.
+\newblock \doi{10.1145/2692915.2628161}.
+\newblock URL \url{https://doi.org/10.1145/2692915.2628161}.
+
+\bibitem[Zeng et~al.(2013)Zeng, Tan, and
+  Erlingsson]{Zeng:2013:SRF:2534766.2534798}
+Bin Zeng, Gang Tan, and \'{U}lfar Erlingsson.
+\newblock {Strato: A Retargetable Framework for Low-level Inlined-reference
+  Monitors}.
+\newblock In \emph{Proceedings of the 22Nd USENIX Conference on Security},
+  2013.
+
+\bibitem[Zhao et~al.(2012)Zhao, Nagarakatte, Martin, and
+  Zdancewic]{Zhao:2012:FLI:2103621.2103709}
+Jianzhou Zhao, Santosh Nagarakatte, Milo~M.K. Martin, and Steve Zdancewic.
+\newblock {Formalizing the LLVM Intermediate Representation for Verified
+  Program Transformations}.
+\newblock \emph{SIGPLAN Not.}, 47\penalty0 (1):\penalty0 427--440, January
+  2012.
+\newblock ISSN 0362-1340.
+\newblock \doi{10.1145/2103621.2103709}.
+\newblock URL \url{http://doi.acm.org/10.1145/2103621.2103709}.
+
+\bibitem[Zhou et~al.(2006)Zhou, Condit, Anderson, Bagrak, Ennals, Harren,
+  Necula, and Brewer]{Feng2006}
+Feng Zhou, Jeremy Condit, Zachary Anderson, Ilya Bagrak, Rob Ennals, Matthew
+  Harren, George Necula, and Eric Brewer.
+\newblock {SafeDrive}: Safe and recoverable extensions using language-based
+  techniques.
+\newblock In \emph{7th Symposium on Operating System Design and Implementation
+  (OSDI'06)}, Seattle, Washington, 2006. USENIX Association.
+
+\end{thebibliography}

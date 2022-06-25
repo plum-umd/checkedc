@@ -57,7 +57,7 @@ Section HeapProp.
   | HtVar : forall x, heap_wt H (EVar x)
   | HtStrlen : forall x, heap_wt H (EStrlen x)
   | HtCall : forall f el, heap_wt_args H el -> heap_wt H (ECall f el)
-  | HtRet : forall x old a e, heap_wt H e -> heap_wt H (ERet x old a e)
+  | HtRet : forall x old e, heap_wt H e -> heap_wt H (ERet x old e)
   | HtDynCast : forall t e, heap_wt H e -> heap_wt H (EDynCast t e)
   | HtLet : forall x e1 e2,
       heap_wt H e1 -> heap_wt H e2 -> heap_wt H (ELet x e1 e2)

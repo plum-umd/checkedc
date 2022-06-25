@@ -1,0 +1,467 @@
+\section{Random Testing via the Implementation}\label{sec:evaluation}
+
+% \review{While I found the idea behind section V very interesting, the current version
+%   of this section lacks some details that would help in better understanding (1) 
+%   how the approach works, and (2) the overall scope of the approach. 
+%   $\\$
+%   For instance, the authors state that, following [19], they try to "exercise
+%   interesting patterns" by adding "admissible but redundant typing rules" like
+%   G-ASTR. There are a few points that are unclear here: (1) are these rules
+%   discovered manually or automatically (starting from the Redex semantics)?, (2)
+%   are there any guiding principles for coming up with rules that lead to
+%   interesting cases?
+%   $\\$
+%   Later, the authors refer to "generation rules modified to be slightly more
+%   permissive" to generate "a little" ill-typed terms. Again, are these rules
+%   obtained automatically or defined manually? If the latter, did you follow any
+%   methodology to derive such rules? Are these rules the same as the "admissible
+%   but redundant typing rules" from above?}
+% \liyi{Deena? Leo? }
+
+In addition to using the \lang Redex model to establish simulation of
+compilation (Section~\ref{sec:meta}), we also used it to gain confidence
+that our model matches the Clang \checkedc implementation.
+Disagreement on outcomes signals a bug in either the model or the
+compiler itself. Doing so allowed us to quickly iterate on the
+design of the model while adding new features, and revealed
+several bugs in the Clang \checkedc implementation.
+
+\myparagraph{Generating Well Typed Terms} For this random generation, we follow
+the approach of~\citet{PalkaAST11} to generate well-typed \checkedc
+terms by viewing the typing rules as generation rules.
+%
+%Suppose we have a context $\textcolor{red}{\Gamma}$, a mode
+%$\textcolor{red}{m}$ and a type $\textcolor{red}{\tau}$, and we are
+Suppose we have a context $\Gamma$, a mode
+$m$ and a type $\tau$, and we are
+trying to generate a well-typed expression. We can do that by
+reversing the process of type checking, selecting a typing rule and
+building up an expression in a way that satisfies the rule's premises.
+
+Recall the typing rule for dereferencing an
+array pointer, which we depict below as
+\textsc{G-DefArr}\footnote{Generator rules G-* correspond one to one
+  with the type rules T-* in Sec.~\ref{sec:type-system}.}, color-coded to represent \textcolor{red}{inputs} and \textcolor{blue}{outputs} of the
+generation process:%
+\footnote{This input-output marking is commonly called a mode in
+  the literature, but we eschew this term to avoid
+  confusion with our pointer mode annotation.}
+%
+%\begin{figure}[t]
+\begin{mathpar}
+    \inferrule[G-DefArr]
+              {\textcolor{red}{\Gamma};\textcolor{red}{\Theta} \vdash_{\textcolor{red}{m}} \textcolor{blue}{e} : \tptr{\tallarraybc{\textcolor{cyan}{\bvar}}{\textcolor{red}{\tau}}}{\textcolor{cyan}{m'}} \\
+\textcolor{red}{m} \leq \textcolor{cyan}{m'} 
+              }
+              {\textcolor{red}{\Gamma};\textcolor{red}{\Theta} \vdash_{\textcolor{red}{m}} \textcolor{blue}{\estar{e}} : \textcolor{red}{\tau}}
+%  
+%     \inferrule[T-Dfa] {
+% %      \textcolor{cyan}{m'} = \texttt{choose}(C,U) \text{ if } \textcolor{red}{m} = U
+% %      \text{, otherwise } \textcolor{cyan}{m'} = C
+% %      \\
+%       \textcolor{red}{\Gamma} \vdash_{\textcolor{red}{m}} \textcolor{blue}{e} : \tptr{\textcolor{red}{\tau}}{\textcolor{cyan}{m'}} \\      
+%       \textcolor{red}{m} \leq \textcolor{cyan}{m'} \\
+% }
+%     {\textcolor{red}{\Gamma} \vdash_{\textcolor{red}{m}} \textcolor{blue}{\estar{e}} : \textcolor{red}{\tau}}
+  \end{mathpar}
+%   \caption{T-DFA as a generation rule}
+%   \label{fig:tdfagen}
+% \end{figure}
+%
+If we selected \textsc{G-DefArr} for generating an expression, the
+generated expression has to have the form $\textcolor{blue}{*e}$,
+for some $\textcolor{blue}{e}$, to be generated according
+to the rule's premises.
+%
+To satisfy the premise
+$\textcolor{red}{\Gamma};\textcolor{red}{\Theta}
+\vdash_{\textcolor{red}{m}} \textcolor{blue}{e} :
+\tptr{\tallarraybc{\textcolor{cyan}{\bvar}}{\textcolor{red}{\tau}}}{\textcolor{cyan}{m'}}$,
+we essentially need to make a recursive call to the generator, with
+appropriately adjusted inputs.
+%
+However, the type in this judgment is not fixed yet---it contains
+three unknown variables: $\textcolor{cyan}{m'}$,
+$\textcolor{cyan}{\bvar}$, and $\textcolor{cyan}{\kappa}$---that need
+to be generated before making the call.
+%
+Looking at the second premise informs that generation:
+if the input mode $\textcolor{red}{m}$ is $\umode$, then $\textcolor{cyan}{m'}$
+needs to be $\umode$ as well; if not, it is unconstrained,
+just like $\textcolor{cyan}{\bvar}$ and $\textcolor{cyan}{\kappa}$, and therefore all three are free to be generated at random.
+%
+Thus, the recursive call to generate $\textcolor{blue}{e}$ can now
+be made, and the \textsc{G-DefArr} rule returns $\textcolor{blue}{*e}$
+as its output.
+
+% If we selected \textbf{T-Dfa} for generating an expression, the
+% expression we generate has to have the form $\textcolor{blue}{*e}$,
+% for some expression $\textcolor{blue}{e}$, to be generated according
+% to the rule's premises.
+% %
+% To satisfy the premise $\textcolor{red}{\Gamma}
+% \vdash_{\textcolor{red}{m}} \textcolor{blue}{e} :
+% \tptr{\textcolor{red}{\tau}}{\textcolor{cyan}{m'}}$, we essentially
+% need to make a recursive call to the generator, with appropriately
+% adjusted inputs.
+% %
+% However, the type in this judgement is not fixed yet---it contains an
+% unknown variable $\textcolor{cyan}{m'}$ that needs to be generated
+% before making the call.
+% %
+% Looking at the second premise informs that generation:
+% if the input mode $\textcolor{red}{m}$ is $\umode$, then $\textcolor{cyan}{m'}$
+% needs to be $\umode$ as well; if not, it is unconstrained and we're free
+% to generate it at random to be $\cmode$ or $\umode$.
+% %
+% Thus, the recursive call to generate $\textcolor{blue}{e}$ can now
+% be made, and the \textbf{T-Dfa} rule returns $\textcolor{blue}{*e}$
+% as its output.
+
+Using such generator rules, we can create a generator for random
+well-typed terms of a given type in a straightforward manner: find all
+rules whose conclusion matches the given type and then randomly choose
+a candidate rule to perform the generation. To ensure that this
+process terminates, we follow the standard practice of using ``fuel'' to
+bound the depth of the generated terms; once the fuel is exhausted,
+only rules without recursive premises are
+selected~\cite{Pierce:SF4}. Similar methods were used for
+generating top level functions and \kw{struct} definitions. 
+
+%^ \leo{The following is an insanely large, undigestible paragraph, but now moved to the correct place.}
+%^ The generator follows the typing rules in the redex model to generate
+%^ well typed terms. Since the redex model only supports top level
+%^ functions the functions were generated separately, as were struct
+%^ definitions. Given a list of struct definitions, a list of functions,
+%^ and a type the generator randomly chooses the structure of a term that
+%^ can have that type. This is based on the typing rules. Then depending
+%^ on the holes needed to be filled in the term, new expressions are
+%^ generated. For example when attempting to generate an expression of
+%^ type (ptr c int) with fuel 2 the following steps might be taken. First
+%^ a conditional expression is randomly chosen. In order for this to have
+%^ the correct type a random expression of type int with fuel 1 is
+%^ generated as the guard. Then both branched must have type (ptr c
+%^ int). They will recursively generate but with reduced fuel. If the
+%^ fuel is less than or equal to zero then either a variable with the
+%^ correct type will be chosen from the enviornment or a malloc
+%^ expression will be generated. The generator takes fuel so that
+%^ generating expressions will always terminate.
+
+While using just the typing-turned-generation rules is in theory
+enough to generate all well-typed terms, it's more effective in
+practice to try and exercise interesting patterns.  As
+in~\citet{PalkaAST11} this can be viewed as a way of adding admissible
+but redundant typing rules, with the sole purpose of
+using them for generation. For example, below is one such rule,
+\textsc{G-ASTR}, which creates an initialized null-terminated string that
+is statically cast into an array with bounds $(0,0)$.
+%
+%\begin{figure}[t]
+  \begin{mathpar}
+    \inferrule[G-ASTR]
+    {
+      \textcolor{cyan}{i} \in \mathbb{N}^* \quad\quad
+      \textcolor{cyan}{n_0,\ldots,n_{i-1} } \in \mathbb{Z} \quad\quad
+      \texttt{fresh}(\textcolor{cyan}{x})\\
+      \textcolor{red}{\Gamma} \vdash_{\textcolor{red}{m}}
+      \textcolor{blue}{e'} :
+      \tptr{\textcolor{red}{\tntarray{0}{\textcolor{cyan}{i}}{\tint}}}{c}
+      \\      
+% \eassign{(\ebinop{x}{0})}{n_0};\ldots;\eassign{(\ebinop{x}{i-1})}
+      \textcolor{blue}{e} = \elet{\textcolor{cyan}{x}}{\textcolor{blue}{e'}}{\texttt{(init $\textcolor{cyan}{x}$ with }\textcolor{cyan}{n_0,\ldots
+        n_{i-1}}\texttt{)};\textcolor{cyan}{x}}
+      % \textcolor{cyan}{m'} = \texttt{choose}(C,U) \text{ if } \textcolor{red}{m} = U
+      % \text{, otherwise } \textcolor{cyan}{m'} = C
+      % \\
+}
+    {\textcolor{red}{\Gamma} \vdash_{\textcolor{red}{m}} \textcolor{blue}{\ecast{\tptr{\tntarray{0}{0}{\tint}}{c}}{e}} : \textcolor{red}{\tptr{\tntarray{0}{0}{\tint}}{c}}}
+  \end{mathpar}
+%  \caption{Specialized rule for generating initialized strings}
+%  \label{fig:gastr}
+%\end{figure}
+%
+Given some positive number $\textcolor{cyan}{i}$, numbers
+$\textcolor{cyan}{n_0, \ldots, n_{i-1}}$, and a fresh variable
+$\textcolor{cyan}{x}$ (which are arbitrarily generated), we can
+recursively generate a pointer $\textcolor{blue}{e'}$ with bounds
+$(0,\textcolor{cyan}{i})$, and initialize it with the generated $n_j$
+using $\textcolor{cyan}{x}$ to temporarily store the pointer.
+
+This rule is particularly useful when combined with \textsc{G-IfNT}
+since there is a much higher chance of obtaining a non-zero value when
+evaluating $\estar{p}$ in the guard of $\eiftext$, skewing the
+distribution towards programs that enter the $\ethentext$ branch.
+Relying solely on the type-based rules, entering the $\ethentext$
+branch requires that \textsc{G-AssignArr} was chosen before \textsc{G-IfNT},
+and that assignment would have to appear before $\eiftext$, which
+means additional \textsc{G-Let} rules would need to be chosen: this
+combination would therefore be essentially impossible to generate in
+isolation.
+
+Adding admissible generation rules like \textsc{G-Astr} in this
+manner, as described in~\citet{PalkaAST11}, is a manual process. It is
+guided by gathering statistics on the generated data and focusing on
+language constructs that appear underrepresented in the posterior
+distribution. For example, we arrived at the \textsc{G-Astr} rule by
+recognizing that the pure type-based generation was not generating
+non-trivial null-terminated strings, and then analyzing the sequence
+of random choices that could lead to their generation.
+
+% Originally only the
+% typing rules were used to generate expressions. Eventualy new options
+% were added to create more interesting programs. Interesting programs
+% include allocating memory for an array and then initializing it with
+% values, and casting arrays to a smaller type so that bounds widening
+% can be triggered. There were also some issues with generating strlen
+% expressions. After a variable is assigned to the strlen of a pointer
+% that bounds for that pointer contain the variable. This caused issues
+% with scope as an array with bounds dependent on that variable could be
+% returned. In order to prevent these issues expressions that use strlen
+% are only generated in the form \code{let \_ = let x = (strlen y)} in
+% (expression generated with updated bounds for y) in (some literal
+% expression that does not contain y). Once expressions from the redex
+% model are generated they are compiled into CheckedC and compiled with
+% the clang compiler. One problem is that type annotations are needed in
+% Checked-C but do not exist in the Redex model. To properly translate
+% an enviornment is passed around. As various parts are translated types
+% are added to the enviornment so when declarations are needed their
+% types can be found.  Several small changes had to be made to
+% expressions since the redex model which used immutable values, had
+% expressions that were not allowed in the clang version (e.g. let
+% expressions, conditional expressions with complex bound types in the
+% branches, using calloc to initialize nt-arrays, and casting motivating
+% expressions). Let, if and cast expressions got lifted to functions. We
+% defined a calloc for nt-arrays using a dynamic bounds cast. The int
+% type was changed to char. This is because while in the specification
+% any nt-array can be passed to strlen the clang compiler only allows
+% arrays of type const char *. The expression was evaluated and then
+% printed to stdout.
+%  
+%  
+%  
+% \leo{TODO: adding interesting patterns (mentioned later), just like Palka
+%   adds seq}
+% \leo{I don't understand why the conversion tool is important here. I
+%   moved the following para up, as it has to do with generation.}
+% % \yiyun{I'm not sure if patterns can be written as a clean rule. For
+% %   example, we want to add rules that creates an ntarray of size n,
+% %   initializes the array, and then }
+% \yiyun{I'm not sure if T-ASTR is exactly implemented like that in
+%   Deena's random generator, but we do have something that performs
+%   this type of initialization.}
+% The conversion tool can be used separately from the random generator
+% to speed up the manual testing process, where we construct programs
+% that we believe are likely to trigger rules that have subtle
+% definitions and are likely to cause failure in the experimental Clang
+% implementation. For example, we were able to find that % \yiyun{is this
+% % accurate? not that familiar with itype} the \code{itype} 
+% \checkedc wrapper
+% of \code{strlen} does not perform null check at the
+% interface, which would lead to undefined behavior within the checked
+% region. We integrate
+% these manually found patterns into the random generator to complement the
+% type-based generation approach, allowing us to cover more interseting
+% cases during random testing. 
+
+\myparagraph{Generating Ill-typed Terms}
+%
+We can use generated well-typed terms to test our simulation theorem
+(Section~\ref{sec:compilation}) and test that \lang and \checkedc
+Clang agree on what is type-correct. But it is also useful to generate
+ill-typed terms to test that \lang and \checkedc Clang also agree on
+what is not.  However, while it is easy to generate arbitrary
+ill-typed terms, they would be very unlikely to trigger any
+inconsistencies; those are far more likely to exist on the boundary
+between well- and ill-typedness. Therefore, we also manually added
+variations of existing generation rules modified to be slightly more
+permissive, e.g., by relaxing a single premise, thus allowing terms
+that are ``a little'' ill-typed to be generated. Unlike coming up with
+admissible generation rules like \textsc{G-Astr} (which is quite
+challenging to automate), systematically and automatically relaxing
+premises of existing rules seems feasible, and worthwhile future work.
+
+
+
+% \myparagraph{Testing Model Properties}
+% The generator is used to establish confidence in properties that are
+% expected to hold in our model, such as progress and preservation of
+% \lang, or more notably the simulation property between \lang and
+% \elang (Theorem~\ref{simulation-thm}).
+% %
+% As discussed in
+% Section~\ref{sec:compilation}, we use the simulation property to
+% ensure that our source language can be compiled into a language that
+% does not rely on fat pointers. For simulation to hold, 
+% the semantics must avoid accessing information that would
+% necessitate the use of fat pointers during compilation. This is unsurprisingly
+% a tricky process, and we found mistakes in early versions of our
+% desing where we wrote widened bounds onto the heap, or passed
+% widened bounds to functions, making them accessible outside of the
+% current stack frame (thus implying the existence of fat
+% pointers). Random testing also helped us discover the limitation of
+% the standard simulation theorem and motivated us to rephrase it
+% in such a way that is compatible with our definition of compilation.
+% % relax our simulation theorem to require only the confluence of the
+% % two compiled programs by providing examples where the compilation
+% % process can generate redundant stack variables that would break the more
+% % standard simulation property
+% . \yiyun{does this deserve a figure to
+%   explain? or maybe I should mention why our simulation is slightly
+%   off from what a ``standard'' simulation should look like in
+%   compilation? }\leo{This should have already been discussed in the
+%   statement of simulation - point there?}
+
+\myparagraph{Random Testing for Language Design}
+%
+We used our Redex model and random generator to successfully guide the
+design of our formal model, and indeed the Clang Checked C
+implementation itself, which is being actively developed. To that end, we implemented a
+conversion tool that converts \lang into a subset of the \checkedc
+language and ensured that model and implementation exhibit the same
+behavior (accept and reject the same programs and yield the same return
+value).
+
+This approach constitutes an interesting twist to traditional
+model-based checking approaches.  Usually, one checks that the
+implementation and model agree on all inputs \emph{of the
+  implementation}, with the goal of covering as many behaviors as
+possible. This is the case, for example, in \citet{lambdajs}, where
+they use real test suites to demonstrate the faithfullness of their
+core calculus to Javascript. Our approach and goal in this work is
+essentially the opposite: as the Clang Checked C implementation does
+not fully implement the Checked C spec, there is little hope of
+covering all terms that are generated by Clang Checked C. Instead,
+we're looking for \emph{inconsistencies}, which could be caused by
+bugs either in the Clang Checked C compiler or our own model.  
+
+One inconsistency we found comes from the following:
+
+{\small 
+\begin{lstlisting}[xleftmargin=4 mm]
+ array_ptr<char> fun(void) : count(3) {
+   array_ptr<char> x : count(3);
+   x = calloc(3, sizeof(char));
+   return x+3;
+ }
+ int main(void) {
+   *(fun()) = 0;
+   return 0;
+ }
+\end{lstlisting}
+}% 
+%
+\noindent
+In this code, the function \code{fun} is supposed to return a
+checked array pointer of size 3. Internally, it allocates such an
+array, but instead of returning the pointer \code{x} to that array, it
+increments that pointer by 3. Then, the \code{main} function just
+calls \code{fun}, and tries to assign 0 to its result. Our model
+correctly rules out this program, while the Clang Checked C
+implementation happily accepted this out-of-bounds
+assignment. Interestingly, it correctly rejected programs where the
+array had size 1 or 2. This inconsistency has been fixed in the latest
+version of the compiler.
+
+We also found the opposite kind of inconsistency---programs that
+the Clang Checked C implementation rejects contrary to the spec.
+For instance:%
+\footnote{After minimization, this turned out to be a known issue: 
+  \url{https://github.com/microsoft/checkedc-clang/issues/1008}}
+
+{\small 
+\begin{lstlisting}[xleftmargin=4 mm]
+array_ptr<int> f(void) : count(5) {
+  array_ptr<int> x : count(5) =
+    calloc<int>(5, sizeof(int)); 
+  return x;
+}
+array_ptr<int> g(void ) : count(5) {
+  array_ptr<int> x : count(5) =
+    calloc<int>(5, sizeof(int)); 
+  return x+3;
+}
+int main(void) {
+  return *(0 ? g() : f() + 3);
+}    
+\end{lstlisting}
+}% 
+\noindent
+In this piece of code both \code{f} and \code{g} functions compute a
+pointer to the same index in an array of size 5 (as \code{f} calls
+\code{g}). The \code{main} function then creates a ternary expression
+whose branches call \code{f} and \code{g}, but the Clang Checked C
+implementation rejects this program, as its static analysis is not
+sophisticated enough to detect that both branches have the same type.
+% 
+%\leo{The following is extremely
+%  weak. ``Most of them'', were there any that weren't? Which ones? For
+%  the ones that were, mention github issues.}  The random generator,
+%equipped with the conversion tool, successfully found a few minor
+%errors in the clang compiler, most of them were already issues in the
+%git bug reports. For example, we discovered that while the ternary
+%operator is implemented in the compiler it cannot handle complex
+%bounds types in the branches. The static analysis is not sophisticated
+%enough to properly detect that both branches have the same type. While
+%not precisely a bug, the clang compiler does not permit memory for
+%null terminated arrays to be allocated with calloc. Although calloc
+%fills all spaces in memory with null, the compiler does not recognize
+%this and claims that it is an unsafe cast.
+
+
+% Recall that our
+% formal model makes liberal use of bounds annotations in literals and
+% the heap. 
+
+
+% In order to get a better understanding of the formalism we wrote it in
+% redex. This allowed us to make sure that expressions were well-typed
+% and evaluated to what we expected. It also was helpful for use in
+% prototyping; new features could first be added to the redex model to
+% see how they interacted with the existing language. This model was
+% slightly larger than the Coq model and there are some differences in
+% the type systems. We included top level functions and conditional
+% expressions. All of these extra expressions are still expressible in
+% the coq model, for example functions can be represented as nested let
+% expressions. In the Coq model variables are stored on a stack while in
+% the Redex model the variables are simply looked up in the context. In
+% general the Redex model is easier to modify and slightly closer to the
+% actual Checked-C specifications. Instead of using the model for a
+% static proof, we used it to increase our certainty of the accuracy of
+% the model.
+
+
+% \item Describe the random testing generator setup and the properties
+%   to test.
+% \yiyun{Deena's description of the implementation details. I tried
+%   integrating the ones that I find relevant/interesting to the text above. Maybe we can
+%   add more if we have some space to fill in.}
+% In order for our guarantee of safety to hold, we need to know that our
+% model acurately reflects the CheckedC clang compiler. Safety is proved
+% for the Coq model, but it is significantly smaller than the actual
+% language. The Redex model is a combination of both. It is written in
+% the same style as the formalism but has slightly more of Checked-C's
+% extra features. If expressions from the Redex model display the same
+% behavior as equivalent programs in Checked-C then we have greater
+% certainty that our model is useful. We built a random testing
+% generator to increase this certainty.
+
+  % \item Describe the bug findings from the random testing against the Checked-C compiler.
+%   \leo{This is now integrated above}
+% The generator was helpful in finding bugs in the redex model. Several things failed to typecheck that should have been well typed, and the generator was able to catch them. The generated code also found a few minor errors in the clang compiler, most of them were already issues in the git bug reports. For example we discovered that while the ternary operator is implemented in the compiler it cannot handle complex bounds types in the branches. The static analysis is not sophisticated enough to properly detect that both branches have the same type. While not precisely a bug, the clang compiler does not permit memory for null terminated arrays to be allocated with calloc. Although calloc fills all spaces in memory with null, the compiler does not recognize this and claims that it is an unsafe cast. In the Redex model there is no issue with this. A few other minor things were brought to light in the implementation of the generator. The main use was to increase certainty that the behavior in the formal model accurately matched the clang compiler.
+%  
+% % \end{itemize}
+
+
+% \begin{itemize}
+%  
+% \item Show that why the formal semantics/type-system defined for Checked-C is useful. 
+% Since we have certainty that our model reflects the clang compiler the model is very useful. Proofs are easier on the smaller model, so we can show  that certain things are true for it. Since the Redex model is between the formalism and the clang version we can have certainty that properties we expect are actually true for the clang version.
+%  
+% \begin{itemize}
+% \item Show some bug findings. 
+% \item Show the properties that we can guarantee for Checked-C based on the type-system and blame theorem.
+% \item Maybe other useful tools that can be extracted from the Redex model.
+%  
+% \end{itemize}
+%  
+% \end{itemize}

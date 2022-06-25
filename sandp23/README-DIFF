@@ -1,0 +1,12 @@
+On respective commits:
+```
+latexpand main.tex > {old,new}.tex
+```
+Or maybe call the above with --empty-comments, not sure why.
+
+Then comment out authors, CCS, keywords, and acks, and
+```
+$ latexdiff --exclude-textcmd=section,subsection,cmidrule,cmidrulewidth --exclude-safecmd=cmidrule,cmidrulewidth --disable-auto-mbox --graphics-markup=1 old.tex new.tex > diff.tex
+```
+
+and fix the remaining compilation errors.

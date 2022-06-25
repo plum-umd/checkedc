@@ -1,0 +1,1386 @@
+\section{Formalization}\label{sec:formal}
+
+% \begin{itemize}
+% \item Describe the types for checked-C as a graph. \dvh{I don't know what this means.}
+
+% \item Describe the subtyping for checked-C types.
+% \begin{itemize}
+% \item State that the subtypes in Checked-C are transitive.
+% \end{itemize}
+
+% \item Describe the syntax of Checked-C
+
+% \item Describe the semantics of Checked-C
+
+% \item Describe the type system of Checked-C
+
+% \item Describe the progress and preservation theorems, and outline the proofs.
+
+% \item Describe the blame theorem and proof.
+
+% \end{itemize}
+
+\ignore{
+\begin{figure}
+  \begin{center}
+    \includegraphics[height=6in]{syntax.pdf}
+  \end{center}
+  \caption{\lang: Syntax}
+\end{figure}
+
+\begin{figure}
+  \begin{center}
+    \includegraphics[height=6in]{types.pdf}
+  \end{center}
+  \caption{\lang: Typing}
+\end{figure}
+}
+% \liyi{main text begins here. }
+
+
+
+
+\begin{figure}
+  \small \centering
+  $\begin{array}{l}
+\begin{array}{lll}
+\text{Function names:}~f&
+       \text{Variables:}~ x
+& \text{Integers:}~n::=\mathbb{Z} 
+\end{array}
+\\[0.5em]
+
+\begin{array}{llcllcl}
+
+\text{Mode:} & m & ::= & \cmode \mid \umode \\[0.5em]
+
+\text{Bound:} & b & ::= & n \mid x \plus n \\
+              & \bvar & ::= & (b,b) \\[0.5em]
+  
+     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{m}
+\\[0.5em]
+
+\text{Type Flag:}&\kappa &::=& nt \mid \cdot
+\\[0.5em]
+
+\text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau}
+\\[0.5em]
+
+\text{Expression:}& e & ::= & 
+\evalue{n}{\tau} \mid x \mid \emalloc{\omega} \mid\elet{x}{e}{e} \\[0.2em]
+&&\mid&
+\ecast{\tau}{e} \mid \edyncast{\tau}{e}\mid \ecall{f}{\overline{e}} \mid \estrlen{x} \\[0.2em]
+&&\mid&
+\ebinop{e}{e} \mid\estar{e}\mid\eassign{e}{e}\mid\eunchecked{e}
+\\[0.2em]
+&&\mid&\eif{e}{e}{e}
+\end{array}
+    \end{array}
+  $
+  \caption{\lang Syntax}
+  \label{fig:checkc-syn}
+\end{figure}
+
+%% \dvh{I don't understand the variable grammar.  What is $T$?  What is $\eta$?  I think $\cmode$ and $\umode$ should be in tt font.}
+%% \liyi{T and $\eta$ can be moved to the appendix, they are useful only for struct types.}
+
+This section describes our formal model of \checkedc, called
+\lang, making precise its syntax, semantics, and type system, and
+developing its metatheory, including type soundness and the blame
+theorem.
+
+\subsection{Syntax}\label{sec:syntax}
+
+The syntax of \lang is given by the expression-based
+language presented in Fig.~\ref{fig:checkc-syn}.
+
+There are two notions of type in \lang.  Types $\tau$ classify
+word-sized values including the integers and pointers, while types
+$\omega$ classify multi-word values such as arrays, null-terminated
+arrays, and single-word-size values.
+%
+Pointer types ($\tptr{\omega}{m}$) include a mode annotation ($m$)
+which is either checked (\cmode) or unchecked (\umode) and a type
+($\omega$) denoting the type of value to which is pointed. Array types include both the type of
+elements ($\tau$) and a bound ($\bvar$) comprised of an upper and
+lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
+limited to integer literals $n$ and expressions $x + n$.
+Whether an array pointer is null terminated or not is determined by annotation
+$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
+otherwise (we elide the $\cdot$ when writing the type). Here is the
+corresponding \checkedc syntax for these types:
+\[
+\begin{array}{rcl}
+$\code{array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+&\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\cmode}
+\\[0.2em]
+$\code{nt_array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+&\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
+\end{array}
+\]
+As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
+$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
+be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
+
+\lang expressions include literals ($n\!:\!\tau$), variables ($x$), memory
+allocation ($\emalloc{\omega}$), let binding ($\elet{x}{e_1}{e_2}$),
+static and dynamic casts ($\ecast{\tau}{e}$ and $\edyncast{\tau}{e}$,
+resp.), function calls ($\ecall{f}{\overline{e}}$), addition
+($\ebinop{e_1}{e_2}$), pointer dereference and assignment ($\estar{e}$
+and $\eassign{e_1}{e_2}$, resp.), unchecked blocks ($\eunchecked{e}$),
+the \texttt{strlen} operation ($\estrlen{x}$), and conditionals $\eif{e}{e_1}{e_2}$.
+
+Integer literals $n$ are annotated with a type $\tau$ which can be either
+$\tint$, or $\tptr{\omega}{m}$ in the case $n$ is being used as
+a heap address (this is useful for the semantics). The
+$\texttt{strlen}$ expression operates on variables $x$
+rather than arbitrary expressions to simplify managing
+bounds information in the type system; the more general case can be
+encoded with a \code{let}. We use a less verbose syntax for dynamic bounds
+casts; e.g., the following %
+
+\code{dyn_bounds_cast<array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
+
+\noindent
+becomes $\edyncast{\tptr{\tntarrayb{n}{\tau}}{\cmode}}{e}$.
+
+\lang aims to be simple enough to work with, but powerful enough to
+encode realistic \checkedc idioms. For example: mutable local
+variables can be encoded as immutable locals that point to the heap
+(and likewise use of \code{&} can be simulated with \code{malloc});
+loops can be encoded as recursive function calls; \code{struct}s are
+not in Fig.~\ref{fig:checkc-syn} for space reasons, but they are
+actually in our model, and developed in
+Appendix~\ref{appx:struct}. C-style \code{union}s have no safe typing
+in \checkedc, so we elide them. By default, functions are assumed to
+be within checked regions; placing the body in an \code{unchecked}
+expression relaxes this, and within that, checked regions can be
+nested within via function calls. Bounds are restricted slightly:
+rather than allowing arbitrary subexpressions, bounds must be either
+integer literals or variables plus an integer offset, which accounts
+for most uses of \code{bounds} in \checkedc programs. \lang bounds are
+defined as relative offsets, not absolute ones, as in the second part
+of Fig.~\ref{fig:checkedc-example}. We see no technical problem to
+modeling absolute bounds, but it would be a pervasive change so we
+have not done so.
+
+% \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
+%   POINTERS: Array and NT-array types have two relative bounds, whose structures
+% can be either an integer or a variable plus an integer. For example,
+% if we have the expression
+% $x\texttt{=}\emalloc{\tarrayb{(0,10)}{\tint}}$, $x$ then has the type
+% $\tptr{\tarrayb{10}{\tint}}{\cmode}$, which represents an array
+% pointer of size $10$. The bounds ($(b_l,b_h)$ in
+% $\evalue{p}{\tptr{\tarrayb{(b_l,b_h)}{\tau}}{m}}$) indicate relative
+% offsets from this pointer of the accessible memory, i.e., $p+b_l$ and
+% $p+b_h$. As such, a pointer can only be directly dereferenced if 0 is
+% included within the annotated range.  If following the $\emalloctext$
+% operation, we execute $*(x-1)$ and $*(x\plus 10)$. The two expressions
+% are not valid, because the type of the two expressions $(x-1)$ and
+% $(x\plus 10)$ are $\tarrayptr{1}{11}{\tint}{\cmode}$ and
+% $\tarrayptr{-10}{0}{\tint}{\cmode}$ and $0$ in these two cases are not
+% in the ranges: $[1,11)$ and $[-10,0)$. Thus, in order for a $\cmode$
+% pointer with type $\tarrayptr{b_l}{b_h}{\tint}{\cmode}$ to be
+% accessible in \checkedc, $0$ must be in the range of $[b_l,b_h)$.}
+
+\begin{figure}
+{\small
+$    \begin{array}{l}
+    \begin{array}{lll}
+\mu & ::= & \evalue{n}{\tau} \mid \bot\\
+e & ::= & \ldots \mid \ret{x}{\mu}{e}\\
+r & ::= & e \mid \enull \mid \ebounds\\
+E &::=& \Box \mid \elet{x}{E}{e} \mid \ecall{f}{\overline{E}}\mid\ecast{\tau}{E} \mid \edyncast{\tau}{E} \\[0.2em]
+&&\mid \ret{x}{\evalue{n}{\tau}}{E}\mid\ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid\estar{E}\mid\eassign{E}{e} \\[0.2em]
+&&\mid\eassign{\evalue{n}{\tau}}{E}\mid\eunchecked{E}\mid\eif{E}{e}{e}\\[0.2em]
+\overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
+\end{array}
+\\ \\
+    \end{array} 
+$
+  \begin{mathpar}
+    \inferrule{ m=\mode(E) \\
+      e=E[e'] \\
+      (\varphi,\heap,e') \longrightarrow (\varphi',\heap',e'')}
+    {(\varphi,\heap,e)\longrightarrow_{m} (\varphi',\heap',E[e''])}
+    
+  \end{mathpar}
+}
+  \caption{\lang Semantic Defs; Successful Transition}
+  \label{fig:c-context}
+\end{figure}
+
+\subsection{Semantics}\label{sec:semantics}
+
+% The semantics
+% gives an independent account of spatial safety in \lang by
+% checking pointer bounds based on the annotations carried on types at
+% run-time.  While this account makes clear that bounds checking occurs
+% as expected, it suggests an implementation that uses fat pointers to
+% carry bounds.  We resolve this tension in the subsequent section on
+% compilation and show that an implementation faithful to the semantics
+% can be obtained without fat pointers.  
+
+The operational semantics for \lang is defined as a small-step
+transition relation with the judgment $ (\varphi,\heap,e)
+\longrightarrow_m (\varphi',\heap',r)$. Here, $\varphi$ is a
+\emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
+$\heap$ is a \emph{heap} mapping addresses (integer literals) to
+values $\evalue{n}{\tau}$; for both we ensure
+$\fv(\tau)=\emptyset$. The relation steps to a \emph{result} $r$,
+which is either an expression or a $\enull$ or $\ebounds$ failure,
+representing a null-pointer dereference or out-of-bounds access,
+respectively. Such failures are a \emph{good} outcome; stuck states
+(non-value expressions that cannot transition to a result $r$)
+characterize undefined behavior.
+%
+The mode $m$ indicates whether the
+stepped redex within $e$ was in a checked ($\cmode$) or
+unchecked ($\umode$) region.
+
+The main rule for the semantics is given at the bottom of
+Fig.~\ref{fig:c-context}. The rule takes an expression $e$, decomposes
+it into an \emph{evaluation context} $E$ and a subexpression $e'$
+(such that replacing the hole $\Box$ in $E$ with $e'$ would yield
+$e$), and then evaluates $e'$ according \emph{computation relation} $
+(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$, discussed
+shortly. The computation relation can transition to any $r$; the rule
+in the figure just considers $r = e$. For the cases $r = \enull$ and
+$r = \ebounds$, two other rules (not shown) will cause the whole
+evaluation to terminate with $r$.  The semantics has a special case
+for a conditional $\eif{e_0}{e_1}{e_2}$.  If $e_0=\estar{x}$, the
+conditional itself is considered as the redex with special handling
+for bound widening.  Otherwise, the standard conditional behavior is
+used.
+The $\mode$ function
+determines the mode of the evaluating $e'$ based on the context $E$:
+if the $\Box$ in $E$ occurs in context $\eunchecked{E'}$, the mode is
+$\umode$, otherwise, it is $\cmode$. Evaluation contexts $E$ define a
+standard left-to-right evaluation order. (We explain the
+$\ret{x}{\mu}{e}$ syntax shortly.)
+% For a term $e$, $C$ is a context if any
+% only if it contains a $\Box$ hole term in one of the subterm position
+% in $e$. $\Box$ indicates the break point where we split $e$ into $C$
+% and a subterm $e'$ such that $C[e'] = e$.  For a function call
+% $\ecall{f}{\overline{e}}$, a valid context ($\overline{C}$) is defined
+% as any one of the elements in the list $\overline{e}$ being a
+% context. We show a rule of the upper level \checkedc semantics. The
+% rule splits a term $e$ into a context $C$ and redex $e'$.  If subterm
+% $e'$ is transitioned to $e_a$, $C[e']$ is transitioned to
+% $C[e_a]$.
+
+
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[S-Cast]
+              {}
+              {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
+
+    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
+
+        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
+
+    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+        \inferrule[S-DefNTArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h]}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-Fun]{ \Xi(f) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
+        {(\varphi,\heap,\ecall{f}{{\evalue{\overline{n}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
+    
+  \inferrule[S-DynCast]{
+\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{m})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{m} \\ n_l' \le n_l\ \\ n_h \le n_h'}
+    { (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{m}}}) \longrightarrow (\varphi',\heap',\evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau_b}{m}})}
+
+
+ \inferrule[S-DynCastBound]{\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{\cmode})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{\cmode} \\ n_l' > n_l \vee n_h > n_h'}{ (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{\cmode}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{\cmode}}}) 
+ \longrightarrow (\varphi',\heap',\ebounds)}
+
+     % \inferrule[S-IfNTF]{\varphi(x)=\evalue{n}{\tau} \\ \heap(n)=0}
+     %      {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
+ 
+
+      \inferrule[S-StrWiden]{
+         \varphi(x) = \evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{\cmode}}\\ 0 \in [n_l,n_h] \\ n_a > n_h
+\\ \heap(n+n_a) = 0 
+\\\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
+    {(\varphi,\heap,\estrlen{x}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tarrayptr{n_l}{n_a}{\tau}{\cmode}}],\heap,\evalue{n_a}{\tint})}
+
+     \inferrule[S-IfNTT]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{0}{\tau}{\cmode}} \\ \heap(n)\neq 0}
+    {(\varphi,\heap,\eif{*x}{e_1}{e_2}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tntarrayptr{n_l}{1}{\tau}{\cmode}}],\heap,e_1)}
+
+ % \inferrule[S-IfNTNot]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(n)\neq 0\\ 0 < n_h}
+ %            {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
+
+    
+
+    \inferrule[S-AssignArr]{\heap(n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+
+
+
+        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+\end{mathpar}
+}
+% {\footnotesize
+% \begin{center}
+% $
+% \begin{array}{l}
+% \tau[\overline{n} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall n_i\in\overline{n}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \Rightarrow \tau[n_i / x_i]\\[0.2em]
+% \mathtt{let}\;\overline{x}=\overline{e}\;\mathtt{in}...\triangleq \mathtt{let}\;x_0=e_0\;\mathtt{in}\;\mathtt{let}\;x_1=e_1\;\mathtt{in}...
+% \end{array}
+% $
+% \end{center}
+% }
+\caption{\lang Computation Relation, Selected Rules}
+\label{fig:semantics}
+\end{figure*}
+
+\begin{figure}[t]
+{\small
+{\captionsetup[lstlisting]{margin = 8 mm}
+  \begin{lstlisting}[xleftmargin=8 mm]
+nt_array_ptr<int> strncat : count(0)
+  (nt_array_ptr<int> a : count(n),
+   nt_array_ptr<int> b : count(0), int n) {
+  int x = strlen(a);
+  int y = strlen(b);
+  if (x <= n)
+    nt_array_ptr<int> c : count(n) =
+      dynamic_bounds_cast
+        <nt_array_ptr<int>>(a,count(n));
+    else return null;
+
+  if (x+y <= n) 
+      for (int i = 0; i < y; ++i)
+         * (c+x+i) = * (b+i);
+    else return null;
+  return a;
+}
+
+nt_array_ptr<int> strncat_c : count(0)
+  (nt_array_ptr<int> a : count(n),
+   nt_array_ptr<int> b : count(0), int n) {
+   int x = 0;
+   int y = strlen(b);
+   while (*x != '/0')
+    a++; x++;
+    
+   for (int i = 0; i < y; ++i)
+     if (i + x < n)
+         * (a+i) = * (b+i);
+       else return null;
+   return a;
+}
+  \end{lstlisting}
+}
+}
+\caption{Implementations for strncat}
+\label{fig:strncat-ex}
+\end{figure}
+
+Fig.~\ref{fig:semantics} shows selected cases of the computation
+relation. We explain the rules in turn using the
+example of Fig.~\ref{fig:strncat-ex}.
+
+% Below, we introduce low-level transition semantics for some case operations. The design of the low-level individual operation semantics is carefully engineered to perform match our compiler's behavior, such as correctly characterizing the bound widening behaviors for NT-array pointers, even though it is written in terms of fat-pointer formalization.
+
+\myparagraph{Pointer accesses}
+%
+The rules for dereference and assignment operations---\textsc{S-Def},
+\textsc{S-DefNull}, \textsc{S-DefNTArray}, and
+\textsc{S-AssignArr}---illustrate how the semantics checks bounds.
+Rule \textsc{S-DefNull} transitions attempted null-pointer
+dereferences to $\enull$, whereas \textsc{S-Def} dereferences a
+non-null (single) pointer.
+
+\textsc{S-AssignArr} assigns to an array as long as 0 (the point of
+dereference) is within bounds designated by the pointer's annotation
+and strictly less than the upper bound. Note for the assignment rule,
+arrays are treated uniformly whether they are null-terminated or not
+($\kappa$ can be $\cdot$ or $nt$)---the semantics does not search past
+the current position for a null terminator, for example. The program
+can widen the bounds as needed, if they currently precede the null
+terminator: \textsc{S-DefNTArray}, which dereferences an NT array
+pointer, allows an upper bound of $0$, since the program may read, but
+not write, the null terminator. A separate rule (not shown) handles
+normal arrays.
+
+\myparagraph{Casts}
+%
+Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
+by \textsc{S-Cast}. In a type-correct program, such casts are
+confirmed safe by the type system. To evaluate a cast, the rule
+updates the type annotation on $n$. Before doing so, it must
+``evaluate'' any variables that occur in $\tau$ according to their
+bindings in $\varphi$. For example, if $\tau$ was
+$\tarrayptr{0}{x+3}{\tint}{\cmode}$, then $\varphi(\tau)$ would
+produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+
+Dynamic casts are accounted for by \textsc{S-DynCast} and
+\textsc{S-DynCastBound}. In a type-correct program, such casts are
+assumed correct by the type system, and later confirmed by the
+semantics. As such, a dynamic cast will cause a $\ebounds$ failure if
+the cast-to type is incompatible with the type of the target pointer,
+as per the $n_l' > n_l \vee n_h > n_h'$ condition in
+\textsc{S-DynCastBound}. An example use of dynamic casts is given on
+line~7 in Fig.~\ref{fig:strncat-ex}. The values of \code{x} and
+\code{n} might not be known statically, so the type system cannot
+confirm that \code{x <= n}; the dynamic cast assumes this inequality
+holds, but then checks it at run-time.
+
+\myparagraph{Binding and Function Calls}
+%
+The semantics handles variable scopes using the special $\erettext$
+form. \textsc{S-Let} evaluates to a configuration whose stack
+is $\varphi$ extended with a binding for $x$, and whose expression is
+$\ret{x}{\varphi(x)}{e})$ which remembers $x$ was previously bound to
+$\varphi(x)$; if it had no previous binding, $\varphi(x) =
+\bot$. Evaluation proceeds on $e$ until it becomes a literal
+$n\!:\!\tau$, in which case \textsc{S-Ret} restores the saved
+binding (or $\bot$) in the new stack, and evaluates to
+$n\!:\!\tau$. 
+
+Function calls are handled by \textsc{S-Fun}. Recall that array
+bounds in types may refer to in-scope variables; e.g., parameter
+\code{a}'s bound \code{count(n)} refers to parameter \code{n} on lines
+2-3 in Fig.~\ref{fig:strncat-ex}. A call to function $f$ causes $f$'s
+definition to be retrieved from $\Xi$, which maps function names to
+forms $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e$, where
+$\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
+is the parameter list of variables and their types, and $e$ is the
+function body. The call is expanded into a \texttt{let} which binds
+parameter variables $\overline{x}$ to the actual arguments
+$\overline{n}$, but annotated with the parameter types
+$\overline{\tau}$ (this will be safe for type-correct programs). The
+function body $e$ is wrapped in a static cast
+$(\tau[\overline{n} / \overline{x}])$, which is the function's return
+type but with any parameter variables $\overline{x}$ appearing in that
+type substituted with the call's actual arguments $\overline{n}$. To
+see why this is needed, suppose that \code{strncat} in
+Fig.~\ref{fig:strncat-ex} is defined to return a
+\code{nt_array_ptr<int>:count(n)} typed term, and assume that we
+perform a \code{strncat} function call as
+\code{x=strncat(a,b,10)}. After the evaluation of \code{strncat}, the
+function returns a value with type \code{nt_array_ptr<int>:count(10)}
+because we substitute bound variable \code{n} in the 
+defined return type with \code{10} from the function call's
+argument list.
+
+\myparagraph{Bounds Widening}
+%
+Bounds widening occurs when branching on a dereference of a NT array
+pointer, or when performing $\estrlentext$. The latter is most useful
+when assigned to a local variable so that subsequent code can use the
+result, e.g., $e$ in $\elet{x}{\estrlen{y}}{e}$.  Lines 4 and 5 in
+Fig.~\ref{fig:strncat-ex} are examples. The widened bounds
+precipitated by $\estrlen{y}$ is $x$'s scope, meaning that within $e$
+the upper bound of $y$'s pointed-to array is $x$. Outside this scope,
+the old bound is restored. For example, \code{x}'s scope in line 4 is
+the whole function body in \code{strncat} because our compiler parses
+the local variable assignment to be a let-binding as
+\elet{\code{x}}{\estrlen{\code{a}}}{...}. % Allowing widening to persist
+% outside the scope is sound, % but would precipitate the need for
+% % fat pointers during compilation, which we want to avoid.
+% and we take this approach to give more precise runtime behavior. We
+% show in Sec.~\ref{sec:compilation}
+We allow widening to persist outside the scope at runtime as long as
+we are within the stack frame, and we show
+this does not necessarily precipitate the need for fat pointers in
+Sec.~\ref{sec:compilation}.
+
+Rule \textsc{S-StrWiden} implements $\estrlentext$ widening. The
+predicate
+$\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i)
+= \evalue{n_i}{\tau_i} \wedge n_i \neq 0))$ aims to find a position
+$n+n_a$ in the NT array that stores a null character, where no
+character as indexes between $n$ and $n+n_a$ contains one. (This rule
+handles the case when $n_a > n_h$, the $n_a \le n_h$ case is handled
+by a normal $\estrlentext$ rule; see Appx.~\ref{fig:rem-semantics}.) 
+
+Rule \textsc{S-IfNTT} performs bounds widening on $x$ when the
+dereference $\estar{x}$ is not at the null terminator, but the
+pointer's upper bound is 0 (i.e., it's at the end of its known
+range). $x$'s upper bound is incremented to 1, and this count persists
+as long as $x$ is live.  For example, \code{s}'s increment (lines
+5--8) is live until the return of the function in
+Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
+\code{s}'s upper bound is properly extended. %  For this rule and
+% \textsc{S-StrWiden}, this widening persists in the current stack
+% frame. When $x$ goes out of scope, .
+
+% \textsc{S-IfNTF} does not widen when seeing null; rule
+% \textsc{S-IfNTNot} sees a non-null character, but the pointer is not
+% at its upper bound, so the bounds cannot be widened. 
+
+% \ignore{
+% Fig.~\ref{fig:semantics} provides the low-level semantic rules for operations involving NT-array pointers, mainly, the $\estrlentext$ and $\eiftext$ operations. The semantics has concurred the ambiguity in the \checkedc specification, e.g., we define the exact behavior of the $\estrlentext$ operation to return the length between the current pointer position and the first null-character.
+% We also utilize new technique in our compiler so that the scope of the bound widening behavior in our formalization is a little longer. More details are in Sec.~\ref{sec:compilation}.
+
+% The first rule defines the evaluation behavior of a $\estrlentext$ operation. Given a pointer $x$ with its type $\tntarrayptr{0}{n_h}{\tau}{m}$, the application of such operation takes the address of the pointer $x$, and search incrementally the heap positions next to the address $x$ until we find a $0$ value (representing a null character). We return the value $n_a$ as the length, and update the bound information in the stack for $x$. In the compilation, we use a ghost variable to record such bound changes without using fat-pointer implementations.
+
+% The last three rules in Fig.~\ref{fig:semantics} describe the semantic behaviors of an $\eiftext$ branching operation when the Boolean guard is a dereference of an NT-array pointer. The first one states that if the type upper bound of the pointer $x$ is $0$, and the pointer data value $n_a$ is not $0$, we can conclude that the upper bound is not the last position of the NT-array pointer, so we can then update $1$ in the upper bound while jump to the $\etrue$ branch. The second rule describes that we do not extend the upper bound if the upper-bound of the type of $x$ is not zero because we know that we are not in the NT-array's last position. The third rule describes the behavior of jumping to the $\efalse$ branch when the pointer content is $0$. In this case, we also do not need to increase the upper-bound of the type of $x$.}
+
+\subsection{Typing}\label{sec:type-system}
+
+%% DVH: covered above.
+%% Any \checkedc expression is a word type object ($\tau$ in Fig.~\ref{fig:checkc-syn}), which is either an \tint{} or a pointer. A pointer can be either a word type $\tau$, an array $\tarray{b}{b}{\tau}$, or an NT-array $\tntarray{b}{b}{\tau}$. Each pointer type is associated with a mode $m$ indicating whether the pointer is checked (\cmode) or unchecked ($\umode$).
+
+We now turn to the \lang type system.
+% The design of the type
+% system has been carefully constructed to ensure the expected
+% properties of progress and preservation, but also so that the
+% type-based compilation strategy detailed later is correct and
+% economical in its representation of pointers.
+%
+The typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
+which states that in type environment $\Gamma$ (mapping variables to
+their types) and predicate environment $\Theta$ (mapping integer-typed
+variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
+in mode $m$. Key rules for this judgment are given in
+Fig.~\ref{fig:type-system-1}. In the rules, $m \le m'$ uses
+the two-point lattice with $\umode < \cmode$. \mwh{All remaining rules
+  are given in Appendix XXX}
+
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+    \inferrule[T-Cast]
+              {m = \cmode \Rightarrow \tau \neq\tptr{\tau''}{\cmode} \text{ for any $\tau''$} \\\\
+                \Gamma;\Theta \vdash_m e : \tau'}
+              {\Gamma;\Theta \vdash_m \ecast{\tau}{e} : \tau}
+              
+     \inferrule[T-CastCheckedPtr]
+               {\Gamma;\Theta \vdash_m e : \tau' \\
+                 \tau' \sqsubseteq \tptr{\tau}{\cmode}}
+               {\Gamma;\Theta \vdash_m \ecast{\tptr{\tau}{\cmode}}{e} : \tptr{\tau}{\cmode}}
+                
+      \inferrule[T-DynCast]
+                {\Gamma;\Theta \vdash_m e : \tptr{\tallarrayb{\bvar'}{\tau}}{m}}
+                {\Gamma;\Theta \vdash_m \edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{e} : \tptr{\tallarrayb{\bvar}{\tau}}{m}}
+                
+
+      \inferrule[T-Str]
+                {\Gamma; \Theta \vdash_m e :  \tptr{\tntarrayb{\bvar}{\tau_a}}{m} 
+                }
+                {\Gamma;\Theta \vdash_m \estrlen{e} : \tint}
+
+      \inferrule[T-LetStr]
+                {\Gamma(y) = \tntarrayptr{b_l}{b_h}{\tau_a}{\cmode} \\ x \not\in \fv(\tau) \\\\
+                 \Gamma[x\mapsto \tint,y\mapsto [\tntarrayptr{b_l}{x}{\tau_a}{\cmode}];\Theta[x\mapsto \texttt{ge}\_0] \vdash_m e : \tau}
+                {\Gamma;\Theta \vdash_m \elet{x}{\estrlen{y}}{e} : \tau}
+
+                \inferrule[T-Ret]
+    {\Gamma(x)\neq \bot \\
+          \Gamma;\Theta \vdash_m e : \tau}
+    {\Gamma;\Theta \vdash_m \eret{x}{\mu}{e} : \tau}
+
+
+      \inferrule[T-If ]
+        {\Gamma; \Theta \vdash_m e : \tau \\\\ \Gamma; \Theta \vdash_m e_1 : \tau_1 \\\\ \Gamma; \Theta \vdash_m e_2 : \tau_2}
+        {\Gamma; \Theta \vdash_m \eif{e}{e_1}{e_2} : \tau_1 \sqcup \tau_2}
+        
+      \inferrule [T-IfNT]
+                { \Gamma; \Theta \vdash_m x : \tptr{\tntarrayb{(b_l,0)}{\tau}}{c} \\\\
+                   \Gamma[x \mapsto \tptr{\tntarrayb{(b_l,1)}{\tau}}{c}]; \Theta \vdash_m e_1 : \tau_1\\\\
+                  \Gamma;\Theta \vdash_m e_2 : \tau_2 }
+                {\Gamma;\Theta \vdash_m \eif{\estar{x}}{e_1}{e_2} : \tau_1 \sqcup \tau_2}
+
+
+   \inferrule[T-Let]
+    { x\in \fv(\tau') \Rightarrow e_1 \in \text{Bound} \\\\
+        \Gamma;\Theta \vdash_m e_1 : \tau \\\\
+           \Gamma[x\mapsto \tau];\Theta \vdash_m e_2 : \tau'
+             }
+    {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'[e_1 / x]}
+
+
+    \inferrule[T-DefArr]
+              {m \leq m' \\\\ \Gamma;\Theta \vdash_{m} e : \tptr{\tallarrayb{\bvar}{\tau}}{m'}}
+              {\Gamma;\Theta \vdash_m \estar{e} : \tau}
+
+    \inferrule[T-AssignArr]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\\\
+                \Gamma; \Theta \vdash_m e_2 : \tau' \\
+                \tau'\sqsubseteq \tau\\
+                m \leq m'}
+              {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}
+
+
+\inferrule[T-Fun]
+    {\Xi(f) = \tau\;(\overline{x}:\overline{\tau})\;e \\\\
+        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
+             \overline{\tau'} \sqsubseteq 
+               \overline{\tau}[\overline{e} / \overline{x}]}
+    {\Gamma; \Theta \vdash_m f(\overline{e}) : \tau[\overline{e} / \overline{x}]}
+  \end{mathpar}
+}
+% {\footnotesize
+% \begin{center}
+% $
+% \begin{array}{l}
+% \fm(e)\triangleq(\exists x\; n\; \tau. e=x+\evalue{n}{\tau}) \vee (\exists n\;\tau. e = \evalue{n}{\tau})
+% \\[0.2em]
+% \tau[\overline{e} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall e_i\in\overline{e}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \wedge (x_i \in \fv(\tau) \Rightarrow \fm(e_i)) \Rightarrow \tau[e_i / x_i]
+% \end{array}
+% $
+% \end{center}
+% }
+\caption{Selected Type Rules}
+\label{fig:type-system-1}
+\end{figure*}
+
+\myparagraph{Pointer Access}
+%
+Rules \textsc{T-DefArr} and \textsc{T-AssignArr} typecheck array
+dereference and assignment operations resp. returning the type of
+pointed-to objects; rules for pointers to single objects are
+similar. The condition $m\le m'$ ensures that checked pointers cannot
+be dereferenced in $\eunchecked{e}$ blocks; the type rule for
+$\eunchecked{e}$  (not shown) sets $m = \umode$ when checking $e$.
+The rules do not attempt to reason whether the access is in bounds;
+this check is deferred to the semantics.
+
+% Subtyping and casting operations are briefly introduced in
+% Sec.~\ref{sec:intros}~and~\ref{sec:overview}.  Subtyping is useful in
+% static casting operations that allow users to view a pointer in one
+% type as another, such as casting an NT-array pointer to an array
+% one. \checkedc provides a set of safe static casting operations that
+% have no cost in execution.  Moreover, subtyping acts as oracles for
+% bound widening and dynamic casting operations; thus, \checkedc is
+% different from a complete static array pointer bound system.  For
+% example, if $e$ has type $\tau'$ and $\varphi$ is the current stack
+% snapshot, the semantics of $\edyncast{\tau}{e}$ does not transition to
+% an error state when $\varphi(\tau')\sqsubseteq\varphi(\tau)$.  In a
+% function call, for every argument, \lang permits users to input a
+% subtype entity and we prove that this does not affect the correctness
+% of the program.
+
+\myparagraph{Casting and Subtyping}
+%
+Rule \textsc{T-Cast} rule forbids casting to checked pointers when in checked
+regions (when $m = \cmode$), but $\tau$ is unrestricted when
+$m = \umode$. The \textsc{T-CastCheckedPtr} rule
+permits casting from an expression of type $\tau'$ to a checked pointer when
+$\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
+$\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype}; the many
+rules ensure the relation is transtive. Most of the rules handle
+casting between array pointer types; the second rule 
+$0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
+\tarrayptr{b_l}{b_h}{\tau}{m}$ permits treating a singleton
+pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
+
+Since bounds expressions may
+contain variables, determining assumptions like $b_l \leq b_l'$
+requires reasoning about those variables' possible values. The type
+system uses $\Theta$ to make such reasoning more precise.\footnote{So,
+  technically, the subtyping relation $\sqsubseteq$ and the bounds
+  ordering relation $\leq$ are parameterized by $\Theta$; this fact is
+  implicit to avoid clutter.} $\Theta$ is a map from variables $x$ to
+predicates $P$, which have the form $P ::= \top \;|\; \texttt{ge}\_0$.
+If $\Theta$ maps $x$ to $\top$, that means that the variable can
+possibly be any value; $\texttt{ge}\_0$ means that $x \ge 0$. We will
+see how $\Theta$ gets populated and give a detailed example of
+subtyping below.\footnote{As it turns out, the subtyping relation is
+  also parameterized by $\varphi$, which is needed when type checking
+  intermediate results to prove type preservation; source programs
+  would always have $\varphi = \emptyset$. Details are in
+Appendix~\ref{app:le}.}
+
+Rule \textsc{T-DynCast} typechecks dynamic casting operations, which
+apply to array pointer types only. The cast is accepted by the type
+system, as its legality will be checked by the semantics.
+
+\begin{figure}
+{\small
+\begin{center}
+  $\begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+    &&\multicolumn{1}{r}{\tau} &\sqsubseteq& \tau\\[0.6em]
+    0\le b_l \wedge b_h \le 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.6em]
+    b_l \le 0 \wedge 1 \le b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq& \tptr{\tau}{m}\\[0.6em]
+    b_l \le 0 \wedge 1 \le b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq& \tptr{\tau}{m}\\[0.6em]
+    %% b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow&  \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq&  \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq& \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow& \tallarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq& \tallarrayptr{b_l'}{b_h'}{\tau}{m}
+    \end{array}
+  $
+\end{center}
+}
+  \caption{Subtyping Relation}
+  \label{fig:checkc-subtype}
+\end{figure}
+
+\myparagraph{Bounds Widening}
+%
+The bounds of NT array pointers may be widened at conditionals, and
+due to calls to $\estrlentext$.  Rule \textsc{T-If} handles normal
+branching operations; rule \textsc{T-IfNT} is specialized to the case
+of branching on $\estar{x}$ when $x$ is a NT array pointer whose upper
+bound is 0. In this case, true-branch $e_1$ is checked with $x$'s type
+updated so that its upper bound is incremented by 1; the else-branch
+$e_2$ is typechecked under the existing assumptions. For both rules,
+the resulting type is the join of the types of the two branches
+(according to subtyping). This is important for the situation when $x$
+itself is part of the result, since $x$ will have
+different types in the two branches.
+
+Rule \textsc{T-Str} handles the case for when $\estrlentext(y)$ does
+not appear in a let binding. Rule \textsc{T-LetStr} handles the case
+when it does, and performs bounds widening. The result of the call is
+stored in variable $x$, and the type of $y$ is updated in $\Gamma$ when
+checking the let-body $e$ to indicate that $x$ is $y$'s upper
+bound. Notice that the lower bound $b_l$ is unaffected by the call to
+$\estrlentext(y)$; this is sound because we know that $\estrlentext$
+will always return a result $n$ such that $n \ge b_h$, the current
+view of $x$'s upper bound.
+
+This rule also extends $\Theta$ when checking $e$, adding a predicate
+indicating that $x\ge 0$. To see how this information is used,
+consider this example.  The \code{return} on line 16 of
+Fig.~\ref{fig:strncat-ex} has an implicit static cast from the
+returned expression to the declared function type (see rule
+\textsc{T-Fun}, described below). In type checking the $\estrlentext$
+on line 4, we insert a predicate in $\Theta$ showing
+\code{n}$\;\ge 0$.  The static cast on line 16 is valid according ot
+the last line in Fig.~\ref{fig:checkc-subtype}:
+$$
+\tallarrayptr{0}{n}{\tau}{c} \sqsubseteq \tallarrayptr{0}{0}{\tau}{c}
+$$
+because $0 \leq 0$ and $0 \leq n$, where the latter holds since
+$\Theta$ proves $n \ge 0$.  Without $\Theta$, we would need a
+dynamic cast.
+
+In our formal presentation, $\Theta$ is quite simple and is just meant
+to illustrate how static information can be used to avoid dynamic
+checks; it is easy to imagine richer environments of facts that can be
+leveraged by, say, an SMT solver as part of the subtyping
+check. \mwh{Cite Liquid Haskell and
+  \url{https://www.haskellforall.com/2015/12/compile-time-memory-safety-using-liquid.html},
+maybe others}
+
+% There is a difference between the \checkedc and \lang type systems in
+% terms of recognizing subtyping due to $\Theta$. \code{strncat_c} in
+% Fig.~\ref{fig:strncat-ex} represents what the \checkedc specification
+% can do, while \code{strncat} represents what \lang can do. In the
+% usage of a static casting operation in line 16 of
+% Fig.~\ref{fig:strncat-ex}, \lang formalization is smart enough to
+% infer that \code{x} must be a non-negative number because the creation
+% of \code{x} is from a \code{strlen} call.  \checkedc does not perform
+% predicate decision procedure to reason about the bounds statically;
+% thus, a dynamic casting is required in the case, such as line 30 in
+% \code{strncat_c} in Fig.~\ref{fig:strncat-ex}.  More differences are
+% in Sec.~\ref{sec:disc}.
+
+% Here, we introduce
+% two most common NT-array operations: $\estrlentext$ and branching
+% operations.  Line 4 in Fig.~\ref{fig:strncat-ex} shows the bound
+% widening behavior of the NT-array pointer usage in a $\estrlentext$
+% expression.  The upper-bound of pointer \code{a} is updated to
+% \code{x} through out the whole function body, which is the scope of
+% variable \code{x}.  Line 5-8 in Fig.~\ref{fig:checkedc-example} shows
+% the bound widening behavior of using NT-array pointers in a branching
+% operation. In \checkedc, if a Boolean guard has the form $\estar{x}$,
+% and $x$'s upper bound is $0$, then the \code{true} branch recognizes
+% the upper bound of $x$ incremented by $1$, because the end position in
+% the NT-array pointed to by $x$ is not a null-character in the
+% \code{true} branch; thus, there is at least one more valid position in
+% the NT-array after the current end position. More details discussion
+% are in Sec.~\ref{sec:disc}.
+
+\myparagraph{Dependent Functions and Let Bindings}
+%
+Rule \textsc{T-Fun} is the standard dependent function call rule. It
+looks up the definition of the function in the function environment
+$\Xi$, typechecks the actual arguments $\overline{e}$ which have
+types $\overline{\tau'}$, and then confirms that each of these types
+is a subtype of the declared type of $f$'s corresponding parameter. Because
+functions have dependent types, we substitute each parameter $e_i$ for
+its corresponding parameter $x_i$ in both the parameter types and the
+return type. Consider the \code{strncat} function in
+Fig.~\ref{fig:strncat-ex}; its parameter type for \code{a} 
+depends on \code{n}. The \textsc{T-Fun} rule will substitute 
+\code{n} with the argument at a call-site.
+
+Rule \textsc{T-Let} types a $\elettext$ expression, which also admits
+type dependency. In particular, the result of evaluating a $\elettext$
+may have a type that refers to one of its bound variables (e.g., if
+the result is a checked pointer with a variable-defined bound); if so,
+we must substitute away this variable once it goes out of scope. Note
+that we restrict the expression $e_1$ to syntactically match the
+structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
+
+Rule \textsc{T-Ret} types a $\erettext$ expression, which does not
+appear in source programs but is introduced by the semantics when
+evaluating a let binding (rule \textsc{S-Let} in
+Fig.~\ref{fig:semantics}); this rule is needed for the preservation
+proof. After the evaluation of a let binding a variable $x$ concludes,
+we need to restore any prior binding of $x$, which is either
+$\bot$ (meaning that there is no $x$ originally) or some value
+$\evalue{n}{\tau}$.
+
+\subsection{Type Soundness and Blame}\label{sec:theorem}
+
+% Before we present our main theorems, we need to first
+% discuss the meaning what a pointer being well-typed in a given heap
+% snapshot $\heap$ means, which is captured by rules in
+% Fig.~\ref{fig:const-type}. The variable type rule ($\textsc{T-Var}$)
+% simply checks if a given variable has the defined type in $\Gamma$;
+% the constant rule ($\textsc{T-Const}$) is slightly more involved.
+% First, it ensures that the type annotation $\tau$ does not contain any
+% free variables. More importantly, it ensures that the pointer points
+% to a location that makes sense in a given heap.
+%  
+%  
+%  The $\size$ function in Fig.~\ref{fig:const-type}
+% refers to the \code{sizeof} function in C computing the number of
+% bytes for a type.
+%  
+%  
+%  Second, we
+% require that any constant ($\evalue{n}{\tau}$) should make sense in
+% $\heap$. We develop a recursive predicate $\sigma \vdash n : \tau$ to
+% verify if $n$ has $\tau$ in a heap snapshot $\heap$. $\sigma$ is a
+% constant set containing the constants that have been verified by the
+% relation. For every constant $\evalue{n}{\tau}$, it is either an
+% integer $\tint$, an unchecked pointer $\tptr{\omega}{\umode}$,
+% zero-valued number ($n=0$), checked in $\sigma$
+% ($\evalue{n}{\tptr{\omega}{\cmode}}\in \sigma$); or if it is not the
+% above case, then (i) $\heap(n)$ is defined, and (ii) for every heap
+% location $n+i$ in the range of the pointer (if $\omega$ is a word
+% type, range is $[0,1)$; if $\omega$ is an array type
+%   ($\tarray{0}{b_h}{\tau'}$), range is $[0,b_h)$, if $\tau$ is a
+%     NT-array type ($\tntarray{0}{b_h}{\tau'}$), range is $[0,b_h+1)$),
+%       if $\heap(n+i)=\evalue{n_a}{\tau_a}$, then
+%       $\evalue{n_a}{\tau_a}$ satisfies $\sigma \cup \{(n,\tau) \}
+%       \vdash n_a : \tau_a$.
+%  
+%  
+% \begin{figure}[t]
+% {\small
+% \text{Type Rules for Constants and Variables:}
+% \begin{mathpar}
+%   \inferrule[T-Var]
+%       {x : \tau \in \Gamma}
+%       {\Gamma;\Theta \vdash_m x : \tau}
+%  
+%   \inferrule[T-Const]
+%       {\fv(\tau) = \emptyset \\ \emptyset \vdash n : \tau}
+%       {\Gamma;\Theta\vdash_m \evalue{n}{\tau} : \tau}
+% \end{mathpar}
+%     
+% \text{Rules for Checking Constant Pointers In Heap:}
+% \begin{mathpar}
+%   \inferrule
+%       {}
+%       {\sigma \vdash n : \tint}
+%  
+%   \inferrule
+%       {}
+%       {\sigma \vdash n : \tptr{\omega}{\umode}}
+%  
+%   \inferrule
+%       {}
+%       {\sigma \vdash 0 : \tptr{\omega}{\cmode}}
+%  
+%   \inferrule
+%       {\evalue{n}{\tptr{\omega}{\cmode}}\in \sigma}
+%       {\sigma \vdash n : \tptr{\omega}{\cmode}}
+%  
+%   \inferrule
+%       {\forall i \in [0,\size(\omega)) .
+%            \sigma \cup \{(n:\tptr{\omega}{\cmode}) \}\vdash \heap(n+i)}
+%       {\sigma \vdash n : \tptr{\omega}{\cmode}}
+% \end{mathpar}
+% }
+% \caption{Type Rules for Checking Constants/Variables}
+% \label{fig:const-type}
+% \end{figure}
+
+In this subsection, we focus on our main metatheoretic results about
+\lang: type soundness (progress and preservation) and blame. The type
+soundness theorems rely on a notion of heap and stack
+\emph{well-formedness}:
+
+%Here, we show several theorems about \lang. The first one is the type soundness theorem relating the \lang type system and the semantics. A type soundness theorem is usually defined in terms of a type progress and type preservation theorem. In both these theorems, we have an important assumption about the well-formedness of the expression and the given initial heap. The expression well-formedness is briefly introduced in Sec.~\ref{sec:type-system}. It means that every variable used in a program is in scope. Below gives the well-formedness definition for a heap snapshot.
+
+\smallskip
+\begin{defi}[Heap Well-formedness]
+A heap $\heap$ is well-formed, iff (i) the null position
+($0$) is not defined in $\heap$, and (ii) every type annotation in it
+contains no free variables.
+\end{defi}
+\smallskip
+\begin{defi}[Stack Well-formedness]
+A stack snapshot $\varphi$ is well-formed, iff every type annotation in
+it contains no free variables.
+\end{defi}
+\smallskip
+
+Moreover, as a program evaluates its expression may contain literals
+$n\!:\!\tau$ where $\tau$ is a pointer type, i.e., $n$ is an index in
+$\heap$ (perhaps because $n$ was chosen by $\mathtt{malloc}$). The
+normal typechecking judgment for $e$ is implicitly parameterized by
+$\heap$, and the rules for typechecking literals confirm that
+pointed-to heap cells are compatible with (subtypes of) the pointer's
+type annotation; in turn this check may precipitate checking the type
+consistency of the heap itself. We follow the same approach as
+\citet{ruef18checkedc-incr}, and show the rules in
+Appendix~\ref{sec:literal-pointer-typing}.
+
+
+Progress now states that terms that don't reduce are either values or their
+mode is unchecked:
+
+\smallskip
+\begin{thm}[Type Progress Theorem]\label{thm:progress}
+For any \checkedc program $e$ and heap $\heap$, if $e$ and $\heap$ are
+well-formed, and $\emptyset;\emptyset\vdash_m e : \tau$, then $e$ is
+either a value ($\evalue{n}{\tau}$), \code{unchecked} ($m=\umode$), or
+there exists $\varphi'$ $\heap'$ $e'$, such that $(\emptyset,\heap,e)
+\longrightarrow_m (\varphi',\heap',e')$.
+\end{thm}
+{\em Proof:} By induction on the typing derivation.
+
+\smallskip
+
+For preservation, we also need to introduce a notion of
+\emph{consistency}, relating heap environments before and after a
+reduction step, and type environments, predicate sets, and stack
+snapshots together.
+
+\smallskip
+\begin{defi}[Type-Stack Consistency]
+A type environment $\Gamma$, variable predicate set $\Theta$, and stack snapshot $\varphi$ are consistent, iff every variable defined in $\Theta$ is defined in $\Gamma$, and for every variable $x$, $\Gamma(x) = \tau$ implies that $\varphi(x)$ is defined and there exists $n$ and $\tau'$, such that $\varphi(x)=\evalue{n}{\tau'}$ and $\tau' \sqsubseteq \tau$.
+\end{defi}
+\smallskip
+\begin{defi}[Heap Consistency]
+A heap $\heap'$ is consistent with $\heap$ iff every address defined
+in $\heap$ is defined in $\heap'$.
+\end{defi}
+\smallskip
+
+\noindent
+Armed with the definitions of consistency, we can now prove
+preservation, which states that a reduction step preserves both the
+type of the expression being reduced, as well as well-formedness and
+consistency of environments:
+
+\smallskip
+\begin{thm}[Type Preservation Theorem]
+For any \checkedc program $e$, heap $\heap$, stack
+$\varphi$, type environment $\Gamma$, variable predicate set $\Theta$,
+and a type $\tau$, that are all are well-formed, if $\Gamma, \Theta$,
+and $\varphi$ are consistent, $e$ is well typed
+$\Gamma;\Theta\vdash_{\cmode} e : \tau$, and if there exists $\varphi'$,
+$\heap'$ and $e'$, such that $(\varphi,\heap,e)
+\longrightarrow_{\cmode} (\varphi',\heap',e')$, then there exists
+$\Gamma'$, $\Theta'$ and $\tau'$, such that $\Gamma'$, $\Theta'$,
+$\varphi'$, $\heap'$ and $e'$ are well-formed, $\Gamma'$, $\Theta'$
+and $\varphi'$ are consistent, $\heap'$ is consistent with $\heap$,
+$\Gamma';\Theta' \vdash_{\cmode} e: \tau'$, and $\tau'\sqsubseteq
+\tau$.
+\end{thm}
+{\em Proof:} By induction on the typing derivation.
+\smallskip
+
+Using type soundness we can prove our main result, {\em blame}, which
+states that if there is any spatial memory safety violation is
+triggered, it must necessarily come from the unchecked region. 
+
+\smallskip
+\begin{thm}\label{thm:blame}
+[The Blame Theorem] For any \checkedc program $e$, heap
+$\heap$, type $\tau$, if $\heap$ and $e$ are well-formed,
+$\emptyset;\emptyset\vdash_{\cmode} e : \tau$, and if there exists
+$\varphi'$, $\heap'$, a failure result $r$, and $m$, such that
+$(\varphi,\heap,e) \longrightarrow_m^* (\varphi',\heap',r)$, then
+there exist $E$ and $e_a$, such that $e' = E[e_a]$, and $\mode(E) = \umode$.
+\end{thm}
+{\em Proof:} By induction on the number of steps of the \checkedc
+evaluation ($\longrightarrow_m^*$), using progress and preservation to
+maintain the invariance of the assumptions.
+
+These proofs have been carried out in a Coq development.
+
+\ignore{
+\begin{figure}[t!]
+  \begin{prooftree}
+    \hypo{\evalue{n}{\tau} \in \defscope}
+    \infer1[T-VConst]{\Gamma;\defscope \vdash_m \evalue{n}{\tau}  : \tau}
+  \end{prooftree}
+  \qquad
+
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma;\defscope \vdash_m e : \tau \\
+        \Gamma;\defscope \vdash_m e_1 : \tau_1 
+      \end{matrix}
+    }
+    \hypo{
+      \begin{matrix}
+\Gamma \vdash_m \tau_3 = \tau_1 \vee \tau_2 \\
+            \Gamma;\defscope \vdash_m e_2 : \tau_2
+          \end{matrix}
+        }
+    \infer2[T-If]{\Gamma;\defscope \vdash_m \eif{e}{e_1}{e_2} : \tau_3}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma;\defscope \vdash_m x : \tptr[c]{(\tntarray{l}{0}{\tau})}, l \leq 0 \\
+        \Gamma, x : \tptr[c]{(\tntarray{l}{1}{\tau})};\defscope \vdash_m e_1 : \tau_1 \\
+        \Gamma;\defscope \vdash_m e_2 : \tau_2 \\
+        \Gamma \vdash_m \tau_3 = \tau_1 \vee \tau_2
+      \end{matrix}
+    }
+    \infer1[T-IfNT]{\Gamma;\defscope \vdash_m \eif{\estar{x}}{e_1}{e_2} : \tau_3}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        F(f) = \tau_{j}\;(x_0:\tau_0, \ldots, x_{j-1}:\tau_{j-1})\;e  \\
+        \Gamma; \defscope \vdash_m \tau_i[x_0,\ldots,x_{i-1} \mapsto e_0,\ldots,e_{i-1}] ~~~ 0 \leq i \leq j\\
+        \Gamma; \defscope \vdash_m e_i : \tau_i' ~~~ 0 \leq i \leq j\\
+        \Gamma; \defscope \vdash_m \subtype{\tau_i'}{\tau_i[x_0,\ldots,x_{i-1} \mapsto e_0,\ldots,e_{i-1}]}  ~~~ 0 \leq i < j
+      \end{matrix}
+    }
+    \infer1[T-VCall]{\Gamma; \defscope \vdash_m f(\overline{e}) : \tau_j[x_0,\ldots,x_{j-1} \mapsto e_0,\ldots,e_{j-1}]}
+  \end{prooftree} \\ \\
+% \inferrule*[lab=T-PtrC]
+% {
+%   \tau = \tptr[c]{\omega} \\
+%   \tau_0, ..., \tau_{j-1} = \mathrm{types}(D,\omega)\\\\
+%   \wt[\Gamma][\defscope, n^\tau]{H(n+k)}{\tau_k} ~~~ 0 \leq k < j
+% %  \Gamma,n^\tau \proves H(n+k) : \tau_k~~~0 \leq k < j
+% }
+
+
+
+  \begin{prooftree}
+    \hypo{
+          \Gamma; \defscope \vdash_m e_1 : \tau_1
+      }
+      \hypo{        \Gamma, x = e_1 : \tau_1; \defscope \vdash_m e_2 : \tau_2
+}
+    \infer2[T-Let]{\Gamma; \defscope \vdash_m \elet{x}{e_1}{e_2} : \tau[x \mapsto e_1]}
+  \end{prooftree} \\ \\
+
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma; \defscope \vdash_m \estrlen{y} : \tau_1\\
+        \Gamma; \defscope \vdash_m y : \tptr[c]{(\tntarray{le}{\_}{\tau_3})}\\
+        \Gamma, x = \estrlen{y} : \tau_1, \\ y : \tptr[c]{(\tntarray{le}{x}{\tau_3})} ;  \defscope  \vdash_m e_2 : \tau_2
+        \end{matrix}
+        }
+        \infer1[T-LetStr]{\Gamma; \defscope \vdash_m \elet{x}{\estrlen{y}}{e_2} : \tau[x \mapsto e_1]}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \hypo{
+        \Gamma; \defscope \vdash_m e : \tptr[c]{(\tntarray{le}{he}{\tau})}
+      }
+        \infer1[T-Str]{\Gamma; \defscope \vdash_m \estrlen{y} : \tint}
+      \end{prooftree} \\ \\
+
+      \begin{prooftree}
+        \hypo{
+          \begin{matrix}
+            \tau = \tint \vee \tau = \tptr[u]{\omega}~\vee  n=0~ \vee \\ \tau = \tptr[c]{(\tarray{0}{0}{\tau'})} \vee \\
+            \tau = \tptr[c]{(\tntarray{0}{0}{\tau'})}
+        \end{matrix}
+      }
+      \infer1[T-Base]{\Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tau}
+    \end{prooftree} \\ \\
+
+    \begin{prooftree}
+      \hypo{
+        \begin{matrix}
+        \tau = \tptr[c]{\omega} \\
+        \tau_0, ..., \tau_{j-1} = \mathrm{types}(D,\omega)\\
+        \Gamma;\defscope, \evalue{n}{\tau}  \vdash_m {H(n+k)} : {\tau_k} ~~~ 0 \leq k < j
+      \end{matrix}
+      }
+      \infer1[T-PtrC]{\Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tau}
+    \end{prooftree} \\ \\
+
+    \begin{prooftree}
+      \hypo{
+        \begin{matrix}
+            \Gamma; \defscope \vdash_m e :  {\tptr[m]{\tstruct{T}}} \\
+            % \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
+            D(T) = ...; \tau_f~f; ...
+        \end{matrix}
+      }
+      \infer1[T-Amper]{\Gamma; \defscope \vdash_m \eamper{e}{f} : \tptr[m]{\tau_f}}
+    \end{prooftree} \\ \\
+
+
+    \todo[inline]{YL: how to express le - n as a metafunction?}
+    \begin{prooftree}
+      \hypo{
+        \begin{matrix}
+        \Gamma; \defscope \vdash_m e_1 : \tptr[m']{(\tgarray{\alpha}{le}{he}{\tau})}\\
+        \Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tint \\
+        le' = le - n, he' = he - n
+      \end{matrix}
+    }
+      \infer1[T-BinopInd]{\Gamma; \defscope \vdash_m (e_1 \plus \evalue{n}{\tau} ) : \tptr[m']{(\tgarray{\alpha}{le'}{he'}{\tau})}}
+    \end{prooftree}
+\caption{Typing}
+\label{fig:typing}
+\end{figure}
+
+\begin{figure}[t!]
+  \todo[inline]{no sizeof check because we don't know statically whether the allocation would be null}
+  \begin{prooftree}
+    \hypo{
+      \omega = \tgarray{\alpha}{le}{he}{\tau} \Rightarrow le = 0
+    }
+    \infer1[T-Malloc]{\Gamma; \defscope \vdash_m \emalloc{\omega} : \tptr[c]{\omega}}
+  \end{prooftree}\\\\
+
+  \begin{prooftree}
+    \hypo{
+      \Gamma; \defscope \vdash_u e : \tau
+    }
+    \infer1[T-Unchecked]{\Gamma; \defscope \vdash_m \eunchecked{e} : \tau}
+  \end{prooftree}\\\\
+
+  \todo[inline]{any constraints on m'?}
+  \begin{prooftree}
+    \hypo{\Gamma; \defscope \vdash_m e :  \tptr[m']{(\tgarray{\alpha}{le'}{he'}{\tau})} }
+    \infer1[T-DynCast]{\Gamma; \defscope \vdash_m \edyncast{\tptr[m']{(\tgarray{\alpha}{le}{he}{\tau})}}{e} : \tau}
+  \end{prooftree}\\\\
+  
+  \begin{prooftree}
+    \hypo{\Gamma; \defscope \vdash_m e : \tau'}
+    \infer1[T-Cast]{\Gamma; \defscope \vdash_m \ecast{\tau}{e} : \tau}
+  \end{prooftree}\\\\
+
+
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\tgarray{\alpha}{le}{he}{\tau}} \\
+        \Gamma; \defscope \vdash_m e_2 : \tint \\
+        m' = u \Rightarrow m = u \\
+      \end{matrix}
+    }
+    \infer1[T-Index]{\Gamma; \defscope \vdash_m \estar{(\ebinop{e_1}{e_2})} : \tau}
+  \end{prooftree} \\\\
+
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\omega} \\
+        \Gamma; \defscope \vdash_m e_2 : \tau \\
+        m' = u \Rightarrow m = u \\
+        \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
+      \end{matrix}
+    }
+    \infer1[T-Assign]{\Gamma; \defscope \vdash_m \eassign{e_1}{e_2} : \tau}
+  \end{prooftree}\\\\
+
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\omega} \\
+        \Gamma; \defscope \vdash_m e_2 : \tint \\
+        \Gamma; \defscope \vdash_m e_3 : \tau \\
+        m' = u \Rightarrow m = u \\
+        \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
+      \end{matrix}
+    }
+    \infer1[T-IndAssign]{\Gamma; \defscope \vdash_m \eassign{(e_1 \plus e_2)}{e_3} : \tau}
+  \end{prooftree}
+
+\caption{Typing Cont.}
+\label{fig:typing2}
+\end{figure}
+\ignore{
+
+
+
+
+
+\begin{figure}[t!]
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma \vdash x_0:\tau_0, \ldots, x_{j}:\tau_{j} \\
+        \Gamma, x_0 = \kw{none} : \tau_0, \ldots, x_{j-1} = \kw{none} : \tau_{j-1}; \defscope \vdash e : \tau_{r}
+      \end{matrix}
+    }
+    \infer1[WF-Fun]{\Gamma;\defscope \vdash \tau_{j}\;(x_0:\tau_0, \ldots, x_{j-1}:\tau_{j-1})\;e}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \infer0[WF-Nil]{\Gamma \vdash \circ}
+  \end{prooftree} \\\\
+
+  \begin{prooftree}
+    \hypo{
+      \begin{matrix}
+        \Gamma \vdash \tau_0 \\
+        \Gamma, x_0 = \kw{none} :\tau_0 \vdash x_1:\tau_{1}, \ldots, x_{j}:\tau_{j}
+      \end{matrix}
+    }
+    \infer1[WF-Cons]{\Gamma \vdash x_0:\tau_0, \ldots, x_{j}:\tau_{j}}
+  \end{prooftree} \\\\
+
+  \begin{prooftree}
+    \infer0[WF-Int]{\Gamma \vdash \tint}
+  \end{prooftree} \\\\
+
+  \begin{prooftree}
+    \hypo{   \Gamma \vdash le }
+     \hypo{   \Gamma \vdash he }
+      \hypo{  \Gamma \vdash \tau}
+
+    \infer3[WF-Array]{\Gamma \vdash \tptr[m]{(\tgarray{\alpha}{le}{he}{\tau})}}
+  \end{prooftree} \\\\
+
+  \begin{prooftree}
+    \hypo{T \in dom(D)}
+    \infer1[WF-Struct]{\Gamma \vdash \tptr[m]{\tstruct{T}}}
+  \end{prooftree} \\\\
+
+  \begin{prooftree}
+    \hypo{\Gamma \vdash \tau}
+    \infer1[WF-Ptr]{\Gamma \vdash \tptr[m]{\tau}}
+  \end{prooftree} \\\\
+  
+  \begin{prooftree}
+    \infer0[WFB-Int]{\Gamma \vdash i}
+  \end{prooftree}\\\\
+  
+  \begin{prooftree}
+    \hypo{x = e? : \tint \in \Gamma}
+    \infer1[WFB-Var]{\Gamma \vdash x \plus i}
+  \end{prooftree} \\\\
+
+  \caption{Well-Formedness}
+  \label{fig:wf}
+\end{figure}
+
+
+
+\begin{figure}[t!]
+  \begin{prooftree}
+    \infer0[Sub-Nt]{\subtype{\tptr[c]{(\tntarray{le}{he}{\tau})}}{\tptr[c]{(\tarray{le}{he}{\tau})}}}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \infer0[Sub-Refl]{\subtype{\tau}{\tau}}
+  \end{prooftree} \\ \\
+
+  \todo[inline]{what about ntarrays?}
+  \begin{prooftree}
+    \infer0[Sub-Ptr]{\subtype{\tptr[c]{\tau}}{\tptr{\tarray{0}{1}{\tau}}}}
+  \end{prooftree} \\ \\
+
+  \todo[inline]{the subtyping relation is not anti-symmetric..}
+  \begin{prooftree}
+    \infer0[Sub-Arr]{\subtype{\tptr[c]{\tarray{0}{1}{\tau}}}{\tptr{\tau}}}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    \hypo{\rboundle{le_0}{le_1}}
+    \hypo{\rboundle{he_1}{he_0}}
+    \infer2[Sub-Subsume]{\subtype{\tptr{(\tgarray{\alpha}{le}{he}{\tau})}{\cmode}}{ \tptr{(\tgarray{\alpha}{ le_1} {he_1} {\tau})}}}
+  \end{prooftree} \\ \\
+
+  \begin{prooftree}
+    % check t-amper below
+    \hypo{D(T) = \tau_f~f; ...}
+    \hypo{\subtype{\tau_f}{\tau}}
+    \infer2{\subtype{\tptr[c]{\tstruct{T}}}{\tau}}
+  \end{prooftree}
+  \caption{Subtyping}
+  \label{fig:sub}
+\end{figure}
+}
+}
+
+\ignore{
+
+\begin{figure*}[t]
+  \begin{lstlisting}
+int foo(nt_array_ptr<char> p : count(0)) {
+  if (* p) {
+    dyn_bounds_cast<nt_array_ptr<char>>(p, count(1));
+  }
+  dyn_bounds_cast<nt_array_ptr<char>>(p, count(1));
+  return 0;
+}
+  \end{lstlisting}
+\caption{The example where clang checkedc fails at runtime}
+\label{fig:clangbad1}
+\end{figure*}
+
+\begin{figure*}[t]
+  \begin{lstlisting}
+/* nt_array_ptr<char> p : bounds(p,p) */
+size_t cnt = 0;
+
+while(*(p+cnt)) {
+  ++cnt;
+}
+dyn_bounds_cast<nt_array_ptr<char>>(p, count(cnt));
+  \end{lstlisting}
+\caption{A useful program that the checkedc spec doesn't allow at runtime}
+\label{fig:clangbad2}
+\end{figure*}
+}
+
+\ignore{
+The Clang CheckedC implementation uses statically determined
+bounds to insert runtime checks. In Fig.~\ref{fig:clangbad1}, the
+\code{dyn_bounds_cast} at line 3 will always succeed, because the
+compiler knows that within the scope of then branch, the pointer
+\code{p} must have at least one element. The same cast at line 5,
+however, will always fail, since there is no way to tell statically
+whether the program has entered the then branch before. The compiler
+will check whether the \code{count(1)} bounds specification is
+contained within the earlier \code{count(0)} specification, resulting
+in a runtime failure even when we pass in a non-empty string.
+
+Our formalization diverges from this runtime behavior and instead keeps
+track of the bounds on the stack. After entering the then branch, we
+increment the upper bound for \code{p}, effectively making the
+updated bounds information available even after we exit the if
+statement. The cast at line 5 will be checking the new bounds against
+the incremented bounds for non-empty strings.
+
+Fig.~\ref{fig:clangbad2} gives a more practical example of why keeping
+track of the bounds on the stack is useful. The program snippet
+implements the functionality of the \code{strlen} function using a
+while loop and a \code{cnt} variable. Even though the type system is
+unable to reason about the while loop, as long as the runtime system
+updates the bounds in-place, the user can apply a
+\code{dyn_bounds_cast} to soundly recover the more precise bounds
+information.
+}
+
+
+% \inferrule*[lab=T-Amper]
+% {
+%   \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
+%   D(T) = ...; \tau_f~f; ...
+% }
+% {
+%   \Gamma \proves \eamper{e}{f} : \tptr[m]{\tau_f}
+% }
