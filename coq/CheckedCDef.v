@@ -941,7 +941,7 @@ Inductive expression : Type :=
   | EVar : var -> expression
   | EStrlen : var -> expression
   | ECall : expression -> list expression -> expression
-  | ERet : var -> Z* type -> option (Z * type) -> expression -> expression (* return new value, old value and the type. *)
+  | ERet : var -> Z* type -> expression -> expression (* return new value, old value and the type. *)
   | EDynCast : type -> expression -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : mode -> type -> expression
@@ -1083,7 +1083,7 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       (forall e, In e el -> (exists n t, e = ELit n t
                  /\ word_type t /\ type_wf D Checked t /\ simple_type t) \/ (exists y, e = EVar y)) ->
       expr_wf D (ECall xe el)
-  | WFRet : forall x old a e, simple_option D (Some old) -> simple_option D a -> expr_wf D e -> expr_wf D (ERet x old a e)
+  | WFRet : forall x old e, simple_option D (Some old) -> expr_wf D e -> expr_wf D (ERet x old e)
   | WFEDynCast : forall t e,
      is_array_ptr t -> type_wf D Checked t -> expr_wf D e -> expr_wf D (EDynCast t e)
   | WFELet : forall x e1 e2,
@@ -1169,8 +1169,7 @@ Fixpoint freeVars (e : expression) :=
           | EVar x => [x]
           | EStrlen x => [x]
           | ECall e1 el => freeVars e1 ++ (fold_right (fun b a => freeVars b ++ a) [] el)
-          | ERet x (n,t) None e => [x]++freeTypeVars t ++ freeVars e
-          | ERet x (n,t) (Some (n1,t1)) e1 => [x]++freeTypeVars t ++ freeTypeVars t1 ++ freeVars e1
+          | ERet x (n,t) e => [x]++freeTypeVars t ++ freeVars e
           | EDynCast t e => freeTypeVars t ++ freeVars e
           | ELet x e1 e2 => set_diff Nat.eq_dec (freeVars e1) [x] ++ freeVars e2 
           | EMalloc m t => freeTypeVars t
@@ -1325,7 +1324,6 @@ Inductive ctxt : Type :=
   | CDeref : ctxt -> ctxt
   | CAssignL : ctxt -> expression -> ctxt
   | CAssignR : Z -> type -> ctxt -> ctxt
-  | CRet : var -> (Z*type) -> option (Z * type) -> ctxt -> ctxt
 (*
   | CIfEqL : ctxt -> expression -> expression -> expression -> ctxt
   | CIfEqR : expression -> ctxt -> expression -> expression -> ctxt
@@ -1348,7 +1346,6 @@ Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   | CDeref E' => EDeref (in_hole e E')
   | CAssignL E' e' => EAssign (in_hole e E') e'
   | CAssignR n t E' => EAssign (ELit n t) (in_hole e E')
-  | CRet x old a E' => ERet x old a (in_hole e E')
   | CIf E' e1 e2 => EIf (in_hole e E') e1 e2
 (*
   | CIfEqL E' e1 e2 e3 => EIfPtrEq (in_hole e E') e1 e2 e3
@@ -1373,7 +1370,6 @@ Fixpoint mode_of (E : ctxt) : mode :=
   | CDeref E' => mode_of E'
   | CAssignL E' _ => mode_of E'
   | CAssignR _ _ E' => mode_of E'
-  | CRet x old a E' => mode_of E'
   | CIf E' e1 e2 => mode_of E'
 (*
   | CIfEqL E' e1 e2 e3 => mode_of E'
@@ -1397,7 +1393,7 @@ Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   | CDeref E' => CDeref (compose E' E_inner)
   | CAssignL E' e' => CAssignL (compose E' E_inner) e'
   | CAssignR n t E' => CAssignR n t (compose E' E_inner)
-  | CRet x old a E' => CRet x old a (compose E' E_inner)
+
   | CIf E' e1 e2 => CIf (compose E' E_inner) e1 e2
 (*
   | CIfEqL E' e1 e2 e3 => CIfEqL (compose E' E_inner) e1 e2 e3
@@ -1899,6 +1895,11 @@ Definition mem : Type := stack * real_heap.
 
 Create HintDb sem.
 
+Definition inject_ret (x:var) (v1:Z * type) (e:result) :=
+  match e with RExpr ea => RExpr (ERet x v1 ea)
+            | a => a
+ end.
+
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 Inductive step
   (D : structdef)
@@ -2015,17 +2016,23 @@ Inductive step
     step D F
       (s, R) (ELet x (ELit n t) e)
       (Stack.add x (n,t') s,  R)
-      (RExpr (ERet x (n,t') (Stack.find x s) e))
+      (RExpr (ERet x (n,t') e))
 
-| SRetSome : forall s R x a ta ntb n t,
+| SRetSome : forall s R s' R' x nb tb nb' tb' a' ta' e re,
+    Stack.MapsTo x (a',ta') s ->
+    Stack.MapsTo x (nb',tb') s' ->
+    step D F (Stack.add x (nb,tb) s, R) e (s',R') re ->
     step D F
-      (s, R) (ERet x ntb (Some (a,ta)) (ELit n t))
-      (Stack.add x (a,ta) s, R) (RExpr (ELit n t))
-| SRetNone : forall s R x ntb n t,
+      (s, R) (ERet x (nb,tb) e)
+      (Stack.add x (a',ta') s, R) (inject_ret x (nb',tb') re)
+| SRetNone : forall s R s' R' x nb tb nb' tb' e re,
+    ~ Stack.In x s ->
+    Stack.MapsTo x (nb',tb') s' ->
+    step D F (Stack.add x (nb,tb) s,R) e (s',R') re ->
     step D F
       (s, R)
-      (ERet x ntb None (ELit n t))
-      (Stack.remove x s, R) (RExpr (ELit n t))
+      (ERet x (nb,tb) e)
+      (Stack.remove x s', R) (inject_ret x (nb',tb') re)
 | SPlusChecked : forall s R n1 t1 n2,
     n1 > 0 -> is_check_array_ptr t1 ->
     step D F
@@ -2684,17 +2691,14 @@ Section Typing.
       well_typed (Env.add x t1 env) Q m e2 t ->
       well_typed env Q m (ELet x e1 e2) t
 
-  | TyRetTNat : forall env Q m x na a e t,
-      Env.MapsTo x TNat env ->
-      Theta.MapsTo x (NumEq na) Q ->
-      well_typed env Q m e t ->
-      well_typed env Q m (ERet x (na,TNat) a e) (subst_type [(x,(Num na))] t)
+  | TyRetTNat : forall env Q m x na e t,
+      well_typed (Env.add x TNat env) (Theta.add x (NumEq na) Q) m e t ->
+      well_typed env Q m (ERet x (na,TNat) e) (subst_type [(x,(Num na))] t)
 
-  | TyRet : forall env Q m x na ta a e t,
+  | TyRet : forall env Q m x na ta e t,
       ta <> TNat ->
-      Env.MapsTo x ta env ->
-      well_typed env Q m e t ->
-      well_typed env Q m (ERet x (na,ta) a e) t
+      well_typed (Env.add x ta env) Q m e t ->
+      well_typed env Q m (ERet x (na,ta) e) t
 
   | TyPlus : forall env Q m e1 e2,
       well_typed env Q m e1 (TNat) ->
