@@ -239,7 +239,7 @@ $    \begin{array}{l}
 e & ::= & \ldots \mid \ret{x}{\mu}{e}\\
 r & ::= & e \mid \enull \mid \ebounds\\
 E &::=& \Box \mid \elet{x}{E}{e} \mid \ecall{f}{\overline{E}}\mid\ecast{\tau}{E} \mid \edyncast{\tau}{E} \\[0.2em]
-&&\mid \ret{x}{\evalue{n}{\tau}}{E}\mid\ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid\estar{E}\mid\eassign{E}{e} \\[0.2em]
+&& \mid \ebinop{\evalue{n}{\tau}}{E}\mid\estar{E}\mid\eassign{E}{e} \\[0.2em]
 &&\mid\eassign{\evalue{n}{\tau}}{E}\mid\eunchecked{E}\mid\eif{E}{e}{e}\\[0.2em]
 \overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
 \end{array}
@@ -386,8 +386,9 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 
         \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
 
-    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
+    \inferrule[S-RetCon]{\varphi(x)=\mu\\ (\varphi[x\mapsto \mu'],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\mu'}{e}) \longrightarrow (\varphi'[x\mapsto \mu],\heap',\ret{x}{\varphi'(x)}{e'})}
 
+    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
     \inferrule[S-Fun]{ \Xi(f) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
         {(\varphi,\heap,\ecall{f}{{\evalue{\overline{n}}{\overline{\tau_a}}}}) \longrightarrow
@@ -721,9 +722,9 @@ the supplemental report~\cite{checkedc-tech-report}.
                 {\Gamma;\Theta \vdash_m \estrlen{e} : \tint}
 
       \inferrule[T-LetStr]
-                {\Gamma(y) = \tntarrayptr{b_l}{b_h}{\tau_a}{\cmode} \\ x \not\in \fv(\tau) \\\\
+                {\Gamma(y) = \tntarrayptr{b_l}{b_h}{\tau_a}{\cmode} \\\\
                  \Gamma[x\mapsto \tint,y\mapsto [\tntarrayptr{b_l}{x}{\tau_a}{\cmode}];\Theta[x\mapsto \texttt{ge}\_0] \vdash_m e : \tau}
-                {\Gamma;\Theta \vdash_m \elet{x}{\estrlen{y}}{e} : \tau}
+                {\Gamma;\Theta \vdash_m \elet{x}{\estrlen{y}}{e} : \tau[b_h / x]}
 
 
    \inferrule[T-Let]
