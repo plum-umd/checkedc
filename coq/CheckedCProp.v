@@ -141,7 +141,7 @@ Section StackProp.
 
   Definition stack_wf env s := forall x t,
       Env.MapsTo x t env -> exists v t' t'',
-        eval_type_bound s t = Some t'
+        eval_type_bound s t = t'
         /\ subtype D Q t'' t' 
         /\ Stack.MapsTo x (v, t'') s.
 End StackProp. 
@@ -216,7 +216,7 @@ Section FunctionProp.
   (*   exact (IHtvl _ env env'0 s s'0 AS H7 H8 H1) . *)
   (* Qed. *)
 End FunctionProp.
-
+(*
 
 Section TypeProp.
   Variable D : structdef.
@@ -232,8 +232,8 @@ Section TypeProp.
   Qed.
 
   Lemma eval_type_bound_idempotent : forall s t t',
-      eval_type_bound s t = Some t' ->
-      eval_type_bound s t' = Some t'.
+      eval_type_bound s t = t' ->
+      eval_type_bound s t' = t'.
   Proof with auto.
     induction t using type_ind'; intros * Hbound; inv Hbound; try solve [cbn; auto].
     + solveopt in H0. cbn; rewrite (IHt t0)...
@@ -253,14 +253,14 @@ Section TypeProp.
   Qed.
 
   Lemma simple_eval_bound : forall s b,
-      eval_bound s b = Some b -> exists n, b = Num n.
+      eval_bound s b = b -> exists n, b = Num n.
   Proof.
     destruct b; intros; eauto.
     inv H. solveopt in *. destruct p. congruence.
   Qed.
 
   Lemma simple_eval_type_bound : forall s t,
-      eval_type_bound s t = Some t <-> simple_type t.
+      eval_type_bound s t = t <-> simple_type t.
   Proof with (cbn; auto).
     intros s t. split.
     - Ltac solveleft :=
@@ -300,3 +300,4 @@ End TypeProp.
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve <- simple_eval_type_bound : ty.
 #[export] Hint Resolve -> simple_eval_type_bound : ty.
+*)

@@ -48,16 +48,13 @@ Section Preservation.
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
-      exists vars' env' Q',
+      exists vars' env' Q' t',
         sub_domain env' vars'
         /\ stack_wf D Q' env' s'
         /\ stack_rheap_consistent D F Q' R vars' s'
         /\ rheap_consistent D F Q' R' R
-        /\ (well_typed D F s' R' env' Q' Checked e' t
-            \/ (exists t' t'',
-                   eval_type_bound s' t = Some t'
-                   /\ subtype D Q' t'' t'
-                   /\ well_typed D F s' R' env' Q' Checked e' t'')).
+        /\ well_typed D F s' R' env' Q' Checked e' t'
+        /\ type_eq Q t t'.
   Proof with (eauto with ty sem heap).
     intros vars s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
@@ -65,7 +62,7 @@ Section Preservation.
     remember Checked as m.
     induction Hwt as
       [
-        env Q n t t' Hbound HTyLit                                 | (* Literals *)
+        env Q n t HSim HTyLit                                      | (* Literals *)
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
         env Q m m' b es x ts t HMode HZero HTyf IH1 HArgs          | (* Call *)
@@ -82,6 +79,7 @@ Section Preservation.
         env Q m e t HTy IH                                         | (* Unchecked *)
         env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
         env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
+        env Q m t e t' Wb HTy IH HSub                              | (* Cast - type_eq *)
         env Q m e x y u v t t' Wb HTy IH Teq                       | (* DynCast - ptr array *)
         env Q m e x y t t' HNot Teq Wb HTy IH                      | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH                       | (* DynCast - ptr nt-array *)
@@ -101,8 +99,8 @@ Section Preservation.
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - inv Hreduces; solve_ctxt.
-      exists vars, env, Q. intuition.
-      right. rewrite H4 in Hbound. inv Hbound. exists t', t'...
+      exists vars, env, Q, t. intuition.
+      rewrite H4 in Hbound. inv Hbound. exists t', t'...
     (* T-LitUnchecked *)
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
