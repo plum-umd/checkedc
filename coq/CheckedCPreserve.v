@@ -142,8 +142,18 @@ Section Preservation.
       inv H4. easy.
     (*T-Call*)
     - destruct HMode. assert (Checked = Checked) by easy.
+      apply H in H1.
+      inv Hreduces. destruct E; try congruence; try solve [solve_step].
+      simpl in *; subst.
+      inv H5.
+      
+      3: { inv HTyf. easy. }
       apply H in H1. destruct m'; try easy.
-      + inv Hreduces.
+      + inv Hreduces. destruct E; inv H2.
+      2: {}.
+
+
+inv Hreduces;solve_step ;cbn.
 
       inv Hreduces. destruct E; eauto with Preservation.
 

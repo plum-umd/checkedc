@@ -4,7 +4,7 @@ Require Import ExtLib.Structures.Monads.
 From CHKC Require Import Tactics ListUtil Map.
 Require Import Coq.FSets.FMapFacts.
 (** * Document Conventions *)
-
+fc
 (* 
 (** It is common when defining syntax for a language on paper to associate one or manysimple_type *)
 (*     _metavariables_ with each syntactic class. For example, the metavariables <<x>>, <<y>>,

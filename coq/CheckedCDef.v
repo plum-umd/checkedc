@@ -1072,8 +1072,7 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       expr_wf D (EStrlen x)
   | WFECall : forall xe el,
       expr_wf D xe ->
-      (forall e, In e el -> (exists n t, e = ELit n t
-                 /\ word_type t /\ type_wf D Checked t /\ simple_type t) \/ (exists y, e = EVar y)) ->
+      (forall e, In e el -> (exists n t, e = ELit n t) \/ (exists y, e = EVar y)) ->
       expr_wf D (ECall xe el)
   | WFRet : forall x old e, simple_option D (Some old) -> expr_wf D e -> expr_wf D (ERet x old e)
   | WFEDynCast : forall t e,
@@ -1672,6 +1671,13 @@ Section EvalArg.
       Stack.MapsTo x (n,t') S ->
       eval_arg (EVar x) t (ELit n t).
 
+  Inductive eval_vl: list Z -> list (var * type) -> expression -> type -> expression -> type -> Prop :=
+  | eval_vl_empty: forall e ta, eval_vl [] []  e ta e ta
+  | eval_vl_many_1: forall e es x t tvl ea ta ea' ta',
+     eval_vl es tvl ea ta ea' ta' -> eval_vl (e::es) ((x,t)::tvl) ea ta (ELet x (ELit e t) ea') ta'
+  | eval_vl_many_2: forall e es x tvl ea ta ea' ta',
+     eval_vl es tvl ea ta ea' ta' -> eval_vl (e::es) ((x,TNat)::tvl) ea ta (ELet x (ELit e TNat) ea') (subst_type [(x,Num e)] ta').
+
   Inductive eval_el : list expression -> list (var * type) -> expression -> expression -> Prop :=
   | eval_el_empty : forall e, eval_el [] [] e e
   | eval_el_many : forall e es x t tvl v ea ea',
@@ -1679,7 +1685,33 @@ Section EvalArg.
       eval_el es tvl ea ea' ->
       eval_el (e::es) ((x,t)::tvl) ea (ELet x v ea').
 
+  Lemma vl_el_same: forall es tvl e ea ta, eval_el es tvl e ea ->
+        exists vl ta', eval_vl vl tvl e ta ea ta' /\ (Forall3 (fun a b c => eval_arg a (snd c) (ELit b (snd c))) es vl tvl).
+  Proof.
+    intros. induction H; simpl in *.
+    exists [],ta. split. constructor.
+    constructor.
+    destruct IHeval_el. destruct H1.
+    assert (t = TNat \/ t <> TNat). destruct t; auto; right; easy.
+    destruct H2. subst.
+    inv H.
+    exists (n::x0), (subst_type [(x,Num n)] x1). split.
+    apply eval_vl_many_2; try easy.
+    constructor. constructor. easy.
+    exists (n::x0), (subst_type [(x,Num n)] x1). split.
+    apply eval_vl_many_2; try easy.
+    constructor. econstructor. apply H2. easy.
+    inv H.
+    exists (n::x0), x1. split.
+    constructor; try easy.
+    constructor. constructor. easy.
+    exists (n::x0), x1. split.
+    constructor; try easy.
+    constructor. econstructor. apply H3. easy.
+  Qed.
+
 End EvalArg.
+
 
 Definition is_nor_array_ptr (t:type) : Prop :=
    match t with (TPtr m (TArray x y t')) => True
@@ -2408,7 +2440,7 @@ Definition eq_subtype_core (D: structdef) (Q:theta) (t1 t3:type) := (exists t2, 
 
 Definition eq_subtype (D: structdef) (Q:theta) (t1 t3:type) := (exists t2, type_eq Q t1 t2 /\ subtype D Q t2 t3).
 
-Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (S:stack) (R : real_heap)
+Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (R : real_heap)
   (env:env)
   : mode -> expression -> type -> Prop :=
 | ArgLitChecked : forall n t t',
@@ -2416,25 +2448,25 @@ Inductive well_typed_arg (D: structdef) (F:FEnv) (Q:theta) (S:stack) (R : real_h
     simple_type t ->
     well_typed_lit_checked D F Q (fst R) empty_scope n t' ->
     eq_subtype D Q t' t ->
-    well_typed_arg D F Q S R env Checked (ELit n t') t
+    well_typed_arg D F Q R env Checked (ELit n t') t
 | ArgVar : forall m x t t',
     Env.MapsTo x t' env ->
     well_type_bound_in env t ->
     eq_subtype D Q t' t ->
-    well_typed_arg D F Q S R env m (EVar x) t.
-Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {S:stack} {H : real_heap}:
+    well_typed_arg D F Q R env m (EVar x) t.
+Inductive well_typed_args {D: structdef} {U:FEnv} {Q:theta} {H : real_heap}:
   env -> mode -> list expression -> list (type) -> list var -> type -> type -> Prop :=
 | args_empty : forall env m ta, well_typed_args env m [] [] [] ta ta
 
 | args_many_1 : forall env m e es t vl xl ta ta',
    t <> TNat ->
-    well_typed_arg D U Q S H env m e t ->
+    well_typed_arg D U Q H env m e t ->
     well_typed_args env m es vl xl ta ta'
     -> well_typed_args env m (e::es) (t::vl) xl ta ta'
 
 | args_many_2 : forall env m e es vl x b xl ta ta',
     get_good_dept e = Some b ->
-    well_typed_arg D U Q S H env m e TNat ->
+    well_typed_arg D U Q H env m e TNat ->
     well_typed_args env m es (map (subst_type [(x,b)]) vl) xl ta ta'
     -> well_typed_args env m (e::es) (TNat::vl) (x::xl) ta (subst_type [(x,b)] ta').
 
@@ -2627,7 +2659,6 @@ Definition is_off_zero (b:bound) :=
 Section Typing. 
   Variable D : structdef.
   Variable F : FEnv.
-  Variable S : stack. 
   Variable H : real_heap.
   Inductive well_typed
     : env -> theta -> mode -> expression -> type -> Prop :=
@@ -2644,7 +2675,7 @@ Section Typing.
   | TyCall : forall env Q m m' es x xl ts t ta,
       mode_leq m' m ->
       well_typed env Q m x (TPtr m' (TFun xl t ts)) ->
-      @well_typed_args D F Q S H env m' es ts xl t ta ->
+      @well_typed_args D F Q H env m' es ts xl t ta ->
       well_typed env Q m (ECall x es) ta
 
   (*
@@ -2859,23 +2890,17 @@ Inductive fun_arg_wf {D : structdef} {m:mode}: list var -> list (var * type) -> 
                                       -> fun_arg_wf AS ((x,t)::tvl)
 | fun_arg_many_2 : forall AS x tvl, fun_arg_wf (x::AS) tvl -> fun_arg_wf AS ((x,TNat)::tvl).
 
-
-Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
-  (forall n n' f, n <> n' -> F n f = None \/ F n' f = None)
-  /\
-    (forall env env' f tvl t e m,
+Definition fun_wf (D : structdef) (F:FEnv) (H:real_heap) :=
+    (forall env Q f tvl t e vl ea ta m,
         F m f = Some (tvl,t,e) ->
-        gen_arg_env env tvl env' ->
+        eval_vl vl tvl (ECast t e) t ea ta ->
         (m = Checked \/ m = Tainted) /\
-        @fun_arg_wf D m [] tvl /\
-          (forall n n' a b,
-              n <> n' -> nth_error tvl n = Some a ->
-              nth_error tvl n' = Some b -> fst a <> fst b) /\
+        @fun_arg_wf D m [] tvl /\ NoDup (fst (List.split tvl)) /\
           word_type t /\
           type_wf D m t /\
           well_bound_vars_type (fst (List.split tvl)) t /\
           expr_wf D e /\
-          @well_typed D (F) S H env' empty_theta m e t).
+          @well_typed D (F) H env Q m ea ta).
 
 
 Definition sub_domain (env: env) (S:stack) := forall x,
