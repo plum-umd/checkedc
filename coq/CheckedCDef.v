@@ -256,11 +256,6 @@ Definition is_ptr (t : type) : Prop :=
     match t with TPtr m x => True
               | _ => False
     end.
-
-Inductive well_bound_in : env -> bound -> Prop :=
-   | well_bound_in_num : forall env n, well_bound_in env (Num n)
-   | well_bound_in_var : forall env x y, Env.MapsTo x TNat env -> well_bound_in env (Var x y).
-
 (*
 Definition well_ptr_bound_in (env:env) (p:ptrMode) :=
    match p with None => True
@@ -275,6 +270,9 @@ Section EnvWt.
   Variable D : structdef.
   Variable m : mode.
 
+  Definition well_bound_in (env:env) (b:bound) :=
+    (forall x, In x (freeBoundVars b) -> Env.In x env).
+
   Definition well_type_bound_in (env:env) (t:type) :=
     (forall x, In x (freeTypeVars t) -> Env.In x env).
 
@@ -286,6 +284,8 @@ End EnvWt.
 
 
 (* Definition of simple type meaning that has no bound variables. *)
+Definition simple_bound (b:bound) := freeBoundVars b = [].
+
 Definition simple_type (t:type) := freeTypeVars t = [].
 
 
@@ -925,15 +925,7 @@ Definition cast_bound (s:stack) (b:bound) : option bound :=
                     | None => None end)
    end.
 
-Inductive eval_type_bound (s:stack) : type -> type -> Prop :=
-   | eval_type_bound_nat : eval_type_bound s (TNat) (TNat)
-   | eval_type_bound_ptr : forall c t t', eval_type_bound s t t'
-                 -> eval_type_bound s (TPtr c t) (TPtr c t')
-   | eval_type_bound_array : forall l l' h h' t t', cast_bound s l = Some l' -> cast_bound s h = Some h' ->
-                  eval_type_bound s t t' -> eval_type_bound s (TArray l h t) (TArray l' h' t')
-   | eval_type_bound_ntarray : forall l l' h h' t t', cast_bound s l = Some l' -> cast_bound s h = Some h' ->
-                  eval_type_bound s t t' -> eval_type_bound s (TNTArray l h t) (TNTArray l' h' t')
-   | eval_type_bound_struct : forall t, eval_type_bound s (TStruct t) (TStruct t).
+
 *)
 
 Inductive expression : Type :=
@@ -1428,10 +1420,6 @@ Qed.
 
 (* TODO: say more *)
 
-Definition eval_bound (s:stack) (b:bound) : option bound :=
-   match b with Num n => Some (Num n)
-             | Var x n => (match (Stack.find x s) with Some (v,t) => Some (Num (v + n)) | None => None end)
-   end.
 (*
 Fixpoint eval_type_bound (s:stack) (t:type) :=
   match t with
@@ -1623,7 +1611,7 @@ Fixpoint get_dept_map (l:list (var * type)) (es:list expression) :=
 Definition subst_bound (b:bound) (x:var) (b1:bound) :=
    match b with Num n => (Num n)
            | Var y n =>
-        if var_eq_dec y x then
+        if Nat.eqb y x then
            match b1 with (Num m) => (Num (n+m))
                          | (Var z m) => (Var z (n+m))
            end
@@ -1656,11 +1644,24 @@ Fixpoint get_var_stack (S:stack) (l:list var) :=
                              | Some v => (x,Num (fst v))::(get_var_stack S xs)
                         end
    end.
-Definition eval_type_bound (s:stack) (t:type) := subst_type (get_var_stack s (freeTypeVars t)) t.
 
 
 
+Definition eval_bound (s:stack) (b:bound) : option bound :=
+   match b with Num n => Some (Num n)
+             | Var x n => (match (Stack.find x s) with Some (v,t) => Some (Num (v + n)) | None => None end)
+   end.
 
+Inductive eval_type_bound (s:stack) : type -> type -> Prop :=
+   | eval_type_bound_nat : eval_type_bound s (TNat) (TNat)
+   | eval_type_bound_ptr : forall c t t', eval_type_bound s t t'
+                 -> eval_type_bound s (TPtr c t) (TPtr c t')
+   | eval_type_bound_array : forall l l' h h' t t', eval_bound s l = Some l' -> eval_bound s h = Some h' ->
+                  eval_type_bound s t t' -> eval_type_bound s (TArray l h t) (TArray l' h' t')
+   | eval_type_bound_ntarray : forall l l' h h' t t', eval_bound s l = Some l' -> eval_bound s h = Some h' ->
+                  eval_type_bound s t t' -> eval_type_bound s (TNTArray l h t) (TNTArray l' h' t')
+   | eval_type_bound_struct : forall t, eval_type_bound s (TStruct t) (TStruct t)
+   | eval_type_bound_fun : forall xl t ts,  eval_type_bound s (TFun xl t ts) (TFun xl t ts).
 
 Section EvalArg.
   Variable S : stack. 
@@ -2012,7 +2013,7 @@ Inductive step
       (s, R) (RExpr ea)
 
 | SLet : forall s R x n t e t',
-    eval_type_bound s t = t' ->
+    eval_type_bound s t t' ->
     step D F
       (s, R) (ELet x (ELit n t) e)
       (Stack.add x (n,t') s,  R)
@@ -2049,56 +2050,56 @@ Inductive step
       (s, R) (EPlus (ELit n1 t) (ELit n2 (TNat)))
       (s, R) RNull
 | SCast : forall s R t n t' t'',
-    eval_type_bound s t = t'' ->
+    eval_type_bound s t t'' ->
     step D F
       (s, R) (ECast t (ELit n t'))
       (s, R) (RExpr (ELit n t''))
 
 | SCastNotArray : forall s R x y t n m t' t'',
-    ~ is_array_ptr (TPtr m t') -> eval_type_bound s t = t'' ->
+    ~ is_array_ptr (TPtr m t') -> eval_type_bound s t t'' ->
     step D F
       (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t')))
       (s, R) (RExpr (ELit n (TPtr m (TArray (Num n) (Num (n+1)) t''))))
 
 | SCastArray : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
     l' <= l -> l < h -> h <= h' ->
     step D F
       (s, R) (EDynCast t (ELit n t'))
       (s, R) (RExpr (ELit n (TPtr Checked (TArray (Num l) (Num h) w))))
 | SCastArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
     l < l' ->
     step D F (s, R) (EDynCast t (ELit n t'))  (s, R) RBounds
 | SCastArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SCastArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
     h' < h ->
            step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SCastNTArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
     l < l' ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SCastNTArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SCastNTArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t = (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' = (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
     h' < h ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SDerefChecked : forall s H1 H2 n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr Checked t) = t2 ->
+    eval_type_bound s (TPtr Checked t) t2 ->
     Heap.MapsTo n (n1, t1) H1 ->
     (forall l h t',
         t2 = TPtr Checked (TArray (Num l) (Num h) t') -> l <= n < h) ->
@@ -2109,7 +2110,7 @@ Inductive step
       (s, (H1,H2)) (EDeref (ELit n (TPtr Checked t)))
       (s, (H1,H2)) (RExpr (ELit n1 tv))
 | SDerefTainted : forall s H1 H2 n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr Tainted t) = t2 ->
+    eval_type_bound s (TPtr Tainted t) t2 ->
     Heap.MapsTo n (n1, t1) H2 ->
     well_typed_lit_tainted D F empty_theta H2 empty_scope n1 t1 ->
     (forall l h t',
@@ -2121,7 +2122,7 @@ Inductive step
       (s, (H1,H2)) (EDeref (ELit n (TPtr Tainted t)))
       (s, (H1,H2)) (RExpr (ELit n1 tv))
 | SDerefNone : forall s H1 H2 m n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr m t) = t2 -> m <> Unchecked ->
+    eval_type_bound s (TPtr m t) t2 -> m <> Unchecked ->
     Heap.MapsTo n (n1, t1) H2 ->
     @get_root D t2 tv ->
     step D F
@@ -2130,7 +2131,7 @@ Inductive step
 (* Add two rules for when pm = None. *)
 
 | SDerefUnChecked : forall s H1 H2 m n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr m t) = t2 ->
+    eval_type_bound s (TPtr m t) t2 ->
     Heap.MapsTo n (n1, t1) H2 ->
     m <> Checked ->
     @get_root D t2 tv ->
@@ -2139,12 +2140,12 @@ Inductive step
       (s, (H1,H2)) (RExpr (ELit n1 tv))
 | SDerefHighOOB : forall s R n t t' h,
     h <= n ->
-    eval_type_bound s t = t' ->
+    eval_type_bound s t t' ->
     get_high_ptr t' = Some (Num h) ->
     step D F (s, R) (EDeref (ELit n t)) (s, R) RBounds
 | SDerefLowOOB : forall s R n t t' l,
     l > n ->
-    eval_type_bound s t = t' ->
+    eval_type_bound s t t' ->
     get_low_ptr t' = Some (Num l) ->
     step D F (s, R) (EDeref (ELit n t)) (s, R) RBounds
 | SDerefNull : forall s R t n,
@@ -2152,7 +2153,7 @@ Inductive step
     step D F (s, R) (EDeref (ELit n (TPtr Checked t))) (s, R) RNull
 | SAssignChecked : forall s H1 H2 n t na ta tv n1 t1 tv',
     Heap.MapsTo n (na,ta) H1 ->
-    eval_type_bound s (TPtr Checked t) = tv ->
+    eval_type_bound s (TPtr Checked t) tv ->
     (forall l h t',
         tv = TPtr Checked (TArray (Num l) (Num h) t') -> l <= n < h) ->
     (forall l h t',
@@ -2164,7 +2165,7 @@ Inductive step
 | SAssignTainted : forall s H1 H2 n t na ta tv n1 t1 tv',
     Heap.MapsTo n (na,ta) H2 ->
     well_typed_lit_tainted D F empty_theta H2 empty_scope na ta ->
-    eval_type_bound s (TPtr Tainted t) = tv ->
+    eval_type_bound s (TPtr Tainted t) tv ->
     (forall l h t',
         tv = TPtr Tainted (TArray (Num l) (Num h) t') -> l <= n < h) ->
     (forall l h t',
@@ -2186,28 +2187,28 @@ Inductive step
 
 | SAssignUnChecked : forall s H1 H2 m n t na ta tv n1 t1 tv',
     Heap.MapsTo n (na,ta) H2 -> m <> Checked ->
-    eval_type_bound s (TPtr m t) = tv ->
+    eval_type_bound s (TPtr m t) tv ->
     @get_root D tv tv' ->
     step D F
       (s, (H1,H2))  (EAssign (ELit n (TPtr m t)) (ELit n1 t1))
       (s, (H1,Heap.add n (n1, ta) H2)) (RExpr (ELit n1 tv'))
 | SAssignHighOOB : forall s R n t t' n1 t1 h,
      h <= n ->
-    eval_type_bound s t = t' ->
+    eval_type_bound s t t' ->
      get_high_ptr t' = Some (Num h) ->
      step D F
        (s, R) (EAssign (ELit n t) (ELit n1 t1))
        (s, R) RBounds
  | SAssignLowOOB : forall s R n t t' n1 t1 l,
      l > n ->
-     eval_type_bound s t = t' ->
+     eval_type_bound s t t' ->
      get_low_ptr t' = Some (Num l) ->
      step D F
        (s, R) (EAssign (ELit n t) (ELit n1 t1))
        (s, R) RBounds
  | SAssignNull : forall s R t tv m n n1 t',
      n1 <= 0 -> m <> Unchecked ->
-     eval_type_bound s t = tv ->
+     eval_type_bound s t tv ->
      step D F
        (s, R) (EAssign (ELit n1 t) (ELit n t')) (s, R) RNull
 | SFieldAddrChecked : forall s R n t (fi : field) n0 t0 T fs i fi ti,
@@ -2261,27 +2262,27 @@ Inductive step
       (s, R) (EFieldAddr (ELit n t) fi)
       (s, R) (RExpr (ELit n0 t0))
 | SMallocChecked : forall s H1 H2 w w' H1' n1,
-    eval_type_bound s w = w' -> malloc_bound w' ->
+    eval_type_bound s w w' -> malloc_bound w' ->
     allocate D H1 w' = Some (n1, H1') ->
     step D F
       (s, (H1,H2)) (EMalloc Checked w)
       (s, (H1,H2)) (RExpr (ELit n1 (TPtr Checked w')))
 | SMallocUnChecked : forall s H1 H2 m w w' H2' n1,
-    eval_type_bound s w = w' -> malloc_bound w' -> m <> Checked ->
+    eval_type_bound s w w' -> malloc_bound w' -> m <> Checked ->
     allocate D H2 w' = Some (n1, H2') ->
     step D F
       (s, (H1,H2)) (EMalloc m w)
       (s, (H1, H2')) (RExpr (ELit n1 (TPtr m w')))
 | SMallocHighOOB : forall s R m w t' h l,
     h <= l ->
-    eval_type_bound s w = t' ->
+    eval_type_bound s w t' ->
     get_high t' = Some (Num h) ->
     get_low t' = Some (Num l) ->
     step D F (s, R) (EMalloc m w)  (s, R) RBounds
 
 | SMallocLowOOB : forall s R m w t' l,
     l <> 0 ->
-    eval_type_bound s w = t' ->
+    eval_type_bound s w t' ->
     get_low t' = Some (Num l) ->
     step D F (s, R) (EMalloc m w)  (s, R) RBounds
 
@@ -2601,7 +2602,7 @@ Definition fun_mode_eq (m1 m2 :mode) : Prop :=
    (m2 = Checked /\ m1 = Checked) \/ (m2 = Unchecked /\ (m1 <> Checked)).
 
 Definition mode_leq (m1 m2 :mode) : Prop :=
-   (m2 = Checked /\ m1 <> Unchecked) \/ (m2 = Tainted /\ (m1 <> Checked)).
+   (m2 = Checked -> m1 <> Unchecked) /\ (m2 = Unchecked -> (m1 <> Checked)).
 
 (** [mode_comp m1 m2]: variable mode [m1] is compatible in region mode [m2]*)
 Inductive mode_comp : mode -> mode -> Prop :=
@@ -2877,8 +2878,8 @@ Definition fun_wf (D : structdef) (F:FEnv) (S:stack) (H:real_heap) :=
           @well_typed D (F) S H env' empty_theta m e t).
 
 
-Definition sub_domain (env: env) (S:list var) := forall x,
-    Env.In x env -> In x S.
+Definition sub_domain (env: env) (S:stack) := forall x,
+    Env.In x env -> Stack.In x S.
 
 Local Close Scope Z_scope.
 Local Open Scope nat_scope.

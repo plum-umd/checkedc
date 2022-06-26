@@ -29,35 +29,63 @@ Ltac solve_ctxt :=
   end.  
          
 
+Lemma step_implies_reduces : forall D F H s e H' s' r,
+    @step D F (s,H) e (s',H') r ->
+    reduces D F (s,H) e.
+Proof.
+  intros.
+  assert (e = in_hole e CHole); try reflexivity.
+  rewrite H1.
+  destruct r; eauto with ty.
+Admitted.
+
+Hint Resolve step_implies_reduces : Preservation.
+
+Lemma reduces_congruence : forall D F H s e0 e,
+    (exists E, in_hole e0 E = e) ->
+    reduces D F (s,H) e0 ->
+    reduces D F (s,H) e.
+Proof.
+  intros.
+  destruct H0 as [ E Hhole ].
+  destruct H1 as [ m' [ H' [r  HRed ]] ].
+  inv HRed as [ ? e0' ? ? e0'' E' | ? e0' ? ? E' | ? e0' ? ? E' ]; rewrite compose_correct; eauto 20.
+Admitted.
+
+Hint Resolve reduces_congruence : Preservation.
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
   Variable F : FEnv.
   Hypothesis HDwf : structdef_wf D.
-  Lemma preservation : forall vars s R env Q e t s' R' e',
+  Lemma preservation : forall s R env Q e t s' R' e',
       rheap_wf R ->
       rheap_wt_all D F Q Checked R ->
       expr_wf D e ->
       stack_wt D Checked s ->
       env_wt D Checked env ->
       theta_wt Q env s ->
-      sub_domain env vars ->
+      stack_theta_wf s Q ->
+      sub_domain env s ->
       stack_wf D Q env s ->
-      stack_rheap_consistent D F Q R vars s ->
+      stack_rheap_consistent D F Q R s ->
       well_typed D F s R env Q Checked e t ->
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
-      exists vars' env' Q' t',
-        sub_domain env' vars'
+      exists env' Q' t',
+        sub_domain env' s'
         /\ stack_wf D Q' env' s'
-        /\ stack_rheap_consistent D F Q' R vars' s'
+        /\ theta_wt Q' env' s'
+        /\ stack_theta_wf s' Q' 
+        /\ stack_rheap_consistent D F Q' R s'
         /\ rheap_consistent D F Q' R' R
         /\ well_typed D F s' R' env' Q' Checked e' t'
-        /\ eq_subtype_core D Q t t'.
-  Proof with (eauto with ty sem heap).
-    intros vars s R env Q e t s' R' e'
-      HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwt.
+        /\ eq_subtype_core D Q t' t.
+  Proof with (eauto with ty sem heap Preservation).
+    intros s R env Q e t s' R' e'
+      HRwf HRWt HEwf Hswt Henvt HQt Hsqt HsubDom Hswf HsHwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
@@ -65,7 +93,8 @@ Section Preservation.
         env Q n t HSim HTyLit                                      | (* Literals *)
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
-        env Q m m' b es x ts t HMode HZero HTyf IH1 HArgs          | (* Call *)
+        env Q m m' es x xl ts t ta HMode HTyf IH1 HArgs            | (* Call *)
+
         env Q m n' x h l t Wb HMode                                | (* Strlen *)
         env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
         env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hx Hdept             | (* Let-Nat-Expr *)
@@ -102,23 +131,23 @@ Section Preservation.
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
     - inv Hreduces; solve_ctxt.
-      inv H5. exists vars,env, Q, t0.
+      inv H5. exists env, Q, t0.
       destruct R' as [Hchk Htnt]; subst; intuition... cbn.
-      right.
-      specialize (Hswf x t Hx) as [v' [t' [t'' [Hbd [Hsub Hrst]]]]].
-      specialize (Stack.mapsto_always_same _ _ _ _ _ H4 Hrst) as Heq; inv Heq.
-      clear H4.
-      exists t', t''; intuition.
-      specialize (Hswt _ _ _ Hrst) as (_ & _ & Hsimple)...
-      specialize (HsHwf Hchk).
-      Check eq_refl.
-      assert (In x vars) as X1. apply HsubDom.
-      exists t; try easy.
-      specialize (HsHwf Htnt x _ _ eq_refl X1 Hrst) as Echk...
+      constructor.
+      unfold stack_wt in *.
+      apply Hswt in H4. intuition...
+      eapply HsHwf in H4. apply H4. easy.
+      apply Hswf in Hx. destruct Hx as [v1 [t1 [HSub1 HM]]]. 
+      apply Stack.mapsto_always_same with (v1 := (v1, t1)) in H4; try easy.
+      inv H4. easy.
     (*T-Call*)
-    - destruct HMode as [[ _ [=]] | [[=] _ ]]; subst.
-      inv Hreduces. destruct E; try congruence; try solve [solve_step].
-      + inv HEwf. intuition. solve_step; cbn.
+    - destruct HMode. assert (Checked = Checked) by easy.
+      apply H in H1. destruct m'; try easy.
+      + inv Hreduces.
+
+      inv Hreduces. destruct E; eauto with Preservation.
+
+inv HEwf. intuition. solve_step; cbn.
         * inv HTyf. destruct H13 as (be & Ha & Hb). inv Ha. inv Hb. 
           exists vars,env, Q. intuition.
           right. 

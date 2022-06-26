@@ -6,6 +6,7 @@ From CHKC Require Import
   ListUtil
   Map
   CheckedCDef.
+Require Import Coq.Logic.Classical_Prop.
 
 Create HintDb heap.
 
@@ -102,10 +103,10 @@ Section RealHeapProp.
   Definition is_checked (t:type) := match t with TNat => True | TPtr m w => (m = Checked) | _ => False end.
 
   (** Types on the stack agree with those on the rheap. *)
-  Definition stack_rheap_consistent (R : real_heap) l S :=
+  Definition stack_rheap_consistent (R : real_heap) S :=
     forall Hchk Htnt x n t,
       R = (Hchk, Htnt) ->
-      In x l -> Stack.MapsTo x (n,t) S -> well_typed_lit_checked D F Q Hchk empty_scope n t.
+      Stack.MapsTo x (n,t) S -> well_typed_lit_checked D F Q Hchk empty_scope n t.
 
 
   (* FIXME: hold the definition for now *)
@@ -135,16 +136,24 @@ End RealHeapProp.
   
 Section StackProp.
   Variable D : structdef.
-  Variable F : FEnv.
   Variable Q : theta.
-  Variable m : mode.
 
   Definition stack_wf env s := forall x t,
-      Env.MapsTo x t env -> exists v t' t'',
-        eval_type_bound s t = t'
-        /\ subtype D Q t'' t' 
-        /\ Stack.MapsTo x (v, t'') s.
+      Env.MapsTo x t env -> exists (v:Z) t',
+        eq_subtype_core D Q t' t 
+        /\ Stack.MapsTo x (v, t') s.
+
+  Lemma stack_wf_sub_domain : forall env s, stack_wf env s -> sub_domain env s.
+  Proof.
+  intros. unfold stack_wf, sub_domain in *.
+  intros. destruct H0. apply H in H0. destruct H0. destruct H0. destruct H0.
+  exists (x1,x2). easy.
+  Qed.
+
 End StackProp. 
+
+(* theta and stack relationship *)
+Definition stack_theta_wf s Q := forall x v, Stack.MapsTo x (v,TNat) s -> Theta.MapsTo x (NumEq v) Q.
 
 
 Ltac find_Hstep :=
@@ -183,8 +192,7 @@ Section FunctionProp.
     exists (Env.add v t x).
     constructor. easy.
   Qed.
-
-
+(*
   Lemma sub_domain_grow : forall env S x t,
       sub_domain env S -> sub_domain (Env.add x t env) (x::S).
   Proof with auto.
@@ -202,7 +210,7 @@ Section FunctionProp.
       exists x1...
       apply H in H1. simpl. right. easy.
   Qed.
-(*
+
   Lemma sub_domain_grows : forall tvl es env env' s s' e e',
       gen_arg_env env tvl env' -> eval_el s es tvl e e' -> sub_domain env s ->
       sub_domain env' s'.
@@ -216,42 +224,159 @@ Section FunctionProp.
   (*   exact (IHtvl _ env env'0 s s'0 AS H7 H8 H1) . *)
   (* Qed. *)
 End FunctionProp.
-(*
 
 Section TypeProp.
   Variable D : structdef.
   Variable F : FEnv.
   Variable Q : theta.
 
-  Lemma eval_bound_idempotent : forall s b b', 
-      eval_bound s b = Some b' ->
-      eval_bound s b' = Some b'.
-  Proof with auto.
-    induction b; intros b' Hbound; inv Hbound; try solve [cbn; auto].
-    cbn. solveopt in *. destruct p. inv H2. cbn...
+  Lemma eval_bound_simple: forall s b b',
+       eval_bound s b = Some b' -> (exists n, b' = Num n).
+  Proof.
+   intros. unfold eval_bound,simple_bound in *. destruct b.
+   inv H. exists z. easy.
+   destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
+   inv H. exists ((z0 + z)%Z). easy.
+   inv H.
   Qed.
 
-  Lemma eval_type_bound_idempotent : forall s t t',
-      eval_type_bound s t = t' ->
-      eval_type_bound s t' = t'.
-  Proof with auto.
-    induction t using type_ind'; intros * Hbound; inv Hbound; try solve [cbn; auto].
-    + solveopt in H0. cbn; rewrite (IHt t0)...
-    + repeat solveopt in *. cbn. rewrite IHt...
-      do 2 erewrite (eval_bound_idempotent); eauto.
-    + repeat solveopt in *. cbn. rewrite (IHt t0)...
-      do 2 erewrite (eval_bound_idempotent); eauto.
-    + repeat solveopt in *. cbn. rewrite (IHt t0)...
-      erewrite (eval_bound_idempotent); eauto.
-      generalize dependent l0; induction l; intros l' Hfold.
-      * inv Hfold...
-      * cbn in Hfold. solveopt in Hfold. solveopt in H3.
-        inv H as [| _a _l Hcons HAll].
-        specialize (IHl HAll l0 eq_refl). solveopt in IHl.
-        specialize (Hcons t1 H2).
-        cbn. rewrite IHl0. rewrite Hcons. reflexivity.
+  Lemma not_in_empty {A : Type}: forall (l:list A), (forall x, ~ In x l) -> l = [].
+  Proof.
+   induction l;intros; simpl in *. easy.
+   specialize (H a).
+   apply not_or_and in H.
+   destruct H. easy.
   Qed.
 
+  Lemma eval_type_bound_simple:
+     forall m s t t', type_wf D m t -> eval_type_bound s t t' -> simple_type t'.
+  Proof.
+    intros.
+    unfold simple_type in *.
+    generalize dependent m.
+    induction H0;intros;simpl in *; try easy.
+    inv H.
+    rewrite (IHeval_type_bound c); try easy.
+    rewrite (IHeval_type_bound m); try easy.
+    inv H2.
+    apply eval_bound_simple in H as X1.
+    apply eval_bound_simple in H0 as X2.
+    destruct X1; subst. destruct X2; subst.
+    simpl in *. 
+    rewrite (IHeval_type_bound m); try easy.
+    inv H2.
+    apply eval_bound_simple in H as X1.
+    apply eval_bound_simple in H0 as X2.
+    destruct X1; subst. destruct X2; subst.
+    simpl in *. 
+    rewrite (IHeval_type_bound m); try easy.
+    inv H.
+    apply not_in_empty. intros.
+    intros R.
+    apply ListSet.set_diff_iff in R.
+    destruct R.
+    apply H7 in H. easy.
+  Qed.
+
+  Lemma eval_bound_valid:
+     forall env s b, sub_domain env s -> well_bound_in env b -> (exists b', eval_bound s b = Some b').
+  Proof.
+   intros. 
+   unfold sub_domain, well_bound_in,eval_bound in *.
+   destruct b. exists (Num z). easy.
+   destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
+   exists ((Num (z0 + z))). easy.
+   specialize (H0 v). simpl in H0.
+   assert (v = v \/ False). left. easy.
+   apply H0 in H1. apply H in H1. destruct H1.
+   apply Stack.find_1 in H1.
+   rewrite eq1 in H1. easy.
+  Qed.
+
+  Lemma eval_type_bound_valid:
+     forall env s t, sub_domain env s -> well_type_bound_in env t -> (exists t', eval_type_bound s t t').
+  Proof.
+    intros.
+    induction t;intros;simpl in *; try easy.
+    exists TNat. constructor.
+    apply IHt in H0. destruct H0.
+    exists (TPtr m x). constructor. easy.
+    exists (TStruct s0). constructor.
+    unfold well_type_bound_in in *.
+    specialize (eval_bound_valid env s b H) as X1.
+    assert (well_bound_in env b).
+    unfold well_bound_in in *.
+    intros. apply H0. simpl.
+    apply in_app_iff. left. easy.
+    apply X1 in H1. destruct H1.
+    specialize (eval_bound_valid env s b0 H) as X2.
+    assert (well_bound_in env b0).
+    unfold well_bound_in in *.
+    intros. apply H0. simpl.
+    apply in_app_iff. right.
+    apply in_app_iff. left. easy.
+    apply X2 in H2. destruct H2.
+    assert ((forall x : var,
+       In x (freeTypeVars t) -> Env.In (elt:=type) x env)).
+    intros.
+    apply H0.
+    apply in_app_iff. right.
+    apply in_app_iff. right. easy.
+    apply IHt in H3. destruct H3.
+    exists (TArray x x0 x1). constructor; easy.
+    unfold well_type_bound_in in *.
+    specialize (eval_bound_valid env s b H) as X1.
+    assert (well_bound_in env b).
+    unfold well_bound_in in *.
+    intros. apply H0. simpl.
+    apply in_app_iff. left. easy.
+    apply X1 in H1. destruct H1.
+    specialize (eval_bound_valid env s b0 H) as X2.
+    assert (well_bound_in env b0).
+    unfold well_bound_in in *.
+    intros. apply H0. simpl.
+    apply in_app_iff. right.
+    apply in_app_iff. left. easy.
+    apply X2 in H2. destruct H2.
+    assert ((forall x : var,
+       In x (freeTypeVars t) -> Env.In (elt:=type) x env)).
+    intros.
+    apply H0.
+    apply in_app_iff. right.
+    apply in_app_iff. right. easy.
+    apply IHt in H3. destruct H3.
+    exists (TNTArray x x0 x1). constructor; easy.
+    exists ((TFun l t l0)). constructor.
+  Qed.
+
+  Lemma eval_type_bound_idempotent : forall s t,
+      simple_type t ->
+      eval_type_bound s t t.
+  Proof with auto.
+    induction t using type_ind';intros;unfold simple_type in *;simpl in *; try easy.
+    constructor.
+    constructor. apply IHt. easy.
+    constructor.
+    apply app_eq_nil in H. destruct H.
+    apply app_eq_nil in H0. destruct H0.
+    constructor.
+    unfold eval_bound.
+    destruct b. easy. simpl in *. inv H.
+    unfold eval_bound.
+    destruct b0. easy. simpl in *. inv H0.
+    apply IHt;try easy.
+    apply app_eq_nil in H. destruct H.
+    apply app_eq_nil in H0. destruct H0.
+    constructor.
+    unfold eval_bound.
+    destruct b. easy. simpl in *. inv H.
+    unfold eval_bound.
+    destruct b0. easy. simpl in *. inv H0.
+    apply IHt;try easy.
+    constructor.
+  Qed.
+
+(*
   Lemma simple_eval_bound : forall s b,
       eval_bound s b = b -> exists n, b = Num n.
   Proof.
@@ -295,9 +420,9 @@ Section TypeProp.
     apply simple_eval_type_bound; assumption.
     inv Hwt; constructor; congruence.
   Qed.
+*)
 End TypeProp.
 
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
-#[export] Hint Resolve <- simple_eval_type_bound : ty.
-#[export] Hint Resolve -> simple_eval_type_bound : ty.
-*)
+#[export] Hint Resolve eval_type_bound_simple : ty.
+
