@@ -948,7 +948,8 @@ Inductive expression : Type :=
   | EIfPtrLt : expression -> expression -> expression -> expression -> expression (* if e1 < e2 then e3 else e4. *)
 *)
   | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
-  | EUnchecked : expression -> expression.
+  | EUnchecked : list var -> type -> expression -> expression
+  | Echecked : list var -> type -> expression -> expression.
 
 Definition funElem : Type := (list (var * type) * type * expression).
 
@@ -1125,9 +1126,9 @@ Inductive expr_wf (D : structdef) : expression -> Prop :=
       expr_wf D e1 ->
       expr_wf D e2 ->
       expr_wf D (EAssign e1 e2)
-  | WFEUnchecked : forall e,
+  | WFEUnchecked : forall tvl t e,
       expr_wf D e ->
-      expr_wf D (EUnchecked e).
+      expr_wf D (EUnchecked tvl t e).
 
 
 (* Standard substitution.
@@ -1171,8 +1172,11 @@ Fixpoint freeVars (e : expression) :=
           | EAssign e1 e2 => freeVars e1 ++ freeVars e2
           | EIfDef x e1 e2 => [x] ++ freeVars e1 ++ freeVars e2
           | EIf e1 e2 e3 => freeVars e1 ++ freeVars e2 ++ freeVars e3
-          | EUnchecked e => freeVars e
+          | EUnchecked vl t e => freeVars e
+          | Echecked vl t e => freeVars e
 end.
+
+Definition list_sub (l1 l2:list var) := (forall x, In x l1 -> In x l2).
 
 (** Values, [v], are expressions [e] which are literals. *)
 
@@ -1322,7 +1326,8 @@ Inductive ctxt : Type :=
   | CIfLtR : expression -> ctxt -> expression -> expression -> ctxt
 *)
   | CIf : ctxt -> expression -> expression -> ctxt
-  | CUnchecked : ctxt -> ctxt.
+  | CUnchecked : list var -> type -> ctxt -> ctxt
+  | Cchecked : list var -> type -> ctxt -> ctxt.
 
 Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   match E with
@@ -1344,32 +1349,35 @@ Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   | CIfLtL E' e1 e2 e3 => EIfPtrLt (in_hole e E') e1 e2 e3
   | CIfLtR e1 E' e2 e3 => EIfPtrLt e1 (in_hole e E') e2 e3
 *)
-  | CUnchecked E' => EUnchecked (in_hole e E')
+  | CUnchecked vl t E' => EUnchecked vl t (in_hole e E')
+  | Cchecked vl t E' => Echecked vl t (in_hole e E')
   end.
 
 
-Fixpoint mode_of (E : ctxt) : mode :=
+Fixpoint mode_of (E : ctxt) (m:mode) : mode :=
   match E with
-  | CHole => Checked
-  | CLet _ E' _ => mode_of E'
-  | CCall E' _ => mode_of E'
-  | CPlusL E' _ => mode_of E'
-  | CPlusR _ _ E' => mode_of E'
-  | CFieldAddr E' _ => mode_of E'
-  | CDynCast _ E' => mode_of E'
-  | CCast _ E' => mode_of E'
-  | CDeref E' => mode_of E'
-  | CAssignL E' _ => mode_of E'
-  | CAssignR _ _ E' => mode_of E'
-  | CIf E' e1 e2 => mode_of E'
+  | CHole => m
+  | CLet _ E' _ => mode_of E' m
+  | CCall E' _ => mode_of E' m
+  | CPlusL E' _ => mode_of E' m
+  | CPlusR _ _ E' => mode_of E' m
+  | CFieldAddr E' _ => mode_of E' m
+  | CDynCast _ E' => mode_of E' m
+  | CCast _ E' => mode_of E' m
+  | CDeref E' => mode_of E' m
+  | CAssignL E' _ => mode_of E' m
+  | CAssignR _ _ E' => mode_of E' m
+  | CIf E' e1 e2 => mode_of E' m
 (*
   | CIfEqL E' e1 e2 e3 => mode_of E'
   | CIfEqR e1 E' e2 e3 => mode_of E'
   | CIfLtL E' e1 e2 e3 => mode_of E'
   | CIfLtR e1 E' e2 e3 => mode_of E'
 *)
-  | CUnchecked E' => Unchecked
+  | CUnchecked vl t E' => mode_of E' Unchecked
+  | Cchecked vl t E' => mode_of E' Checked
   end.
+
 
 Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   match E_outer with
@@ -1392,7 +1400,8 @@ Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   | CIfLtL E' e1 e2 e3 => CIfLtL (compose E' E_inner) e1 e2 e3
   | CIfLtR e1 E' e2 e3 => CIfLtR e1 (compose E' E_inner) e2 e3
 *)
-  | CUnchecked E' => CUnchecked (compose E' E_inner)
+  | CUnchecked vl t E' => CUnchecked vl t (compose E' E_inner)
+  | Cchecked vl t E' => Cchecked vl t (compose E' E_inner)
   end.
 
 Lemma hole_is_id : forall e,
@@ -1402,6 +1411,7 @@ Proof.
   reflexivity.
 Qed.
 
+
 Lemma compose_correct : forall E_outer E_inner e0,
     in_hole (in_hole e0 E_inner) E_outer = in_hole e0 (compose E_outer E_inner).
 Proof.
@@ -1409,14 +1419,15 @@ Proof.
   induction E_outer; try reflexivity; try (simpl; rewrite IHE_outer; reflexivity).
 Qed.
 
-Lemma compose_unchecked : forall E_outer E_inner,
-    mode_of E_inner = Unchecked ->
-    mode_of (compose E_outer E_inner) = Unchecked.
+(*
+Lemma compose_unchecked : forall m E_outer E_inner,
+    mode_of (compose E_outer E_inner) Checked = mode_of E_inner Checked.
 Proof.
   intros.
   induction E_outer; try reflexivity; try (simpl; rewrite IHE_outer; reflexivity); try assumption.
+  simpl.
 Qed.
-
+*)
 (* TODO: say more *)
 
 (*
@@ -1678,13 +1689,18 @@ Section EvalArg.
   | eval_vl_many_2: forall e es x tvl ea ta ea' ta',
      eval_vl es tvl ea ta ea' ta' -> eval_vl (e::es) ((x,TNat)::tvl) ea ta (ELet x (ELit e TNat) ea') (subst_type [(x,Num e)] ta').
 
-  Inductive eval_el : list expression -> list (var * type) -> expression -> expression -> Prop :=
-  | eval_el_empty : forall e, eval_el [] [] e e
-  | eval_el_many : forall e es x t tvl v ea ea',
+  Inductive eval_el : list expression -> list (var * type) -> expression -> type -> expression -> type -> Prop :=
+  | eval_el_empty : forall e t, eval_el [] [] e t e t
+  | eval_el_many_1 : forall e es x t tvl v ea ta ea' ta',
       eval_arg e t v ->
-      eval_el es tvl ea ea' ->
-      eval_el (e::es) ((x,t)::tvl) ea (ELet x v ea').
+      eval_el es tvl ea ta ea' ta' ->
+      eval_el (e::es) ((x,t)::tvl) ea ta (ELet x v ea') ta'
+  | eval_el_many_2 : forall e es x tvl v ea ta ea' ta',
+      eval_arg e TNat (ELit v TNat) ->
+      eval_el es tvl ea ta ea' ta' ->
+      eval_el (e::es) ((x,TNat)::tvl) ea ta (ELet x (ELit v TNat) ea') (subst_type [(x,Num v)] ta').
 
+(*
   Lemma vl_el_same: forall es tvl e ea ta, eval_el es tvl e ea ->
         exists vl ta', eval_vl vl tvl e ta ea ta' /\ (Forall3 (fun a b c => eval_arg a (snd c) (ELit b (snd c))) es vl tvl).
   Proof.
@@ -1709,7 +1725,7 @@ Section EvalArg.
     constructor; try easy.
     constructor. econstructor. apply H3. easy.
   Qed.
-
+*)
 End EvalArg.
 
 
@@ -1999,13 +2015,13 @@ Inductive step
     step D F
       (s, R) (EStrlen x)
       (s, R) RNull
-| SCallChecked : forall s R x ta ts el t tvl e ea xl,
+| SCallChecked : forall s R x ta ts el t t' tvl e ea xl,
     F Checked x = Some (tvl,t,e) ->
-    @eval_el s el tvl (ECast t e) ea ->
+    @eval_el s el tvl e t ea t' ->
    (* subtype D empty_theta (TPtr Checked (TFun (Num n) [] ta' ts')) (TPtr Checked (TFun (Num n) [] ta ts)) -> *)
     step D F
       (s, R) (ECall (ELit x (TPtr Checked (TFun xl ta ts))) el)
-      (s, R) (RExpr ea)
+      (s, R) (RExpr (Echecked (fst (List.split tvl)) t' ea))
 (*
 | SCallCheckedType : forall s R x ta ts ta' ts' el t tvl e ea n,
     n = -1 ->
@@ -2022,13 +2038,13 @@ Inductive step
     step D F
       (s, R) (ECall (ELit x (TPtr m (TFun xl ta ts))) el)
       (s, R) RNull
-| SCallTainted : forall s H1 H2 x ta ts el t tvl e ea xl,
+| SCallTainted : forall s H1 H2 x ta ts el t t' tvl e ea xl,
     F Tainted x = Some (tvl,t,e) ->
-    @eval_el s el tvl (ECast t e) ea ->
+    @eval_el s el tvl e t ea t' ->
     well_typed_lit_tainted D F empty_theta H2 empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
     step D F
       (s, (H1, H2)) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el)
-      (s, (H1, H2)) (RExpr ea)
+      (s, (H1, H2)) (RExpr (Echecked (fst (List.split tvl)) t' ea))
 
 | SCallTaintedType : forall s R x ta ts el t tvl e xl,
     F Tainted x = Some (tvl,t,e) ->
@@ -2037,12 +2053,12 @@ Inductive step
       (s, R) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el)
       (s, R) RBounds
 
-| SCallUnchecked : forall s R x ta ts el t tvl e ea xl,
+| SCallUnchecked : forall s R x ta ts el t t' tvl e ea xl,
     F Unchecked x = Some (tvl,t,e) ->
-    @eval_el s el tvl (ECast t e) ea ->
+    @eval_el s el tvl e t ea t' ->
     step D F
       (s, R) (ECall (ELit x (TPtr Unchecked (TFun xl ta ts))) el)
-      (s, R) (RExpr ea)
+      (s, R) (RExpr (EUnchecked (fst (List.split tvl)) t' ea))
 
 | SLet : forall s R x n t e t',
     eval_type_bound s t t' ->
@@ -2318,10 +2334,18 @@ Inductive step
     get_low t' = Some (Num l) ->
     step D F (s, R) (EMalloc m w)  (s, R) RBounds
 
-| SUnchecked : forall s R n,
+| SUnchecked : forall s R n vl t t' t'',
+    eval_type_bound s t t'' ->
     step D F
-      (s, R) (EUnchecked (ELit n TNat))
-      (s, R) (RExpr (ELit n TNat))
+      (s, R) (EUnchecked vl t (ELit n t'))
+      (s, R) (RExpr (ELit n t''))
+
+| Schecked : forall s R n vl t t' t'',
+    eval_type_bound s t t'' ->
+    step D F
+      (s, R) (Echecked vl t (ELit n t'))
+      (s, R) (RExpr (ELit n t''))
+
 | SIfDefTrueNotNTHit : forall s R x n t e1 e2 n1 t1,
     Stack.MapsTo x (n,t) s ->
     step D F (s, R) (EDeref (ELit n t)) (s, R) (RExpr (ELit n1 t1)) ->
@@ -2368,21 +2392,21 @@ Inductive reduce
   : mem -> expression -> mode -> mem -> result -> Prop :=
   | RSExp : forall M e m M' e' E,
       step D F M e M' (RExpr e') ->
-      m = mode_of(E) ->
+      m = mode_of(E) Checked ->
       reduce D F
         M (in_hole e E)
         m
         M' (RExpr (in_hole e' E))
   | RSHaltNull : forall M e m M' E,
       step D F M e M' RNull ->
-      m = mode_of(E) ->
+      m = mode_of(E) Checked ->
       reduce D F
         M (in_hole e E)
         m
         M RNull
   | RSHaltBounds : forall M e m M' E,
       step D F M e M' RBounds ->
-      m = mode_of(E) ->
+      m = mode_of(E) Checked ->
       reduce D F
         M (in_hole e E)
         m
@@ -2759,9 +2783,17 @@ Section Typing.
       well_typed (Env.add x (TPtr m w) env) Q mr e2 t ->
       well_typed env Q mr (ELet x (EMalloc m w) e2) t
 
-  | TyUnchecked : forall env Q m e,
-      well_typed env Q Unchecked e TNat ->
-      well_typed env Q m (EUnchecked e) TNat
+  | TyUnchecked : forall env Q m vl t e,
+      list_sub (freeVars e) vl ->
+      well_typed env Q Unchecked e t ->
+      well_typed env Q m (EUnchecked vl t e) t
+
+  | Tychecked : forall env Q m vl t e,
+      list_sub (freeVars e) vl ->
+      well_typed env Q Checked e t ->
+      well_typed env Q m (Echecked vl t e) t
+
+
   | TyCast1 : forall env Q m t e t',
       well_type_bound_in env t ->
       match_mode_ptr t m ->

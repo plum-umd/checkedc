@@ -70,7 +70,7 @@ Section Preservation.
       sub_domain env s ->
       stack_wf D Q env s ->
       stack_rheap_consistent D F Q R s ->
-      well_typed D F s R env Q Checked e t ->
+      well_typed D F R env Q Checked e t ->
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
@@ -81,7 +81,7 @@ Section Preservation.
         /\ stack_theta_wf s' Q' 
         /\ stack_rheap_consistent D F Q' R s'
         /\ rheap_consistent D F Q' R' R
-        /\ well_typed D F s' R' env' Q' Checked e' t'
+        /\ well_typed D F R' env' Q' Checked e' t'
         /\ eq_subtype_core D Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
