@@ -2389,33 +2389,33 @@ Inductive step
 Inductive reduce
   (D : structdef)
   (F : FEnv)
-  : mem -> expression -> mode -> mem -> result -> Prop :=
-  | RSExp : forall M e m M' e' E,
+  : mode -> mem -> expression -> mode -> mem -> result -> Prop :=
+  | RSExp : forall M e m m' M' e' E,
       step D F M e M' (RExpr e') ->
-      m = mode_of(E) Checked ->
+      m' = mode_of(E) m ->
       reduce D F
-        M (in_hole e E)
-        m
+        m M (in_hole e E)
+        m'
         M' (RExpr (in_hole e' E))
-  | RSHaltNull : forall M e m M' E,
+  | RSHaltNull : forall M e m m' M' E,
       step D F M e M' RNull ->
-      m = mode_of(E) Checked ->
+      m' = mode_of(E) m ->
       reduce D F
-        M (in_hole e E)
-        m
+        m M (in_hole e E)
+        m'
         M RNull
-  | RSHaltBounds : forall M e m M' E,
+  | RSHaltBounds : forall M e m m' M' E,
       step D F M e M' RBounds ->
-      m = mode_of(E) Checked ->
+      m' = mode_of(E) m ->
       reduce D F
-        M (in_hole e E)
-        m
+        m M (in_hole e E)
+        m'
         M' RBounds.
 
 #[export] Hint Constructors reduce : sem.
 
-Definition reduces (D : structdef) (F:FEnv) (M : mem) (e : expression) : Prop :=
-  exists (m : mode) (M' : mem) (r : result), reduce D F M e m M' r.
+Definition reduces (D : structdef) (F:FEnv) (m:mode) (M : mem) (e : expression) : Prop :=
+  exists (m' : mode) (M' : mem) (r : result), reduce D F m M e m' M' r.
 
 #[export] Hint Unfold reduces : sem.
 
