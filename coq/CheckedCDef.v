@@ -1353,30 +1353,31 @@ Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   | Cchecked vl t E' => Echecked vl t (in_hole e E')
   end.
 
-
-Fixpoint mode_of (E : ctxt) (m:mode) : mode :=
+(* the top mode is always checked mode. *)
+Fixpoint mode_of' (E : ctxt) (m:mode) : mode :=
   match E with
   | CHole => m
-  | CLet _ E' _ => mode_of E' m
-  | CCall E' _ => mode_of E' m
-  | CPlusL E' _ => mode_of E' m
-  | CPlusR _ _ E' => mode_of E' m
-  | CFieldAddr E' _ => mode_of E' m
-  | CDynCast _ E' => mode_of E' m
-  | CCast _ E' => mode_of E' m
-  | CDeref E' => mode_of E' m
-  | CAssignL E' _ => mode_of E' m
-  | CAssignR _ _ E' => mode_of E' m
-  | CIf E' e1 e2 => mode_of E' m
+  | CLet _ E' _ => mode_of' E' m
+  | CCall E' _ => mode_of' E' m
+  | CPlusL E' _ => mode_of' E' m
+  | CPlusR _ _ E' => mode_of' E' m
+  | CFieldAddr E' _ => mode_of' E' m
+  | CDynCast _ E' => mode_of' E' m
+  | CCast _ E' => mode_of' E' m
+  | CDeref E' => mode_of' E' m
+  | CAssignL E' _ => mode_of' E' m
+  | CAssignR _ _ E' => mode_of' E' m
+  | CIf E' e1 e2 => mode_of' E' m
 (*
   | CIfEqL E' e1 e2 e3 => mode_of E'
   | CIfEqR e1 E' e2 e3 => mode_of E'
   | CIfLtL E' e1 e2 e3 => mode_of E'
   | CIfLtR e1 E' e2 e3 => mode_of E'
 *)
-  | CUnchecked vl t E' => mode_of E' Unchecked
-  | Cchecked vl t E' => mode_of E' Checked
+  | CUnchecked vl t E' => mode_of' E' Unchecked
+  | Cchecked vl t E' => mode_of' E' Checked
   end.
+Definition mode_of (E: ctxt) := mode_of' E Checked.
 
 
 Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
@@ -2389,33 +2390,33 @@ Inductive step
 Inductive reduce
   (D : structdef)
   (F : FEnv)
-  : mode -> mem -> expression -> mode -> mem -> result -> Prop :=
-  | RSExp : forall M e m m' M' e' E,
+  : mem -> expression -> mode -> mem -> result -> Prop :=
+  | RSExp : forall M e m M' e' E,
       step D F M e M' (RExpr e') ->
-      m' = mode_of(E) m ->
+      m = mode_of(E) ->
       reduce D F
-        m M (in_hole e E)
-        m'
+        M (in_hole e E)
+        m
         M' (RExpr (in_hole e' E))
-  | RSHaltNull : forall M e m m' M' E,
+  | RSHaltNull : forall M e m M' E,
       step D F M e M' RNull ->
-      m' = mode_of(E) m ->
+      m = mode_of(E) ->
       reduce D F
-        m M (in_hole e E)
-        m'
+        M (in_hole e E)
+        m
         M RNull
-  | RSHaltBounds : forall M e m m' M' E,
+  | RSHaltBounds : forall M e m M' E,
       step D F M e M' RBounds ->
-      m' = mode_of(E) m ->
+      m = mode_of(E) ->
       reduce D F
-        m M (in_hole e E)
-        m'
+        M (in_hole e E)
+        m
         M' RBounds.
 
 #[export] Hint Constructors reduce : sem.
 
-Definition reduces (D : structdef) (F:FEnv) (m:mode) (M : mem) (e : expression) : Prop :=
-  exists (m' : mode) (M' : mem) (r : result), reduce D F m M e m' M' r.
+Definition reduces (D : structdef) (F:FEnv) (M : mem) (e : expression) : Prop :=
+  exists (m : mode) (M' : mem) (r : result), reduce D F M e m M' r.
 
 #[export] Hint Unfold reduces : sem.
 

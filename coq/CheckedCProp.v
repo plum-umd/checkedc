@@ -53,6 +53,7 @@ Section HeapProp.
   | heap_wt_many : forall e el,
       heap_wt_arg H e -> heap_wt_args H el -> heap_wt_args H (e::el).
 
+(*
   Inductive heap_wt (H:heap) : expression -> Prop :=
   | HtLit : forall n t, heap_well_typed_checked H n t -> heap_wt H (ELit n t)
   | HtVar : forall x, heap_wt H (EVar x)
@@ -73,7 +74,7 @@ Section HeapProp.
   | HtIf : forall x e1 e2,
       heap_wt H e1 -> heap_wt H e2 -> heap_wt H (EIf x e1 e2)
   | HtUnChecked : forall e, heap_wt H e -> heap_wt H (EUnchecked e).
-
+*)
   Definition heap_wt_all (H : heap) :=
     forall x n t,
       Heap.MapsTo x (n,t) H ->
@@ -163,15 +164,30 @@ Ltac find_Hstep :=
       rename H into Hstep
   end.
 
+Ltac solve_step :=
+  match goal with
+  | [Hstep : step _ _ _ _ _ _ |- _] =>
+      (* Leave [Hstep] there for goal information *)
+      inversion Hstep; subst; rename Hstep into _Hstep
+  end; 
+  try solve [cbn in *; subst; congruence];
+  repeat match goal with
+    | [H : in_hole _ _ = _ |- _ ] => inv H
+    end.
 
 Section GeneralProp.
   Variable D : structdef.
   Variable F : FEnv.
 
   Lemma lit_are_nf : forall R s n t,
-      ~ exists R' s' m r, reduce D F (s, R) (ELit n t) m (s', R') r.
+      ~ exists R' s' m' r, reduce D F (s, R) (ELit n t) m' (s', R') r.
   Proof.
-  Abort.
+   intros. intros H. destruct H as [R' [s' [m' [r X1]]]].
+   remember (ELit n t) as q. inv X1; simpl in *.
+   destruct E; try congruence; try solve [solve_step].
+   destruct E; try congruence; try solve [solve_step].
+   destruct E; try congruence; try solve [solve_step].
+  Qed.
   (* intros R s n t Contra. *)
   (* destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ]. *)
   (* inv Contra; find_Hstep; destruct E; cbn in *; subst; *)

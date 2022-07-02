@@ -11,17 +11,6 @@ From CHKC Require Import
 Hint Unfold rheap_consistent : Preservation.
 Hint Unfold heap_consistent_checked : Preservation.
 
-Ltac solve_step :=
-  match goal with
-  | [Hstep : step _ _ _ _ _ _ |- _] =>
-      (* Leave [Hstep] there for goal information *)
-      inversion Hstep; subst; rename Hstep into _Hstep
-  end; 
-  try solve [cbn in *; subst; congruence];
-  repeat match goal with
-    | [H : in_hole _ _ = _ |- _ ] => inv H
-    end.
-
 Ltac solve_ctxt :=
   match goal with
   | [E : ctxt |- _] =>
@@ -31,7 +20,7 @@ Ltac solve_ctxt :=
 
 Lemma step_implies_reduces : forall D F H s e H' s' r,
     @step D F (s,H) e (s',H') r ->
-    reduces D F (s,H) e.
+    reduces D F m (s,H) e.
 Proof.
   intros.
   assert (e = in_hole e CHole); try reflexivity.
