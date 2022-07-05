@@ -1,0 +1,26 @@
+\section{Related Work}
+% Safe C dialects and Checked C
+Existing instrumentation based memory safety retrofitting techniques~\cite{duck2016heap,serebryany2012addresssanitizer,
+  nagarakatte2009softbound,kendall1983bcc,steffen1992adding} add significant overhead~\cite{duck2016heap,serebryany2012addresssanitizer,
+  nagarakatte2009softbound,kendall1983bcc,steffen1992adding}.
+CCured~\cite{necula2005ccured}  and its successor Deputy~\cite{condit2007dependent}
+aims to reduce overhead by adding checks only where
+needed.
+Nonetheless, unconverted pointers in CCured require extra metadata for pointers causing backward compatibility issues.
+On the other hand, Checked C has no overhead and also is backward compatible.
+% RLBox and related works
+\systemname provides a Software Fault Isolation (SFI)~\cite{tan2017principles} mechanism for arbitrary functions in a program.
+It uses a sandbox technique to enforce isolation.
+There has been a considerable amount of work done in the area, especially for browsers~\cite{minsfi,barth-et-al:chromium:08, site-isolation-usenix}, which constantly runs code from potentially untrusted entities.
+However, all these techniques use process/program-level isolation~\cite{site-isolation-usenix} and are not suited for seamlessly isolating parts of the same program.
+
+Similar to RLBox, there are other works that provide sandboxing APIs.
+These sandboxing mechanisms have different performance trade-offs \cite{wahbe-et-al:sfi:sosp93, nacl-amd64, minsfi, wasm,erim, tan-sfi-survey, shu-isolation-survey}. 
+However, unlike RLBox, which enforces constraints 
+through~\code{tainted} types, the other works have no such restrictions and expect the developer to take care of attacks from sandboxed regions explicitly.
+% what does CheckCBox does on top of RLBox? What it provides? We should add that.
+\systemname borrows the~\code{tainted} types from RLBox and merges them with Checked C types.
+This enables us to have a more efficient sandboxing mechanism..what else?
+\aravind{Fill this part.}
+
+Our workflow of interactive type annotations has been explored before and is shown as an effective technique to assist developers in code conversion~\cite{machiry2022c} and vulnerability finding tasks~\cite{naik2021sporq}.

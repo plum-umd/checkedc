@@ -1,0 +1,39 @@
+
+\usepackage{minted}
+\usepackage{fontawesome}
+\usepackage{tikz}
+\usepackage{tikz-network}
+\usepackage{xspace}
+\usemintedstyle{emacs}
+
+\newcommand{\code}[1]{%
+  \mintinline[fontsize=\footnotesize{},mathescape, escapeinside=||]{c}{#1}%
+}
+
+\definecolor{taintcolor}{rgb}{0.87, 0.36, 0.51}
+
+\newcommand{\tbl}[1]{Table~\ref{#1}}
+\newcommand{\sect}[1]{Section~\ref{#1}}
+\newcommand{\fig}[1]{Figure~\ref{#1}}
+\newcommand{\lst}[1]{Listing~\ref{#1}}
+\newcommand{\algo}[1]{Algorithm~\ref{#1}}
+\newcommand{\apdx}[1]{Appendix~\ref{#1}}
+
+\newcommand{\realbug}{\textcolor{red}{\faBug}}
+\newcommand{\complexcode}{\faChainBroken}
+\newcommand{\entrypoint}{\faForward}
+\newcommand{\rootcause}{\textcolor{orange}{\faWarning}}
+\newcommand{\useradded}{\faUserPlus}
+\newcommand{\usermods}{\faUser}
+
+\newcommand{\ptr}{\ensuremath{ptr}}
+\newcommand{\arr}{\ensuremath{arr}}
+\newcommand{\ntarr}{\ensuremath{ntarr}}
+\newcommand{\ptrT}[1]{\code{ptr<#1>}}
+\newcommand{\arrT}[1]{\code{array_ptr<#1>}}
+\newcommand{\ntarrT}[1]{\code{nt_array_ptr<#1>}}
+\newcommand{\ucregion}{\ensuremath{uc-region}\xspace}
+\newcommand{\cregion}{\ensuremath{c-region}\xspace}
+\newcommand{\taintt}{\code{t_*}}
+
+\newcommand{\aravind}[1]{\textcolor{green}{Aravind: #1}}
