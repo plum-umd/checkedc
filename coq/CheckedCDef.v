@@ -1223,7 +1223,7 @@ Module Heap := Map.Make Z_as_OT.
 
 Definition heap : Type := Heap.t (Z * type).
 
-(** Real Heaps, [R], consist of 2 heaps that represents (checked * tainted)
+(** Real Heaps, [R], consist of 2 heaps tha  t represents (checked * tainted)
     heaps
  *)
 Definition real_heap : Type := heap * heap.
@@ -1296,8 +1296,7 @@ End allocation.
 Inductive result : Type :=
   | RExpr : expression -> result
   | RNull : result
-  | RBounds : result
-  | RCrashed: result.
+  | RBounds : result.
 
 (** Contexts, [E], are expressions with a hole in them. They are used in the standard way,
     for lifting a small-step reduction relation to compound expressions.
@@ -1418,6 +1417,23 @@ Lemma compose_correct : forall E_outer E_inner e0,
 Proof.
   intros.
   induction E_outer; try reflexivity; try (simpl; rewrite IHE_outer; reflexivity).
+Qed.
+
+Lemma expr_wf_in_hole : forall E D e, expr_wf D (in_hole e E) -> expr_wf D e.
+Proof.
+ induction E; intros;simpl in *; try easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H1. easy.
+ inv H. apply IHE in H4. easy.
+ inv H. apply IHE in H4. easy.
+ inv H. apply IHE in H1. easy.
+ inv H. apply IHE in H2. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H3. easy.
+ inv H. apply IHE in H1. easy.
 Qed.
 
 (*
@@ -2411,7 +2427,13 @@ Inductive reduce
       reduce D F
         M (in_hole e E)
         m
-        M' RBounds.
+        M RBounds
+  | RUnChecked: forall M l t t' e E,
+      eval_type_bound (fst M) t t' ->
+      reduce D F
+        M (in_hole (EUnchecked l t e) E)
+        Unchecked
+        M (RExpr (in_hole (ELit 0 t') E)). (* rep*)
 
 #[export] Hint Constructors reduce : sem.
 
@@ -2927,7 +2949,6 @@ Definition fun_wf (D : structdef) (F:FEnv) (H:real_heap) :=
     (forall env Q f tvl t e vl ea ta m,
         F m f = Some (tvl,t,e) ->
         eval_vl vl tvl (ECast t e) t ea ta ->
-        (m = Checked \/ m = Tainted) /\
         @fun_arg_wf D m [] tvl /\ NoDup (fst (List.split tvl)) /\
           word_type t /\
           type_wf D m t /\
@@ -2938,6 +2959,7 @@ Definition fun_wf (D : structdef) (F:FEnv) (H:real_heap) :=
 
 Definition sub_domain (env: env) (S:stack) := forall x,
     Env.In x env -> Stack.In x S.
+
 
 Local Close Scope Z_scope.
 Local Open Scope nat_scope.

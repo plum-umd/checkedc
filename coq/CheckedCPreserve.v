@@ -20,13 +20,21 @@ Ltac solve_ctxt :=
 
 Lemma step_implies_reduces : forall D F H s e H' s' r,
     @step D F (s,H) e (s',H') r ->
-    reduces D F m (s,H) e.
+    reduces D F (s,H) e.
 Proof.
   intros.
   assert (e = in_hole e CHole); try reflexivity.
   rewrite H1.
   destruct r; eauto with ty.
-Admitted.
+  assert (mode_of CHole = Checked).
+  easy.
+  exists Checked, (s', H'), (RExpr (in_hole e0 CHole)).
+  constructor; try easy.
+  exists Checked, (s, H), RNull.
+  apply RSHaltNull with (M' := (s',H')); try easy.
+  exists Checked, (s, H), RBounds.
+  apply RSHaltBounds with (M' := (s',H')); try easy.
+Qed.
 
 Hint Resolve step_implies_reduces : Preservation.
 
@@ -95,6 +103,7 @@ Section Preservation.
         env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
         env Q m w Wb                                               | (* Malloc *)
         env Q m e t HTy IH                                         | (* Unchecked *)
+        env Q m e t HTy IH                                         | (* checked *)
         env Q m t e t' Wb HChkPtr HTy IH                           | (* Cast - nat *)
         env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
         env Q m e x y u v t t' Wb HTy IH Teq                       | (* DynCast - ptr array *)
@@ -134,7 +143,8 @@ Section Preservation.
       apply H in H1.
       inv Hreduces. destruct E; try congruence; try solve [solve_step].
       simpl in *; subst.
-      inv H5.
+      2: { }
+      inv  H5.
       
       3: { inv HTyf. easy. }
       apply H in H1. destruct m'; try easy.
@@ -1361,4 +1371,46 @@ specialize (gen_arg_env_good tvl env) as [env' HGen].
         * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
           split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
   Qed.
+
+
+Section Noncrash. 
+  Variable D : structdef.
+  Variable F : FEnv.
+  Hypothesis HDwf : structdef_wf D.
+
+Definition normal (M : mem) (e : expression) : Prop :=
+  ~ exists m' M' r, @reduce D F M e m' M' r.
+
+Definition stuck (M : mem) (r : result) : Prop :=
+  match r with
+  | RBounds => False
+  | RNull => False
+  | RExpr e => @normal M e /\ ~ value D e
+  end.
+
+Inductive eval: mem -> expression -> mode -> mem -> result -> Prop :=
+  | eval_refl   : forall M e m, eval M e m M (RExpr e)
+  | eval_transC : forall m M M' M'' e e' r,
+      eval M e m M' (RExpr e') ->
+      @reduce D F M' e' Checked M'' r ->
+      eval M e Checked M'' r
+  | eval_transU : forall m M M' M'' e e' r,
+      eval M e m M' (RExpr e') ->
+      @reduce D F M' e' Unchecked M'' r ->
+      eval M e Unchecked M'' r.
+
+Theorem noncrash : forall S Q R e t m S' R' r,
+    rheap_wf R ->
+    @rheap_wt_all D F Q R ->
+    @fun_wf D F R ->
+    stack_wt D m S ->
+    @expr_wf D e ->
+    @well_typed D F R empty_env empty_theta Checked e t ->
+    @eval (S,R) e m (S',R') r ->
+    ~ @stuck (S',R') r.
+Proof.
+Admitted.
+
+End Noncrash.
+
   
