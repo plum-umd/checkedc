@@ -1,32 +1,267 @@
-\section{Overview}\label{sec:overview}
-
-Give an overview of Checked-C and RLBox.
-
-\begin{enumerate}
-
-\item discuss Checked-C and its usage.
-
-\item discuss RLBox.
-
-\item A running example (web-browser with third party libraries).
-
-\end{enumerate}
-
-
-\section{Key Updates}\label{sec:key-updates}
+\section{Overview and Transcendence}\label{sec:overview}
 
 This section discusses the key merge features between Checked-C and RLBox and the problems we are trying to solve.
 
-\begin{enumerate}
 
-\item Pointing out that the current Checked-C and C formalism is not enough to ensure the security of linking web-browser with third party libraries. Pointing out that even though Checked-C previously has blame theorem, but it still allows program crashing, and our new work can guarantee that every crashes can be detected and handled (non-crashing theorem).
 
-\item Using an example to highlight the overhead of RLBox, and points out the advantage of building RLBox mechanism in a compiler.
+\begin{figure}[t]
+{\small
+  \begin{lstlisting}[xleftmargin=4 mm]
+//in checked region
 
-\item Discuss function pointer formalism and points out the potential security issues without a proper handling of function pointer set up. Mentioning what happens in RLBox and other tools. Pointing out that this is the first work formalizing function pointers.
+int compare_1(nt_array_ptr<char> x: count (0),
+  nt_array_ptr<char> y : count (0)) { 
+  int len_x = strlen(x);
+  int len_y = strlen(y);
+  return sum(x,len_x) < sum(y,len_y);
+  }
+...
 
-\end{enumerate}
+int stringsort(
+ nt_array_ptr<nt_array_ptr<char>> s : count (n),
+ ptr<(int)(nt_array_ptr<char>,
+  nt_array_ptr<char>)> cmp, int n) {
+  int i, j, gap;
+  int didswap;
+ 
+  for(gap = n / 2; gap > 0; gap /= 2) {
+    {
+    do  {
+        didswap = 0;
+        for(i = 0; i < n - gap; i++)
+           {
+             j = i + gap;
+             if((*cmp)(s[i], s[j]) > 0)
+             {
+                int len = strlen(s[i]);
+                nt_array_ptr<char> 
+                  tmp : count (len) = s[i];
+                s[i] = s[j];
+                s[j] = tmp;
+                didswap = 1;
+             }
+           }
+        } while(didswap);
+    }
+  }
 
+  return 0;
+}
+  \end{lstlisting}
+}
+\caption{Checked stringsort Code}
+\label{fig:checkedc-example-1}
+\end{figure}
+
+\begin{figure}[t]
+{\small
+  \begin{lstlisting}[xleftmargin=4 mm]
+//in checked region, tainted version
+int tainted_compare_1(
+  nt_array_tptr<char> x : count (0),
+  nt_array_tptr<char> y : count (0)) {
+  int len_x = strlen(x);
+  int len_y = strlen(y);
+  nt_array_ptr<char> tx : count (len_x)
+   = malloc(nt_array<char>, len_x);
+  nt_array_ptr<char> ty : count (len_y)
+   = malloc(nt_array<char>, len_y);
+  safe_memcpy(tx,x,len_x);
+  safe_memcpy(ty,y,len_y);
+  return compare_1(tx,ty);
+}
+...
+
+//calling the function turns
+//an unchecked region to a checked region.
+int tainted_stringsort(nt_array_tptr
+     <nt_array_tptr<char>> s : count (n),
+ tptr<(int)(nt_array_tptr<char>,
+  nt_array_tptr<char>)> cmp, int n) {
+  int i;
+  nt_array_ptr<nt_array_ptr<char>> p : count (n)
+    = malloc(nt_array<nt_array_ptr<char>>, n);
+  for(i = 0; i < n; i++) {
+    int len = strlen s[i];
+    nt_array_ptr<char> tmp : count (len)
+      = new malloc(nt_array<char>, len);
+    safe_memcpy(tmp,s[i],len);
+    p[i] = tmp;
+  }
+  ptr<(int)(nt_array_ptr<char> : count (0),
+  nt_array_ptr<char> : count (0))>
+    cfun = find_check(cmp);
+  
+  return stringsort(p,cfun);
+}
+  \end{lstlisting}
+}
+\caption{Tainted stringsort Code}
+\label{fig:checkedc-example-2}
+\end{figure}
+
+\begin{figure}[t]
+{\small
+  \begin{lstlisting}[xleftmargin=4 mm]
+//in unchecked region
+int f(char ** s, int (*cmp)(char *,char *),
+  int (*sort)(char **, int (*)(char *,char *),
+               int), int n) {
+...
+
+  int i = sort(s,cmp,n);
+  free(s[10]);
+...
+}
+
+int g(int (*cmp)(char *,char *)) {
+...
+  int real_addr = derandomize(cmp);
+...
+}
+
+int main(int n) {
+  nt_array_ptr<nt_array_ptr<char>> p : count(n)
+    = malloc(nt_array<nt_array_ptr<char>>, n);
+
+  nt_array_tptr<nt_array_tptr<char>>
+     tp : count(n) =
+       tmalloc(nt_array<nt_array_tptr<char>>, n);
+...
+  safe_memcpy(tp, p, n);
+
+  unchecked {
+    if (BAD) // a flag to call different funs.
+      //input checked pointers
+      f(p, compare_1, stringsort); 
+    else 
+      //input tainted pointers
+      f(tp, tainted_compare_1, tainted_stringsort);
+  }
+
+  if (!BAD) safe_memcpy(p, tp, n);
+  p[10] = "crash?";
+  
+  unchecked {
+    if (BAD) g(compare_1)
+      else g(tainted_compare_1);
+  }
+
+  return 0;
+}
+  \end{lstlisting}
+}
+\caption{Tainted Pointer Usage in Calling Unchecked Fun}
+\label{fig:checkedc-example-3}
+\end{figure}
+
+
+\myparagraph{Maintaining Non-crashing}
+Previously, the main guarantee of \checkedc \cite{li22checkedc} was the blame theorem,
+i.e., if there is a crash, the source is from some unchecked regions.
+For example, at \Cref{fig:checkedc-example-3} line 31,
+we call a unchecked function \code{f} with a checked null-terminated array (NT-array) pointer argument.
+At line 8, depending on the NT-array size, \code{free(s[10])} might crash.
+Even if it does not crash, line 38 is doomed because of the \code{free} call.
+
+The philosophy is that unchecked regions are written in C and unstable,
+and programmers will eventually remove them by converting them to \checkedc code.
+The reality is that users might not want to convert everything.
+For some insignificant or handy history C code, such as library functions,
+they might want to keep it as long as no crashing.
+
+The sources of crashing in \checkedc are (1) unchecked regions crash themselves;
+  and (2) the misuse of checked pointers in unchecked regions.
+Enlightened by RLBox \cite{rlbox-paper},
+we sandbox the unchecked regions and then we utilize the \checkedc type system
+to disallow checked pointers to be used in an unchecked region. 
+To achieve the communication between checked and unchecked regions,
+we create tainted pointers that can be shared by different regions,
+whose data are stored in the sandboxed heap.
+Users are required to copy data to tainted pointers that are shared in unchecked regions.
+For example,  we copy the checked pointer data to the tainted pointer \code{tp}
+at \Cref{fig:checkedc-example-3} line 26,
+and input the tainted pointer to the unchecked function at line 34.
+At line 8, even if statement might crash, since tainted pointers are stored
+in the sandboxed heap, it can be recovered.
+At line 37, the use of a tainted pointer in a checked region
+requires a verification on it.
+This is handled by inserting additional checks
+and creating exception handling before the use by the \systemname compiler.
+Thus, the checked pointer \code{p} is safely used at line 38.
+
+In short, banning checked pointer uses in unchecked regions and providing tainted shared pointers
+are the solution for crashing. 
+In \systemname, we proved the non-crashing theorem based on the \systemname type system,
+.i.e, any program execution is stopped in a predictable manner
+where either the execution terminates or is stopped at a place where an exception handler exists.
+In fact, our work is \textit{the first formalism of RLBox},
+and formally shows the security guarantee that RLBox provides 
+is actually the non-crashing theorem.
+
+\myparagraph{Formalism Function Pointers}
+In C, manipulating function pointers is a major way of implementing high order functions.
+Previously, we assumed all function calls are through calling by name to a global map.
+In \systemname, we formalize function pointers and maintain the \systemname type soundness.
+To the best of our knowledge,
+this is the first work of formalizing C function pointers with security guarantee.
+
+\Cref{fig:checkedc-example-1} defines a string sorting algorithm
+depending on the input function pointer \code{cmp} defining the generic order for strings,
+and \code{compare_1} is an example \code{cmp} function
+that adds the ASCII numbers of characters in the two strings and compare the results.
+In addition, function pointers enable the callback mechanism,
+i.e., a server sends a function pointer to a client in an unchecked region,
+and allows the client to access some server resources by calling back the pointer.
+This is a common usage between a web-browser and untrusted third party libraries.
+The function call in \Cref{fig:checkedc-example-3} line 34 is one such usage.
+
+We also utilize \systemname subtyping relation to permit function pointer static auto-casting.
+Function pointer type information might contain array pointer bound information,
+for which it is inconvenient to coincide the defined types for a function implementation and the function pointer type. 
+For example, the \code{cmp} argument in \code{stringsort} (\Cref{fig:checkedc-example-1})
+has type \code{ptr<(int)(nt_array_ptr<char>, nt_array_ptr<char>)>},
+meaning that the function takes two NT-array pointers with arbitrary size and outputs an integer.
+The function \code{compare_1}'s pointer has type \code{ptr<(int)(nt_array_ptr<char> : count (0), nt_array_ptr<char> : count (0) )>}
+To use \code{compare_1} in \code{stringsort}, the type is auto-cast to the \code{cmp}'s type.
+In general, if function pointer $x$ has type $* (tl \to t)$, and  $y$ has $* (tl' \to t')$,
+in order to use $x$ as $y$, $tl'$ should be a subtype of $tl$ and $t$ subtypes to $t'$.
+
+\myparagraph{Not Exposing Checked Pointer Addresses}
+The design for the non-crashing property bans the checked pointer uses in unchecked regions.
+Thus, there is no reason to permit checked pointer variable assignments in unchecked regions;
+especially, this might expose a checked pointer address to untrusted parties.
+For example, the call to function $g$ at \Cref{fig:checkedc-example-3} line 41 lives in an unchecked region,
+and $g$ might use some mechanism, such as derandomizing ASLR \cite{shacham-aslr},
+to achieve the checked pointer address.
+Thus, it enables a third party to access any checked heap and function data by simple pointer arithmetic.
+
+To prevent the checked pointer address leak,
+we prevent any unchecked regions acknowledge checked pointer variables.
+In addition, to facilitate checked function callbacks, 
+the \systemname compiler compiles every checked function
+with an additional tainted shell function.
+Users are required to serve unchecked regions with the tainted shell pointer instead of the original checked function pointer.
+For example, \code{tainted_compare_1} and \code{tainted_stringsort} in \Cref{fig:checkedc-example-2} 
+are the tainted shells of the checked functions \code{compare_1} and \code{stringsort}.
+In the tainted shells, the arguments are tainted versions of the corresponding arguments in the checked functions.
+Inside the shell body, create checked pointer copies of the tainted arguments, and call the checked functions.
+In addition, once a checked function returns,
+if the output is a checked pointer, we also its the data to a new tainted pointer and exit the shell.
+\Cref{fig:checkedc-example-3} line 42 is an example of serving the function call living in an unchecked region
+with a tainted shell pointer argument \code{tainted_compare_1}.
+Even if $g$ derndomizes its address (line 14), the shell address is in the sandbox and has no harm,
+and calling the shell never exposes any checked pointer information outside of the shell.
+
+Conceptually, the shell is run in a checked region.
+One can imagine that a tainted shell is a safe closure that contains a checked block.
+Once the closure is called, the system is turned to a checked region,
+so that the checked function call at \Cref{fig:checkedc-example-2} line 13 is safe, 
+even if it is called by $g$ in \Cref{fig:checkedc-example-3} , because it lives in the checked region.
+In the \systemname formalism, we formalize a \textit{checked} block on top of the existing unchecked regions,
+and the transition of a tainted shell call creates a checked block containing the shell body.
+We also make sure that no arguments in these tainted shell contains any checked pointers,
+as well as no output is of a checked type.
 
 % \paragraph*{\textbf{NT-array Pointer Formalization}} NT-array pointers point to NT-arrays whose endings are determined by a null (\code{'\0'}). The length of a NT-array is usually not fixed. The two uses of NT-array pointers in \checkedc are branching and \code{strlen} operations. \code{if (*x) }$e_1$\code{ else }$e_2$ branches to $e_1$/$e_2$ depending one the \code{x}'s data, while \code{strlen(x)} computes the length of the NT-array pointed to by \code{x}.
 % \liyi{move to formal and later section.}

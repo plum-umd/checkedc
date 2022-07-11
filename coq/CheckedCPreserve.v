@@ -46,7 +46,7 @@ Proof.
   intros.
   destruct H0 as [ E Hhole ].
   destruct H1 as [ m' [ H' [r  HRed ]] ].
-  inv HRed as [ ? e0' ? ? e0'' E' | ? e0' ? ? E' | ? e0' ? ? E' ]; rewrite compose_correct; eauto 20.
+  inv HRed as [ ? e0' ? ? e0'' E' | ? e0' ? ? E' | ? e0' ? ? E'  | ? e0' ? ? E' ]; rewrite compose_correct; eauto 20.
 Admitted.
 
 Hint Resolve reduces_congruence : Preservation.
@@ -58,7 +58,7 @@ Section Preservation.
   Hypothesis HDwf : structdef_wf D.
   Lemma preservation : forall s R env Q e t s' R' e',
       rheap_wf R ->
-      rheap_wt_all D F Q Checked R ->
+      rheap_wt_all D F Q R ->
       expr_wf D e ->
       stack_wt D Checked s ->
       env_wt D Checked env ->

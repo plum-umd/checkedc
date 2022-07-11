@@ -1,7 +1,7 @@
 \newif\iftr\trtrue
 \trtrue
 
-\documentclass[conference]{IEEEtran}
+ \documentclass[conference,compsoc]{IEEEtran}
 
 \makeatletter
 \def\endthebibliography{%
@@ -25,7 +25,7 @@
 \usepackage{color}
 \usepackage{xcolor}
 \DeclareMathAlphabet{\mathpzc}{OT1}{pzc}{m}{it}
-
+\usepackage{cleveref} % must be loaded after hyperref and amsmath
 %% Some recommended packages.
 \usepackage{subcaption} %% For complex figures with subfigures/subcaptions
                         %% http://ctan.org/pkg/subcaption
@@ -43,9 +43,12 @@
 \usepackage{enumitem}
 %\input{header.tex}
 %\input{macros.tex}
+%\usepackage{minted}
 \usepackage{tikz}
+\usepackage{tikz-network}
 \usetikzlibrary{chains,fit,shapes,positioning,calc,arrows.meta,shapes.arrows}
-
+\usepackage{xspace}
+%\usemintedstyle{emacs}
 \usepackage[numbers]{natbib}
 \bibliographystyle{plainnat}
 %\bibliographystyle{IEEEtran}
@@ -75,7 +78,7 @@
 \newcommand{\myparagraph}[1]{\textbf{#1}.\xspace}
 
 \newcommand{\code}[1]{\lstinline|#1|}
-%\newcommand{\ignore}[1]{{}}
+\newcommand{\ignore}[1]{{}}
 \newcommand{\kwchecked}{\lstinline|\_Checked|}
 \newcommand{\kwunchecked}{\lstinline|\_Unchecked|}
 \newcommand{\kwdynamiccheck}{\lstinline|\_Dynamic\_check|}
@@ -91,6 +94,37 @@
 \newcommand{\Checkedarr}[2]{{#1}~\lstinline|_Checked[|{#2}\lstinline|]|}
 \newcommand{\CheckedarrT}[1]{\Checkedarr{$\tau$}{#1}}
 
+
+%\newcommand{\code}[1]{%
+%  \mintinline[fontsize=\footnotesize{},mathescape, escapeinside=||]{c}{#1}%
+%}
+
+\definecolor{taintcolor}{rgb}{0.87, 0.36, 0.51}
+
+\newcommand{\tbl}[1]{Table~\ref{#1}}
+\newcommand{\sect}[1]{Section~\ref{#1}}
+\newcommand{\fig}[1]{Figure~\ref{#1}}
+\newcommand{\lst}[1]{Listing~\ref{#1}}
+\newcommand{\algo}[1]{Algorithm~\ref{#1}}
+\newcommand{\apdx}[1]{Appendix~\ref{#1}}
+
+\newcommand{\realbug}{\textcolor{red}{\faBug}}
+\newcommand{\complexcode}{\faChainBroken}
+\newcommand{\entrypoint}{\faForward}
+\newcommand{\rootcause}{\textcolor{orange}{\faWarning}}
+\newcommand{\useradded}{\faUserPlus}
+\newcommand{\usermods}{\faUser}
+
+\newcommand{\ptr}{\ensuremath{ptr}}
+\newcommand{\arr}{\ensuremath{arr}}
+\newcommand{\ntarr}{\ensuremath{ntarr}}
+\newcommand{\ptrT}[1]{\code{ptr<}$#1$\code{>}}
+\newcommand{\arrT}[1]{\code{array_ptr<}$#1$\code{>}}
+\newcommand{\ntarrT}[1]{\code{nt_array_ptr<}$#1$\code{>}}
+\newcommand{\ucregion}{\ensuremath{uc-region}\xspace}
+\newcommand{\cregion}{\ensuremath{c-region}\xspace}
+\newcommand{\taintt}{\code{t_*}}
+
 \newif\ifsubmit\submitfalse
 
 \ifsubmit
@@ -102,16 +136,14 @@
 \newcommand{\liyi}[1]{}
 \newcommand{\yiyun}[1]{}
 \newcommand{\review}[1]{}
+\newcommand{\aravind}[1]{}
 
 \else
 \newcommand{\mwh}[1]{\textcolor{red}{Mike: #1}}
-\newcommand{\dtarditi}[1]{\textcolor{purple}{David: #1}}
-\newcommand{\leo}[1]{\textcolor{green!80!blue}{Leo: #1}}
 \newcommand{\liyi}[1]{\textbf{\textcolor{orange}{Liyi: #1}}}
 \newcommand{\yiyun}[1]{\textcolor{cyan}{Yiyun: #1}}
-\newcommand{\dvh}[1]{\textcolor{magenta}{DVH: #1}}
 \newcommand{\review}[1]{\textbf{\textcolor{blue}{Review: #1}}}
-
+\newcommand{\aravind}[1]{\textcolor{green}{Aravind: #1}}
 \fi
 
 \newcommand{\lang}{\textsc{CoreChkC}\xspace}
@@ -269,7 +301,7 @@
 \newcommand{\ewidenstrlen}[5]{\ensuremath{#5 = ~ \vdash_{widenstr}#1, #2, #3, #4}}
 \newcommand{\ewidenderef}[4]{\ensuremath{#4 = ~ \vdash_{widenderef}#1, #2, #3}}
 \newcommand{\eleq}[2]{\ensuremath{#1 \leq #2}}
-
+\newcommand{\systemname}{\textsc{CheckedCBox}\xspace}
 
 
 
@@ -312,9 +344,9 @@
 
 %% Title information
 \iftr
-\title{A Formal Model of Checked C {\large (Extended Version)}}
+\title{\systemname: Formalizing RLBox in \checkedc for Incremental Spatial Memory Safety {\large (Extended Version)}}
 \else
-\title{A Formal Model of Checked C}
+\title{{\systemname: Formalizing RLBox in \checkedc for Incremental Spatial Memory Safety}
 \fi
 %% [Short Title] is optional;
 %% when present, will be used in
@@ -361,45 +393,7 @@
 
 \maketitle
 
-\begin{abstract}
-  % Programs written in C account for a significant portion of code
-  % currently in use, despite its lack of memory safety which has been
-  % the cause of many disastrous vulnerabilities throughout the years.
-  % %
-  % Checked C is a Microsoft-backed attempt at a solution to this problem
-  % which extends C with types and annotations that guarantees spatial
-  % memory safety in a backwards compatible manner, while allowing
-  % the mix of checked and unchecked code.
-  % %
-  % However, Checked C's implementation is a complex beast built on top
-  % of Clang, while Checked C's specification is over \leo{X} pages of
-  % natural language, reducing confidence in the promised guarantees.
 
-  We present a formal model of Checked C, a dialect of C
-  that aims to enforce spatial memory safety. Our model pays particular
-  attention to the semantics of dynamically sized, potentially null-terminated
-  arrays.
-  %
-  We formalize this model in Coq, and prove that any spatial memory
-  safety errors can be \emph{blamed} on portions of the program
-  labeled \emph{unchecked}; this is a Checked C feature that supports
-  incremental porting and backward compatibility.
- %
-While our model's operational semantics uses annotated
-  (``fat'') pointers to enforce spatial
-  safety, we show that such annotations can be safely erased.
-    Using PLT Redex we formalize an executable
-    version of our model and a compilation procedure to an untyped C-like
-    language, as well as use randomized testing to
-    validate that generated code faithfully simulates the original.
-  %
-  Finally, we develop a custom random generator 
-  for well-typed and almost-well-typed terms in our Redex model, and
-  use it to search for
-  inconsistencies between our model and the Clang Checked C
-  implementation. We find these steps to be a useful way to co-develop a language
-  (Checked C is still in development) and a core model of it.
-\end{abstract}
 
 \iftr
 \bigskip
@@ -409,7 +403,7 @@ While our model's operational semantics uses annotated
 \end{small}
 \fi
   
-%\input{introduction}
+\input{introduction}
 
 \input{background}
 
@@ -449,9 +443,9 @@ While our model's operational semantics uses annotated
 
 \bigskip
 
-\paragraph*{Acknowledgments}
-We thank the anonymous reviewers for their helpful, constructive
-comments. This work was supported in part by a gift from Microsoft. 
+%\paragraph*{Acknowledgments}
+%We thank the anonymous reviewers for their helpful, constructive
+%comments. This work was supported in part by a gift from Microsoft. 
 
 % \ignore{
 % %% Acknowledgments
