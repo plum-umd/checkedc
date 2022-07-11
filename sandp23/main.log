@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  25 JUN 2022 15:12
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  10 JUL 2022 23:59
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -21,6 +21,7 @@ LaTeX Font Info:    Trying to load font information for OT1+ptm on input line 5
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ptm.fd
 File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 )
+-- Using IEEE Computer Society mode.
 -- Using 8.5in x 11in (letter) paper.
 -- Using PDF output.
 \@IEEEnormalsizeunitybaselineskip=\dimen137
@@ -28,54 +29,57 @@ File: ot1ptm.fd 2001/06/04 font definitions for OT1/ptm.
 \CLASSINFOnormalsizebaselineskip=\dimen138
 \CLASSINFOnormalsizeunitybaselineskip=\dimen139
 \IEEEnormaljot=\dimen140
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <5.01874> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <5> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <5.01874> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <7.02625> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <7> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <7.02625> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <8.03> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <8> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <8.03> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <9.03374> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <9> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <9.03374> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <10.03749> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <10> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <10.03749> not available
+
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <11> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <11.04124> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <11> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <11.04124> not available
+
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <12.045> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <12> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <12.045> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <17> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <17.06374> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <17> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <17.06374> not available
+
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <20> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <20.075> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <20> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <20.075> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
-LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <24> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/n' in size <24.09> not available
 (Font)              Font shape `OT1/ptm/b/n' tried instead on input line 1090.
-LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <24> not available
+LaTeX Font Info:    Font shape `OT1/ptm/bx/it' in size <24.09> not available
 (Font)              Font shape `OT1/ptm/b/it' tried instead on input line 1090.
 
 \IEEEquantizedlength=\dimen141
@@ -609,6 +613,9 @@ erence Rules
 \mpr@vlist=\box67
 \mpr@right=\box68
 )
+(/usr/share/texlive/texmf-dist/tex/latex/cleveref/cleveref.sty
+Package: cleveref 2018/03/27 v0.21.4 Intelligent cross-referencing
+)
 (/usr/share/texlive/texmf-dist/tex/latex/caption/subcaption.sty
 Package: subcaption 2020/01/22 v1.3d Sub-captions (AR)
 
@@ -629,15 +636,13 @@ Package caption Info: Unknown document class (or package),
 (caption)             standard defaults will be used.
 Package caption Info: \@makecaption = \long macro:#1#2->\ifx \@captype \@IEEEta
 blestring \footnotesize \bgroup \par \centering \@IEEEtabletopskipstrut {\norma
-lfont \footnotesize #1}\\{\normalfont \footnotesize \scshape #2}\par \addvspace
- {0.5\baselineskip }\egroup \@IEEEtablecaptionsepspace \else \@IEEEfigurecaptio
-nsepspace \setbox \@tempboxa \hbox {\normalfont \footnotesize {#1.}\nobreakspac
-e \nobreakspace #2}\ifdim \wd \@tempboxa >\hsize \setbox \@tempboxa \hbox {\nor
-malfont \footnotesize {#1.}\nobreakspace \nobreakspace }\parbox [t]{\hsize }{\n
-ormalfont \footnotesize \noindent \unhbox \@tempboxa #2}\else \ifCLASSOPTIONcon
-ference \hbox to\hsize {\normalfont \footnotesize \hfil \box \@tempboxa \hfil }
-\else \hbox to\hsize {\normalfont \footnotesize \box \@tempboxa \hfil }\fi \fi 
-\fi  on input line 1082.
+lfont \footnotesize {#1.}\nobreakspace \scshape #2}\par \addvspace {0.5\baselin
+eskip }\egroup \@IEEEtablecaptionsepspace \else \@IEEEfigurecaptionsepspace \se
+tbox \@tempboxa \hbox {\normalfont \footnotesize {#1.}\nobreakspace #2}\ifdim \
+wd \@tempboxa >\hsize \setbox \@tempboxa \hbox {\normalfont \footnotesize {#1.}
+\nobreakspace }\parbox [t]{\hsize }{\normalfont \footnotesize \noindent \unhbox
+ \@tempboxa #2}\else \hbox to\hsize {\normalfont \footnotesize \hfil \box \@tem
+pboxa \hfil }\fi \fi  on input line 1082.
 )
 
 Package caption Warning: Unknown document class (or package),
@@ -728,18 +733,177 @@ Package: enumitem 2019/06/20 v3.9 Customized lists
 \enit@count@id=\count312
 \enitdp@description=\count313
 )
+(/usr/share/texlive/texmf-dist/tex/latex/tikz-network/tikz-network.sty
+Package: tikz-network 2019/08/15 tikz-network v1.1
+
+(/usr/share/texlive/texmf-dist/tex/latex/etex-pkg/etex.sty
+Package: etex 2016/08/01 v2.7 eTeX basic definition package (PEB,DPC)
+
+
+Package etex Warning: Extended allocation already in use.
+(etex)                etex.sty code will not be used.
+(etex)                To force etex package to load, add
+(etex)                \RequirePackage{etex}
+(etex)                at the start of the document.
+
+) (/usr/share/texlive/texmf-dist/tex/latex/xifthen/xifthen.sty
+Package: xifthen 2015/11/05 v1.4.0 Extended ifthen features
+
+(/usr/share/texlive/texmf-dist/tex/latex/ifmtarg/ifmtarg.sty
+Package: ifmtarg 2018/04/16 v1.2b check for an empty argument
+))
+(/usr/share/texlive/texmf-dist/tex/latex/datatool/datatool.sty
+Package: datatool 2019/09/27 v2.32 (NLCT)
+
+(/usr/share/texlive/texmf-dist/tex/latex/xfor/xfor.sty
+Package: xfor 2009/02/05 v1.05 (NLCT)
+)
+(/usr/share/texlive/texmf-dist/tex/latex/substr/substr.sty
+Package: substr 2009/10/20 v1.2 Handle substrings
+\c@su@anzahl=\count314
+)
+(/usr/share/texlive/texmf-dist/tex/latex/etoolbox/etoolbox.sty
+Package: etoolbox 2019/09/21 v2.5h e-TeX tools for LaTeX (JAW)
+\etb@tempcnta=\count315
+)
+(/usr/share/texlive/texmf-dist/tex/latex/datatool/datatool-base.sty
+Package: datatool-base 2019/09/27 v2.32 (NLCT)
+
+(/usr/share/texlive/texmf-dist/tex/latex/datatool/datatool-fp.sty
+Package: datatool-fp 2019/09/27 v2.32 (NLCT)
+
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp.sty
+Package: fp 1995/04/02
+
+`Fixed Point Package', Version 0.8, April 2, 1995 (C) Michael Mehlich
+(/usr/share/texlive/texmf-dist/tex/latex/fp/defpattern.sty
+Package: defpattern 1994/10/12
+\actioncount=\count316
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-basic.sty
+Package: fp-basic 1996/05/13
+\FP@xs=\count317
+\FP@xia=\count318
+\FP@xib=\count319
+\FP@xfa=\count320
+\FP@xfb=\count321
+\FP@rega=\count322
+\FP@regb=\count323
+\FP@regs=\count324
+\FP@times=\count325
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-addons.sty
+Package: fp-addons 1995/03/15
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-snap.sty
+Package: fp-snap 1995/04/05
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-exp.sty
+Package: fp-exp 1995/04/03
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-trigo.sty
+Package: fp-trigo 1995/04/14
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-pas.sty
+Package: fp-pas 1994/08/29
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-random.sty
+Package: fp-random 1995/02/23
+\FPseed=\count326
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-eqn.sty
+Package: fp-eqn 1995/04/03
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-upn.sty
+Package: fp-upn 1996/10/21
+)
+(/usr/share/texlive/texmf-dist/tex/latex/fp/fp-eval.sty
+Package: fp-eval 1995/04/03
+)))
+\@dtl@toks=\toks39
+\@dtl@tmpcount=\count327
+\dtl@tmplength=\skip60
+\dtl@sortresult=\count328
+\@dtl@numgrpsepcount=\count329
+\@dtl@datatype=\count330
+\dtl@codeA=\count331
+\dtl@codeB=\count332
+\@dtl@foreach@level=\count333
+)
+\dtlcolumnnum=\count334
+\dtlrownum=\count335
+\@dtl@before=\toks40
+\@dtl@after=\toks41
+\@dtl@colhead=\toks42
+\dtlcurrentrow=\toks43
+\dtlbeforerow=\toks44
+\dtlafterrow=\toks45
+\dtlforeachlevel=\count336
+\c@DTLrowi=\count337
+\c@DTLrowii=\count338
+\c@DTLrowiii=\count339
+\c@DTLrow=\count340
+\dtl@rowi=\count341
+\dtl@rowii=\count342
+\dtl@rowiii=\count343
+\@dtl@curi=\toks46
+\@dtl@previ=\toks47
+\@dtl@nexti=\toks48
+\@dtl@curii=\toks49
+\@dtl@previi=\toks50
+\@dtl@nextii=\toks51
+\@dtl@curiii=\toks52
+\@dtl@previii=\toks53
+\@dtl@nextiii=\toks54
+\@dtl@elements=\count344
+\@dtl@list=\toks55
+\@dtl@rowa=\toks56
+\@dtl@rowb=\toks57
+\@dtl@toksA=\toks58
+\@dtl@toksB=\toks59
+\@dtl@write=\write4
+\@dtl@read=\read3
+\dtl@entrycr=\count345
+\dtl@omitlines=\count346
+)
+(/usr/share/texlive/texmf-dist/tex/latex/trimspaces/trimspaces.sty
+Package: trimspaces 2009/09/17 v1.1 Trim spaces around a token list
+)
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarychains.code.tex
-File: tikzlibrarychains.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+zlibraryarrows.code.tex
+File: tikzlibraryarrows.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.code.
+tex
+File: pgflibraryarrows.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+\arrowsize=\dimen314
+))
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibrary3d.code.tex
+File: tikzlibrary3d.code.tex 2020/01/08 v3.1.5b (3.1.5b)
 )
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
 zlibraryfit.code.tex
 File: tikzlibraryfit.code.tex 2020/01/08 v3.1.5b (3.1.5b)
 )
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryshapes.code.tex
-File: tikzlibraryshapes.code.tex 2020/01/08 v3.1.5b (3.1.5b)
-
+zlibrarycalc.code.tex
+File: tikzlibrarycalc.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+)
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibrarybackgrounds.code.tex
+File: tikzlibrarybackgrounds.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+\pgf@layerbox@background=\box72
+\pgf@layerboxsaved@background=\box73
+)
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.meta.
+code.tex
+File: pgflibraryarrows.meta.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+\pgfarrowinset=\dimen315
+\pgfarrowlength=\dimen316
+\pgfarrowwidth=\dimen317
+\pgfarrowlinewidth=\dimen318
+)
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
 zlibraryshapes.geometric.code.tex
 File: tikzlibraryshapes.geometric.code.tex 2020/01/08 v3.1.5b (3.1.5b)
@@ -748,6 +912,16 @@ File: tikzlibraryshapes.geometric.code.tex 2020/01/08 v3.1.5b (3.1.5b)
 s.geometric.code.tex
 File: pgflibraryshapes.geometric.code.tex 2020/01/08 v3.1.5b (3.1.5b)
 ))
+\c@LayerCounter=\count347
+)
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibrarychains.code.tex
+File: tikzlibrarychains.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+)
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibraryshapes.code.tex
+File: tikzlibraryshapes.code.tex 2020/01/08 v3.1.5b (3.1.5b)
+
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
 zlibraryshapes.misc.code.tex
 File: tikzlibraryshapes.misc.code.tex 2020/01/08 v3.1.5b (3.1.5b)
@@ -783,99 +957,88 @@ File: tikzlibraryshapes.multipart.code.tex 2020/01/08 v3.1.5b (3.1.5b)
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshape
 s.multipart.code.tex
 File: pgflibraryshapes.multipart.code.tex 2020/01/08 v3.1.5b (3.1.5b)
-\pgfnodepartlowerbox=\box72
-\pgfnodeparttwobox=\box73
-\pgfnodepartthreebox=\box74
-\pgfnodepartfourbox=\box75
-\pgfnodeparttwentybox=\box76
-\pgfnodepartnineteenbox=\box77
-\pgfnodeparteighteenbox=\box78
-\pgfnodepartseventeenbox=\box79
-\pgfnodepartsixteenbox=\box80
-\pgfnodepartfifteenbox=\box81
-\pgfnodepartfourteenbox=\box82
-\pgfnodepartthirteenbox=\box83
-\pgfnodeparttwelvebox=\box84
-\pgfnodepartelevenbox=\box85
-\pgfnodeparttenbox=\box86
-\pgfnodepartninebox=\box87
-\pgfnodeparteightbox=\box88
-\pgfnodepartsevenbox=\box89
-\pgfnodepartsixbox=\box90
-\pgfnodepartfivebox=\box91
+\pgfnodepartlowerbox=\box74
+\pgfnodeparttwobox=\box75
+\pgfnodepartthreebox=\box76
+\pgfnodepartfourbox=\box77
+\pgfnodeparttwentybox=\box78
+\pgfnodepartnineteenbox=\box79
+\pgfnodeparteighteenbox=\box80
+\pgfnodepartseventeenbox=\box81
+\pgfnodepartsixteenbox=\box82
+\pgfnodepartfifteenbox=\box83
+\pgfnodepartfourteenbox=\box84
+\pgfnodepartthirteenbox=\box85
+\pgfnodeparttwelvebox=\box86
+\pgfnodepartelevenbox=\box87
+\pgfnodeparttenbox=\box88
+\pgfnodepartninebox=\box89
+\pgfnodeparteightbox=\box90
+\pgfnodepartsevenbox=\box91
+\pgfnodepartsixbox=\box92
+\pgfnodepartfivebox=\box93
 )))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarycalc.code.tex
-File: tikzlibrarycalc.code.tex 2020/01/08 v3.1.5b (3.1.5b)
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.meta.
-code.tex
-File: pgflibraryarrows.meta.code.tex 2020/01/08 v3.1.5b (3.1.5b)
-\pgfarrowinset=\dimen314
-\pgfarrowlength=\dimen315
-\pgfarrowwidth=\dimen316
-\pgfarrowlinewidth=\dimen317
-) (/usr/share/texlive/texmf-dist/tex/latex/natbib/natbib.sty
+(/usr/share/texlive/texmf-dist/tex/latex/natbib/natbib.sty
 Package: natbib 2010/09/13 8.31b (PWD, AO)
 
 
 Package natbib Warning: The `cite' package should not be used
 (natbib)                with natbib. Use option `sort' instead.
 
-\bibhang=\skip60
-\bibsep=\skip61
+\bibhang=\skip61
+\bibsep=\skip62
 LaTeX Info: Redefining \cite on input line 694.
 LaTeX Info: Redefining \citenum on input line 708.
-\c@NAT@ctr=\count314
+\c@NAT@ctr=\count348
 ) (/usr/share/texlive/texmf-dist/tex/latex/listings/lstlang1.sty
 File: lstlang1.sty 2019/09/10 1.8c listings language file
 )
 (/usr/share/texlive/texmf-dist/tex/latex/listings/lstmisc.sty
 File: lstmisc.sty 2019/09/10 1.8c (Carsten Heinz)
 )
-\c@defi=\count315
-\c@thm=\count316
-\c@prop=\count317
+\c@defi=\count349
+\c@thm=\count350
+\c@prop=\count351
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 311.
-LaTeX Font Info:    ... okay on input line 311.
-LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 311.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 343.
+LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 343.
 LaTeX Font Info:    Trying to load font information for mTT+cmtt on input line 
-311.
+343.
 
 (/usr/share/texlive/texmf-dist/tex/latex/mdwtools/mTTcmtt.fd
 File: mTTcmtt.fd 1996/05/25 1.1 Handing of the cmtt font
 )
-LaTeX Font Info:    ... okay on input line 311.
+LaTeX Font Info:    ... okay on input line 343.
 
--- Lines per column: 56 (exact).
+-- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
-\scratchcounter=\count318
-\scratchdimen=\dimen318
-\scratchbox=\box92
-\nofMPsegments=\count319
-\nofMParguments=\count320
-\everyMPshowfont=\toks39
-\MPscratchCnt=\count321
-\MPscratchDim=\dimen319
-\MPnumerator=\count322
-\makeMPintoPDFobject=\count323
-\everyMPtoPDFconversion=\toks40
+\scratchcounter=\count352
+\scratchdimen=\dimen319
+\scratchbox=\box94
+\nofMPsegments=\count353
+\nofMParguments=\count354
+\everyMPshowfont=\toks60
+\MPscratchCnt=\count355
+\MPscratchDim=\dimen320
+\MPnumerator=\count356
+\makeMPintoPDFobject=\count357
+\everyMPtoPDFconversion=\toks61
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 
@@ -924,12 +1087,17 @@ ABD: EveryShipout initializing macros
 Package todonotes Warning: The length marginparwidth is less than 2cm and will 
 most likely cause issues with the appearance of inserted todonotes. The issue c
 an be solved by adding a line like \setlength {\marginparwidth }{2cm} prior to 
-loading the todonotes package. on input line 311.
+loading the todonotes package. on input line 343.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
-\c@lstlisting=\count324
+\c@lstlisting=\count358
+LaTeX Font Info:    Trying to load font information for OT1+phv on input line 3
+94.
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1phv.fd
+File: ot1phv.fd 2001/06/04 scalable font definitions for OT1/phv.
+)
 
 LaTeX Warning: No \author given.
 
@@ -939,57 +1107,107 @@ LaTeX Warning: No \author given.
 
 LaTeX Warning: No \author given.
 
-(./background.tex) (./formal.tex
-LaTeX Font Info:    Trying to load font information for U+msa on input line 50.
+(./introduction.tex
+LaTeX Font Info:    Trying to load font information for mTT+pcr on input line 9
+.
+LaTeX Font Info:    No file mTTpcr.fd. on input line 9.
 
+
+LaTeX Font Warning: Font shape `mTT/pcr/m/n' undefined
+(Font)              using `mTT/cmtt/m/n' instead on input line 9.
+
+
+LaTeX Warning: Reference `fig:memprotections' on page 1 undefined on input line
+ 19.
+
+
+Underfull \hbox (badness 7944) in paragraph at lines 12--20
+[]\OT1/ptm/m/n/10.03749 There are other retrofitting tech-niques such as
+ []
+
+LaTeX Font Info:    Calculating math sizes for size <10.03749> on input line 28
+.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 28.
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 50.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 28.
 
 
 (/usr/share/texlive/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-LaTeX Font Info:    Trying to load font information for mTT+pcr on input line 6
-0.
-LaTeX Font Info:    No file mTTpcr.fd. on input line 60.
 
-
-LaTeX Font Warning: Font shape `mTT/pcr/m/n' undefined
-(Font)              using `mTT/cmtt/m/n' instead on input line 60.
-
-
-Overfull \hbox (1.12617pt too wide) in paragraph at lines 50--85
- []$[]$ 
- []
-
-
-LaTeX Warning: Reference `sec:example' on page 1 undefined on input line 144.
-
-
-Underfull \hbox (badness 2762) in paragraph at lines 141--152
-\OT1/ptm/m/n/10 ables ($\OML/cmm/m/it/10 x$\OT1/ptm/m/n/10 ), mem-ory al-lo-ca-
-tion ($[]\OT1/cmr/m/n/10 (\OML/cmm/m/it/10 !\OT1/cmr/m/n/10 )$\OT1/ptm/m/n/10 )
-, let bind-ing
- []
-
-
-Underfull \hbox (badness 1776) in paragraph at lines 141--152
-\OT1/ptm/m/n/10 (as-sumed at compile-time and ver-i-fied at run-time, see
- []
+LaTeX Font Warning: Font shape `mTT/pcr/b/n' undefined
+(Font)              using `mTT/pcr/m/n' instead on input line 33.
 
 [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}
 
 
-]
+]) (./background.tex
 
-LaTeX Font Warning: Font shape `mTT/pcr/b/n' undefined
-(Font)              using `mTT/pcr/m/n' instead on input line 162.
+LaTeX Font Warning: Font shape `mTT/pcr/m/it' undefined
+(Font)              using `mTT/pcr/m/n' instead on input line 10.
 
 
-LaTeX Warning: Reference `fig:checkedc-example' on page 2 undefined on input li
+Underfull \vbox (badness 8170) has occurred while \output is active []
+
+ [2]
+Underfull \hbox (badness 10000) in paragraph at lines 219--229
+[][][][][][][][][][][][]\OT1/ptm/m/n/10.03749 , mean-ing that the func-tion
+ []
+
+
+Underfull \hbox (badness 2941) in paragraph at lines 219--229
+\OT1/ptm/m/n/10.03749 takes two NT-array point-ers with ar-bi-trary size and
+ []
+
+
+Underfull \hbox (badness 1577) in paragraph at lines 219--229
+\OT1/ptm/m/n/10.03749 out-puts an in-te-ger. The func-tion [][][][][]'s pointer
+
+ []
+
+
+Underfull \hbox (badness 6268) in paragraph at lines 219--229
+\OT1/ptm/m/n/10.03749 has type [][][][][][][][][][][][][][][][][][][][][][][][]
+[][]
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 219--229
+[][][][][][][][][][][][][][][][][][][][][][][][][][][][] \OT1/ptm/m/n/10.03749 
+To use
+ []
+
+
+Underfull \vbox (badness 1072) has occurred while \output is active []
+
+ [3]
+
+Package natbib Warning: Citation `shacham-aslr' on page 4 undefined on input li
+ne 235.
+
+) (./formal.tex
+LaTeX Font Info:    Calculating math sizes for size <9.03374> on input line 50.
+
+
+Overfull \hbox (9.4004pt too wide) in paragraph at lines 50--85
+ []$[]$ 
+ []
+
+
+Overfull \hbox (3.33629pt too wide) detected at line 135
+[]
+ []
+
+
+LaTeX Warning: Reference `sec:example' on page 4 undefined on input line 144.
+
+[4]
+
+LaTeX Warning: Reference `fig:checkedc-example' on page 5 undefined on input li
 ne 191.
 
 LaTeX Font Info:    Trying to load font information for OT1+pzc on input line 2
@@ -997,114 +1215,183 @@ LaTeX Font Info:    Trying to load font information for OT1+pzc on input line 2
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pzc.fd
 File: ot1pzc.fd 2001/06/04 font definitions for OT1/pzc.
 )
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <9> not available
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <9.03374> not available
 (Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
 
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <6> not available
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <6.32358> not available
 (Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
 
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5> not available
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.51686> not available
 (Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
 
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <10> not available
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <10.03749> not available
 (Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
 
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <7> not available
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <7.0262> not available
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
+
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.01874> not available
 (Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
 
 
-Underfull \hbox (badness 1400) in paragraph at lines 294--318
-[]\OT1/ptm/m/n/10 The op-er-a-tional se-man-tics for \OT1/ptm/m/sc/10 CoreChkC 
-\OT1/ptm/m/n/10 is de-fined
+Underfull \hbox (badness 1997) in paragraph at lines 294--318
+\OT1/ptm/m/n/10.03749 as a small-step tran-si-tion re-la-tion with the judg-men
+t
  []
 
-
-Underfull \hbox (badness 4556) in paragraph at lines 294--318
-\OT1/ptm/m/n/10 as a small-step tran-si-tion re-la-tion with the judg-ment
- []
-
-LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <8> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 335.
+[5]
+Underfull \vbox (badness 5563) has occurred while \output is active []
 
 
-LaTeX Font Warning: Font shape `mTT/pcr/m/it' undefined
-(Font)              using `mTT/pcr/m/n' instead on input line 454.
+Underfull \vbox (badness 1122) has occurred while \output is active []
 
-[2]
-Underfull \vbox (badness 7397) has occurred while \output is active []
+ [6]
 
- [3]
-
-LaTeX Warning: Reference `fig:checkedc-example' on page 4 undefined on input li
+LaTeX Warning: Reference `fig:checkedc-example' on page 7 undefined on input li
 ne 626.
 
-[4] [5]
-Underfull \vbox (badness 1400) has occurred while \output is active []
+LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 817.
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <8.03> not available
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
 
- [6])
-(./compilation.tex [7] [8]) (./evaluation.tex [9] [10]
-Underfull \hbox (badness 1990) in paragraph at lines 365--370
-[]\OT1/ptm/m/n/10 We also found the op-po-site kind of inconsistency---
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.62097> not available
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
+
+LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.015> not available
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
+
+[7]
+Overfull \hbox (3.94127pt too wide) in paragraph at lines 841--851
+ []$ 
  []
 
-) (./comparison.tex) (./conclusion.tex
-Underfull \vbox (badness 3701) has occurred while \output is active []
+
+Underfull \vbox (badness 6380) has occurred while \output is active []
+
+ [8]
+[9]
+Underfull \hbox (badness 1701) in paragraph at lines 1244--1247
+\OT1/ptm/m/it/10.03749 Proof: \OT1/ptm/m/n/10.03749 By in-duc-tion on the num-b
+er of steps of the
+ []
+
+) (./compilation.tex [10]
+Underfull \hbox (badness 10000) in paragraph at lines 286--300
+[]\OT1/ptm/m/n/10.03749 For [][][][][][][][][][] and con-di-tion-als [][][][][]
+[][][][][], the
+ []
+
+
+Underfull \hbox (badness 1917) in paragraph at lines 286--300
+\OT1/ptm/m/sc/10.03749 CoreChkC \OT1/ptm/m/n/10.03749 se-man-tics al-lows the u
+p-per bound of [][][][][]
+ []
+
+
+Underfull \hbox (badness 2245) in paragraph at lines 342--369
+\OT1/ptm/m/n/10.03749 more pre-ci-sion to bounds check-ing at run-time com-
+ []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
  [11])
+(./evaluation.tex [12] [13]) (./comparison.tex [14]) (./conclusion.tex)
 (./main.bbl
-Underfull \hbox (badness 1888) in paragraph at lines 62--68
-\OT1/ptm/m/it/9 Con-fer-ence on Object-Oriented Pro-gram-ming\OT1/ptm/m/n/9 , E
-COOP'10,
+Underfull \hbox (badness 10000) in paragraph at lines 18--24
+\OT1/ptm/m/n/9.03374 se-cu-rity vul-ner-a-bil-ity.  $https : / / www . zdnet . 
+com / article /
  []
 
-[12])
-Overfull \vbox (1.85844pt too high) has occurred while \output is active []
+
+Overfull \hbox (32.59021pt too wide) in paragraph at lines 18--24
+\OT1/ptm/m/n/9.03374 microsoft-[]70-[]percent-[]of-[]all-[]security-[]bugs-[]ar
+e-[]memory-[]safety-[]issues/$,
+ []
 
 
-[13] (./appendix.tex
+Underfull \hbox (badness 3746) in paragraph at lines 88--94
+\OT1/ptm/m/n/9.03374 The Essence of Javascript.  In \OT1/ptm/m/it/9.03374 Pro-c
+eed-ings of the
+ []
+
+
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
+
+[15]
+Underfull \hbox (badness 10000) in paragraph at lines 123--128
+[]\OT1/ptm/m/n/9.03374 Leonidas Lam-propou-los and Ben-jamin C. Pierce.
+ []
+
+
+Underfull \hbox (badness 1546) in paragraph at lines 200--203
+[]\OT1/ptm/m/n/9.03374 Mozilla.  Rust Pro-gram-ming Lan-guage.  $https : / / ww
+w .
+ []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Underfull \hbox (badness 4899) in paragraph at lines 237--242
+\OT1/ptm/m/n/9.03374 Mc-Peak, and West-ley Weimer.  CCured: Type-Safe
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 290--293
+[]\OT1/ptm/m/n/9.03374 Konstantin Sere-bryany, Derek Bru-en-ing, Alexan-der
+ []
+
+
+Underfull \hbox (badness 1735) in paragraph at lines 290--293
+\OT1/ptm/m/n/9.03374 Potapenko, and Dmitriy Vyukov.  Ad-dress-san-i-tizer: A
+ []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Overfull \vbox (1.17278pt too high) has occurred while \output is active []
+
+
+Overfull \vbox (0.78558pt too high) has occurred while \output is active []
+
+
+[16]) [17] (./appendix.tex
 ** WARNING: Ignoring useless \section in Appendix (line 1).
 
-Underfull \hbox (badness 10000) in paragraph at lines 130--133
-[]\OT1/ptm/m/n/10 Fig. 13[] shows the re-main-ing se-man-tic rules for
+Underfull \hbox (badness 3240) in paragraph at lines 130--133
+[]\OT1/ptm/m/n/10.03749 Fig. 15[] shows the re-main-ing se-man-tic rules for
  []
 
 
-Underfull \hbox (badness 2376) in paragraph at lines 130--133
-[]$\OT1/ptm/m/n/10 . We ex-plain a se-lected few rules in this
- []
+Overfull \vbox (3.39984pt too high) has occurred while \output is active []
 
 
-Underfull \hbox (badness 2875) in paragraph at lines 237--250
-[]\OT1/ptm/m/n/10 To cap-ture bound vari-ables in de-pen-dent types, the
- []
-
-
-Overfull \vbox (0.9174pt too high) has occurred while \output is active []
-
-
-[14]
+[18]
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
 
-
-Underfull \vbox (badness 1173) has occurred while \output is active []
-
-
-Overfull \vbox (60.0532pt too high) has occurred while \output is active []
-
-
-Overfull \vbox (60.0532pt too high) has occurred while \output is active []
-
-
-[15]
-Underfull \hbox (badness 1527) in paragraph at lines 357--361
-\OT1/ptm/m/n/10 typed value, [] has a spe-cial op-er-a-tion for it,
+[19]
+Overfull \hbox (6.23pt too wide) in paragraph at lines 364--383
+[]$[]$ 
  []
 
 
-LaTeX Warning: `h' float specifier changed to `ht'.
+Overfull \vbox (104.34518pt too high) has occurred while \output is active []
 
-[16]
+
+[20]
+Overfull \hbox (0.59682pt too wide) detected at line 553
+[]
+ []
+
+
+Overfull \vbox (3.0924pt too high) has occurred while \output is active []
+
+
+[21]
 
 LaTeX Warning: `h' float specifier changed to `ht'.
 
@@ -1120,25 +1407,33 @@ Before submitting the final camera ready copy, remember to:
  uses only Type 1 fonts and that every step in the generation
  process uses the appropriate paper size.
 
-[17] [18] [19] [20] (./main.aux)
+
+Package natbib Warning: There were undefined citations.
+
+
+Overfull \vbox (1.86272pt too high) has occurred while \output is active []
+
+
+[22] [23] [24] [25] (./main.aux)
+
+LaTeX Font Warning: Size substitutions with differences
+(Font)              up to 2.74158pt have occurred.
+
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 
 LaTeX Warning: There were undefined references.
 
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
  ) 
 Here is how much of TeX's memory you used:
- 22239 strings out of 481239
- 440371 string characters out of 5920377
- 944151 words of memory out of 5000000
- 37024 multiletter control sequences out of 15000+600000
- 590296 words of font info for 134 fonts, out of 8000000 for 9000
+ 27582 strings out of 481239
+ 540811 string characters out of 5920377
+ 1090225 words of memory out of 5000000
+ 42264 multiletter control sequences out of 15000+600000
+ 607696 words of font info for 184 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 68i,24n,100p,1386b,1686s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 68i,24n,100p,1386b,1591s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/
@@ -1167,10 +1462,10 @@ f-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/ty
 pe1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/
 utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></u
 sr/share/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (20 pages, 421564 bytes).
+Output written on main.pdf (25 pages, 446320 bytes).
 PDF statistics:
- 218 PDF objects out of 1000 (max. 8388607)
- 148 compressed objects within 2 object streams
+ 234 PDF objects out of 1000 (max. 8388607)
+ 159 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  109 words of extra memory for PDF output out of 10000 (max. 10000000)
 

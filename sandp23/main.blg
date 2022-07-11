@@ -4,45 +4,59 @@ The top-level auxiliary file: main.aux
 The style file: plainnat.bst
 Database file #1: IEEEabrv.bib
 Database file #2: paper.bib
+Repeated entry---line 1418 of file paper.bib
+ : @misc{c2rust
+ :             ,
+I'm skipping whatever remains of this entry
+Repeated entry---line 1791 of file paper.bib
+ : @article{necula2005ccured
+ :                          ,
+I'm skipping whatever remains of this entry
 Database file #3: sources.bib
-You've used 29 entries,
+Repeated entry---line 66 of file sources.bib
+ : @inproceedings{duanrefactoring
+ :                               ,
+I'm skipping whatever remains of this entry
+Warning--empty journal in mergendahlcross
+You've used 45 entries,
             2773 wiz_defined-function locations,
-            1193 strings with 18850 characters,
-and the built_in function-call counts, 16695 in all, are:
-= -- 1507
-> -- 1160
-< -- 14
-+ -- 388
-- -- 359
-* -- 1454
-:= -- 2590
-add.period$ -- 137
-call.type$ -- 29
-change.case$ -- 205
-chr.to.int$ -- 29
-cite$ -- 58
-duplicate$ -- 703
-empty$ -- 1184
-format.name$ -- 394
-if$ -- 3522
-int.to.chr$ -- 1
+            1268 strings with 21508 characters,
+and the built_in function-call counts, 24584 in all, are:
+= -- 2205
+> -- 1663
+< -- 25
++ -- 562
+- -- 515
+* -- 2078
+:= -- 3772
+add.period$ -- 192
+call.type$ -- 45
+change.case$ -- 306
+chr.to.int$ -- 43
+cite$ -- 91
+duplicate$ -- 1052
+empty$ -- 1812
+format.name$ -- 569
+if$ -- 5205
+int.to.chr$ -- 3
 int.to.str$ -- 1
-missing$ -- 28
-newline$ -- 195
-num.names$ -- 118
-pop$ -- 391
+missing$ -- 39
+newline$ -- 279
+num.names$ -- 178
+pop$ -- 620
 preamble$ -- 1
-purify$ -- 177
+purify$ -- 262
 quote$ -- 0
-skip$ -- 562
+skip$ -- 844
 stack$ -- 0
-substring$ -- 453
-swap$ -- 123
-text.length$ -- 8
+substring$ -- 671
+swap$ -- 185
+text.length$ -- 12
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 309
-warning$ -- 0
-while$ -- 118
+type$ -- 485
+warning$ -- 1
+while$ -- 181
 width$ -- 0
-write$ -- 477
+write$ -- 687
+(There were 3 error messages)

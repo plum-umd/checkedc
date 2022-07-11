@@ -124,7 +124,7 @@ Section RealHeapProp.
   
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
-    heap_wt_all D F Q m Hchk /\ heap_wt_tainted D m Htnt.
+    heap_wt_all D F Q Checked Hchk /\ heap_wt_tainted D Tainted Htnt.
 
 End RealHeapProp.
 
@@ -187,6 +187,7 @@ Section GeneralProp.
    destruct E; try congruence; try solve [solve_step].
    destruct E; try congruence; try solve [solve_step].
    destruct E; try congruence; try solve [solve_step].
+   destruct E;simpl in *; inv H1;try easy.
   Qed.
   (* intros R s n t Contra. *)
   (* destruct Contra as [R' [ s' [ m [ r Contra ] ] ] ]. *)
@@ -441,4 +442,8 @@ End TypeProp.
 
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
+
+
+
+
 
