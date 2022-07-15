@@ -1,4 +1,4 @@
-\begin{thebibliography}{45}
+\begin{thebibliography}{46}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -153,7 +153,7 @@ Liyi Li, Yiyun Liu, Deena~L. Postol, Leonidas Lampropoulos, David~Van Horn, and
   Michael Hicks.
 \newblock A formal model of {Checked C}.
 \newblock In \emph{Proceedings of the Computer Security Foundations Symposium
-  (CSF)}, June 2022.
+  (CSF)}, August 2022.
 
 \bibitem[Machiry et~al.(2022)Machiry, Kastner, McCutchen, Eline, Headley, and
   Hicks]{machiry2022c}
@@ -290,6 +290,13 @@ Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
 Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitriy Vyukov.
 \newblock Addresssanitizer: A fast address sanity checker.
 \newblock In \emph{{USENIX} Annual Technical Conference}, pages 309--318, 2012.
+
+\bibitem[Shacham et~al.(2004)Shacham, Page, Pfaff, Goh, Modadugu, and
+  Boneh]{shacham-aslr}
+Hovav Shacham, Matthew Page, Ben Pfaff, Eu-Jin Goh, Nagendra Modadugu, and Dan
+  Boneh.
+\newblock On the effectiveness of address-space randomization.
+\newblock In \emph{CCS}. ACM, 2004.
 
 \bibitem[Song et~al.(2019)Song, Lettner, Rajasekaran, Na, Volckaert, Larsen,
   and Franz]{song2019sanitizing}

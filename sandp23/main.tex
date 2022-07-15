@@ -230,7 +230,7 @@
 
 \newcommand{\evalue}[2]{\ensuremath{{#1}\!:\!{#2}}}
 
-\newcommand{\emalloc}[1]{\ensuremath{\kw{malloc}({#1})}}
+\newcommand{\emalloc}[2]{\ensuremath{\kw{malloc}({#1},{#2})}}
 \newcommand{\emalloctext}{\ensuremath{\kw{malloc}}}
 \newcommand{\ecall}[2]{\ensuremath{{#1}({#2})}}
 \newcommand{\ret}[3]{\ensuremath{\kw{ret}({#1},{#2},{#3})}}
@@ -249,7 +249,7 @@
 \newcommand{\eunchecked}[2]{\ensuremath{\kw{unchecked}({#1})\{#2\}}}
 \newcommand{\euncheckedtext}{\ensuremath{\kw{unchecked}}}
 
-\newcommand{\echecked}[3]{\ensuremath{\kw{checked}({#1},{#2}){\{#3\}}}}
+\newcommand{\echecked}[2]{\ensuremath{\kw{checked}({#1}){\{#2\}}}}
 \newcommand{\echeckedtext}{\ensuremath{\kw{checked}}}
 
 
@@ -299,6 +299,9 @@
 
 \newcommand{\bvar}{\ensuremath{\beta}}
 \newcommand{\mode}{\textit{mode}}
+\newcommand{\type}{\textit{type}}
+\newcommand{\funptr}{\textit{fun\_t}}
+
 
 % compilation
 \newcommand{\cextend}[4]{\ensuremath{#4 = ~ \vdash_{extend} #1, #2, #3}}

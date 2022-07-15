@@ -47,7 +47,7 @@
 
 \begin{figure}
   \small \centering
-  \[ \hspace*{-1em}
+  \[ \hspace*{-1.2em}
 \begin{array}{l}
 \begin{array}{ll}
        \text{Variables:}~ x
@@ -74,20 +74,57 @@
 \\[0.5em]
 
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \ecast{\tau}{e} \mid \edyncast{\tau}{e} \mid \ebinop{e}{e} \\[0.2em]
-&&\mid& \emalloc{\omega} \mid \estrlen{x} \mid\estar{e}\mid\eassign{e}{e}  \\[0.2em]
+\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \edyncast{\tau}{e}  \\[0.2em]
+&&\mid& \estrlen{x} \mid\estar{e}\mid\eassign{e}{e}  \\[0.2em]
 &&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e}
 \\[0.2em]
-&&\mid&  \ecall{e}{\overline{e}} \mid
-\echecked{\overline{x}}{\tau}{e}
+&&\mid&  \emalloc{\xi}{\omega} \mid \ecall{e}{\overline{e}}
 \\[0.2em]
 &&\mid&\eunchecked{\overline{x}}{e}
+\mid \echecked{\overline{x}}{e}
 
 \end{array}
     \end{array}
   \]
   \caption{\lang Syntax}
   \label{fig:checkc-syn}
+\end{figure}
+
+\begin{figure}[t]
+{\small
+  \begin{mathpar}
+
+  \inferrule[]
+  {}
+  {m \vdash \tint}
+
+  \inferrule[]
+  {\xi \wedge m\vdash \tau \\ \xi \le m}
+  {m \vdash \tptr{\tallarrayb{\bvar}{\tau}}{\xi}}
+
+  \inferrule[]
+  {\xi \wedge m \vdash \tau\\ \xi \le m}
+  {m \vdash \tptr{\tau}{\xi}}
+
+  \inferrule[]
+  {\xi \wedge m \vdash \tau\\ \xi \le m \\\\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
+  {m \vdash \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi})}
+  \end{mathpar}
+}
+{\footnotesize
+\[
+\begin{array}{l} 
+\tmode \wedge \cmode = \umode \qquad \xi \wedge \umode = \umode
+\qquad \cmode \wedge m = m 
+\qquad  m_1 \wedge m_2 = m_2 \wedge m_1
+\\[0.2em]
+\xi \le \xi \qquad \tmode \le \xi
+\end{array}
+\\
+\]
+}
+ \caption{Well-formedness for Types}
+\label{fig:wftypes}
 \end{figure}
 
 %% \dvh{I don't understand the variable grammar.  What is $T$?  What is $\eta$?  I think $\cmode$ and $\umode$ should be in tt font.}
@@ -149,7 +186,7 @@ $\code{nt_array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 $\code{tptr<(int)(nt_array_tptr<}$\tau$\code{> : count(}$n$\code{),}$\\
 \qquad\qquad$\code{nt_array_tptr<}$\tau$\code{>)>: count(}$n$\code{))>}$
 \\[0.2em]
-\Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} * \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
+\Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
 As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
@@ -157,25 +194,26 @@ $\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
 be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
-\lang expressions include literals ($n\!:\!\tau$), variables ($x$), memory
-allocation ($\emalloc{\omega}$), let binding ($\elet{x}{e_1}{e_2}$),
-static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$)
-(assumed at compile-time and verified at run-time, see Sec.~\ref{sec:example}),
-function calls ($\ecall{f}{\overline{e}}$), addition
-($\ebinop{e_1}{e_2}$), pointer dereference and assignment ($\estar{e}$)
-and ($\eassign{e_1}{e_2}$), resp.), unchecked blocks ($\eunchecked{e}$),
-the \texttt{strlen} operation ($\estrlen{x}$), and conditionals ($\eif{e}{e_1}{e_2}$).
+\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
+ addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 
+dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}},
+the \texttt{strlen} operation ($\estrlen{x}$),
+pointer dereference and assignment ($\estar{e}$)
+and ($\eassign{e_1}{e_2}$), resp.),
+let binding ($\elet{x}{e_1}{e_2}$),
+conditionals ($\eif{e}{e_1}{e_2}$),
+memory allocation ($\emalloc{\xi}{\omega}$), 
+function calls ($\ecall{e}{\overline{e}}$),
+unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
 % \review{III.A.: the "dynamic cast" terminology may be briefly confused for C++'s
 %   RTTI-based dynamic cast feature}
 % \mwh{Added reference back to Section 2-B}
 
 Integer literals $n$ are annotated with a type $\tau$ which can be either
-$\tint$, or $\tptr{\omega}{m}$ in the case $n$ is being used as
+$\tint$, or $\tptr{\omega}{m}$ in the case $n$ is being used as 
 a heap address (this is useful for the semantics);
-$\evalue{0}{\tptr{\omega}{m}}$ (for any $m$ and $\omega$) represents
-the $\enull$ pointer, as usual. 
-The
-$\texttt{strlen}$ expression operates on variables $x$
+$\evalue{0}{\tptr{\omega}{m}}$ (for any $m$ and $\omega$) represents the $\enull$ pointer, as usual. 
+The $\texttt{strlen}$ expression operates on variables $x$
 rather than arbitrary expressions to simplify managing
 bounds information in the type system; the more general case can be
 encoded with a \code{let}. We use a less verbose syntax for dynamic bounds
@@ -185,6 +223,27 @@ casts; e.g., the following %
 
 \noindent
 becomes $\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$. 
+
+Compared to the former \checkedc model \cite{li22checkedc},
+there are four differences.
+First, the \systemname type annotations have well-formed restrictions in \Cref{fig:wftypes}, 
+for maintaining non-exposure.
+Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi'} ...)}{\xi}$, if the outside mode $\xi$ is 
+$\tmode$ or $\umode$, the inside mode $\xi'$ cannot be $\cmode$.
+It is worth noting that pointer modes are a three point partial order ($\le$),
+where $\tmode$ is the infimum, and
+$\xi\wedge m$ is a special meet operation that projects pointer modes onto context modes,
+such that a pointer mode $\tmode$ is projected as $\umode$.
+Second, $\emalloc{\xi}{\omega}$ includes a mode flag
+$\xi$ for allocating different pointers in different heap mode regions.
+For simplicity, we disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$),
+Third, the first expression $e$ in a function call ($\ecall{e}{\overline{e}}$) represents a function pointer.
+Fourth, we update $\eunchecked{\overline{x}}{e}$ 
+to specify $\overline{x}$ restricting all free variables appearing in $e$.
+Additionally, we create $\echeckedtext$ blocks indicating the context mode change from $\umode$ to $\cmode$.
+Both the free variables in the $\euncheckedtext$ and $\echeckedtext$ blocks
+and the return types cannot be $\cmode$ mode for maintaining non-exposure,
+i.e., no checked pointer can be communicated between $\euncheckedtext$ and $\echeckedtext$ blocks.
 
 \lang aims to be simple enough to work with, but powerful enough to
 encode realistic \checkedc idioms. For example, mutable local
@@ -199,7 +258,15 @@ Appendix~\ref{appx:struct}.
 the supplemental report~\cite{checkedc-tech-report}.
 \fi
 C-style \code{union}s have no safe typing
-in \checkedc, so we omit them. By default, functions are assumed to
+in \checkedc, so we omit them.
+Additional syntactic descrition is listed in the \checkedc formalism paper \cite{li22checkedc}.
+
+
+
+
+
+\ignore{
+ By default, functions are assumed to
 be within checked regions; placing the body in an \code{unchecked}
 expression relaxes this, and within that, checked regions can be
 nested via function calls. Bounds are restricted slightly:
@@ -210,6 +277,7 @@ defined as relative offsets, not absolute ones, as in the second part
 of Fig.~\ref{fig:checkedc-example}. We see no technical problem to
 modeling absolute bounds, but it would be a pervasive change so we
 have not done so.
+
 
   We have mechanized two models of \lang, one in Coq
   and one in PLT Redex~\cite{pltredex}, which is a semantic
@@ -230,7 +298,7 @@ have not done so.
 \fi
   outlines the differences
   between the two models and the paper formalism.
-
+}
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
 %   POINTERS: Array and NT-array types have two relative bounds, whose structures
 % can be either an integer or a variable plus an integer. For example,
@@ -252,15 +320,19 @@ have not done so.
 
 \begin{figure}
 {\small
-$    \begin{array}{l}
+$\hspace*{-1.2em}
+    \begin{array}{l}
     \begin{array}{lll}
-\mu & ::= & \evalue{n}{\tau} \mid \bot\\
+\mu & ::= & \evalue{n}{\tau}\\
 e & ::= & \ldots \mid \ret{x}{\mu}{e}\\
 r & ::= & e \mid \enull \mid \ebounds\\
-E &::=& \Box \mid \elet{x}{E}{e} \mid \ecall{f}{\overline{E}}\mid\ecast{\tau}{E} \mid \edyncast{\tau}{E} \\[0.2em]
-&& \mid \ebinop{\evalue{n}{\tau}}{E}\mid\estar{E}\mid\eassign{E}{e} \\[0.2em]
-&&\mid\eassign{\evalue{n}{\tau}}{E}\mid\eunchecked{E}\mid\eif{E}{e}{e}\\[0.2em]
-\overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
+E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
+&&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid \eif{E}{e}{e}\\[0.2em]
+&&\mid \ecall{E}{\overline{e}} \mid \ecall{\evalue{n}{\tau}}{\overline{E}} \mid 
+\eunchecked{\overline{x}}{E}
+\mid \echecked{\overline{x}}{E}
+
+
 \end{array}
 \\ \\
     \end{array} 
@@ -279,7 +351,28 @@ $
     {(\varphi,\heap,e)\longrightarrow_{m} (\varphi',\heap',E[e'])}
     \;\;\;{[\emph{prefer}]}
 
+    \inferrule{ \umode=\mode(E) \\
+      e=E[e'] \\
+      \tau=\type(e')}
+    {(\varphi,\heap,e)\longrightarrow_{\umode} (\varphi,\heap,E[\evalue{0}{\tau}])}
+
   \end{mathpar}
+}
+{\footnotesize
+\[
+\begin{array}{l} 
+\mode(E)=\mode'(E,\cmode)
+\\[0.2em]
+\mode'(\Box,m)=m
+\\[0.2em]
+\mode'(\eunchecked{\overline{x}}{E},m)=\mode'(E,\umode)
+\\[0.2em]
+\mode'(\echecked{\overline{x}}{E},m)=\mode'(E,\cmode)
+\\[0.2em]
+\mode'(\alpha({E}),m)=\mode'(E,m)\;\;{[\emph{owise}]}
+\end{array}
+\\
+\]
 }
   \caption{\lang Semantics: Evaluation}
   \label{fig:c-context}
@@ -314,9 +407,16 @@ The operational semantics for \lang is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$. Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
-$\heap$ is a \emph{heap} mapping addresses (integer literals) to
-values $\evalue{n}{\tau}$; for both we ensure
-$\fv(\tau)=\emptyset$.
+$\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ regions), each of which
+maps addresses (integer literals) to values $\evalue{n}{\tau}$.
+If a pointer has mode $\cmode$, it lives in the $\cmode$ region; otherwise, it lives in the $\umode$ region.
+We wrote $\heap(m,n)$ to retrieve the $n$-location heap value in the $m$ region,
+and $\heap(m)[n\mapsto \mu]$ to update location $n$ with the value $\mu$.
+It is worth noting that \systemname is not a fat-pointer system;
+thus, in every heap update, the value type annotation remains the same through program executions.
+Additionally, for both stack and heap, 
+we ensure $\fv(\tau)=\emptyset$ for all the value type annotations $\tau$.
+
 While heap bindings can change, stack bindings are immutable---once
 variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
 be updated; we can model mutable stack variables as pointers into the
@@ -331,7 +431,7 @@ respectively. Such failures are a \emph{good} outcome; stuck states
 (non-value expressions that cannot transition to a result $r$)
 characterize undefined behavior.
 %
-The mode $m$ indicates whether the
+The context mode $m$ indicates whether the
 stepped redex within $e$ was in a checked ($\cmode$) or
 unchecked ($\umode$) region.
 
@@ -348,10 +448,72 @@ shortly.
 The second rule handles conditionals $\eif{\estar{x}}{e_2}{e_3}$ in
 redex position specially, delegating directly to the \textsc{S-IfNTT} computation
 rule, which supports bounds widening; we discuss this rule
-shortly. When the second and first rules could both apply, we always
-prefer the second.\footnote{This approach is that of the PLT Redex model of \lang; the Coq
-development uses a slightly simpler syntax to achieve the same
-effect.}
+shortly. When the second and first rules could both apply, we always prefer the second.
+The third rule describes the exception handling 
+for possible crashing behaviors in unchecked region.
+A program in $\umode$ mode can non-deterministically crash
+and the \systemname sandbox mechanism recorvers
+the program to a safe point ($\evalue{0}{\tau}$)
+and continues with the existing program state.
+
+\begin{DIFnomarkup}
+ \begin{figure}[t]
+ {\small
+
+ \begin{mathpar}
+   \inferrule
+       {}
+       {m;\Theta;\heap;\sigma \vdash n : \tint}
+  
+   \inferrule
+       {}
+       {m;\Theta;\heap;\sigma \vdash n : \tptr{\omega}{\umode}}
+  
+   \inferrule
+       {}
+       {m;\Theta;\heap;\sigma \vdash 0 : \tptr{\omega}{\xi}}
+  
+   \inferrule
+       {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
+       {m;\Theta;\heap;\sigma \vdash n : \tptr{\omega}{\xi}}
+
+
+   \inferrule
+       {\tptr{\omega'}{\xi'} \sqsubseteq_{\Theta} \tptr{\omega}{\xi} 
+            \\ m;\Theta;\heap;\sigma \vdash n : \tptr{\omega'}{\xi'}}
+       {m;\Theta;\heap;\sigma \vdash n : \tptr{\omega}{\xi}}
+
+   \inferrule
+       { \xi \le m 
+     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\xi,e)
+       \\  \overline{x} = \{x|(x:\tint) \in (\overline{x'}:\overline{\tau}) \}}
+       {m;\Theta;\heap;\sigma \vdash n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\xi}}
+  
+   \inferrule
+       {\neg\funptr(\omega)\\ \xi \le m\\
+        \forall i \in [0,\size(\omega)) \;.\;
+            m;\Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\xi})) \}\vdash \heap(m,n+i)}
+       {m;\Theta;\heap;\sigma \vdash n : \tptr{\omega}{\xi}}
+ \end{mathpar}
+ }
+{\footnotesize
+\[
+\begin{array}{l} 
+\funptr(\tfun{\overline{x}}{\overline{\tau}}{\tau}) = \texttt{true}
+\qquad
+\funptr(\omega) = \texttt{false}\;\;{[\emph{owise}]}
+\end{array}
+\\
+\]
+}
+ \caption{Verification/Type Rules for Constants}
+ \label{fig:const-type}
+ \end{figure}
+\end{DIFnomarkup}
+
+%\footnote{This approach is that of the PLT Redex model of \lang; the Coq
+%development uses a slightly simpler syntax to achieve the same
+%effect.}
 % \review{the special case raises questions, e.g. why is this syntax-driven and
 %   not type-driven? }
 % \liyi{This describes the semantic transition rules. We are using context evaluation framework to define the transition rules as the $E$ definition in Fig.3. like $\frac{x \Rightarrow y}{x+z \Rightarrow y + z}$, I don't know how type-driven can help us define translation rules.  }
@@ -359,10 +521,14 @@ effect.}
 %   rule'' anywhere, and I'm not sure how it would fire, if we had it.}
 % \liyi{The comment seems to confuse the meaning of the text about the if-then-else rules. Making the rule specific will help. }
 The $\mode$ function
-determines the mode when evaluating $e'$ based on the context $E$:
-if the $\Box$ occurs within $(\eunchecked{E'})$ inside $E$, then the mode is
-$\umode$; otherwise, it is $\cmode$. Evaluation contexts $E$ define a
-standard left-to-right evaluation order. (We explain the
+determines the context mode when evaluating $e'$ based on the context $E$.
+For any program execution, the top context mode always starts with $\cmode$ ($\mode(E)=\mode'(E,\cmode)$).
+The result context mode is depeneded on where the $\Box$ locates.
+If it occurs within $(\eunchecked{\overline{x}}{E'})$ inside $E$ without
+a surrounding $\echeckedtext$ block, then the mode is
+$\umode$; if the exact opposite happens (within $(\echecked{\overline{x}}{E'})$ without surrounding $\euncheckedtext$ blocks),
+the mode is $\cmode$; the other cases ($\mode'(\alpha({E}),m)=\mode'(E,m)$) are recursively defined by the above base cases ($\alpha$ represents any syntactic categories in \Cref{fig:c-context} other than $\Box$, $\euncheckedtext$, and $\echeckedtext$).
+Evaluation contexts $E$ define a standard left-to-right evaluation order. (We explain the
 $\ret{x}{\mu}{e}$ syntax shortly.)
 % For a term $e$, $C$ is a context if any
 % only if it contains a $\Box$ hole term in one of the subterm position
@@ -379,29 +545,28 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 \begin{figure*}[t]
 {\small
   \begin{mathpar}
-        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+        \inferrule[S-DefC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{c}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-AssignArrC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,(\heap,\cmode)[n \mapsto \evalue{n_1}{\tau_a}],\evalue{n_1}{\tau})}
+
+        \inferrule[S-DefT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}
+         \\  \umode;\emptyset;\heap ; \emptyset \vdash\evalue{n_a}{\tau} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-AssignArrT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h)
+               \\  \umode;\emptyset;\heap ; \emptyset \vdash\evalue{n_1}{\tau} }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\tmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,(\heap,\umode)[n \mapsto \evalue{n_1}{\tau_a}],\evalue{n_1}{\tau})}
 
     \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
 
-        \inferrule[S-DefNTArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h]}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-
-
-    \inferrule[S-AssignArr]{\heap(n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+     \inferrule[S-IfNTTC]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{0}{\tau}{\cmode}} \\ \heap(\cmode,n)\neq 0}
+    {(\varphi,\heap,\eif{*x}{e_1}{e_2}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tntarrayptr{n_l}{1}{\tau}{\cmode}}],\heap,e_1)}
 
     \inferrule[S-Cast]
               {}
               {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
-
-  \inferrule[S-DynCast]{
-\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{m})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{m} \\ n_l' \le n_l\ \\ n_h \le n_h'}
-    { (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{m}}}) \longrightarrow (\varphi',\heap',\evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau_b}{m}})}
-
-
- \inferrule[S-DynCastBound]{\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{\cmode})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{\cmode} \\ n_l' > n_l \vee n_h > n_h'}{ (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{\cmode}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{\cmode}}}) 
- \longrightarrow (\varphi',\heap',\ebounds)}
 
         \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
 
@@ -409,20 +574,19 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 
     \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
-    \inferrule[S-Fun]{ \Xi(f) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
-        {(\varphi,\heap,\ecall{f}{{\evalue{\overline{n}}{\overline{\tau_a}}}}) \longrightarrow
+    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+
+    \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
+        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
    (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
 
-     % \inferrule[S-IfNTF]{\varphi(x)=\evalue{n}{\tau} \\ \heap(n)=0}
-     %      {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
-      \inferrule[S-StrWiden]{
-         \varphi(x) = \evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{\cmode}}\\ 0 \in [n_l,n_h] \\ n_a > n_h
-\\ \heap(n+n_a) = 0 
-\\\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
-    {(\varphi,\heap,\estrlen{x}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tarrayptr{n_l}{n_a}{\tau}{\cmode}}],\heap,\evalue{n_a}{\tint})}
+    \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
-     \inferrule[S-IfNTT]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{0}{\tau}{\cmode}} \\ \heap(n)\neq 0}
-    {(\varphi,\heap,\eif{*x}{e_1}{e_2}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tntarrayptr{n_l}{1}{\tau}{\cmode}}],\heap,e_1)}
+    \inferrule[S-FunT]{ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\tmode,e)
+                  \\ \umode;\emptyset;\heap ; \emptyset \vdash\evalue{n}{\tptr{\tau}{\tmode}}}
+        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\tmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
+
 
  % \inferrule[S-IfNTNot]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(n)\neq 0\\ 0 < n_h}
  %            {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
@@ -487,7 +651,10 @@ nt_array_ptr<char> safe_strcat
 \end{figure}
 
 Fig.~\ref{fig:semantics} shows selected rules for the computation
-relation; we explain them with the help of the example in
+relation; we explain them with the help of the example in \Cref{fig:checkedc-example-1} and \Cref{fig:checkedc-example-2}.
+
+\ignore{
+ in
 Fig.~\ref{fig:strcat-ex},
   which defines a 
   safe version of \code{strcat} (using actual Checked C syntax).  The
@@ -495,28 +662,29 @@ Fig.~\ref{fig:strcat-ex},
   pointer \code{dst} of capacity \code{n}, where the first null
   character (determined by \code{strlen}) is at index \code{x} where
   $0 \leq $\code{x}$ \leq n$. It concatenates the \code{src} buffer to
-  the end of \code{dst} as long as \code{dst} has sufficient space.
+  the end of \code{dst} as long as \code{dst} has sufficient space.}
 
 % Below, we introduce low-level transition semantics for some case operations. The design of the low-level individual operation semantics is carefully engineered to perform match our compiler's behavior, such as correctly characterizing the bound widening behaviors for NT-array pointers, even though it is written in terms of fat-pointer formalization.
 
-\myparagraph{Pointer accesses}
+\myparagraph{Checked and Tainted Pointer Operations}
 %
-The rules for dereference and assignment operations---\textsc{S-Def},
-\textsc{S-DefNull}, \textsc{S-DefNTArray}, and
-\textsc{S-AssignArr}---illustrate how the semantics checks bounds.
+The rules for pointer related operations---\textsc{S-DefC},
+\textsc{S-DefT}, \textsc{S-AssignArrC}, \textsc{S-AssignArrT},
+\textsc{S-DefNull}, \textsc{S-IfNTTC} and \textsc{S-Cast}.
+The first five are deference and assignment operations---illustrate how the semantics checks bounds.
 Rule \textsc{S-DefNull} transitions attempted null-pointer
-dereferences to $\enull$, whereas \textsc{S-Def} dereferences a
+dereferences to $\enull$, whereas \textsc{S-DefC} dereferences a \cmode-mode
 non-null (single) pointer.
   When $\enull$ is returned by the
 computation relation, the evaluation relation halts the entire
 evaluation with $\enull$ (using a rule not shown in Fig.~\ref{fig:c-context}); it
-does likewise when $\ebounds$ is returned (see below).
+does likewise when $\ebounds$ is returned (see \Cref{sec:rem-semantics}).
 
 % \review{- on page 6, section IIIC, paragraph "Pointer Access" mentions that checked pointers cannot be dereferenced in unchecked blocks - this looks funny, shouldn't it be the other way around? The Coq code contains the hypothesis m'=Unchecked -> m Unchecked in various rules of definition well-typed (BoundCheckedC, line 669; rule TyDeref in the code seems closest to the figure's T-DefArr and T-Def in the appendix, although it's a bit concerning that there's no 1-to-1 correspondence of the rules in the code and the paper).
 % }
 % \liyi{Yeah. It is another typo. It should be the other way around.  }
 
-\textsc{S-AssignArr} assigns to an array as long as 0 (the point of
+\textsc{S-AssignArrC} assigns to an array as long as 0 (the point of
 dereference) is within the bounds designated by the pointer's annotation
 and strictly less than the upper bound. For the assignment rule,
 arrays are treated uniformly whether they are null-terminated or not
@@ -1172,48 +1340,7 @@ one of the following holds:
 \end{thm}
 {\em Proof:} By induction on the typing derivation.
 
-\begin{DIFnomarkup}
- \begin{figure}[t]
- {\small
- \text{Type rules for constants and variables:}
- \begin{mathpar}
-   \inferrule[T-Var]
-       {x : \tau \in \Gamma}
-       {\Gamma;\Theta \vdash_m x : \tau}
-  
-   \inferrule[T-Const]
-       {\fv(\tau) = \emptyset \\ \heap;\emptyset \vdash n : \tau}
-       {\Gamma;\Theta\vdash_m \evalue{n}{\tau} : \tau}
- \end{mathpar}
-     
- \text{Rules for checking constant pointers:}
- \begin{mathpar}
-   \inferrule
-       {}
-       {\heap;\sigma \vdash n : \tint}
-  
-   \inferrule
-       {}
-       {\heap;\sigma \vdash n : \tptr{\omega}{\umode}}
-  
-   \inferrule
-       {}
-       {\heap;\sigma \vdash 0 : \tptr{\omega}{\cmode}}
-  
-   \inferrule
-       {(\evalue{n}{\tptr{\omega}{\cmode}})\in \sigma}
-       {\heap;\sigma \vdash n : \tptr{\omega}{\cmode}}
-  
-   \inferrule
-       {\forall i \in [0,\size(\omega)) .
-            \heap;(\sigma \cup \{(n:\tptr{\omega}{\cmode})) \}\vdash \heap(n+i)}
-       {\heap;\sigma \vdash n : \tptr{\omega}{\cmode}}
- \end{mathpar}
- }
- \caption{Type Rules for Constants/Variables}
- \label{fig:const-type}
- \end{figure}
-\end{DIFnomarkup}
+
 
 \noindent
 Preservation states that a reduction step preserves both the
