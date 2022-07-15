@@ -10,6 +10,7 @@ From CHKC Require Import
 #[global]
 Hint Unfold rheap_consistent : Preservation.
 Hint Unfold heap_consistent_checked : Preservation.
+Local Open Scope Z_scope.
 
 Ltac solve_ctxt :=
   match goal with
@@ -67,6 +68,7 @@ Section Preservation.
       sub_domain env s ->
       stack_wf D Q env s ->
       stack_rheap_consistent D F Q R s ->
+      fun_wf D F R ->
       well_typed D F R env Q Checked e t ->
       reduce D F
         (s, R) e Checked
@@ -82,7 +84,7 @@ Section Preservation.
         /\ eq_subtype_core D Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
-      HRwf HRWt HEwf Hswt Henvt HQt Hsqt HsubDom Hswf HsHwf Hwt.
+      HRwf HRWt HEwf Hswt Henvt HQt Hsqt HsubDom Hswf HsHwf Hwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
     remember Checked as m.
     induction Hwt as
@@ -143,23 +145,16 @@ Section Preservation.
       apply H in H1.
       inv Hreduces. destruct E; try congruence; try solve [solve_step].
       simpl in *; subst.
-      2: { }
-      inv  H5.
-      
-      3: { inv HTyf. easy. }
-      apply H in H1. destruct m'; try easy.
-      + inv Hreduces. destruct E; inv H2.
-      2: {}.
-
-
-inv Hreduces;solve_step ;cbn.
-
-      inv Hreduces. destruct E; eauto with Preservation.
-
-inv HEwf. intuition. solve_step; cbn.
-        * inv HTyf. destruct H13 as (be & Ha & Hb). inv Ha. inv Hb. 
-          exists vars,env, Q. intuition.
-          right. 
+      inv  H5. inv HTyf.
+      inv H14; eauto; try easy.
+      destruct Hwf. rewrite H2 in H6. easy. rewrite H6 in H7.
+      inv H7.
+      apply subtype_fun in H11 as Y1. destruct Y1 as [yl [tb [tlb Y1]]];subst.
+      specialize (get_fun_type_fun tvl0 ta0 Checked) as X1.
+      destruct X1 as [xl0 X1]. rewrite X1 in H11. rewrite X1 in Y1.
+      inv Y1.
+      apply subtype_fun_1 in H11 as X2.
+      destruct X2 as [X2 [X3 X4]]; subst.
   Abort.
 
 

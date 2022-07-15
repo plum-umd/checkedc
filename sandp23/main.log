@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  10 JUL 2022 23:59
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  14 JUL 2022 19:10
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1002,28 +1002,28 @@ File: lstmisc.sty 2019/09/10 1.8c (Carsten Heinz)
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 343.
-LaTeX Font Info:    ... okay on input line 343.
-LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 343.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 353.
+LaTeX Font Info:    ... okay on input line 353.
+LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 353.
 LaTeX Font Info:    Trying to load font information for mTT+cmtt on input line 
-343.
+353.
 
 (/usr/share/texlive/texmf-dist/tex/latex/mdwtools/mTTcmtt.fd
 File: mTTcmtt.fd 1996/05/25 1.1 Handing of the cmtt font
 )
-LaTeX Font Info:    ... okay on input line 343.
+LaTeX Font Info:    ... okay on input line 353.
 
 -- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
@@ -1087,14 +1087,14 @@ ABD: EveryShipout initializing macros
 Package todonotes Warning: The length marginparwidth is less than 2cm and will 
 most likely cause issues with the appearance of inserted todonotes. The issue c
 an be solved by adding a line like \setlength {\marginparwidth }{2cm} prior to 
-loading the todonotes package. on input line 343.
+loading the todonotes package. on input line 353.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count358
-LaTeX Font Info:    Trying to load font information for OT1+phv on input line 3
-94.
+LaTeX Font Info:    Trying to load font information for OT1+phv on input line 4
+04.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1phv.fd
 File: ot1phv.fd 2001/06/04 scalable font definitions for OT1/phv.
 )
@@ -1193,86 +1193,101 @@ ne 235.
 LaTeX Font Info:    Calculating math sizes for size <9.03374> on input line 50.
 
 
-Overfull \hbox (9.4004pt too wide) in paragraph at lines 50--85
- []$[]$ 
+Overfull \hbox (8.45316pt too wide) detected at line 88
+| []
  []
 
 
-Overfull \hbox (3.33629pt too wide) detected at line 135
-[]
+Underfull \hbox (badness 6641) in paragraph at lines 106--110
+\OT1/ptm/m/n/10.03749 tax, se-man-tics, and type sys-tem. It also de-vel-ops
  []
 
 
-LaTeX Warning: Reference `sec:example' on page 4 undefined on input line 144.
+Underfull \hbox (badness 2790) in paragraph at lines 113--115
+[]\OT1/ptm/m/n/10.03749 The syn-tax of \OT1/ptm/m/sc/10.03749 CoreChkCBox \OT1/
+ptm/m/n/10.03749 is given by the
+ []
 
-[4]
+
+Overfull \hbox (8.31755pt too wide) detected at line 154
+| []
+ []
+
+
+Underfull \vbox (badness 1354) has occurred while \output is active []
+
+ [4]
+
+LaTeX Warning: Reference `sec:example' on page 5 undefined on input line 163.
+
+LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 1
+66.
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omsptm.fd
+File: omsptm.fd 
+)
+LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10.03749> not available
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 166.
+
 
 LaTeX Warning: Reference `fig:checkedc-example' on page 5 undefined on input li
-ne 191.
+ne 210.
 
 LaTeX Font Info:    Trying to load font information for OT1+pzc on input line 2
-53.
+72.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pzc.fd
 File: ot1pzc.fd 2001/06/04 font definitions for OT1/pzc.
 )
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <9.03374> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 272.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <6.32358> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 272.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.51686> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 253.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 272.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <10.03749> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 314.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <7.0262> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 314.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.01874> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 295.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 314.
 
-
-Underfull \hbox (badness 1997) in paragraph at lines 294--318
-\OT1/ptm/m/n/10.03749 as a small-step tran-si-tion re-la-tion with the judg-men
-t
- []
-
-[5]
-Underfull \vbox (badness 5563) has occurred while \output is active []
-
-
-Underfull \vbox (badness 1122) has occurred while \output is active []
-
- [6]
+ [5] [6]
 
 LaTeX Warning: Reference `fig:checkedc-example' on page 7 undefined on input li
-ne 626.
+ne 645.
 
-LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 817.
+
+Underfull \vbox (badness 2020) has occurred while \output is active []
+
+ [7]
+LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 836.
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <8.03> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 836.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.62097> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 836.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.015> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 817.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 836.
 
-[7]
-Overfull \hbox (3.94127pt too wide) in paragraph at lines 841--851
+
+Overfull \hbox (3.94127pt too wide) in paragraph at lines 860--870
  []$ 
  []
 
-
-Underfull \vbox (badness 6380) has occurred while \output is active []
-
- [8]
-[9]
-Underfull \hbox (badness 1701) in paragraph at lines 1244--1247
+[8] [9]
+Underfull \hbox (badness 1701) in paragraph at lines 1263--1266
 \OT1/ptm/m/it/10.03749 Proof: \OT1/ptm/m/n/10.03749 By in-duc-tion on the num-b
 er of steps of the
+ []
+
+
+Underfull \hbox (badness 10000) in paragraph at lines 1273--1279
+[]\OT1/ptm/m/n/10.03749 Compared to Ruef et al. [][][], proofs for
  []
 
 ) (./compilation.tex [10]
@@ -1282,9 +1297,15 @@ Underfull \hbox (badness 10000) in paragraph at lines 286--300
  []
 
 
-Underfull \hbox (badness 1917) in paragraph at lines 286--300
-\OT1/ptm/m/sc/10.03749 CoreChkC \OT1/ptm/m/n/10.03749 se-man-tics al-lows the u
-p-per bound of [][][][][]
+Underfull \hbox (badness 5954) in paragraph at lines 286--300
+\OT1/ptm/m/sc/10.03749 CoreChkCBox \OT1/ptm/m/n/10.03749 se-man-tics al-lows th
+e up-per bound
+ []
+
+
+Underfull \hbox (badness 1708) in paragraph at lines 286--300
+\OT1/ptm/m/n/10.03749 of [][][][][] to be ex-tended. The com-piler ex-plic-itly
+ in-serts
  []
 
 
@@ -1292,11 +1313,13 @@ Underfull \hbox (badness 2245) in paragraph at lines 342--369
 \OT1/ptm/m/n/10.03749 more pre-ci-sion to bounds check-ing at run-time com-
  []
 
+[11] [12]
+Underfull \hbox (badness 3281) in paragraph at lines 571--571
+[]\OT1/ptm/m/n/10.03749 Figure 14: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
+49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
+ []
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [11])
-(./evaluation.tex [12] [13]) (./comparison.tex [14]) (./conclusion.tex)
+) (./evaluation.tex [13]) (./comparison.tex [14]) (./conclusion.tex)
 (./main.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 18--24
 \OT1/ptm/m/n/9.03374 se-cu-rity vul-ner-a-bil-ity.  $https : / / www . zdnet . 
@@ -1310,28 +1333,28 @@ e-[]memory-[]safety-[]issues/$,
  []
 
 
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
+
+[15]
 Underfull \hbox (badness 3746) in paragraph at lines 88--94
 \OT1/ptm/m/n/9.03374 The Essence of Javascript.  In \OT1/ptm/m/it/9.03374 Pro-c
 eed-ings of the
  []
 
 
-Package balance Warning: You have called \balance in second column
-(balance)                Columns might not be balanced.
-
-[15]
 Underfull \hbox (badness 10000) in paragraph at lines 123--128
 []\OT1/ptm/m/n/9.03374 Leonidas Lam-propou-los and Ben-jamin C. Pierce.
  []
+
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
 Underfull \hbox (badness 1546) in paragraph at lines 200--203
 []\OT1/ptm/m/n/9.03374 Mozilla.  Rust Pro-gram-ming Lan-guage.  $https : / / ww
 w .
  []
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
 Underfull \hbox (badness 4899) in paragraph at lines 237--242
@@ -1352,10 +1375,10 @@ Underfull \hbox (badness 1735) in paragraph at lines 290--293
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-Overfull \vbox (1.17278pt too high) has occurred while \output is active []
+Overfull \vbox (0.99661pt too high) has occurred while \output is active []
 
 
-Overfull \vbox (0.78558pt too high) has occurred while \output is active []
+Overfull \vbox (0.60942pt too high) has occurred while \output is active []
 
 
 [16]) [17] (./appendix.tex
@@ -1386,10 +1409,6 @@ Overfull \vbox (104.34518pt too high) has occurred while \output is active []
 Overfull \hbox (0.59682pt too wide) detected at line 553
 []
  []
-
-
-Overfull \vbox (3.0924pt too high) has occurred while \output is active []
-
 
 [21]
 
@@ -1427,13 +1446,13 @@ LaTeX Warning: There were undefined references.
 
  ) 
 Here is how much of TeX's memory you used:
- 27582 strings out of 481239
- 540811 string characters out of 5920377
- 1090225 words of memory out of 5000000
- 42264 multiletter control sequences out of 15000+600000
+ 27606 strings out of 481239
+ 541181 string characters out of 5920377
+ 1089225 words of memory out of 5000000
+ 42285 multiletter control sequences out of 15000+600000
  607696 words of font info for 184 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 68i,24n,100p,1386b,1591s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 68i,24n,100p,1386b,1446s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/
@@ -1462,7 +1481,7 @@ f-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/ty
 pe1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/
 utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></u
 sr/share/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (25 pages, 446320 bytes).
+Output written on main.pdf (25 pages, 448554 bytes).
 PDF statistics:
  234 PDF objects out of 1000 (max. 8388607)
  159 compressed objects within 2 object streams

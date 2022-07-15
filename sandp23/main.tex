@@ -146,7 +146,7 @@
 \newcommand{\aravind}[1]{\textcolor{green}{Aravind: #1}}
 \fi
 
-\newcommand{\lang}{\textsc{CoreChkC}\xspace}
+\newcommand{\lang}{\textsc{CoreChkCBox}\xspace}
 \newcommand{\elang}{\textsc{CoreC}\xspace}
 
 \newtheorem{defi}{Definition}
@@ -211,6 +211,8 @@
 \newcommand{\tntarrayb}[2]{\tarrayb{#1}{#2}_{nt}}
 \newcommand{\tallarrayb}[2]{\ensuremath{[{#1}~{#2}]_{\kappa}}}
 \newcommand{\tallarraybc}[2]{\ensuremath{[{#1}~{#2}]_{\textcolor{cyan}{\kappa}}}}
+\newcommand{\tfun}[3]{\ensuremath{\forall \;#1.\;{#2}\to#3}}
+
 
 \newcommand{\tallarray}[3]{\tallarrayb{({#1},{#2})}{#3}}
 
@@ -244,8 +246,14 @@
 \newcommand{\efield}[2]{\ensuremath{{#1}\kw{\rightarrow}{#2}}}
 \newcommand{\estar}[1]{\ensuremath{\texttt{*}{#1}}}
 \newcommand{\eamper}[2]{\ensuremath{\kw{\&}{#1}\kw{\rightarrow}{#2}}}
-\newcommand{\eunchecked}[1]{\ensuremath{\kw{unchecked}\;{#1}}}
+\newcommand{\eunchecked}[2]{\ensuremath{\kw{unchecked}({#1})\{#2\}}}
 \newcommand{\euncheckedtext}{\ensuremath{\kw{unchecked}}}
+
+\newcommand{\echecked}[3]{\ensuremath{\kw{checked}({#1},{#2}){\{#3\}}}}
+\newcommand{\echeckedtext}{\ensuremath{\kw{checked}}}
+
+
+
 \newcommand{\eif}[3]{\ensuremath{\kw{if\;}(#1)\;{#2}\;\kw{else}\;{#3}}}
 \newcommand{\eifa}[3]{\ensuremath{\kw{IF\;}(#1)\;{#2}\;\kw{ELSE}\;{#3}}}
 \newcommand{\eifatext}{\ensuremath{\kw{IF}}}
@@ -287,6 +295,8 @@
 
 \newcommand{\cmode}{\texttt{c}}
 \newcommand{\umode}{\texttt{u}}
+\newcommand{\tmode}{\texttt{t}}
+
 \newcommand{\bvar}{\ensuremath{\beta}}
 \newcommand{\mode}{\textit{mode}}
 

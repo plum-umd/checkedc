@@ -47,9 +47,9 @@
 
 \begin{figure}
   \small \centering
-  $\begin{array}{l}
-\begin{array}{lll}
-\text{Function names:}~f&
+  \[ \hspace*{-1em}
+\begin{array}{l}
+\begin{array}{ll}
        \text{Variables:}~ x
 & \text{Integers:}~n::=\mathbb{Z} 
 \end{array}
@@ -57,31 +57,35 @@
 
 \begin{array}{llcllcl}
 
-\text{Mode:} & m & ::= & \cmode \mid \umode \\[0.5em]
+\text{Context Mode:} & m & ::= & \cmode \mid \umode \\[0.5em]
+
+\text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\[0.5em]
 
 \text{Bound:} & b & ::= & n \mid x \plus n \\
               & \bvar & ::= & (b,b) \\[0.5em]
   
-     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{m}
+     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{ \xi}
 \\[0.5em]
 
 \text{Type Flag:}&\kappa &::=& nt \mid \cdot
 \\[0.5em]
 
-\text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau}
+\text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau} \mid \tfun{\overline{x}}{\overline{\tau}}{\tau}
 \\[0.5em]
 
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \emalloc{\omega} \mid\elet{x}{e}{e} \\[0.2em]
-&&\mid&
-\ecast{\tau}{e} \mid \edyncast{\tau}{e}\mid \ecall{f}{\overline{e}} \mid \estrlen{x} \\[0.2em]
-&&\mid&
-\ebinop{e}{e} \mid\estar{e}\mid\eassign{e}{e}\mid\eunchecked{e}
+\evalue{n}{\tau} \mid x \mid \ecast{\tau}{e} \mid \edyncast{\tau}{e} \mid \ebinop{e}{e} \\[0.2em]
+&&\mid& \emalloc{\omega} \mid \estrlen{x} \mid\estar{e}\mid\eassign{e}{e}  \\[0.2em]
+&&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e}
 \\[0.2em]
-&&\mid&\eif{e}{e}{e}
+&&\mid&  \ecall{e}{\overline{e}} \mid
+\echecked{\overline{x}}{\tau}{e}
+\\[0.2em]
+&&\mid&\eunchecked{\overline{x}}{e}
+
 \end{array}
     \end{array}
-  $
+  \]
   \caption{\lang Syntax}
   \label{fig:checkc-syn}
 \end{figure}
@@ -99,9 +103,9 @@
 %   Coq file?}
 % \liyi{The detailed explanation is in the appendix.}
 
-This section describes our formal model of \checkedc, called
+This section describes the formal model of \systemname, called
 \lang, making precise its syntax, semantics, and type system. It also
-develops \lang's meta-theory, including type soundness and the blame
+develops \lang's meta-theory, including type soundness, the non-exposure, and the non-crashing
 theorem.
 
 \subsection{Syntax}\label{sec:syntax}
@@ -112,7 +116,7 @@ language presented in Fig.~\ref{fig:checkc-syn}.
 There are two notions of type in \lang.  Types $\tau$ classify
 word-sized values including integers and pointers, while types
 $\omega$ classify multi-word values such as arrays, null-terminated
-arrays, and single-word-size values.
+arrays, functions, and single-word-size values.
 %
 Pointer types ($\tptr{\omega}{m}$) include a mode annotation ($m$)
 which is either checked (\cmode) or unchecked (\umode) and a type
@@ -122,15 +126,30 @@ lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
 limited to integer literals $n$ and expressions $x + n$.
 Whether an array pointer is null terminated or not is determined by annotation
 $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
-otherwise (we elide the $\cdot$ when writing the type). Here is the
+otherwise (we elide the $\cdot$ when writing the type).
+\systemname function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
+reflect its dependent function declrations,
+where $\overline{x}$ represents
+a list of \tint type variables in a dependent function header,
+which bind all bounds appearing in $\overline{\tau}$ and $\tau$.
+We have a well-formed requirement for a function type,
+such that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+Here is the
 corresponding \checkedc syntax for these types:
-\[
+\[\hspace*{-0.5em}
+\begin{array}{l}
 \begin{array}{rcl}
-$\code{array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
-&\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\cmode}
+$\code{array_tptr<}$\tau$\code{> : count(}$n$\code{)}$
+&\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
 \\[0.2em]
 $\code{nt_array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
+\end{array}
+\\[0.2em]
+$\code{tptr<(int)(nt_array_tptr<}$\tau$\code{> : count(}$n$\code{),}$\\
+\qquad\qquad$\code{nt_array_tptr<}$\tau$\code{>)>: count(}$n$\code{))>}$
+\\[0.2em]
+\Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} * \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
 As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
