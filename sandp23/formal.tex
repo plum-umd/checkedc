@@ -608,6 +608,63 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 \end{figure*}
 \end{DIFnomarkup}
 
+\begin{figure}[t]
+{\small
+  \begin{lstlisting}[xleftmargin=4 mm]
+nt_array_ptr<const char>
+parse_utf16_hex(nt_array_ptr<const char> s,
+                  ptr<uint> result) {
+ int x1, x2, x3, x4;
+ if (s[0] != 0) { x1 = hex_char_to_int(s[0]);
+ if (s[1] != 0) { x2 = hex_char_to_int(s[1]);
+ if (s[2] != 0) { x3 = hex_char_to_int(s[2]);
+ if (s[3] != 0) { x4 = hex_char_to_int(s[3]);
+ if (x1 != -1 && x2 != -1 && x3 != -1 && x4 != -1){
+   *result = (uint)((x1<<12)|(x2<<8)|(x3<<4)|x4);
+   return s+4;
+  ...// several } braces
+ } 
+ return 0;
+}
+void parse(nt_array_ptr<const char> s,
+            array_ptr<uint> p : count(n), 
+            int n) {
+ array_ptr<uint> q : bounds(p,p+n) = p;
+ while (s && q < p+n) {
+   array_ptr<uint> r : count(1) =
+     dyn_bounds_cast<array_ptr<uint>>(q,count(1));
+   s = parse_utf16_hex(s,r);
+   q++;
+ }
+}
+  \end{lstlisting}
+
+% {\captionsetup[lstlisting]{margin = 8 mm}
+%   \begin{lstlisting}[xleftmargin=8 mm]
+% array_ptr<int> memcpy(int x,
+%      array_ptr<int> a : count(x),
+%      array_ptr<int> b : count(x)) : count(x) {
+%  for(int i = 0; i < x; ++i) {
+%     (*a = *b); a++; b++;
+%  }
+%  return a;
+}
+
+% static int idx = 0;
+% int buf (int * reg,
+%           nt_array_ptr<int> x,
+%           nt_array_ptr<int> y) {
+%   if (idx < n)
+%     unchecked { * x = &(reg + idx); idx++; }
+%   else bug();
+%   memcpy(n,x,y);
+%   return 0;
+% }
+% }
+\caption{Parsing a String of UTF16 Hex Characters in \checkedc}
+\label{fig:checkedc-example}
+\end{figure}
+
 % \review{Fig4: it was hard to tell which cases were stuck states, or could reduce
 %   owing to a rule that was not shown}
 % \mwh{Stuck states are those where the expression is a non-value and
@@ -622,33 +679,6 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 %   typical).} 
 
 % LEO: This has an overfull line...?
-\begin{figure}[t]
-{\small
-{\captionsetup[lstlisting]{margin = 8 mm}
-  \begin{lstlisting}[xleftmargin=8 mm]
-nt_array_ptr<char> safe_strcat
-   (nt_array_ptr<char> dst : count(n),
-    nt_array_ptr<char> src : count(0), int n) {
-  int x = strlen(dst);
-  int y = strlen(src);
-  nt_array_ptr<char> c : count(n) =
-    dyn_bounds_cast
-           <nt_array_ptr<char>>(dst,count(n));
-    // sets c == dst with bound n (not x)
-  if (x+y < n) {
-    for (int i = 0; i < y; ++i)
-      *(c+x+i) = *(src+i);
-    *(c+x+y) = '\0';
-    return dst;
-  }
-  return null;
-}
-  \end{lstlisting}
-}
-}
-\caption{Implementation of safe \code{strcat}}
-\label{fig:strcat-ex}
-\end{figure}
 
 Fig.~\ref{fig:semantics} shows selected rules for the computation
 relation; we explain them with the help of the example in \Cref{fig:checkedc-example-1} and \Cref{fig:checkedc-example-2}.
@@ -679,11 +709,89 @@ non-null (single) pointer.
 computation relation, the evaluation relation halts the entire
 evaluation with $\enull$ (using a rule not shown in Fig.~\ref{fig:c-context}); it
 does likewise when $\ebounds$ is returned (see \Cref{sec:rem-semantics}).
+\textsc{S-AssignArrC} assigns to an array as long as 0 (the point of
+dereference) is within the bounds designated by the pointer's annotation
+and strictly less than the upper bound. 
 
+\textsc{S-DefC} and \textsc{S-AssignArrT} are the deference and assignment rules for tainted pointers.
+Any dynamic heap use of a tainted pointer requires to perform a verification.
+Performing such a verification equates to performing a type check for a pointer constant in \Cref{fig:const-type}.
+We explain this shortly in \Cref{sec:type-system}.
+For now, the verification step, e.g. $\umode;\emptyset;\heap ; \emptyset \vdash\evalue{n_a}{\tau}$ in \textsc{S-DefC},
+means we verify that the value $n_a$ has type $\tau$ in the $\umode$ region heap.
+
+Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
+by \textsc{S-Cast}. In a type-correct program, such casts are
+confirmed safe by the type system no matter
+if the target is a $\tmode$ or $\cmode$ pointer. To evaluate a cast, the rule
+updates the type annotation on $n$. Before doing so, it must
+``evaluate'' any variables that occur in $\tau$ according to their
+bindings in $\varphi$. For example, if $\tau$ was
+$\tarrayptr{0}{x+3}{\tint}{\cmode}$, then $\varphi(\tau)$ would
+produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+
+Bounds widening occurs when branching on a dereference of a NT array
+pointer, or when performing $\estrlentext$, which has been explained in \cite{li22checkedc}. 
+Here, we explain Rule \textsc{S-IfNTTC} that 
+performs bounds widening on a $\cmode$-mode pointer $x$ when the
+dereference $\estar{x}$ is not at the null terminator, but the
+pointer's upper bound is 0 (i.e., it's at the end of its known
+range). $x$'s upper bound is incremented to 1, and this count persists
+as long as $x$ is live.  For example, \code{s}'s increment (lines
+5--8) is live until the return of the function in
+Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
+\code{s}'s upper bound is properly extended.
+
+\ignore{
+The latter is most useful
+when assigned to a local variable so that subsequent code can use the
+result, e.g., $e$ in $\elet{x}{\estrlen{y}}{e}$.  Lines 4 and 5 in
+Fig.~\ref{fig:strcat-ex} are examples. 
+The widened upper bound
+precipitated by $\estrlen{y}$ is extended beyond the lifetime of $x$, as long as $y$ is live.
+% Even if $x$ returns, if $y$'s upper bound keeps the widened bound that is caused by $\estrlen{y}$.
+For example, \code{x}'s scope in line 4 at runtime is
+the whole function body in \code{safe_strcat} because the lifetime of the pointer \code{dst} is in the function body.
+% Allowing widening to persist
+% outside the scope is sound, % but would precipitate the need for
+% % fat pointers during compilation, which we want to avoid.
+% and we take this approach to give more precise run-time behavior. We
+% show in Sec.~\ref{sec:compilation}
+This is different from the \checkedc specification, 
+which only allows bound widening to happen within the scope of \code{x}, and restoring old bound values once \code{x} dies.
+We allow widening to persist outside the scope at run-time as long as
+we are within the stack frame, and we show
+this does not necessarily require the use of fat pointers in
+Sec.~\ref{sec:compilation}.
+
+Rule \textsc{S-StrWiden} implements $\estrlentext$ widening. The
+predicate
+$\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i)
+= \evalue{n_i}{\tau_i} \wedge n_i \neq 0))$ aims to find a position
+$n+n_a$ in the NT array that stores a null character, where no
+character as indexes between $n$ and $n+n_a$ contains one. (This rule
+handles the case when $n_a > n_h$, the $n_a \le n_h$ case is handled
+by a normal $\estrlentext$ rule; see 
+\iftr
+Appendix~\ref{sec:rem-semantics}.)
+\else
+the supplemental report~\cite{checkedc-tech-report}.)
+\fi
+
+Rule \textsc{S-IfNTT} performs bounds widening on $x$ when the
+dereference $\estar{x}$ is not at the null terminator, but the
+pointer's upper bound is 0 (i.e., it's at the end of its known
+range). $x$'s upper bound is incremented to 1, and this count persists
+as long as $x$ is live.  For example, \code{s}'s increment (lines
+5--8) is live until the return of the function in
+Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
+\code{s}'s upper bound is properly extended.
+}
 % \review{- on page 6, section IIIC, paragraph "Pointer Access" mentions that checked pointers cannot be dereferenced in unchecked blocks - this looks funny, shouldn't it be the other way around? The Coq code contains the hypothesis m'=Unchecked -> m Unchecked in various rules of definition well-typed (BoundCheckedC, line 669; rule TyDeref in the code seems closest to the figure's T-DefArr and T-Def in the appendix, although it's a bit concerning that there's no 1-to-1 correspondence of the rules in the code and the paper).
 % }
 % \liyi{Yeah. It is another typo. It should be the other way around.  }
 
+\ignore{
 \textsc{S-AssignArrC} assigns to an array as long as 0 (the point of
 dereference) is within the bounds designated by the pointer's annotation
 and strictly less than the upper bound. For the assignment rule,
@@ -694,18 +802,12 @@ can widen the bounds as needed, if they currently precede the null
 terminator: \textsc{S-DefNTArray}, which dereferences an NT array
 pointer, allows an upper bound of $0$, since the program may read, but
 not write, the null terminator. A separate rule (not shown) handles
-normal arrays.
+normal arrays.}
 
+\ignore{
 \myparagraph{Casts}
 %
-Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
-by \textsc{S-Cast}. In a type-correct program, such casts are
-confirmed safe by the type system. To evaluate a cast, the rule
-updates the type annotation on $n$. Before doing so, it must
-``evaluate'' any variables that occur in $\tau$ according to their
-bindings in $\varphi$. For example, if $\tau$ was
-$\tarrayptr{0}{x+3}{\tint}{\cmode}$, then $\varphi(\tau)$ would
-produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+
 
 Dynamic casts are accounted for by \textsc{S-DynCast} and
 \textsc{S-DynCastBound}. In a type-correct program, such casts are
@@ -718,6 +820,7 @@ line~7 in Fig.~\ref{fig:strcat-ex}. The values of \code{x} and
 \code{n} might not be known statically, so the type system cannot
 confirm that \code{x <= n}; the dynamic cast assumes this inequality
 holds, but then checks it at run-time.
+}
 
 \myparagraph{Binding and Function Calls}
 %
@@ -766,6 +869,7 @@ Note that the \textsc{S-Fun} rule replaces the
 the function has no impact on the soundness of \lang, but will violate
 Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
 
+\ignore{
 \myparagraph{Bounds Widening}
 %
 Bounds widening occurs when branching on a dereference of a NT array
@@ -811,7 +915,8 @@ range). $x$'s upper bound is incremented to 1, and this count persists
 as long as $x$ is live.  For example, \code{s}'s increment (lines
 5--8) is live until the return of the function in
 Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
-\code{s}'s upper bound is properly extended. %  For this rule and
+\code{s}'s upper bound is properly extended.
+} %  For this rule and
 % \textsc{S-StrWiden}, this widening persists in the current stack
 % frame. When $x$ goes out of scope, .
 
