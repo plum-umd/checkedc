@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  15 JUL 2022 16:12
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  15 JUL 2022 16:27
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1278,42 +1278,45 @@ S-DefC\OT1/ptm/m/n/10.03749 , \OT1/ptm/m/sc/10.03749 S-DefT\OT1/ptm/m/n/10.0374
 
 [6]
 
-LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 840.
+LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 843.
 
 
 
-LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 857.
+LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 860.
 
 
 LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 1
-071.
+074.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/omsptm.fd
 File: omsptm.fd 
 )
 LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10.03749> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 1071.
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 1074.
 
  [7]
-Overfull \hbox (3.94127pt too wide) in paragraph at lines 1133--1143
+Overfull \hbox (3.94127pt too wide) in paragraph at lines 1136--1146
  []$ 
  []
 
 
-LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1188
+LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1191
 .
 
 
-LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1249
+LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1252
 .
 
-[8] [9]
-Underfull \hbox (badness 1701) in paragraph at lines 1495--1498
+[8]
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [9]
+Underfull \hbox (badness 1701) in paragraph at lines 1498--1501
 \OT1/ptm/m/it/10.03749 Proof: \OT1/ptm/m/n/10.03749 By in-duc-tion on the num-b
 er of steps of the
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1505--1511
+Underfull \hbox (badness 10000) in paragraph at lines 1508--1514
 []\OT1/ptm/m/n/10.03749 Compared to Ruef et al. [][][], proofs for
  []
 
@@ -1405,10 +1408,10 @@ Underfull \hbox (badness 4899) in paragraph at lines 237--242
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-Overfull \vbox (1.24731pt too high) has occurred while \output is active []
+Overfull \vbox (0.99661pt too high) has occurred while \output is active []
 
 
-Overfull \vbox (0.95045pt too high) has occurred while \output is active []
+Overfull \vbox (0.60942pt too high) has occurred while \output is active []
 
 
 [16]
@@ -1489,6 +1492,9 @@ LaTeX Font Warning: Some font shapes were not available, defaults substituted.
 
 LaTeX Warning: There were undefined references.
 
+
+LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
+
  ) 
 Here is how much of TeX's memory you used:
  27639 strings out of 481239
@@ -1497,7 +1503,7 @@ Here is how much of TeX's memory you used:
  42319 multiletter control sequences out of 15000+600000
  608082 words of font info for 186 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 68i,24n,100p,1386b,1591s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 68i,24n,100p,1386b,1446s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/
@@ -1526,7 +1532,7 @@ f-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/ty
 pe1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/
 utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></u
 sr/share/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (25 pages, 456117 bytes).
+Output written on main.pdf (25 pages, 456085 bytes).
 PDF statistics:
  234 PDF objects out of 1000 (max. 8388607)
  159 compressed objects within 2 object streams

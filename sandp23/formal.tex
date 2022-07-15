@@ -568,7 +568,7 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
               {}
               {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
 
-        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
+        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e})}
 
     \inferrule[S-RetCon]{\varphi(x)=\mu\\ (\varphi[x\mapsto \mu'],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\mu'}{e}) \longrightarrow (\varphi'[x\mapsto \mu],\heap',\ret{x}{\varphi'(x)}{e'})}
 
@@ -827,11 +827,14 @@ holds, but then checks it at run-time.
 The semantics handles variable scopes using the special $\erettext$
 form. \textsc{S-Let} evaluates to a configuration whose stack
 is $\varphi$ extended with a binding for $x$, and whose expression is
-$\ret{x}{\varphi(x)}{e})$ which remembers $x$ was previously bound to
-$\varphi(x)$; if it had no previous binding, $\varphi(x) =
-\bot$. Evaluation proceeds on $e$ until it becomes a literal
-$n\!:\!\tau$, in which case \textsc{S-Ret} restores the saved
-binding (or $\bot$) in the new stack, and evaluates to
+$\ret{x}{\evalue{n}{\tau}}{e})$ which keeps $\varphi$ unchanged, but
+remember $x$ with the new value $\evalue{n}{\tau}$ in the scope $e$.
+Every time when Evaluation proceeds on $e$ (Rule \textsc{S-RetCon}),
+we install the current stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$,
+after one-step evaluation is completed, we restore the result $\varphi'(x)$ 
+in the result $\ret{x}{\varphi'(x)}{e'})$.
+This procedure continues until it becomes a literal
+$n\!:\!\tau$, in which case \textsc{S-RetEnd} remove the $\kw{ret}$ frame and evaluates to
 $n\!:\!\tau$. 
 
 Function calls are handled by \textsc{S-Fun}. Recall that array
