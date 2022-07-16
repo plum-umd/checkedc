@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  15 JUL 2022 16:27
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  16 JUL 2022 00:50
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1002,28 +1002,28 @@ File: lstmisc.sty 2019/09/10 1.8c (Carsten Heinz)
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 356.
-LaTeX Font Info:    ... okay on input line 356.
-LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 356.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 358.
+LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 358.
 LaTeX Font Info:    Trying to load font information for mTT+cmtt on input line 
-356.
+358.
 
 (/usr/share/texlive/texmf-dist/tex/latex/mdwtools/mTTcmtt.fd
 File: mTTcmtt.fd 1996/05/25 1.1 Handing of the cmtt font
 )
-LaTeX Font Info:    ... okay on input line 356.
+LaTeX Font Info:    ... okay on input line 358.
 
 -- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
@@ -1087,14 +1087,14 @@ ABD: EveryShipout initializing macros
 Package todonotes Warning: The length marginparwidth is less than 2cm and will 
 most likely cause issues with the appearance of inserted todonotes. The issue c
 an be solved by adding a line like \setlength {\marginparwidth }{2cm} prior to 
-loading the todonotes package. on input line 356.
+loading the todonotes package. on input line 358.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count358
 LaTeX Font Info:    Trying to load font information for OT1+phv on input line 4
-07.
+09.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1phv.fd
 File: ot1phv.fd 2001/06/04 scalable font definitions for OT1/phv.
 )
@@ -1216,111 +1216,101 @@ Underfull \hbox (badness 3108) in paragraph at lines 197--211
  []
 
 
-Overfull \hbox (15.41302pt too wide) in paragraph at lines 323--341
+Overfull \hbox (15.41302pt too wide) in paragraph at lines 286--304
 []$| []$ 
  []
 
 LaTeX Font Info:    Trying to load font information for OT1+pzc on input line 3
-44.
+07.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pzc.fd
 File: ot1pzc.fd 2001/06/04 font definitions for OT1/pzc.
 )
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <9.03374> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 344.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <6.32358> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 344.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.51686> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 344.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <8.03> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.62097> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.015> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <10.03749> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 407.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <7.0262> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 407.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.01874> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 407.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
 
  [5]
-Overfull \hbox (3.4636pt too wide) in paragraph at lines 464--497
- []$ 
+Underfull \hbox (badness 1527) in paragraph at lines 420--440
+\OT1/ptm/m/n/10.03749 eval-u-at-ing $\OML/cmm/m/it/10 e[]$ \OT1/ptm/m/n/10.0374
+9 based on the con-text $\OML/cmm/m/it/10 E$\OT1/ptm/m/n/10.03749 . For any pro
+-
  []
 
 
-Underfull \hbox (badness 2318) in paragraph at lines 523--543
+Underfull \hbox (badness 2318) in paragraph at lines 420--440
 \OT1/cmr/m/n/10 ([]([])\OMS/cmsy/m/n/10 f\OML/cmm/m/it/10 E[]\OMS/cmsy/m/n/10 g
 \OT1/cmr/m/n/10 )$ \OT1/ptm/m/n/10.03749 in-side $\OML/cmm/m/it/10 E$ \OT1/ptm/
 m/n/10.03749 with-out a sur-round-ing
  []
 
 
-Overfull \hbox (1.35442pt too wide) in paragraph at lines 635--636
-[][][][][][][][][][][][][][][][][][][][][][][][][][]  
+Underfull \hbox (badness 3039) in paragraph at lines 564--580
+[]\OT1/ptm/b/n/10.03749 Checked and Tainted Pointer Op-er-a-tions\OT1/ptm/m/n/1
+0.03749 . The
  []
 
 
-Underfull \hbox (badness 2556) in paragraph at lines 699--715
-\OT1/ptm/m/n/10.03749 for pointer re-lated operations---\OT1/ptm/m/sc/10.03749 
-S-DefC\OT1/ptm/m/n/10.03749 , \OT1/ptm/m/sc/10.03749 S-DefT\OT1/ptm/m/n/10.0374
-9 , \OT1/ptm/m/sc/10.03749 S-
+Underfull \hbox (badness 4024) in paragraph at lines 564--580
+\OT1/ptm/m/sc/10.03749 Cast\OT1/ptm/m/n/10.03749 . The first five are def-er-en
+ce and as-sign-ment
+ []
+
+
+Underfull \hbox (badness 7116) in paragraph at lines 604--609
+[]\OT1/ptm/b/n/10.03749 Unchecked and Checked Blocks\OT1/ptm/m/n/10.03749 . Se-
+man-ti-cally,
  []
 
 [6]
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 843.
-
-
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 7 undefined on input line 860.
+Underfull \hbox (badness 2119) in paragraph at lines 847--858
+[]\OT1/ptm/b/n/10.03749 Type Equal-ity and Sub-typ-ing and Cast-ing\OT1/ptm/m/n
+/10.03749 . In
+ []
 
 
-LaTeX Font Info:    Trying to load font information for OMS+ptm on input line 1
-074.
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omsptm.fd
-File: omsptm.fd 
-)
-LaTeX Font Info:    Font shape `OMS/ptm/m/n' in size <10.03749> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 1074.
+Underfull \vbox (badness 4303) has occurred while \output is active []
 
  [7]
-Overfull \hbox (3.94127pt too wide) in paragraph at lines 1136--1146
- []$ 
+Overfull \hbox (21.43398pt too wide) detected at line 933
+| []
  []
 
 
-LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1191
-.
-
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 8 undefined on input line 1252
-.
-
-[8]
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [9]
-Underfull \hbox (badness 1701) in paragraph at lines 1498--1501
-\OT1/ptm/m/it/10.03749 Proof: \OT1/ptm/m/n/10.03749 By in-duc-tion on the num-b
-er of steps of the
+Overfull \hbox (2.27937pt too wide) detected at line 948
+[]
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 1508--1514
-[]\OT1/ptm/m/n/10.03749 Compared to Ruef et al. [][][], proofs for
+Underfull \hbox (badness 2165) in paragraph at lines 1027--1036
+\OT1/ptm/m/n/10.03749 check-ing, Both $[]\OT1/cmr/m/n/10 ([])[]$ \OT1/ptm/m/n/1
+0.03749 and $[]\OT1/cmr/m/n/10 ([])\OMS/cmsy/m/n/10 f\OML/cmm/m/it/10 e\OMS/cms
+y/m/n/10 g$
  []
 
-) (./compilation.tex [10]
+[8] [9]) (./compilation.tex [10]
 Underfull \hbox (badness 10000) in paragraph at lines 286--300
 []\OT1/ptm/m/n/10.03749 For [][][][][][][][][][] and con-di-tion-als [][][][][]
 [][][][][], the
@@ -1338,31 +1328,18 @@ Underfull \hbox (badness 1708) in paragraph at lines 286--300
  in-serts
  []
 
-[11]
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 12 undefined on input line 338
-.
-
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 12 undefined on input line 338
-.
-
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 12 undefined on input line 346
-.
-
 
 Underfull \hbox (badness 2245) in paragraph at lines 342--369
 \OT1/ptm/m/n/10.03749 more pre-ci-sion to bounds check-ing at run-time com-
  []
 
-[12]
+[11]
 Underfull \hbox (badness 3281) in paragraph at lines 571--571
 []\OT1/ptm/m/n/10.03749 Figure 15: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
 49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
  []
 
-) (./evaluation.tex [13]) (./comparison.tex [14]) (./conclusion.tex)
+) (./evaluation.tex [12] [13]) (./comparison.tex [14]) (./conclusion.tex)
 (./main.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 18--24
 \OT1/ptm/m/n/9.03374 se-cu-rity vul-ner-a-bil-ity.  $https : / / www . zdnet . 
@@ -1376,22 +1353,19 @@ e-[]memory-[]safety-[]issues/$,
  []
 
 
-Package balance Warning: You have called \balance in second column
-(balance)                Columns might not be balanced.
-
-[15]
 Underfull \hbox (badness 3746) in paragraph at lines 88--94
 \OT1/ptm/m/n/9.03374 The Essence of Javascript.  In \OT1/ptm/m/it/9.03374 Pro-c
 eed-ings of the
  []
 
 
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
+
+[15]
 Underfull \hbox (badness 10000) in paragraph at lines 123--128
 []\OT1/ptm/m/n/9.03374 Leonidas Lam-propou-los and Ben-jamin C. Pierce.
  []
-
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
 Underfull \hbox (badness 1546) in paragraph at lines 200--203
@@ -1400,21 +1374,14 @@ w .
  []
 
 
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
 Underfull \hbox (badness 4899) in paragraph at lines 237--242
 \OT1/ptm/m/n/9.03374 Mc-Peak, and West-ley Weimer.  CCured: Type-Safe
  []
 
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
-
-Overfull \vbox (0.99661pt too high) has occurred while \output is active []
-
-
-Overfull \vbox (0.60942pt too high) has occurred while \output is active []
-
-
-[16]
 Underfull \hbox (badness 10000) in paragraph at lines 290--293
 []\OT1/ptm/m/n/9.03374 Konstantin Sere-bryany, Derek Bru-en-ing, Alexan-der
  []
@@ -1424,7 +1391,17 @@ Underfull \hbox (badness 1735) in paragraph at lines 290--293
 \OT1/ptm/m/n/9.03374 Potapenko, and Dmitriy Vyukov.  Ad-dress-san-i-tizer: A
  []
 
-)
+
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
+Overfull \vbox (1.8751pt too high) has occurred while \output is active []
+
+
+Overfull \vbox (1.48793pt too high) has occurred while \output is active []
+
+
+[16])
 Overfull \vbox (1.57672pt too high) has occurred while \output is active []
 
 
@@ -1442,10 +1419,6 @@ Overfull \vbox (3.39984pt too high) has occurred while \output is active []
 [18]
 
 LaTeX Warning: `!h' float specifier changed to `!ht'.
-
-
-LaTeX Warning: Reference `fig:strcat-ex' on page 19 undefined on input line 327
-.
 
 [19]
 Overfull \hbox (6.23pt too wide) in paragraph at lines 364--383
@@ -1484,7 +1457,7 @@ Overfull \vbox (1.86272pt too high) has occurred while \output is active []
 [22] [23] [24] [25] (./main.aux)
 
 LaTeX Font Warning: Size substitutions with differences
-(Font)              up to 2.74158pt have occurred.
+(Font)              up to 2.49063pt have occurred.
 
 
 LaTeX Font Warning: Some font shapes were not available, defaults substituted.
@@ -1497,13 +1470,13 @@ LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
  ) 
 Here is how much of TeX's memory you used:
- 27639 strings out of 481239
- 541606 string characters out of 5920377
- 1093225 words of memory out of 5000000
- 42319 multiletter control sequences out of 15000+600000
- 608082 words of font info for 186 fonts, out of 8000000 for 9000
+ 27558 strings out of 481239
+ 540245 string characters out of 5920377
+ 1093224 words of memory out of 5000000
+ 42241 multiletter control sequences out of 15000+600000
+ 603438 words of font info for 170 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 68i,24n,100p,1386b,1446s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 68i,24n,100p,1386b,1591s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/
@@ -1522,20 +1495,21 @@ e1/public/amsfonts/cm/cmsy6.pfb></usr/share/texlive/texmf-dist/fonts/type1/publ
 ic/amsfonts/cm/cmsy7.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsf
 onts/cm/cmsy8.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm
 /cmsy9.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti10
-.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></
-usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/sh
-are/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt8.pfb></usr/share/tex
-live/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share/texlive/tex
-mf-dist/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texm
-f-dist/fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/ty
-pe1/urw/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/
-utmr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></u
-sr/share/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (25 pages, 456085 bytes).
+.pfb></usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti8.pfb></
+usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmti9.pfb></usr/sha
+re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt10.pfb></usr/share/tex
+live/texmf-dist/fonts/type1/public/amsfonts/cm/cmtt8.pfb></usr/share/texlive/te
+xmf-dist/fonts/type1/public/amsfonts/cm/cmtt9.pfb></usr/share/texlive/texmf-dis
+t/fonts/type1/public/amsfonts/symbols/msam10.pfb></usr/share/texlive/texmf-dist
+/fonts/type1/public/amsfonts/symbols/msbm10.pfb></usr/share/texlive/texmf-dist/
+fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw
+/times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.
+pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/shar
+e/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
+Output written on main.pdf (25 pages, 465594 bytes).
 PDF statistics:
- 234 PDF objects out of 1000 (max. 8388607)
- 159 compressed objects within 2 object streams
+ 238 PDF objects out of 1000 (max. 8388607)
+ 162 compressed objects within 2 object streams
  0 named destinations out of 1000 (max. 500000)
  109 words of extra memory for PDF output out of 10000 (max. 10000000)
 
