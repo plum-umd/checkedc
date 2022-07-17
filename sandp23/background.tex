@@ -60,6 +60,7 @@ int stringsort(
 int tainted_compare_1(
   nt_array_tptr<char> x : count (0),
   nt_array_tptr<char> y : count (0)) {
+ checked (x,y) {
   int len_x = strlen(x);
   int len_y = strlen(y);
   nt_array_ptr<char> tx : count (len_x)
@@ -69,6 +70,7 @@ int tainted_compare_1(
   safe_memcpy(tx,x,len_x);
   safe_memcpy(ty,y,len_y);
   return compare_1(tx,ty);
+ }
 }
 ...
 
@@ -78,6 +80,7 @@ int tainted_stringsort(nt_array_tptr
      <nt_array_tptr<char>> s : count (n),
  tptr<(int)(nt_array_tptr<char>,
   nt_array_tptr<char>)> cmp, int n) {
+ checked (s,cmp,n) {
   int i;
   nt_array_ptr<nt_array_ptr<char>> p : count (n)
     = malloc(nt_array<nt_array_ptr<char>>, n);
@@ -93,6 +96,7 @@ int tainted_stringsort(nt_array_tptr
     cfun = find_check(cmp);
   
   return stringsort(p,cfun);
+ }
 }
   \end{lstlisting}
 }
@@ -256,7 +260,7 @@ and calling the shell never exposes any checked pointer information outside of t
 Conceptually, the shell is run in a checked region.
 One can imagine that a tainted shell is a safe closure that contains a checked block.
 Once the closure is called, the system is turned to a checked region,
-so that the checked function call at \Cref{fig:checkedc-example-2} line 13 is safe, 
+so that the checked function call at \Cref{fig:checkedc-example-2} line 14 is safe, 
 even if it is called by $g$ in \Cref{fig:checkedc-example-3} , because it lives in the checked region.
 In the \systemname formalism, we formalize a \textit{checked} block on top of the existing unchecked regions,
 and the transition of a tainted shell call creates a checked block containing the shell body.

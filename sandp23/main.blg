@@ -18,45 +18,45 @@ Repeated entry---line 66 of file sources.bib
  :                               ,
 I'm skipping whatever remains of this entry
 Warning--empty journal in mergendahlcross
-You've used 45 entries,
+You've used 46 entries,
             2773 wiz_defined-function locations,
-            1268 strings with 21508 characters,
-and the built_in function-call counts, 24584 in all, are:
-= -- 2205
-> -- 1663
+            1273 strings with 21679 characters,
+and the built_in function-call counts, 25191 in all, are:
+= -- 2253
+> -- 1720
 < -- 25
-+ -- 562
-- -- 515
-* -- 2078
-:= -- 3772
-add.period$ -- 192
-call.type$ -- 45
-change.case$ -- 306
-chr.to.int$ -- 43
-cite$ -- 91
-duplicate$ -- 1052
-empty$ -- 1812
-format.name$ -- 569
-if$ -- 5205
++ -- 581
+- -- 533
+* -- 2132
+:= -- 3869
+add.period$ -- 196
+call.type$ -- 46
+change.case$ -- 315
+chr.to.int$ -- 44
+cite$ -- 93
+duplicate$ -- 1076
+empty$ -- 1853
+format.name$ -- 588
+if$ -- 5331
 int.to.chr$ -- 3
 int.to.str$ -- 1
-missing$ -- 39
-newline$ -- 279
-num.names$ -- 178
-pop$ -- 620
+missing$ -- 40
+newline$ -- 284
+num.names$ -- 182
+pop$ -- 642
 preamble$ -- 1
-purify$ -- 262
+purify$ -- 270
 quote$ -- 0
-skip$ -- 844
+skip$ -- 860
 stack$ -- 0
-substring$ -- 671
-swap$ -- 185
+substring$ -- 673
+swap$ -- 187
 text.length$ -- 12
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 485
+type$ -- 496
 warning$ -- 1
-while$ -- 181
+while$ -- 184
 width$ -- 0
-write$ -- 687
+write$ -- 700
 (There were 3 error messages)

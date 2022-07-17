@@ -495,15 +495,12 @@ Qed.
 Inductive type_eq (T:theta) : type -> type -> Prop := 
    type_eq_nat : type_eq T TNat TNat
    | type_eq_ptr : forall m t1 t2, type_eq T t1 t2 -> type_eq T (TPtr m t1) (TPtr m t2)
-   | type_eq_struct: forall t1 t2, type_eq T (TStruct t1) (TStruct t2)
+   | type_eq_struct: forall t1, type_eq T (TStruct t1) (TStruct t1)
    | type_eq_array: forall b1 b2 b1a b2a t1 t2, type_eq T t1 t2 -> nat_eq T b1 b1a -> nat_eq T b2 b2a
                -> type_eq T (TArray b1 b2 t1) (TArray b1a b2a t2)
    | type_eq_ntarray: forall b1 b2 b1a b2a t1 t2, type_eq T t1 t2 -> nat_eq T b1 b1a -> nat_eq T b2 b2a
                  -> type_eq T (TNTArray b1 b2 t1) (TNTArray b1a b2a t2)
-   | type_eq_fun: forall xl yl t1 ts1 t2 ts2, length xl = length yl -> 
-              type_eq T t1 (subst_type_var (combine xl yl) t2) -> 
-              Forall2 (type_eq T) ts1 (map (subst_type_var (combine xl yl)) ts2) 
-         -> type_eq T (TFun xl t1 ts1) (TFun yl t2 ts2).
+   | type_eq_fun: forall xl t1 ts1, type_eq T (TFun xl t1 ts1) (TFun xl t1 ts1).
 
 
 Lemma subst_bound_var_same: forall l b, (forall x y, In (x,y) l -> x = y) -> subst_bounds_var b l = b.
@@ -565,6 +562,7 @@ Proof.
  constructor;auto with ty.
  constructor;auto with ty.
  constructor; try easy.
+(*
  rewrite subst_type_var_same.
  apply combine_eq. easy.
  induction l;intros; simpl in *. constructor.
@@ -572,6 +570,7 @@ Proof.
  rewrite subst_type_var_same.
  apply combine_eq. easy.
  apply IHl. easy.
+*)
 Qed.
 
 Lemma type_eq_sym (T:theta) : forall t1 t2, type_eq T t1 t2 -> type_eq T t2 t1.
@@ -582,14 +581,21 @@ Proof.
  constructor; easy.
  constructor; auto with ty.
  constructor; auto with ty.
- constructor. easy.
-Admitted.
+ constructor.
+(* easy.*)
+Qed.
 
 Lemma type_eq_trans (T:theta) : forall t1 t2 t3, type_eq T t1 t2 -> type_eq T t2 t3 -> type_eq T t1 t3.
 Proof.
- intros. induction H;intros; simpl in *.
- easy.
-Admitted.
+ intros. generalize dependent t3. induction H;intros; simpl in *; try easy.
+ inv H0. constructor. apply IHtype_eq; try easy.
+ inv H2. constructor. apply IHtype_eq; auto.
+ specialize (nat_eq_trans T b1 b1a b1a0 H0 H8) as X1; easy.
+ specialize (nat_eq_trans T b2 b2a b2a0 H1 H9) as X1; easy.
+ inv H2. constructor. apply IHtype_eq; auto.
+ specialize (nat_eq_trans T b1 b1a b1a0 H0 H8) as X1; easy.
+ specialize (nat_eq_trans T b2 b2a b2a0 H1 H9) as X1; easy.
+Qed.
 
 (*
 Definition union := list (list var).
@@ -708,7 +714,7 @@ Section Subtype.
       word_type t -> 
       Forall word_type tl ->
       subtype t t' ->
-      Forall2 subtype tl tl ->
+      Forall2 subtype tl' tl ->
       subtype (TPtr Tainted (TFun xl t tl)) (TPtr Tainted (TFun xl t' tl')).
 
   Hint Constructors subtype : ty.
@@ -870,6 +876,12 @@ Section Subtype.
       apply SubTypeFunTainted; try easy.
       apply SubTypeFunTainted; try easy.
       apply IHsubtype_order; try easy.
+      induction H9. constructor.
+      inv H4. inv H5. inv H6.
+      inv H19. inv H21. constructor.
+      apply H0; try easy.
+      inv H8. inv H17. inv H16.
+      apply IHForall3; try easy. 
   Qed.
 
   Lemma subtype_refl : forall t,
@@ -879,6 +891,35 @@ Section Subtype.
   Qed.
 
   Hint Resolve subtype_refl : ty.
+
+
+  Lemma subtype_core_fun : forall xl t tl m ta, m <> Unchecked -> 
+         subtype_core ta (TPtr m (TFun xl t tl)) 
+               -> (exists yl tb tlb, ta = TPtr m (TFun yl tb tlb)).
+  Proof.
+   intros. inv H0;simpl in *; try easy.
+   exists xl, t, tl. easy.
+  Qed.
+
+  Lemma subtype_fun : forall xl t tl m ta, m <> Unchecked -> 
+           subtype ta (TPtr m (TFun xl t tl)) 
+               -> (exists yl tb tlb, ta = TPtr m (TFun yl tb tlb)).
+  Proof.
+   intros. inv H0; try easy.
+   eapply subtype_core_fun. apply H. apply H1.
+   exists xl,t0,tl0. easy. 
+   exists xl,t0,tl0. easy. 
+  Qed.
+
+  Lemma subtype_fun_1 : forall yl tb tlb xl t ts, 
+           subtype (TPtr Checked (TFun yl tb tlb)) (TPtr Checked (TFun xl t ts))
+               -> yl = xl /\ subtype tb t /\ Forall2 subtype ts tlb.
+  Proof.
+   intros. inv H; try easy.
+   inv H0; try easy. split. easy. split. constructor. constructor. 
+   induction ts;intros;simpl in *. constructor.
+   constructor. constructor. constructor. easy.
+  Qed.
 
 End Subtype.
 
@@ -1806,6 +1847,15 @@ Definition tfun_prop (F: FEnv) (n:Z) (t:type) :=
 Definition get_fun_type (m:mode) (tvl: list (var*type)) (t:type) :=
   TPtr m (TFun (fold_right (fun b a => match (snd b) with TNat => (fst b)::a |_ => a end) [] tvl) t (snd (List.split tvl))).
 
+Lemma get_fun_type_fun: forall tvl t m, (exists xl, get_fun_type m tvl t = TPtr m (TFun xl t (snd (List.split tvl)))).
+Proof.
+  unfold get_fun_type in *.
+  induction tvl;intros; simpl in *.
+  exists []. easy. destruct a; simpl in *. destruct t0;simpl in *.
+  specialize (IHtvl t m). destruct IHtvl.
+  exists (v::x).
+Admitted.
+
 (** Typing of literals on Checked heaps *)
 Inductive well_typed_lit_checked (D : structdef) (F: FEnv) (Q:theta) H
   : scope -> Z -> type -> Prop :=
@@ -1816,11 +1866,9 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) (Q:theta) H
     well_typed_lit_checked D F Q H s n (TPtr m w)
 | TyLitZero_C : forall s t,
     well_typed_lit_checked D F Q H s 0 t
-| TyLitFun_C : forall s n xl t ts tvl e ta tq,
-    tfun_prop F n (TPtr Checked (TFun [] t ts)) ->
+| TyLitFun_C : forall s n xl t ts tvl e ta,
      F Checked n = Some (tvl,ta,e) ->
-     type_eq Q (get_fun_type Checked tvl ta) tq ->
-     subtype D Q tq (TPtr Checked (TFun xl t ts)) ->
+     subtype D Q (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) ->
     well_typed_lit_checked D F Q H s n (TPtr Checked (TFun xl t ts))
 | TyLitRec_C : forall s n w t,
     set_In (n, t) s ->
@@ -1851,11 +1899,10 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) (Q:theta) H
     well_typed_lit_tainted D F Q H s n (TPtr Unchecked w)
 | TyLitZero_T : forall s t,
     well_typed_lit_tainted D F Q H s 0 t
-| TyLitFun_T : forall s n t ts tvl ta e xl tq,
+| TyLitFun_T : forall s n t ts tvl ta e xl,
     tfun_prop F n (TPtr Tainted (TFun xl t ts)) ->
     F Tainted n = Some (tvl,ta,e) ->
-     type_eq Q (get_fun_type Tainted tvl ta) tq ->
-     subtype D Q tq (TPtr Tainted (TFun xl t ts)) ->
+     subtype D Q (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
 
     well_typed_lit_tainted D F Q H s n (TPtr Tainted (TFun xl t ts))
 | TyLitRec_T : forall s n w t,
@@ -2700,7 +2747,9 @@ Definition is_off_zero (b:bound) :=
             | _ => True
   end.
 
-
+Inductive is_tainted : type -> Prop :=
+   is_tainted_tnat: is_tainted TNat
+ | is_tainted_tptr: forall t, is_tainted (TPtr Tainted t).
 
 (* The CoreChkC Type System. *)
 Section Typing. 
@@ -2766,9 +2815,9 @@ Section Typing.
   (*     ~ In x (get_tvars t) -> *)
   (*     well_typed env Q m (ELet x e1 e2) t *)
 
-  | TyLet : forall env Q m x e1 t1 e2 t,
-      t1 <> TNat ->
-      well_typed env Q m e1 t1 ->
+  | TyLet : forall env Q m x e1 m' t1 e2 t,
+      mode_leq m' m ->
+      well_typed env Q m e1 (TPtr m' t1) ->
       well_typed (Env.add x t1 env) Q m e2 t ->
       well_typed env Q m (ELet x e1 e2) t
 
@@ -2811,9 +2860,12 @@ Section Typing.
       well_typed env Q Unchecked e t ->
       well_typed env Q m (EUnchecked vl t e) t
 
-  | Tychecked : forall env Q m vl t e,
+  | Tychecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
-      well_typed env Q Checked e t ->
+      well_typed env Q Checked e t' ->
+      eq_subtype D Q t' t ->
+      Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
+      is_tainted t ->
       well_typed env Q m (Echecked vl t e) t
 
 
@@ -2946,6 +2998,7 @@ Inductive fun_arg_wf {D : structdef} {m:mode}: list var -> list (var * type) -> 
 | fun_arg_many_2 : forall AS x tvl, fun_arg_wf (x::AS) tvl -> fun_arg_wf AS ((x,TNat)::tvl).
 
 Definition fun_wf (D : structdef) (F:FEnv) (H:real_heap) :=
+    (forall m, F m 0 = None) /\
     (forall env Q f tvl t e vl ea ta m,
         F m f = Some (tvl,t,e) ->
         eval_vl vl tvl (ECast t e) t ea ta ->

@@ -146,7 +146,7 @@
 \newcommand{\aravind}[1]{\textcolor{green}{Aravind: #1}}
 \fi
 
-\newcommand{\lang}{\textsc{CoreChkC}\xspace}
+\newcommand{\lang}{\textsc{CoreChkCBox}\xspace}
 \newcommand{\elang}{\textsc{CoreC}\xspace}
 
 \newtheorem{defi}{Definition}
@@ -211,6 +211,8 @@
 \newcommand{\tntarrayb}[2]{\tarrayb{#1}{#2}_{nt}}
 \newcommand{\tallarrayb}[2]{\ensuremath{[{#1}~{#2}]_{\kappa}}}
 \newcommand{\tallarraybc}[2]{\ensuremath{[{#1}~{#2}]_{\textcolor{cyan}{\kappa}}}}
+\newcommand{\tfun}[3]{\ensuremath{\forall \;#1.\;{#2}\to#3}}
+\newcommand{\cupdot}{\mathbin{\mathaccent\cdot\cup}}
 
 \newcommand{\tallarray}[3]{\tallarrayb{({#1},{#2})}{#3}}
 
@@ -228,9 +230,11 @@
 
 \newcommand{\evalue}[2]{\ensuremath{{#1}\!:\!{#2}}}
 
-\newcommand{\emalloc}[1]{\ensuremath{\kw{malloc}({#1})}}
+\newcommand{\emalloc}[2]{\ensuremath{\kw{malloc}({#1},{#2})}}
 \newcommand{\emalloctext}{\ensuremath{\kw{malloc}}}
 \newcommand{\ecall}[2]{\ensuremath{{#1}({#2})}}
+\newcommand{\elcall}[3]{\ensuremath{{(#1,#2)}({#3})}}
+
 \newcommand{\ret}[3]{\ensuremath{\kw{ret}({#1},{#2},{#3})}}
 \newcommand{\rettext}{\ensuremath{\kw{ret}}}
 \newcommand{\ecast}[2]{\ensuremath{\kw{(}{#1}\kw{)}{#2}}}
@@ -240,12 +244,22 @@
 \newcommand{\elettext}{\ensuremath{\kw{let}}}
 \newcommand{\ebinop}[2]{\ensuremath{#1 \plus #2}}
 \newcommand{\eassign}[2]{\ensuremath{\texttt{*}{#1}\,\texttt{=}\, {#2}}}
+\newcommand{\elassign}[3]{\ensuremath{\texttt{*}{(#1,#2)}\,\texttt{=}\, {#3}}}
+
 \newcommand{\eassignstack}[2]{\ensuremath{{#1}\,\texttt{=}\, {#2}}}
 \newcommand{\efield}[2]{\ensuremath{{#1}\kw{\rightarrow}{#2}}}
 \newcommand{\estar}[1]{\ensuremath{\texttt{*}{#1}}}
+\newcommand{\getstar}[2]{\ensuremath{\texttt{*}({#1},{#2})}}
+
 \newcommand{\eamper}[2]{\ensuremath{\kw{\&}{#1}\kw{\rightarrow}{#2}}}
-\newcommand{\eunchecked}[1]{\ensuremath{\kw{unchecked}\;{#1}}}
+\newcommand{\eunchecked}[2]{\ensuremath{\kw{unchecked}({#1})\{#2\}}}
 \newcommand{\euncheckedtext}{\ensuremath{\kw{unchecked}}}
+
+\newcommand{\echecked}[2]{\ensuremath{\kw{checked}({#1}){\{#2\}}}}
+\newcommand{\echeckedtext}{\ensuremath{\kw{checked}}}
+
+
+
 \newcommand{\eif}[3]{\ensuremath{\kw{if\;}(#1)\;{#2}\;\kw{else}\;{#3}}}
 \newcommand{\eifa}[3]{\ensuremath{\kw{IF\;}(#1)\;{#2}\;\kw{ELSE}\;{#3}}}
 \newcommand{\eifatext}{\ensuremath{\kw{IF}}}
@@ -287,8 +301,15 @@
 
 \newcommand{\cmode}{\texttt{c}}
 \newcommand{\umode}{\texttt{u}}
+\newcommand{\tmode}{\texttt{t}}
+
 \newcommand{\bvar}{\ensuremath{\beta}}
 \newcommand{\mode}{\textit{mode}}
+\newcommand{\type}{\textit{type}}
+\newcommand{\funptr}{\textit{fun\_t}}
+
+\newcommand{\tgez}{\texttt{ge}\_0}
+\newcommand{\teq}[1]{\texttt{eq}\;{#1}}
 
 % compilation
 \newcommand{\cextend}[4]{\ensuremath{#4 = ~ \vdash_{extend} #1, #2, #3}}
