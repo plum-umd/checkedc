@@ -48,40 +48,89 @@
 % \item there's a funny change of line spacing in column 2 of page 6, about 2/3 down.
 % \end{itemize}
 % }
-  
-The semantics of \lang uses annotations on pointer literals in order
-to keep track of array bounds information, which is used in premises
-of rules like \textsc{S-DefArray} and
-  \textsc{S-AssignArr} to prevent spatial safety violations. However, in the real
-implementation of \checkedc, which extends Clang/LLVM, these annotations
-are not present---pointers are represented as a single
-machine word with no extra metadata, and bounds
-  checks are not handled by the machine, but inserted by the
-  compiler.
 
-This section shows how \lang
-annotations can be safely erased: using static information a compiler
-can insert code to manage and check bounds metadata, with no loss of
-expressiveness. We present a compilation algorithm that converts from
-\lang to \elang, an untyped language without metadata
-annotations. The syntax and semantics \elang
-  closely mirrors that of \lang; it differs only in that literals lack
-  type annotations and its operational rules perform no
-  bounds and null checks, which are instead inserted during
-  compilation. Our compilation algorithm is evidence that \lang's
-  semantics, despite its apparent use of fat pointers, faithfully
-  represents Checked C's intended behavior. The algorithm also sheds
+The main subtlety of compiling \checkedc to Clang/LLVM is to capture the annotations on pointer literals
+that track array bound information, which is used in premises
+of rules like \textsc{S-DefArray} and
+  \textsc{S-AssignArr} to prevent spatial safety violations.
+The \checkedc compiler \cite{li22checkedc} inserted additional pointer checks 
+for verifying pointers being not null and the bounds are within their limits.
+The latter is done by introducing additional shadow variables for storing (NT-)array pointer bound information.
+
+\begin{figure}[t!]
+{\small
+\begin{tabular}{|c|c|c|c|}
+\hline
+& \cmode & \tmode & \umode \\
+\hline
+& \text{Impl} / \text{Foml} & \text{Impl} / \text{Foml} & \text{Impl} / \text{Foml} \\
+\hline
+\cmode & $\estar{x}$ / $\getstar{\cmode}{x}$ 
+ & $\texttt{sand\_get}(x)$ / $\getstar{\umode}{x}$ &  $\times$ \\
+\hline
+\umode & $\times$
+ & $\estar{x}$ / $\getstar{\umode}{x}$ &  $\estar{x}$ / $\getstar{\umode}{x}$ \\
+\hline
+\end{tabular}
+
+}
+\caption{Compiled Targets for Dereference}
+\label{fig:flagtable}
+\end{figure}
+
+In \systemname, context and pointer modes determine the particular heap/function store that a pointer points to,
+i.e., \cmode pointer points to checked regions, while \tmode and \umode pointers point to unchecked regions.
+Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
+In the compiled LLVM code, pointer access operations have different syntax when the modes are different.
+\Cref{fig:flagtable} lists the different compiled syntax for a deference operation ($\estar{x}$) for the compiler implementation (\text{Impl}) and formalism (\text{Foml}). The columns represent different pointer modes and the rows represent context modes.
+For example, when we have a \tmode pointer in a \cmode-mode region, we use the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data. In formalism, we create a new deference data-structure in LLVM on top of the existing $\estar{x}$ operation: $\getstar{m}{x}$. if the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
+
+In the compilation, we use a function \code{mode} to get the pointer mode of a function learning from the pointer's type.
+Thus, the compiler can determine the correct compiled syntax for a pointer access operation with 
+the knowledge of the current context mode.
+We also build a context switching mechanism to change 
+the context mode when we meet $\echeckedtext$ and $\euncheckedtext$ blocks.
+We describe the mechanism shortly.
+
+This section shows how \systemname deals with pointer modes, mode switching and function pointer compilations, 
+with no loss of expressiveness;
+as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
+For the compiler formalism, 
+we present a compilation algorithm that converts from
+\systemname to \elang, an untyped language without metadata
+annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
+In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
+$\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
+The algorithm sheds
   light on how compilation can be implemented in the real Checked C
   compiler, while eschewing many important details (\elang has many 
   differences with LLVM IR).
+
+
+%This section shows how \systemname deals with 
+%annotations can be safely erased: using static information a compiler
+%can insert code to manage and check bounds metadata, with no loss of
+%expressiveness. We present a compilation algorithm that converts from
+%\lang to \elang, an untyped language without metadata
+%annotations. The syntax and semantics \elang
+  %closely mirrors that of \lang; it differs only in that literals lack
+  %type annotations and its operational rules perform no
+  %bounds and null checks, which are instead inserted during
+  %compilation. Our compilation algorithm is evidence that \lang's
+  %semantics, despite its apparent use of fat pointers, faithfully
+  %represents Checked C's intended behavior. The algorithm also sheds
+  %light on how compilation can be implemented in the real Checked C
+  %compiler, while eschewing many important details (\elang has many 
+  %differences with LLVM IR).
 
 Compilation is defined by extending \lang's
 typing judgment thusly:
 \[\Gamma;\Theta;\rho \vdash_m e \gg \dot e:\tau\]
 There is now a \elang output $\dot e$ and an input $\rho$, which maps
-each \code{nt_array_ptr} variable \code{p} to a pair of \emph{shadow
-  variables} that keep \code{p}'s up-to-date upper and lower bounds; these
-may differ from the bounds in \code{p}'s type due to bounds
+each (NT-)array pointer variable to its mode and
+each variable \code{p} to a pair of \emph{shadow
+  variables} that keep \code{p}'s up-to-date upper and lower bounds; 
+these may differ from the bounds in \code{p}'s type due to bounds
 widening.\footnote{Since lower bounds are never widened, the
   lower-bound shadow variable is unnecessary; we include it for uniformity.}
 % When $\Gamma$,$\Theta$ and $\rho$ are all empty, we write $e \gg \dot e$ rather than the
@@ -119,8 +168,8 @@ Appendix~\ref{appx:comp1}.
 the supplemental report~\cite{checkedc-tech-report}.
 \fi
 Each rule performs up to three tasks: (a) conversion of $e$ to
-A-normal form; (b) insertion of dynamic checks; and (c) insertion of
-bounds widening expressions.
+A-normal form; (b) insertion of dynamic checks and bound widening expressions; 
+and (c) generate right pointer accessing expressions based on modes.
 %
 A-normal form conversion is straightforward: compound expressions are
 handled by storing results of subexpressions into temporary variables,
@@ -152,95 +201,43 @@ $
 
 This simplifies the management of effects from subexpressions. The
 next two steps of compilation are more interesting.
-
-
-\begin{figure}[t!]
-  \begin{small}
-\begin{lstlisting}[mathescape,xleftmargin=4 mm]
-/* p : $\color{purple!40!black}\tntarrayptr{0}{0}{\tint}{\cmode}$  */
-/* $\color{purple!40!black}\rho$(p) = p_lo,p_hi */
-{
-  let x = strlen(p);
-  if (x > 1) putchar(*(p+1));
-}
-\end{lstlisting}
-\begin{frame}
-
-\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
-
-\end{frame}
-\begin{lstlisting}[xleftmargin=4 mm]
-{
-  assert(p_lo <= 0 && 0 <= p_hi); // bounds check
-  assert(p != 0); // null check
-  let x = strlen(p);
-  let p_hi_new = x;
-  p_hi = max(p_hi, p_hi_new);
-  if (x > 1) {
-    assert(p != 0); // null check for p + 1
-    let p_1 = p + 1;
-    assert(p_lo <= 1 && // bounds check for p + 1
-     1 <= p_hi);    
-    putchar(*p_1);
-  }
-}
-\end{lstlisting}
-\end{small}
-\caption{Compilation Example for Check Insertions
-% \review{- Fig 8, line 1: did you mean `bounds` instead of `count`? I'm confused
-% - Fig 8, line 8: why null-check `p` again?}
-% \yiyun{Yes, fixed. The second null check is due to the pointer
-%   arithmetic on p; our transformation does not attempt to optimize
-%   away provably redundant checks.}
-}
-\label{fig:compilationexample}
-\end{figure}
-
+We state them based on different \systemname operations.
 
 \begin{figure}[t!]
   \begin{small}
 \begin{lstlisting}[mathescape,xleftmargin=4 mm]
 int deref_array(n : int,
-     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$) {
-  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi */
-  if (* p)
-    (* (p + 1))
-    else 0
+     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$,
+     q : $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\tmode}$) {
+  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi,p_m */
+  /* $\color{purple!40!black}\rho$(q) = q_lo,q_hi,q_m */
+    * p;
+    * q = 1;
 }
 ...
 /* p0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\cmode}$ */
-deref_array(5, p0);
+/* q0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\tmode}$ */
+deref_array(5, p0, q0);
     \end{lstlisting}
 \begin{frame}
 
 \tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
 
 \end{frame}
-\begin{lstlisting}[xleftmargin=4 mm]
-deref_array(n, p) {
-  let p_lo = 0;
-  let p_hi = n;
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+deref_array(int n, int* p, int * q) {
+  //m is the current context mode
+  let p_lo = 0; let p_hi = n; 
+  let q_lo = 0; let q_hi = n; 
   /* runtime checks */
   assert(p_lo <= 0 && 0 <= p_hi);
   assert(p != 0);
-  let p_derefed = *p;
-  if (p_derefed != 0) {
-    /* widening */
-    if (p_hi == 0) {
-      p_hi = p_hi + 1;
-    }
-    /* null check before pointer arithmetic */
-    assert(p != 0);
-    let p0 = p + 1;
-    assert(p_lo <= 1 && 1 <= p_hi);
-    (* p0)
-  }
-  else {
-    0
-  }
+  *(mode(p) $\wedge$ m,p);
+  verify(q, not_null && q_lo <= 0 && 0 <= q_hi);
+  *(mode(q) $\wedge$ m,q)=1;
 }
 ...
-deref_array(5, p0);
+deref_array(5, p0, q0);
     \end{lstlisting}
 \end{small}
     \caption{Compilation Example for Dependent Functions}
@@ -263,141 +260,76 @@ deref_array(5, p0);
 %     index is always valid because CoreC there is technically only
 %     integer arithmetic.}}
 
-During compilation, $\Gamma$ tracks the lower and upper bound
-associated with every pointer variable according to its type. At each
-declaration of a \code{nt_array_ptr} variable \code{p}, the
-compiler allocates two \emph{shadow variables}, 
-stored in $\rho(p)$; these are initialized to \code{p}'s declared bounds
-and will be updated during bounds widening.\footnote{Shadow variables
-  are not used for \code{array_ptr} types (the bounds expressions are)
-  since they are not subject to bounds widening.} 
-Fig.~\ref{fig:compilationexample} shows how an invocation of
-\code{strlen} on a null-terminated string is compiled into C
-code. Each dereference of a checked pointer requires a null check
-(See \textsc{S-DefNull} in Fig.~\ref{fig:semantics}), which the
-compiler makes explicit: Line~$3$ of the generated code has the null
-check on pointer \code{p} due to the \code{strlen},
-  and a similar check happens
-  at line~$8$ due to the pointer arithmetic on \code{p}.
-Dereferences also require bounds checks: line~$2$ checks \code{p} is
-in bounds before computing \code{strlen(p)}, while line~$10$ does
-likewise before computing \code{*(p+1)}.
+\myparagraph{Pointer Accesses and Modes}
+%
+In every declaration (or the beginning of a function body) of a pointer,
+if the poniter is an (NT-)array one,
+we first allocates two \emph{shadow variables}
+to track the lower and upper bounds potentially changed for pointer arithmetic and NT-array bound widening.
+We also associated with every \cmode-mode pointer variable according to its type;
+we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
+In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9), 
+there is an inserted verification step similar to \Cref{fig:const-type},
+which checks a pointer is well defined in the heap for every element in its defined range.
+In implementation, we actually optimize the verification away and substitute it
+with the bounds and null-pointer checks.
+Because tainted pointer is checked every time before it is used,
+so that we only need to check the top pointer is 
+well defined without recursively looking at the sub-terms in a nested pointer case.
+The modes in compiled deference (\code{*(mode(p) }$\wedge$\code{ m,p)})
+ and assignment (\code{*(mode(q) }$\wedge$\code{ m,q)=1}) operations 
+are computed based on the meet 
+operation ($\wedge$) of the pointer mode (e.g. \code{mode(p)}) and the current context mode (\code{m}).
 
-For \code{strlen(p)} and conditionals \code{if(*p)}, the \lang
-semantics allows the upper bound of \code{p} to be extended.
-The compiler explicitly inserts statements to do so on \code{p}'s
-shadow bound variables. For example,
-Fig.~\ref{fig:compilationexample}~line~$6$ widens \code{p}'s upper
-bound if \code{strlen}'s result is larger than the existing
-bound. 
-Lines 7--12 of the generated code in
-Fig.~\ref{fig:compilationexample1}
-show how bounds are 
-widened when compiling expression \code{if(*p)}. If we find that the
-current \code{p}'s relative upper bound is equal to $0$ (line 10),
-and \code{p}'s content is not null (line 8), we then increase the
-upper bound by $1$ (line 11).
+\myparagraph{Checked and Unchecked Blocks}
+%
+In the implementation,
+$\euncheckedtext$ and $\echeckedtext$ blocks 
+are compiled as context switching functions provided by the sandbox mechanism.
+$\eunchecked{\overline{x}}{e}$ is compiled to 
+$\texttt{sandbox\_call}(\overline{x},e)$, where we call the sandbox 
+to execute expression $e$ with the arguments $\overline{x}$.
+$\echecked{\overline{x}}{e}$ is compiled to 
+$\texttt{callback}(\overline{x},e)$, where we perform 
+a \texttt{callback} to a checked block code $e$ inside a sandbox.
+In \systemname, We adopt an aggressive execution scheme that
+directly learns pointer addresses from compiled assembly to make the $\texttt{callback}$ happen.
+In the formalism, we rely on the type system to 
+guarantee the context switching without creating the extra function calls for simplicity.
 
-Fig.~\ref{fig:compilationexample1} also shows a dependent function call.
+%Fig.~\ref{fig:compilationexample} shows how an invocation of
+%\code{strlen} on a null-terminated string is compiled into C
+%code. Each dereference of a checked pointer requires a null check
+%(See \textsc{S-DefNull} in Fig.~\ref{fig:semantics}), which the
+%compiler makes explicit: Line~$3$ of the generated code has the null
+%check on pointer \code{p} due to the \code{strlen},
+%  and a similar check happens
+%  at line~$8$ due to the pointer arithmetic on \code{p}.
+%Dereferences also require bounds checks: line~$2$ checks \code{p} is
+%in bounds before computing \code{strlen(p)}, while line~$10$ does
+%likewise before computing \code{*(p+1)}.
+
+\myparagraph{Function Pointers and Calls}
+%
+Function pointers are dealt with similarly to normal pointers,
+but we insert checks to check if the pointer address is not null in 
+the function store and if the type is correctly represented, 
+for both $\cmode$ and $\tmode$ mode pointers 
+\footnote{$\cmode$-mode pointers are checked once in the beginning and $\tmode$-mode pointers are checked every time when use}.
+Fpr example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
+we place a check \code{verify_fun(cmp, not_null && type_match)},
+and we place a similar check before \Cref{fig:checkedc-example-3} line 7 to check the tainted \code{cmp} when it is used. 
+The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
+is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
+
+For compiling dependent function calls,
+\Cref{fig:compilationexample1} also shows an example.
 Notice that the bounds for the array pointer \code{p} are not passed as
 arguments. Instead, they are initialized according to \code{p}'s
-type---see line~3 of the original \lang program at the top of the figure.
-Line~$2$ of the generated code
-sets the lower bound  to \code{0} and line~$3$ sets the
+type---see line~4 of the original \lang program at the top of the figure.
+Line~$3$ of the generated code
+sets the lower bound  to \code{0} and the
 upper bound to \code{n}.
-
-\subsection{Comparison with Checked C Specification}
-\label{sec:disc}
-
-\begin{figure}[t]
-{\small
-{\captionsetup[lstlisting]{margin = 8 mm}
-  \begin{lstlisting}[xleftmargin=8 mm]
-nt_array_ptr<char> safe_strcat_c 
-   (nt_array_ptr<char> dst : count(n),
-    nt_array_ptr<char> src : count(0), int n) {
-  nt_array_ptr<char> tmp : count(n) = dst;
-  int x = strlen(tmp);
-  /* tmp now has x as its upper bound */
-  /* dst still has n as its upper bound */
-  int y = strlen(src);
-
-  if (x+y < n) {
-    for (int i = 0; i < y; ++i)
-      *(dst+x+i) = *(src+i);
-    *(dst+x+y) = '\0';
-    return dst;
-  }
-  return null;
-}
-\end{lstlisting}
-}
-}
-\caption{Safe \code{strcat} in Checked C that avoids a run-time error
-  exhibited by \code{safe_strcat} (Fig.~\ref{fig:strcat-ex}) when
-  compiled with the current Checked C compiler}
-\label{fig:strcatc-ex}
-\end{figure}
-
-The use of shadow variables for bounds widening is a key novelty of our
-compilation approach, and adds more precision to bounds checking at runtime
-compared to the official specification and current implementation of
-\checkedc~\cite[5.1.2, pg 85]{checkedc}.  For example, the
-\code{safe_strcat} example of Fig.~\ref{fig:strcat-ex} compiles with the
-current Clang \checkedc compiler but will fail with a runtime
-error. The statement \code{int x = strlen(dst)} at line 4 changes the
-statically determined upper bound of \code{dst} to \code{x}, which can be smaller than
-\code{n}, the full capacity of \code{dst}. The attempt to recover
-the full capacity of \code{dst} through a dynamic cast
-at line 7 will always fail if the capacity \code{n} is checked
-against the statically determined new upper bound \code{x}. % This problem can be worked around by
-% effectively inlining the definition of \code{strlen} as 
-% in \code{safe_strcat_c} in Fig.~\ref{fig:strcatc-ex} (lines
-% 6-7).
-This problem can be worked around by invoking \code{strlen} on a temporary
-variable \code{tmp} instead of \code{dst}
-as in \code{safe_strcat_c} in Fig.~\ref{fig:strcatc-ex} (lines 4-5).
-Likewise, if we were to add line \code{putchar(*(p+1));} 
-after line 6 in the original code at the top of
-Fig.~\ref{fig:compilationexample}, the code will always fail: the Clang \checkedc
-compiler (with the transliterated C code as its input) would 
-check \code{p} against its \emph{original} bounds \code{(0,0)} since the
-updated upper bound \code{x} is now out of
-the scope. Shadow variables address these problems because
-they retain widened bounds beyond the scope of variables that store
-them (i.e., \code{x} in both examples).
-
-To make it match the specification, our compilation definition could
-easily eschew
-shadow variables and rely only on the type-based
-bounds expressions available in $\Gamma$ for checking. However, doing so would 
-force us to weaken the simulation theorem, reduce expressiveness,
-and/or force the semantics to be more awkward. We plan to work with
-the \checkedc team to implement our approach in a future revision.
-
-% \textcolor{purple}{Despite its name, \elang
-%   does not model C. As mentioned at the beginning of this section,
-%   \elang is an untyped version of \lang with the annotations on
-%   literals removed. The lack of types make it impossible to capture
-%   the undefinedness of certain operations such as pointer
-%   arithmetic. This restriction is not an issue for establishing
-%   the metatheory covered in the next section, but it does indicate
-%   that we have to be careful if we want to embed \elang programs into C
-%   programs.  As discussed in \cite[2.10, pg 24]{checkedc}, the C
-%   standard can be overly
-%   conservative when it comes to pointer arithmetic. For example,
-%   it should be perfectly safe to increment a pointer out of its allocated
-%   region, as long as the runtime guarantees that
-%   the pointer is never dereferenced. However, a standard C compiler
-%   would treat this type of incrementing operation as undefined, regardless of
-%   whether the resulting pointer is dereferenced or not. Embedding
-%   \elang naively into C would give us this type of undefined programs.
-%   This can be mitigated through casting or rearranging the code during
-%   the embedding process.
-% }
-% \mwh{Don't think all this was necessary. Added clarifying text at the
-%   start at exactly what CoreC is. No need to go on at length about
-%   what it is not.}
 
 \subsection{Metatheory}
 \label{sec:meta}
@@ -438,9 +370,9 @@ the lhs but with type annotations removed:
   \end{split}
 \end{equation*}
 In addition, when $\Gamma;\emptyset\vdash
-\varphi$ and $\varphi$ is well-formed, we write $(\varphi,\heap,e) \gg (\dot \varphi, \dot \heap,
+\varphi$ and $\varphi$ is well-formed, we write $(\varphi,\heap,e) \gg_m (\dot \varphi, \dot \heap,
 \dot e)$ to denote $\varphi \gg \dot \varphi$, $\heap \gg \dot \heap$
-and $\Gamma;\Theta;\emptyset \vdash e \gg \dot e : \tau$ for some $\tau$ respectively. $\Gamma$ is omitted from the notation since the well-formedness of $\varphi$ and its consistency with respect to $\Gamma$ imply that $e$ must be closed under $\varphi$, allowing us to recover $\Gamma$ from $\varphi$.
+and $\Gamma;\Theta;\emptyset \vdash_m e \gg \dot e : \tau$ for some $\tau$ respectively. $\Gamma$ is omitted from the notation since the well-formedness of $\varphi$ and its consistency with respect to $\Gamma$ imply that $e$ must be closed under $\varphi$, allowing us to recover $\Gamma$ from $\varphi$.
 Finally, we use $\xrightarrow{\cdot}^*$ to denote the transitive closure of the
 reduction relation of $\elang$. Unlike the $\lang$, the semantics of
 $\elang$ does not distinguish checked and unchecked regions.
@@ -448,13 +380,17 @@ $\elang$ does not distinguish checked and unchecked regions.
 Fig.~\ref{fig:checkedc-simulation-ref} gives an overview of 
 the simulation theorem.\footnote{We ellide the  possibility of $\dot e_1$ evaluating to $\ebounds$ or $\enull$ in the diagram for readability.} The simulation theorem is specified in a way
 that is similar to the one by~\citet{merigoux2021catala}.
+
 An ordinary simulation property would
 replace the middle and bottom parts of the figure with the
 following: \[(\dot \varphi_0, \dot \heap_0, \dot e_0) 
   \xrightarrow{\cdot}^* (\dot \varphi_1, \dot \heap_1, \dot e_1)\]
 Instead, we relate two erased configurations using the relation $\sim$,
 which only requires that the two configurations will eventually reduce
-to the same state. We formulate our simulation theorem differently
+to the same state.
+
+\ignore{
+ We formulate our simulation theorem differently
 because the standard simulation theorem imposes a very strong
 syntactic restriction to the compilation strategy. Very often, $(\dot
 \varphi_0, \dot \heap_0, \dot e_0)$ reduces to a term that is
@@ -468,14 +404,14 @@ additional rules.
 This slight relaxation on the equivalence relation
 between target configurations allows us to specify compilation more
 naturally without having to worry about syntactic constraints.
-
+}
 
 % The two theorems are translation preservation and simulation. We donate $\xrightarrow{c}$ as the transition semantics of CLight.
 \begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
 For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
-if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg(\dot \varphi_0,\dot \heap_0, \dot e_0)$,
+if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg_c (\dot \varphi_0,\dot \heap_0, \dot e_0)$,
 and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
-\rightarrow_\cmode (\varphi_1, \heap_1, r_1)$, then the following facts hold:
+\rightarrow_c (\varphi_1, \heap_1, r_1)$, then the following facts hold:
 
 \begin{itemize}
 

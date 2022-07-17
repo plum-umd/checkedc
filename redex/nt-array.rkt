@@ -40,7 +40,7 @@
      (array l h vτ)
      (ntarray l h vτ))
 
-  (e ::= (n : τ) x (let x = e in e) (malloc ω) (cast τ e)
+  (e ::= (n : τ) x (let x = e in e) (malloc m ω) (cast τ e)
      (e + e) (& e → f) (* e) (* e = e) (unchecked e)
      ;; NEW:
      (if e e e)
@@ -76,7 +76,7 @@
      ;; NEW:
      (if E e e)
      (strlen E)
-     (malloc Eω)
+     (malloc m Eω)
      (n : Eτ)
      ;;New for functions
      (call n (n : vτ) ... E e ...))
@@ -129,14 +129,14 @@
 
 
   ;; erased serious terms
-  (eS ::= x (malloc ee)
-      (ee + ee) (ee - ee) (* ee) (* ee = ee)
+  (eS ::= x (malloc left_right ee)
+      (ee + ee) (ee - ee) (left_star ee) (right_star ee = ee)
       (x = ee)
       (ee <=? ee)
       (if ee ee ee)
       (let x = ee in ee)
       (strlen ee)
-      (call n ee ...)
+      (call left_right n ee ...)
       ;; exceptions
       (enull) (ebounds))
 
@@ -171,7 +171,7 @@
   (σ ::= ((n : τ) ...))
 
   ;; map from a checked array to the variable that stores its upper bound
-  (ρ ::= ((x_!_0 (x_!_1 x_!_2)) ...))
+  (ρ ::= ((x_!_0 (x_!_1 x_!_2 x_!_3)) ...))
 
   ;; only as a helper
   ;; (boolean ::= #t #f)
@@ -1658,6 +1658,7 @@
    (where τ_2 (⊢nt-incr (ptr m_′ (ntarray le he τ))))
    (⊢ty>>> (⊢extend-Γ (x = none : τ_2) Γ)  σ ρ m e_1 ee_1 τ_1)
    (⊢ty>>> Γ σ ρ m e_2 ee_2 τ_3)
+   (check_mode m m_')
    (where τ_4 (⊢join-type Γ τ_1 τ_3))
    ------------- T-IfNT
    (⊢ty>>> Γ σ ρ m (if (* x) e_1 e_2)
@@ -1679,8 +1680,13 @@
 
   ;; POST rules
   [(where (_ ... (n : τ) _ ...) σ)
-   ------------- T-VConst
-   (⊢ty>>> Γ σ ρ m (n : τ) n τ)]
+   ------------- T-VConstC
+   (⊢ty>>> Γ σ ρ c (n : τ) n τ)]
+
+  ;; POST rules
+  [
+   ------------- T-VConstT
+   (⊢ty>>> Γ σ ρ t (n : τ) n τ)]
 
   ;; NOTE: this rule is only for function elimination
   ;; the well-formdness judgment handles the introduction
@@ -1689,7 +1695,7 @@
    (⊢ty>>> Γ σ ρ m e_2 ee_2 τ_2′′) ...
    (⊢subtype τ_2′′  τ_2′) ...
    ------------- T-VCall
-   (⊢ty>>> Γ σ ρ m (call n_1 e_2 ..._1) (call n_1 ee_2 ...) τ_res)]
+   (⊢ty>>> Γ σ ρ m (call n_1 e_2 ..._1) (call left_right n_1 ee_2 ...) τ_res)]
 
   [(⊢ty>>> Γ σ ρ m e_1 ee_1 τ_1)
    (where (cE ρ_′) (⊢extend-ρ x τ_1 ρ))
@@ -1757,9 +1763,22 @@
    ------------- T-Malloc
    (⊢ty>>> Γ σ ρ m (malloc ω) (malloc (⊢sizeof ω)) (ptr c ω))]
 
-  [(⊢ty>>> Γ σ ρ u e ee τ)
+  [ ....;;      list_sub (freeVars e) x... ->
+      ;;well_typed env Q u e t ->
+      ;;Forall (fun x => Env.MapsTo x t' env -> is_not_c t') x... ->
+      ;;is_not_c t ->
+   (⊢ty>>> Γ σ ρ u e ee τ)
    ------------- T-Unchecked
-   (⊢ty>>> Γ σ ρ m (unchecked e) ee τ)]
+   (⊢ty>>> Γ σ ρ m (unchecked x... e) ee τ)]
+
+  [ ....;;      list_sub (freeVars e) x... ->
+
+      ;; well_typed env Q c e t ->
+      ;;Forall (fun x => Env.MapsTo x t' env -> is_not_c t') x... ->
+      ;;is_not_c t ->
+   (⊢ty>>> Γ σ ρ u e ee τ)
+   ------------- T-Checked
+   (⊢ty>>> Γ σ ρ m (checked x... e) ee τ)]
 
   [(⊢ty>>> Γ σ ρ m e ee τ_′)
    (where #t (⊢dyn-bound-cast-ok? τ_′ τ))
@@ -1777,7 +1796,7 @@
    (where τ (⊢deref-type ω))
    (where #t (⊢mode-ok? m_′ m))
    ------------- T-Deref
-   (⊢ty>>> Γ σ ρ m (* e) (⊢widen-bounds-deref ρ e (ptr m_′ ω)
+   (⊢ty>>> Γ σ ρ m (* e) (⊢widen-bounds-deref ρ e (ptr m_′ ω) ;; get x_mode --> if x_mode is c then determine if left or right star
                                            (* (⊢insert-check #f ρ e ee (ptr m_′ ω)))) τ)]
 
   ;; generalize T-Index?

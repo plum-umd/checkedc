@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  16 JUL 2022 11:59
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  17 JUL 2022 00:20
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -1002,28 +1002,28 @@ File: lstmisc.sty 2019/09/10 1.8c (Carsten Heinz)
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 358.
-LaTeX Font Info:    ... okay on input line 358.
-LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 358.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 364.
+LaTeX Font Info:    ... okay on input line 364.
+LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 364.
 LaTeX Font Info:    Trying to load font information for mTT+cmtt on input line 
-358.
+364.
 
 (/usr/share/texlive/texmf-dist/tex/latex/mdwtools/mTTcmtt.fd
 File: mTTcmtt.fd 1996/05/25 1.1 Handing of the cmtt font
 )
-LaTeX Font Info:    ... okay on input line 358.
+LaTeX Font Info:    ... okay on input line 364.
 
 -- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
@@ -1087,14 +1087,14 @@ ABD: EveryShipout initializing macros
 Package todonotes Warning: The length marginparwidth is less than 2cm and will 
 most likely cause issues with the appearance of inserted todonotes. The issue c
 an be solved by adding a line like \setlength {\marginparwidth }{2cm} prior to 
-loading the todonotes package. on input line 358.
+loading the todonotes package. on input line 364.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count358
 LaTeX Font Info:    Trying to load font information for OT1+phv on input line 4
-09.
+15.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1phv.fd
 File: ot1phv.fd 2001/06/04 scalable font definitions for OT1/phv.
 )
@@ -1311,36 +1311,28 @@ y/m/n/10 g$
  []
 
 [8] [9]) (./compilation.tex [10]
-Underfull \hbox (badness 10000) in paragraph at lines 286--300
-[]\OT1/ptm/m/n/10.03749 For [][][][][][][][][][] and con-di-tion-als [][][][][]
-[][][][][], the
+Underfull \hbox (badness 2460) in paragraph at lines 284--299
+[]\OT1/ptm/b/n/10.03749 Checked and Unchecked Blocks\OT1/ptm/m/n/10.03749 . In 
+the im-ple-
  []
 
 
-Underfull \hbox (badness 5954) in paragraph at lines 286--300
-\OT1/ptm/m/sc/10.03749 CoreChkCBox \OT1/ptm/m/n/10.03749 se-man-tics al-lows th
-e up-per bound
+Underfull \hbox (badness 1558) in paragraph at lines 284--299
+\OT1/ptm/m/n/10.03749 men-ta-tion, $[]$ and $[]$ blocks are com-
  []
 
 
-Underfull \hbox (badness 1708) in paragraph at lines 286--300
-\OT1/ptm/m/n/10.03749 of [][][][][] to be ex-tended. The com-piler ex-plic-itly
- in-serts
- []
-
-
-Underfull \hbox (badness 2245) in paragraph at lines 342--369
-\OT1/ptm/m/n/10.03749 more pre-ci-sion to bounds check-ing at run-time com-
+Underfull \hbox (badness 1728) in paragraph at lines 284--299
+\OT1/ptm/m/n/10.03749 piled as con-text switch-ing func-tions pro-vided by the
  []
 
 [11]
-Underfull \hbox (badness 3281) in paragraph at lines 571--571
-[]\OT1/ptm/m/n/10.03749 Figure 15: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
+Underfull \hbox (badness 3281) in paragraph at lines 507--507
+[]\OT1/ptm/m/n/10.03749 Figure 14: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
 49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
  []
 
-) (./evaluation.tex [12]) (./comparison.tex) (./conclusion.tex [13])
-(./main.bbl
+) (./evaluation.tex) (./comparison.tex [12]) (./conclusion.tex) (./main.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 18--24
 \OT1/ptm/m/n/9.03374 se-cu-rity vul-ner-a-bil-ity.  $https : / / www . zdnet . 
 com / article /
@@ -1353,6 +1345,10 @@ e-[]memory-[]safety-[]issues/$,
  []
 
 
+Package balance Warning: You have called \balance in second column
+(balance)                Columns might not be balanced.
+
+[13]
 Underfull \hbox (badness 3746) in paragraph at lines 88--94
 \OT1/ptm/m/n/9.03374 The Essence of Javascript.  In \OT1/ptm/m/it/9.03374 Pro-c
 eed-ings of the
@@ -1364,16 +1360,15 @@ Underfull \hbox (badness 10000) in paragraph at lines 123--128
  []
 
 
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+
 Underfull \hbox (badness 1546) in paragraph at lines 200--203
 []\OT1/ptm/m/n/9.03374 Mozilla.  Rust Pro-gram-ming Lan-guage.  $https : / / ww
 w .
  []
 
 
-Overfull \vbox (1.60567pt too high) has occurred while \output is active []
-
-
-[14]
 Underfull \hbox (badness 4899) in paragraph at lines 237--242
 \OT1/ptm/m/n/9.03374 Mc-Peak, and West-ley Weimer.  CCured: Type-Safe
  []
@@ -1391,15 +1386,22 @@ Underfull \hbox (badness 1735) in paragraph at lines 290--293
 
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
-)
-Overfull \vbox (1.63991pt too high) has occurred while \output is active []
+
+Overfull \vbox (0.99661pt too high) has occurred while \output is active []
+
+
+Overfull \vbox (0.60942pt too high) has occurred while \output is active []
+
+
+[14])
+Overfull \vbox (1.57672pt too high) has occurred while \output is active []
 
 
 [15] (./appendix.tex
 ** WARNING: Ignoring useless \section in Appendix (line 1).
 
 Underfull \hbox (badness 3240) in paragraph at lines 130--133
-[]\OT1/ptm/m/n/10.03749 Fig. 16[] shows the re-main-ing se-man-tic rules for
+[]\OT1/ptm/m/n/10.03749 Fig. 15[] shows the re-main-ing se-man-tic rules for
  []
 
 
@@ -1453,13 +1455,13 @@ LaTeX Warning: There were undefined references.
 
  ) 
 Here is how much of TeX's memory you used:
- 27520 strings out of 481239
- 539598 string characters out of 5920377
- 1093225 words of memory out of 5000000
- 42203 multiletter control sequences out of 15000+600000
+ 27527 strings out of 481239
+ 539593 string characters out of 5920377
+ 1093223 words of memory out of 5000000
+ 42210 multiletter control sequences out of 15000+600000
  599955 words of font info for 158 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
- 68i,24n,100p,1386b,1446s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 68i,24n,100p,1386b,1438s stack positions out of 5000i,500n,10000p,200000b,80000s
 {/usr/share/texlive/texmf-dist/fonts/enc/dvips/base/8r.enc}</usr/share/texliv
 e/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi10.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/public/amsfonts/cm/cmmi5.pfb></usr/share/texlive/texmf-dist/
@@ -1489,7 +1491,7 @@ fonts/type1/urw/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw
 /times/utmbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.
 pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/shar
 e/texlive/texmf-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (23 pages, 454814 bytes).
+Output written on main.pdf (23 pages, 453105 bytes).
 PDF statistics:
  231 PDF objects out of 1000 (max. 8388607)
  157 compressed objects within 2 object streams
