@@ -1,5 +1,5 @@
 # checkedc
-This is the Checked C formalization files for new RLBox tainted type development.
+This is the Checked C formalization files for new RLBox tainted type development. 
 
 The Checked C Coq Formalization is in the coq directory. Readme file there tells you how to run the coq model.
 
