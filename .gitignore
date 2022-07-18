@@ -1,1 +1,17 @@
 tmp/
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.cut
+main*.pdf
+*.gz
+*.DS_Store
+_minted-*
+*.html
+*.xlsx
+*.fls
+*.fdb_latexmk
+*.xcp
+*.fdb_latexmk
