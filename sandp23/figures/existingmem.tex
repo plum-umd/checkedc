@@ -1,0 +1,45 @@
+\begin{figure}
+\begin{center}
+\begin{tikzpicture}[scale=0.75]
+%\node[text width=3cm] at (1.5,-0.5) 
+%    {some text spanning three};
+%\draw[step=5cm,gray,very thin] (0,0) grid (5,5);
+\fill[red!50!white] (2.5,2.5) rectangle (5,5);
+\fill[red!20!white] (0,2.5) rectangle (2.5,5);
+\fill[red!20!white] (2.5,0) rectangle (5,2.5);
+\fill[green!40!white] (0,0) rectangle (2.5,2.5);
+
+\Text[x=3.8cm,y=4.7cm,fontsize=\tiny]{Managed}
+\Text[x=3.8cm,y=4.5cm,fontsize=\tiny]{Languages.}
+\Text[x=3.8cm,y=4.3cm,fontsize=\tiny]{(Java, Python,}
+\Text[x=3.8cm,y=4.1cm,fontsize=\tiny]{C\#, etc)}
+
+\Text[x=1.2cm,y=4.7cm,fontsize=\tiny]{High Performant}
+\Text[x=1.2cm,y=4.5cm,fontsize=\tiny]{Safe Languages.}
+\Text[x=1.2cm,y=4.3cm,fontsize=\tiny]{(Rust, Go, etc)}
+
+\Text[x=1.9cm,y=2.3cm,fontsize=\tiny]{Checked C}
+
+
+\Text[x=3.8cm,y=2.1cm,fontsize=\tiny]{Retrofitting}
+\Text[x=3.8cm,y=1.8cm,fontsize=\tiny]{Techniques.}
+\Text[x=3.8cm,y=1.5cm,fontsize=\tiny]{(ASAN, CCured,}
+\Text[x=3.8cm,y=1.3cm,fontsize=\tiny]{etc)}
+
+\Text[x=0.9cm,y=0.6cm,fontsize=\tiny]{\bf \faFlagCheckered}
+
+\Text[x=2.0cm,y=1.4cm,fontsize=\tiny]{\bf \footnotesize iC3C}
+
+\draw [{Implies}-,double,line width=1pt] (1.0,0.8) -- (1.9,2.1);
+
+
+\draw[-Stealth,thick] (0,0) -- (5.1,0) node[anchor=north west] {\bf \tiny high};
+\Text[x=0cm,y=-0.2cm,fontsize=\tiny]{\bf least}
+\Text[x=2.6cm,y=-0.2cm,fontsize=\footnotesize]{Performance Overhead}
+\Text[x=-0.2,y=2.6,rotation=90,fontsize=\footnotesize]{Developer effort}
+\draw[-Stealth,thick] (0,0) -- (0,5.1) node[anchor=south east] {\bf \tiny high};
+\end{tikzpicture}
+\caption{Existing approaches to handle memory corruptions vulnerabilities in C programs along with Checked C.}
+\label{fig:memprotections}
+\end{center}
+\end{figure}
