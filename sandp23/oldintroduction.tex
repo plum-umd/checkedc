@@ -1,42 +1,51 @@
 \section{Introduction}
 Vulnerabilities due to memory corruption, especially spatial memory corruptions, are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe} despite a large body of work that tries
 to prevent them~\cite{song2019sanitizing}.
-Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
-Although high-performant safe system languages such as Rust~\cite{rustlang} and Go exist, these a too different to constitute a practical target~\cite{zeng2019identifying}, and rewriting in these languages requires considerable effort.
-Existing automated conversion tools~\cite{c2rust,c2rusttalk, emre2021c2rust} are able to take only small steps (i.e., to unsafe, non-idiomatic Rust) and still~\emph{require considerable work from developers}.
+Vulnerabilities due to memory corruption, especially spatial memory corruptions, are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe} despite a large body of work that tries
+to prevent them~\cite{song2019sanitizing}.
+One way to handle this is to convert these programs into safe languages such as Java. However, it requires considerable development effort. Furthermore, the performance overhead prohibits them from being used in performance-critical settings such as Operating Systems.
+
+With the increased support for high-performant safe system languages such as Rust and Go, we can have tools that convert C to a memory-safe language, e.g., Rust, a promising memory-safe systems
+language~\cite{rustlang}. Unfortunately, Rust is too different from C to constitute a practical target~\cite{zeng2019identifying}, at least for now: the (best of breed) \texttt{c2rust} tool~\cite{c2rust,c2rusttalk} transliterates C to \emph{unsafe, non-idiomatic} Rust, and recent
+work~\cite{emre2021c2rust} is able to take only small steps to close the safety gap and still requires considerable work from developers.
+
 There are other retrofitting techniques such as CCured~\cite{necula2005ccured},
 Softbound~\cite{nagarakatte2009softbound}, Low Fat
 pointers~\cite{duck2016heap}, and Address Sanitizer
 (ASAN)~\cite{serebryany2012addresssanitizer} aim to enforce spatial safety
 automatically~\emph{without any developer effort}, by analyzing a C program and compiling it to include
-run-time safety checks. Unfortunately, the resulting~\emph{run-time overhead is too high
-for deployment (between 60\%-200\%)}, especially in low-powered IoT devices where the usage of C-based system software (e.g., FreeRTOS) is still rampant.
+run-time safety checks. Unfortunately, the resulting run-time overhead is too high
+for deployment (between 60\%-200\%), especially in low-powered IoT devices where the usage of C-based system software (e.g., FreeRTOS) is still rampant.
+~\fig{fig:memprotections} shows the summary of these existing approaches.
 
-\noindent
-\textbf{Checked C.} Tarditi et al. developed~\emph{Checked C}, a safe dialect of C that prevents spatial memory issues (temporal safety is underway~\cite{checkedc:temporal}) with no overhead.
-Checked C extends C with \emph{checked pointer
+\input{figures/existingmem}
+
+\emph{Checked C}~\cite{tarditi2018checked} as a
+practical target to which to convert legacy/active C code. 
+Checked C
+extends C with \emph{checked pointer
   types} which are restricted by the compiler to spatially safe uses (temporal safety is underway~\cite{checkedc:temporal}).
 Such pointers have one of three possible types, \ptrT{T}, \arrT{T},
 or~\ntarrT{T} (\ptr, \arr, and \ntarr{} for short), representing a
 pointer to a single element, array of elements, or null-terminated
 array of elements of type $T$, respectively. The latter two have an
 associated \emph{bounds annotation}; e.g., a declaration \arrT{int}
-\code{p} : \code{count(n)} says that \code{p} is a pointer to an \code{int} array whose size is \code{n}.
-The compiler uses these bounds annotations to add dynamic checks prior to checked pointer accesses, to prevent spatial safety violations.
+\code{p} : \code{count(n)} says that \code{p} is a pointer to an \code{int} array
+whose size is \code{n}.
+%
+Checked C's Clang/LLVM-based compiler represents checked
+pointers as system-level memory words, i.e., without
+``fattening'' metadata, ensuring backward compatibility.
+The compiler uses these bounds annotations to add dynamic checks prior to
+checked pointer accesses, to prevent spatial safety violations.
 These run-time checks can often be proved redundant and removed by LLVM, yielding good performance.
-Specifically, Tarditi et al.~\cite{tarditi2018checked} reported average
+%, and leverages LLVM to optimize away run-time
+%checks, yielding good performance.
+%
+Tarditi et al.~\cite{tarditi2018checked} reported average
 run-time overheads of 8.6\% on a small benchmark suite, and
 \cite{duanrefactoring} found essentially no overhead when running
 Checked C-converted portions of the FreeBSD kernel.
-Furthermore, Checked C is backward compatible as the compiler  represents checked pointers as system-level memory words, i.e., without
-``fattening'' metadata, ensuring backward compatibility. 
-The backward compatibility also enables incremental or partial conversion where Checked annotations can be provided to a few pointers.
-Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
-~\fig{fig:memprotections} shows the summary of these existing approaches along with Checked C.
-We argue that~\emph{converting to Checked C provides a reasonable and practical approach to adding safety to existing system software written in C}.
-
-\input{figures/existingmem}
-
 
 However, converting existing C programs to Checked C requires considerable effort~\cite{duanrefactoring}. 
 Recently, Machiry et al. developed 3C~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
