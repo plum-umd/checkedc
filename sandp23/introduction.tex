@@ -26,7 +26,7 @@ The compiler uses these bounds annotations to add dynamic checks prior to checke
 These run-time checks can often be proved redundant and removed by LLVM, yielding good performance.
 Specifically, Tarditi et al.~\cite{tarditi2018checked} reported average
 run-time overheads of 8.6\% on a small benchmark suite, and
-\cite{duanrefactoring} found essentially no overhead when running
+Duan et al.~\cite{duanrefactoring} found essentially~\emph{no overhead} when running
 Checked C-converted portions of the FreeBSD kernel.
 Furthermore, Checked C is backward compatible as the compiler  represents checked pointers as system-level memory words, i.e., without
 ``fattening'' metadata, ensuring backward compatibility. 
@@ -38,6 +38,42 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 \input{figures/existingmem}
 
 
+\noindent
+\textbf{Converting C to Checked C.} The safety guarantees of Checked C come with certain restrictions. For instance, as shown below, Checked C programs cannot use address-taken variables in a bounds expression as the bounds relations may not hold because of possible modifications through pointers.
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize}{c}
+...
+array_ptr<int> p : count (n) = NULL;
+|\textcolor{red}{\faTimes}|..,&n,.
+\end{minted}
+Consequently, converting existing C programs to Checked C might require refactoring, e.g., modifying the above program to not use~\inlinecode{&n} expression, which might require considerable effort~\cite{duanrefactoring} depending on the program's complexity. 
+Recently, Machiry et al. developed~\threec~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
+However, as described in \threec, complete automated conversion is infeasible and requires the developer to convert some code regions manually.
+Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
+But, the unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+Although the blameless proof exists~\cite{ruef2019achieving}, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
+Consider the following example:
+\begin{minted}[mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
+// Checked code
+int func(array_ptr<char> p : count(5)) {
+|\textcolor{red}{\faChainBroken}|..p[4]..
+}
+
+// unchecked code
+...
+str = "he";
+...
+|\textcolor{red}{\faBug}|assume_bounds_cast<char>(str, 5); 
+...
+char ptr[16];
+...
+len <- derived from user input
+...
+|\textcolor{red}{\faBug}| memcpy(ptr, buff, len);
+\end{minted}
+Here, the checked function~\inlinecode{func} expected a pointer to a buffer of five elements, but unchecked code violated it and invoked the function with a buffer of 2 elements.
+This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the Checked region, but of course, the blame or the root cause is in the unchecked region (\textcolor{red}{\faBug}).
+Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (line ...) can take down the complete program despite having checked regions.
+We need an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions.
 However, converting existing C programs to Checked C requires considerable effort~\cite{duanrefactoring}. 
 Recently, Machiry et al. developed 3C~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
 However, as described in 3C, complete automated conversion is infeasible and consequently requires the developer to convert some code regions manually.
