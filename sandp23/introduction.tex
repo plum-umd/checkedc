@@ -40,7 +40,7 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 
 \noindent
 \textbf{Converting C to Checked C.} The safety guarantees of Checked C come with certain restrictions. For instance, as shown below, Checked C programs cannot use address-taken variables in a bounds expression as the bounds relations may not hold because of possible modifications through pointers.
-\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize}{c}
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 ...
 array_ptr<int> p : count (n) = NULL;
 |\textcolor{red}{\faTimes}|..,&n,.
