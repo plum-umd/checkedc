@@ -52,6 +52,126 @@ Admitted.
 
 Hint Resolve reduces_congruence : Preservation.
 
+Lemma eval_arg_lit: forall S e t e', eval_arg S e t e' -> exists n, e' = ELit n t.
+Proof.
+ intros. inv H. exists n; easy. exists n; easy.
+Qed.
+
+
+Lemma eval_arg_same: forall S e t t' v v', eval_arg S e t (ELit v t) -> eval_arg S e t' (ELit v' t') -> v = v'.
+Proof.
+ intros. inv H. inv H0. easy.
+ inv H0. apply Stack.mapsto_always_same with (v1 := (v', t'1)) in H4; try easy.
+ inv H4. easy.
+Qed.
+
+Lemma eval_el_vl_1: forall S es tvl xl e t ea ta, 
+   eval_el S es tvl xl e t ea ta -> 
+   (exists vl, Forall2 (fun e v => forall t v', eval_arg S e t (ELit v' t) -> v = v') es vl).
+Proof.
+  intros.
+  induction H;simpl in *.
+  exists []. constructor.
+  apply eval_arg_lit in H0 as X1.
+  destruct X1; subst.
+  destruct IHeval_el. exists (x0::x1).
+  constructor;try easy.
+  intros. apply eval_arg_same with (t := t) (v := x0) in H3; try easy.
+  destruct IHeval_el. exists (v::x0).
+  constructor;try easy.
+  intros. apply eval_arg_same with (t := TNat) (v := v) in H2; try easy.
+Qed.
+
+Lemma eval_el_vl: forall S es vl tvl xl e t ea ta, 
+   Forall2 (fun e v => forall t v', eval_arg S e t (ELit v' t) -> v = v') es vl ->
+   eval_el S es tvl xl e t ea ta -> eval_vl vl tvl xl e t ea ta.
+Proof.
+  intros.
+  generalize dependent tvl.
+  generalize dependent xl.
+  generalize dependent e.
+  generalize dependent t.
+  generalize dependent ea.
+  generalize dependent ta.
+  induction H; intros;simpl in *.
+  inv H0. constructor.
+  inv H1.
+  apply  eval_arg_lit in H5 as X1. destruct X1; subst.
+  apply H  in H5 as X2. subst.
+  apply eval_vl_many_1; try easy.
+  apply IHForall2; try easy.
+  apply H  in H4 as X2. subst.
+  apply eval_vl_many_2; try easy.
+  apply IHForall2; try easy.
+Qed.
+
+Lemma split_zero {A B:Type}: forall (l:list (A*B)), (List.split l).2 = [] -> l = [].
+Proof.
+  induction l;intros;simpl in *; try easy.
+  destruct a. 
+  destruct (split l) eqn:eq1. inv H.
+Qed.
+
+(*
+Lemma well_typed_arg_ex: forall D U Q H env m e t x t',
+                  @well_typed_arg D U Q H env m e t
+           -> @well_typed_arg D U Q H (Env.add x t' env) m e t.
+Proof.
+  intros. inv H0; simpl in *.
+  constructor; try easy.
+  constructor.
+Qed.
+*)
+
+Lemma well_typed_args_ex: forall D U Q H env m es vl xl t ta x t',
+                  @well_typed_args D U Q H env m es vl xl t ta
+           -> @well_typed_args D U Q H (Env.add x t' env) m es vl xl t ta.
+Proof.
+  intros. induction H0; simpl in *.
+  constructor.
+  constructor; try easy.
+Admitted.
+
+Lemma well_typed_eval_vs: forall D F Q R env S m es xl ts tvl t t' ta ta' e ea,
+    (forall x, In x xl -> ~ Theta.In x Q) ->
+    subtype D Q t' t ->
+    Forall2 (subtype D Q) ts ((split tvl).2) ->
+    @well_typed_args D F Q R env m es ts xl t ta -> eval_el S es tvl xl e t' ea ta' ->
+    well_typed D F R env Q Checked ea ta'
+    -> eq_subtype D Q ta' ta.
+Proof.
+ intros.
+  generalize dependent t.
+  generalize dependent ts.
+  generalize dependent env.
+  generalize dependent Q.
+ induction H3;intros;simpl in *.
+ inv H2.
+ unfold eq_subtype.
+ exists t. split. apply type_eq_refl. easy.
+ inv H6. inv H2.
+ destruct (split tvl) eqn:eq1. inv H8.
+ inv H4; try easy.
+ inv H0; easy.
+ inv H0. inv H16; try easy.
+ inv H16; try easy.
+ apply IHeval_el with (Q:=Q) (env := (Env.add x t2 env)) (ts := vl) (t := t0); try easy.
+ apply well_typed_args_ex. easy.
+ inv H2.
+ destruct (split tvl) eqn:eq1. inv H8.
+ inv H3. admit.
+ apply subtype_nat_1 in H10. subst. easy.
+ inv H5.
+ destruct (split tvl) eqn:eq1. inv H1.
+ apply subtype_nat in H9; subst ; easy.
+ inv H1.
+ destruct (split tvl) eqn:eq1. inv H7.
+ inv H4.
+ 2: { assert (literal (ELit v TNat)). constructor. easy. }
+ 2: { inv H14.  }
+Admitted.
+
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
@@ -59,15 +179,15 @@ Section Preservation.
   Hypothesis HDwf : structdef_wf D.
   Lemma preservation : forall s R env Q e t s' R' e',
       rheap_wf R ->
-      rheap_wt_all D F Q R ->
-      expr_wf D e ->
+      rheap_wt_all D F R ->
+      expr_wf D Checked e ->
       stack_wt D Checked s ->
       env_wt D Checked env ->
       theta_wt Q env s ->
       stack_theta_wf s Q ->
       sub_domain env s ->
       stack_wf D Q env s ->
-      stack_rheap_consistent D F Q R s ->
+      stack_rheap_consistent D F R s ->
       fun_wf D F R ->
       well_typed D F R env Q Checked e t ->
       reduce D F
@@ -78,10 +198,10 @@ Section Preservation.
         /\ stack_wf D Q' env' s'
         /\ theta_wt Q' env' s'
         /\ stack_theta_wf s' Q' 
-        /\ stack_rheap_consistent D F Q' R s'
-        /\ rheap_consistent D F Q' R' R
+        /\ stack_rheap_consistent D F R s'
+        /\ rheap_consistent D F R' R
         /\ well_typed D F R' env' Q' Checked e' t'
-        /\ eq_subtype_core D Q t' t.
+        /\ eq_subtype D Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt Hsqt HsubDom Hswf HsHwf Hwf Hwt.
@@ -89,7 +209,8 @@ Section Preservation.
     remember Checked as m.
     induction Hwt as
       [
-        env Q n t HSim HTyLit                                      | (* Literals *)
+        env Q n t Hmode HQ HTyLit                                  | (* Literals Checked *)
+        env Q n t Hmode HQ HTyLit                                  | (* Literals Tainted *)
         env Q n t                                                  | (* Literals-Unchecked *)
         env Q m x t Hx                                             | (* Variables *)
         env Q m m' es x xl ts t ta HMode HTyf IH1 HArgs            | (* Call *)
@@ -127,34 +248,54 @@ Section Preservation.
       ]; intros e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - inv Hreduces; solve_ctxt.
+    (* T-LitTainted *)
+    - inv Hreduces; solve_ctxt.
     (* T-LitUnchecked *)
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
-    - inv Hreduces; solve_ctxt.
+    -  inv Hreduces; solve_ctxt.
       inv H5. exists env, Q, t0.
       destruct R' as [Hchk Htnt]; subst; intuition... cbn.
-      constructor.
-      unfold stack_wt in *.
-      apply Hswt in H4. intuition...
-      eapply HsHwf in H4. apply H4. easy.
+      apply Hswt in H4 as eq1. destruct eq1 as [X1 [X2 X3]].
+      inv X1.
+      constructor. constructor. constructor.
+      constructor. destruct m;try easy.
+      constructor. constructor. easy.
+      intuition...
+      apply TyLitTainted. intros R. inv R. easy.
+      apply TyLitTainted. intros R. inv R. easy.
       apply Hswf in Hx. destruct Hx as [v1 [t1 [HSub1 HM]]]. 
       apply Stack.mapsto_always_same with (v1 := (v1, t1)) in H4; try easy.
       inv H4. easy.
     (*T-Call*)
+      
     - destruct HMode. assert (Checked = Checked) by easy.
       apply H in H1.
       inv Hreduces. destruct E; try congruence; try solve [solve_step].
       simpl in *; subst.
       inv  H5. inv HTyf.
-      inv H14; eauto; try easy.
+      inv H15; eauto; try easy.
       destruct Hwf. rewrite H2 in H6. easy. rewrite H6 in H7.
       inv H7.
-      apply subtype_fun in H11 as Y1. destruct Y1 as [yl [tb [tlb Y1]]];subst.
+      apply subtype_fun in H10 as Y1; try easy. destruct Y1 as [yl [tb [tlb Y1]]];subst.
       specialize (get_fun_type_fun tvl0 ta0 Checked) as X1.
-      destruct X1 as [xl0 X1]. rewrite X1 in H11. rewrite X1 in Y1.
+      destruct X1 as [xl0 X1]. rewrite X1 in H10. rewrite X1 in Y1.
       inv Y1.
-      apply subtype_fun_1 in H11 as X2.
+      apply subtype_fun_1 in H10 as X2.
       destruct X2 as [X2 [X3 X4]]; subst.
+      exists env,Q,ta'.
+      split; try easy. split; try easy.
+      split; try easy. split; try easy.
+      split; try easy. 
+      split. apply rheap_consistent_refl.
+      apply eval_el_vl_1 in H12 as X5.
+      destruct X5 as [vl X5].
+      apply eval_el_vl with (tvl := tvl0) (e := e0) 
+        (t := tb) (ea:=e'0) (ta:=ta') in X5 as X6; try easy.
+      destruct Hwf as [Y1 Y2].
+      destruct (Y2 env Q x0 tvl0 tb ta' 
+        e0 vl e'0 Checked H6 X6) as [Y3 [Y4 [Y5 [Y6 [Y7 [Y8 Y9]]]]]].
+      split; try easy.
   Abort.
 
 

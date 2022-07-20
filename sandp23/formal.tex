@@ -723,22 +723,22 @@ the supplemental report~\cite{checkedc-tech-report}.
 {\small
   \begin{mathpar}
    \inferrule[T-ConstU]
-       { }
-       {\Gamma;\Theta\vdash_c \evalue{u}{\tau} : \tau}
+       { \neg \cmode(\tau)}
+       {\Gamma;\Theta\vdash_u \evalue{n}{\tau} : \tau}
 
    \inferrule[T-ConstC]
        {\Theta;\heap;\emptyset \vdash_c n : \tau}
        {\Gamma;\Theta\vdash_c \evalue{n}{\tau} : \tau}
 
     \inferrule[T-Def]
-              {m' \leq m \\\\\Gamma;\Theta \vdash_m e : \tptr{\tau}{m'}}
+              {\xi \leq m \\\\\Gamma;\Theta \vdash_m e : \tptr{\tau}{\xi}}
               {\Gamma;\Theta \vdash_m \estar{e} : \tau}
 
     \inferrule[T-AssignArr]
-              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\\\
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{\xi}\\\\
                 \Gamma; \Theta \vdash_m e_2 : \tau' \\\\
                 \tau'\sqsubseteq_{\Theta} \tau\\
-                m' \leq m}
+                \xi \leq m}
               {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}              
 
      \inferrule[T-CastPtr]
@@ -762,17 +762,16 @@ the supplemental report~\cite{checkedc-tech-report}.
 
 
    \inferrule[T-Ret]
-    {m;\emptyset;\Gamma;\emptyset\vdash \mu : \tau' \\\\
-          \Gamma[x\mapsto \tau'];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
+    { \Gamma[x\mapsto \tau'];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
     {\Gamma;\Theta \vdash_m \eret{x}{\evalue{n}{\tau'}}{e} : \tau}
 
     \inferrule[T-Checked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
+              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
               {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
 
     \inferrule[T-Unchecked]
               {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\\
-                  \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
+                  \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
               {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
 
 \inferrule[T-Fun]

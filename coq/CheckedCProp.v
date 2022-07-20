@@ -33,13 +33,13 @@ Section HeapProp.
 
   Definition heap_consistent_checked (H' : heap) (H : heap) : Prop :=
     forall n t,
-      well_typed_lit_checked D F Q H empty_scope n t->
-      well_typed_lit_checked D F Q H' empty_scope n t.
+      well_typed_lit_checked D F H empty_scope n t->
+      well_typed_lit_checked D F H' empty_scope n t.
 
 
   Definition heap_well_typed_checked (H:heap)
     (n:Z) (t:type) :=
-    simple_type t -> well_typed_lit_checked D F Q H empty_scope n t.
+    simple_type t -> well_typed_lit_checked D F H empty_scope n t.
 
   Inductive heap_wt_arg (H:heap)
     : expression -> Prop :=
@@ -79,7 +79,7 @@ Section HeapProp.
     forall x n t,
       Heap.MapsTo x (n,t) H ->
       word_type t /\ type_wf D m t /\ simple_type t
-      /\ well_typed_lit_checked D F Q H empty_scope n t.
+      /\ well_typed_lit_checked D F H empty_scope n t.
 
   Definition heap_wt_tainted (H : heap) :=
     forall x n t,
@@ -107,14 +107,14 @@ Section RealHeapProp.
   Definition stack_rheap_consistent (R : real_heap) S :=
     forall Hchk Htnt x n t,
       R = (Hchk, Htnt) ->
-      Stack.MapsTo x (n,t) S -> well_typed_lit_checked D F Q Hchk empty_scope n t.
+      Stack.MapsTo x (n,t) S -> well_typed_lit_checked D F Hchk empty_scope n t.
 
 
   (* FIXME: hold the definition for now *)
   Definition rheap_consistent (R' : real_heap) (R : real_heap) : Prop :=
     forall Hchk' Htnt' Hchk Htnt,
       R' = (Hchk', Htnt') -> R = (Hchk, Htnt) -> 
-      heap_consistent_checked D F Q Hchk' Hchk.
+      heap_consistent_checked D F Hchk' Hchk.
 
   Lemma rheap_consistent_refl : forall R, rheap_consistent R R.
   Proof.
@@ -124,7 +124,7 @@ Section RealHeapProp.
   
   Definition rheap_wt_all (R : real_heap) := forall Hchk Htnt,
     R = (Hchk, Htnt) ->
-    heap_wt_all D F Q Checked Hchk /\ heap_wt_tainted D Tainted Htnt.
+    heap_wt_all D F Checked Hchk /\ heap_wt_tainted D Tainted Htnt.
 
 End RealHeapProp.
 
@@ -141,7 +141,7 @@ Section StackProp.
 
   Definition stack_wf env s := forall x t,
       Env.MapsTo x t env -> exists (v:Z) t',
-        eq_subtype_core D Q t' t 
+        eq_subtype D Q t' t 
         /\ Stack.MapsTo x (v, t') s.
 
   Lemma stack_wf_sub_domain : forall env s, stack_wf env s -> sub_domain env s.
