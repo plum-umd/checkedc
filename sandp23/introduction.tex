@@ -81,43 +81,62 @@ The performance overhead of these approaches is dominated by marshaling costs an
 The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
 But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
 
-In this work, we propose~\systemname, an isolation mechanism that enables unchecked regions or, in general, any arbitrary set of functions to be executed in an isolated address space (\ucregion).
-So that checked regions can still enjoy true spatial memory safety even in the presence of unchecked or unsafe regions.
-\systemname extends Checked c using~\textbf{tainted} (\taintt) types, representing the code and data that belong to the~\ucregion.
-
-\noindent
-\textbf{Automated Partitioning.} A pointer (checked or unchecked) can be marked as tainted; similarly, a function can be marked as tainted.
-Along with enforcing spatial safety constraints of checked tainted pointers, the~\systemname compiler will bundle all the tainted types (functions and pointers) so that they remain in an isolated sandbox (\ucregion), and non-tainted types will remain in the process address space (\cregion).
-
-\noindent
-\textbf{Memory Access Restrictions.} The functions in the~\ucregion can only access tainted pointers, i.e., memory within the corresponding sandbox region.
-However, the functions in~\cregion have no-such restrictions and can access both c- and uc-region's memory.
-Similarly, the functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
-
-\noindent
-\textbf{Marshaling free communication.} As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
-We avoid marshaling as all tainted buffers (i.e., regions pointed by tainted pointers) are allocated in~\ucregion and thus can be accessed in both c- and uc-region.
-
-\noindent
-\textbf{Additional checks.} Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
-However, our compiler avoids these attacks by ensuring, either statically or through dynamic checks, that tainted pointers in~\cregion can only point to~\ucregion address space, and our type system enforces that tainted pointers cannot be assigned to non-tainted pointers.
-
-\iffalse
-Recently, Narayan et al. proposed RLBox, which enables sandboxing libraries by making data- and control-flow at the sandbox interface explicit, using types.
-Specifically, RLBox defines a tainted type (\code{tainted<...>}), which is a C++ template class and can be used to have any type tainted (e.g.,~\code{tainted<int>},~\code{tainted<float*>}, etc).
-The tainted types represent values or pointers to buffers that can be accessed from a sandbox.
-The program or unsandboxed code can use only tainted type variables to communicate (i.e., parameters and return values) with sandboxed functions.
-Although RLBox provides a practical technique for sandboxing libraries, it has the following drawbacks:
+In this work, we propose a type-directed code-centric program partitioning approach.
+Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
+The tainted types long with Checked C allow annotating pointer along two dimensions, i.e., (i) taintedness: a pointer can be either tainted or not (untainted), and (ii) checkedness: it can be either checked or not.
+The checked types follow the standard Checked C typing rules. However, our type-system disallows all interactions between taint and untainted types.
+The developer starts by marking desired (unchecked or risky) functions and pointers used in these functions as tainted.
+Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
 \begin{itemize}
-\item\textbf{Marshalling Cost.} Any non-scalar value (e.g., a pointer to a struct) that need to be passed to a sandboxed function should be first copied into a tainted buffer (\emph{marshalling}). Then the corresponding tainted value (i.e., tainted pointer) should be passed to the sandboxed function.
-This can lead to considerable overhead for large objects.
-\item\textbf{Developer Written Sanitization.} The unsandboxed code can access tainted type variables only through certain special (i.e., sanitization) routines.
-This forces developers to sanitize every value that comes from sandboxed library functions.
-However, the correctness of the sanitization is entrusted to the developer.
-Consequently, any mistake in sanitization methods can still lead to vulnerabilities.
-\item\textbf{Library Level Sandboxing.} The unit of sandboxing in RLBox is the whole library. However, we want to sandbox a set of functions in a program.
+\item~\ucregion (low privilege tainted region): This partition contains tainted types (i.e., functions and pointers) and can only access tainted pointers.
+\item~\cregion (high privilege untainted region): This partition contains the remaining (untainted) code and data and has complete access to~\cregion{}.
+The functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
 \end{itemize}
-\fi
+Finally, during program execution, the~\ucregion partition will be executed in an existing sandboxed environment (e.g., WASM sandbox), and our compiler will add the necessary instrumentation to facilitate the communication between code in~\cregion{} and~\ucregion{}.
+
+The combination of tainted types and privileged partitions enables us to enforce isolation and provide memory safety without marshaling costs.
+As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
+We avoid marshaling by allocating all tainted pointers (i.e., tainted buffers) in~\ucregion and thus can be accessed in both partitions.
+Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
+Our compiler avoids these attacks by ensuring, either statically or through dynamic checks, that tainted pointers can only point to~\ucregion address space.
+
+%In this work, we propose~\systemname, an isolation mechanism that enables unchecked regions or, in general, any arbitrary set of functions to be executed in an isolated address space (\ucregion).
+%So that checked regions can still enjoy true spatial memory safety even in the presence of unchecked or unsafe regions.
+%\systemname extends Checked c using~\textbf{tainted} (\taintt) types, representing the code and data that belong to the~\ucregion.
+%
+%\noindent
+%\textbf{Automated Partitioning.} A pointer (checked or unchecked) can be marked as tainted; similarly, a function can be marked as tainted.
+%Along with enforcing spatial safety constraints of checked tainted pointers, the~\systemname compiler will bundle all the tainted types (functions and pointers) so that they remain in an isolated sandbox (\ucregion), and non-tainted types will remain in the process address space (\cregion).
+%
+%\noindent
+%\textbf{Memory Access Restrictions.} The functions in the~\ucregion can only access tainted pointers, i.e., memory within the corresponding sandbox region.
+%However, the functions in~\cregion have no-such restrictions and can access both c- and uc-region's memory.
+%Similarly, the functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
+%
+%\noindent
+%\textbf{Marshaling free communication.} As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
+%We avoid marshaling as all tainted buffers (i.e., regions pointed by tainted pointers) are allocated in~\ucregion and thus can be accessed in both c- and uc-region.
+%
+%\noindent
+%\textbf{Additional checks.} Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
+%However, our compiler avoids these attacks by ensuring, either statically or through dynamic checks, that tainted pointers in~\cregion can only point to~\ucregion address space, and our type system enforces that tainted pointers cannot be assigned to non-tainted pointers.
+%
+%%\iffalse
+%Recently, Narayan et al. proposed RLBox, which enables sandboxing libraries by making data- and control-flow at the sandbox interface explicit, using types.
+%Specifically, RLBox defines a tainted type (\code{tainted<...>}), which is a C++ template class and can be used to have any type tainted (e.g.,~\code{tainted<int>},~\code{tainted<float*>}, etc).
+%The tainted types represent values or pointers to buffers that can be accessed from a sandbox.
+%The program or unsandboxed code can use only tainted type variables to communicate (i.e., parameters and return values) with sandboxed functions.
+%Although RLBox provides a practical technique for sandboxing libraries, it has the following drawbacks:
+%\begin{itemize}
+%\item\textbf{Marshalling Cost.} Any non-scalar value (e.g., a pointer to a struct) that need to be passed to a sandboxed function should be first copied into a tainted buffer (\emph{marshalling}). Then the corresponding tainted value (i.e., tainted pointer) should be passed to the sandboxed function.
+%This can lead to considerable overhead for large objects.
+%\item\textbf{Developer Written Sanitization.} The unsandboxed code can access tainted type variables only through certain special (i.e., sanitization) routines.
+%This forces developers to sanitize every value that comes from sandboxed library functions.
+%However, the correctness of the sanitization is entrusted to the developer.
+%Consequently, any mistake in sanitization methods can still lead to vulnerabilities.
+%\item\textbf{Library Level Sandboxing.} The unit of sandboxing in RLBox is the whole library. However, we want to sandbox a set of functions in a program.
+%\end{itemize}
+%\fi
 
 % How to highlighgt code in minted
 % highlightlines={1-3}, highlightcolor=red
