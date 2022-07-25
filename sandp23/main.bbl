@@ -5,6 +5,12 @@
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
 
+\bibitem[Bittau et~al.(2008)Bittau, Marchenko, Handley, and
+  Karp]{bittau2008wedge}
+Andrea Bittau, Petr Marchenko, Mark Handley, and Brad Karp.
+\newblock Wedge: Splitting applications into reduced-privilege compartments.
+\newblock USENIX Association, 2008.
+
 \bibitem[Blazy and Leroy(2009)]{Blazy2009}
 Sandrine Blazy and Xavier Leroy.
 \newblock {Mechanized Semantics for the Clight Subset of the C Language}.
@@ -21,6 +27,12 @@ BlueHat.
   \url{https://www.zdnet.com/article/microsoft-70-percent-of-all-security-bugs-are-memory-safety-issues/},
   2019.
 \newblock Accessed: 2020-02-11.
+
+\bibitem[Brumley and Song(2004)]{brumley2004privtrans}
+David Brumley and Dawn Song.
+\newblock Privtrans: Automatically partitioning programs for privilege
+  separation.
+\newblock In \emph{USENIX Security Symposium}, volume~57, 2004.
 
 \bibitem[c2rust()]{c2rust}
 c2rust.
@@ -84,14 +96,6 @@ Dan Grossman, Greg Morrisett, Trevor Jim, Michael Hicks, Yanling Wang, and
 \newblock {Region-based Memory Management in {C}yclone}.
 \newblock In \emph{PLDI}, 2002.
 
-\bibitem[Guha et~al.(2010)Guha, Saftoiu, and Krishnamurthi]{lambdajs}
-Arjun Guha, Claudiu Saftoiu, and Shriram Krishnamurthi.
-\newblock {The Essence of Javascript}.
-\newblock In \emph{Proceedings of the 24th European Conference on
-  Object-Oriented Programming}, ECOOP'10, page 126–150, Berlin, Heidelberg,
-  2010. Springer-Verlag.
-\newblock ISBN 3642141064.
-
 \bibitem[Hathhorn et~al.(2015)Hathhorn, Ellison, and
   Ro\c{s}u]{10.1145/2813885.2737979}
 Chris Hathhorn, Chucky Ellison, and Grigore Ro\c{s}u.
@@ -118,13 +122,6 @@ Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic,
 \newblock ISSN 0362-1340.
 \newblock \doi{10.1145/2813885.2738005}.
 \newblock URL \url{http://doi.acm.org/10.1145/2813885.2738005}.
-
-\bibitem[Lampropoulos and Pierce(2018)]{Pierce:SF4}
-Leonidas Lampropoulos and Benjamin~C. Pierce.
-\newblock \emph{{QuickChick}: Property-Based Testing in Coq}.
-\newblock Software Foundations series, volume 4. Electronic textbook, August
-  2018.
-\newblock Version 1.0. \url{http://www.cis.upenn.edu/~bcpierce/sf}.
 
 \bibitem[Larson(2018)]{c2rusttalk}
 Per Larson.
@@ -154,6 +151,22 @@ Liyi Li, Yiyun Liu, Deena~L. Postol, Leonidas Lampropoulos, David~Van Horn, and
 \newblock A formal model of {Checked C}.
 \newblock In \emph{Proceedings of the Computer Security Foundations Symposium
   (CSF)}, August 2022.
+
+\bibitem[Lind et~al.(2017)Lind, Priebe, Muthukumaran, O'Keeffe, Aublin,
+  Kelbert, Reiher, Goltzsche, Eyers, Kapitza, et~al.]{lind2017glamdring}
+Joshua Lind, Christian Priebe, Divya Muthukumaran, Dan O'Keeffe, Pierre-Louis
+  Aublin, Florian Kelbert, Tobias Reiher, David Goltzsche, David Eyers,
+  R{\"u}diger Kapitza, et~al.
+\newblock Glamdring: Automatic application partitioning for intel $\{$SGX$\}$.
+\newblock In \emph{2017 USENIX Annual Technical Conference (USENIX ATC 17)},
+  pages 285--298, 2017.
+
+\bibitem[Liu et~al.(2017)Liu, Tan, and Jaeger]{liu2017ptrsplit}
+Shen Liu, Gang Tan, and Trent Jaeger.
+\newblock Ptrsplit: Supporting general pointers in automatic program
+  partitioning.
+\newblock In \emph{Proceedings of the 2017 ACM SIGSAC Conference on Computer
+  and Communications Security}, pages 2359--2371, 2017.
 
 \bibitem[Machiry et~al.(2022)Machiry, Kastner, McCutchen, Eline, Headley, and
   Hicks]{machiry2022c}
@@ -248,25 +261,6 @@ George~C Necula, Jeremy Condit, Matthew Harren, Scott McPeak, and Westley
 \newblock \emph{ACM Transactions on Programming Languages and Systems
   (TOPLAS)}, 27\penalty0 (3):\penalty0 477--526, 2005.
 
-\bibitem[Pa{\l}ka et~al.(2011)Pa{\l}ka, Claessen, Russo, and
-  Hughes]{PalkaAST11}
-Micha{\l}~H. Pa{\l}ka, Koen Claessen, Alejandro Russo, and John Hughes.
-\newblock {Testing an Optimising Compiler by Generating Random Lambda Terms}.
-\newblock In \emph{Proceedings of the 6th International Workshop on Automation
-  of Software Test}, AST '11, pages 91--97, New York, NY, USA, 2011. ACM.
-\newblock ISBN 978-1-4503-0592-1.
-\newblock \doi{10.1145/1982595.1982615}.
-\newblock URL \url{http://doi.acm.org/10.1145/1982595.1982615}.
-
-\bibitem[Peña(2017)]{LiquidHaskell}
-Ricardo Peña.
-\newblock {An Introduction to Liquid Haskell}.
-\newblock \emph{Electronic Proceedings in Theoretical Computer Science},
-  237:\penalty0 68–80, Jan 2017.
-\newblock ISSN 2075-2180.
-\newblock \doi{10.4204/eptcs.237.5}.
-\newblock URL \url{http://dx.doi.org/10.4204/EPTCS.237.5}.
-
 \bibitem[Ruef et~al.(2019{\natexlab{a}})Ruef, Lampropoulos, Sweet, Tarditi, and
   Hicks]{ruef18checkedc-incr}
 Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
@@ -284,6 +278,12 @@ Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
 \newblock Achieving safety incrementally with checked c.
 \newblock In \emph{International Conference on Principles of Security and
   Trust}, pages 76--98. Springer, Cham, 2019{\natexlab{b}}.
+
+\bibitem[Rul et~al.(2009)Rul, Vandierendonck, and De~Bosschere]{rul2009towards}
+Sean Rul, Hans Vandierendonck, and Koen De~Bosschere.
+\newblock Towards automatic program partitioning.
+\newblock In \emph{Proceedings of the 6th ACM conference on Computing
+  frontiers}, pages 89--98, 2009.
 
 \bibitem[Serebryany et~al.(2012)Serebryany, Bruening, Potapenko, and
   Vyukov]{serebryany2012addresssanitizer}
@@ -306,10 +306,12 @@ Dokyung Song, Julian Lettner, Prabhu Rajasekaran, Yeoul Na, Stijn Volckaert,
 \newblock In \emph{Proceedings of the 2019 IEEE Symposium on Security and
   Privacy (S\&P)}, 2019.
 
-\bibitem[Tarditi(2021)]{checkedc}
-David Tarditi.
-\newblock {Extending C with Bounds Safety and Improved Type Safety}, 2021.
-\newblock URL \url{https://github.com/secure-sw-dev/checkedc/}.
+\bibitem[Tan et~al.(2017)]{tan2017principles}
+Gang Tan et~al.
+\newblock Principles and implementation techniques of software-based fault
+  isolation.
+\newblock \emph{Foundations and Trends{\textregistered} in Privacy and
+  Security}, 1\penalty0 (3):\penalty0 137--198, 2017.
 
 \bibitem[Tarditi et~al.(2018)Tarditi, Elliott, Ruef, and
   Hicks]{tarditi2018checked}
@@ -323,17 +325,6 @@ CVE Trends.
 \newblock Cve trends.
 \newblock \url{https://www.cvedetails.com/vulnerabilities-by-types.php}, 2021.
 \newblock Accessed: 2020-10-11.
-
-\bibitem[Vazou et~al.(2014)Vazou, Seidel, Jhala, Vytiniotis, and
-  Peyton-Jones]{Refinementlh}
-Niki Vazou, Eric~L. Seidel, Ranjit Jhala, Dimitrios Vytiniotis, and Simon
-  Peyton-Jones.
-\newblock {Refinement Types for Haskell}.
-\newblock \emph{SIGPLAN Not.}, 49\penalty0 (9):\penalty0 269–282, August
-  2014.
-\newblock ISSN 0362-1340.
-\newblock \doi{10.1145/2692915.2628161}.
-\newblock URL \url{https://doi.org/10.1145/2692915.2628161}.
 
 \bibitem[Zeng and Crichton(2019)]{zeng2019identifying}
 Anna Zeng and Will Crichton.

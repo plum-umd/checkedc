@@ -8992,7 +8992,7 @@ Proof with eauto 20 with Preservation.
     destruct E; inversion H1; simpl in *; subst. 
     inv H5. exists (Env.remove v env). exists (Theta.remove v Q).
     split.
-    unfold env_wt in *. intros.
+    unfold env_wt in *. intros. admit. admit.
     easy. split. easy. split.
     unfold sub_domain in *. intros.
     destruct (Nat.eq_dec x v). subst.

@@ -101,7 +101,9 @@ Section RealHeapProp.
   Definition rheap_wf (R : real_heap) : Prop := forall Hchk Htnt,
       R = (Hchk, Htnt) -> heap_wf Hchk.
 
+(*
   Definition is_checked (t:type) := match t with TNat => True | TPtr m w => (m = Checked) | _ => False end.
+*)
 
   (** Types on the stack agree with those on the rheap. *)
   Definition stack_rheap_consistent (R : real_heap) S :=
@@ -152,6 +154,155 @@ Section StackProp.
   Qed.
 
 End StackProp. 
+
+
+(* Env consistency *)
+Definition env_consistent (e: expression) (env env' : env) := 
+      forall x t, In x (freeVars e) -> Env.MapsTo x t env -> Env.MapsTo x t env'.
+
+Definition simple_means_not_freeVars:
+   forall t, simple_type t -> freeTypeVars t = [].
+Proof.
+  intros. induction H;simpl in *. easy.
+Qed.
+
+Lemma well_typed_bound : forall D F R env Q m e t,
+      well_typed D F R env Q m e t ->  env_wf e env.
+Proof.
+ intros. induction H;unfold env_wf;intros;simpl in *; eauto.
+ apply simple_means_not_freeVars in H0. rewrite H0 in H2. simpl in *. easy.
+ apply simple_means_not_freeVars in H0. rewrite H0 in H1. simpl in *. easy.
+ apply simple_means_not_freeVars in H. rewrite H in H0. simpl in *. easy.
+ destruct H0;subst.
+ unfold Env.In,Env.Raw.PX.In. exists t; easy. easy.
+ apply in_app_iff in H3. destruct H3.
+ unfold env_wf in *. apply IHwell_typed; easy.
+ clear H1. clear H2. clear IHwell_typed.
+ induction es;intros;simpl in *. easy.
+ inv H0.
+ apply in_app_iff in H3. destruct H3.
+ apply H4. easy.
+ apply IHes; try easy.
+ destruct H1;subst.
+ unfold Env.In,Env.Raw.PX.In. exists (TPtr m' (TNTArray h l t)); easy. easy.
+ destruct H3;subst.
+ unfold Env.In,Env.Raw.PX.In. exists (TPtr m' (TNTArray l h ta)); easy.
+ apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
+ apply not_or_and in H4. destruct H4.
+ specialize (IHwell_typed x0).
+ apply IHwell_typed in H3.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H3.
+ apply Env.add_3 in H3 ; try easy.
+ destruct (Nat.eq_dec x0 y); subst.
+ exists (TPtr m' (TNTArray l h ta)). easy.
+ apply Env.add_3 in H3 ; try easy. exists x1. easy. lia.
+ apply ListSet.set_diff_iff in H1. destruct H1. simpl in *.
+ apply not_or_and in H2. destruct H2.
+ specialize (IHwell_typed2 x0).
+ apply IHwell_typed2 in H1.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H1.
+ apply Env.add_3 in H1 ; try easy.
+ exists x1. easy.
+ apply in_app_iff in H3. destruct H3.
+ apply IHwell_typed1; easy.
+ apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
+ apply not_or_and in H4. destruct H4.
+ apply IHwell_typed2 in H3.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H3.
+ apply Env.add_3 in H3 ; try easy.
+ exists x1. easy.
+ apply in_app_iff in H2. destruct H2.
+ apply IHwell_typed1; easy.
+ apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
+ apply not_or_and in H3. destruct H3.
+ apply IHwell_typed2 in H2.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H2.
+ apply Env.add_3 in H2 ; try easy.
+ exists x1. easy.
+ apply ListSet.set_diff_iff in H0. destruct H0. simpl in *.
+ apply not_or_and in H1. destruct H1.
+ apply IHwell_typed in H0.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H0.
+ apply Env.add_3 in H0 ; try easy.
+ exists x1. easy.
+ apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
+ apply in_app_iff in H2. destruct H2.
+ apply simple_means_not_freeVars in H0. rewrite H0 in H2. simpl in *. easy.
+ apply not_or_and in H3. destruct H3.
+ apply IHwell_typed in H2.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H2.
+ apply Env.add_3 in H2 ; try easy.
+ exists x1. easy.
+ apply in_app_iff in H1. destruct H1.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H2. destruct H2.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H2. destruct H2.
+ apply H. easy.
+ apply IHwell_typed; easy.
+ apply in_app_iff in H2. destruct H2.
+ apply H. easy.
+ apply IHwell_typed; easy.
+ apply in_app_iff in H3. destruct H3.
+ apply H. simpl. easy.
+ apply IHwell_typed; easy.
+ apply in_app_iff in H4. destruct H4.
+ apply H1. simpl. easy.
+ apply IHwell_typed; easy.
+ apply in_app_iff in H3. destruct H3.
+ apply H. simpl. easy.
+ apply IHwell_typed; easy.
+ apply in_app_iff in H4. destruct H4.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H4. destruct H4.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H4. destruct H4.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H5. destruct H5.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H5. destruct H5.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H6. destruct H6.
+ apply in_app_iff in H6. destruct H6.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply IHwell_typed3; easy.
+ apply in_app_iff in H6. destruct H6.
+ apply in_app_iff in H6. destruct H6.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ apply IHwell_typed3; easy.
+ destruct H5; subst. exists t. easy.
+ apply in_app_iff in H5. destruct H5.
+ apply IHwell_typed1; easy.
+ apply IHwell_typed2; easy.
+ destruct H3; subst. exists (TPtr m' (TNTArray l (Var x0 0) t)). easy.
+ apply in_app_iff in H3. destruct H3.
+ apply IHwell_typed1 in H3.
+ destruct H3.
+ destruct (Nat.eq_dec x x0); subst.
+ exists ((TPtr m' (TNTArray l (Var x0 0) t))). easy.
+ apply Env.add_3 in H3. exists x1. easy. easy.
+ apply IHwell_typed2; easy.
+ apply in_app_iff in H2. destruct H2.
+ apply IHwell_typed1; easy.
+ apply in_app_iff in H2. destruct H2.
+ apply IHwell_typed2; easy.
+ apply IHwell_typed3; easy.
+Qed.
 
 (* theta and stack relationship *)
 Definition stack_theta_wf s Q := forall x v, Stack.MapsTo x (v,TNat) s -> Theta.MapsTo x (NumEq v) Q.
@@ -442,8 +593,6 @@ End TypeProp.
 
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
-
-
 
 
 

@@ -4,11 +4,15 @@ The top-level auxiliary file: main.aux
 The style file: plainnat.bst
 Database file #1: IEEEabrv.bib
 Database file #2: paper.bib
-Repeated entry---line 1418 of file paper.bib
+Repeated entry---line 1469 of file paper.bib
  : @misc{c2rust
  :             ,
 I'm skipping whatever remains of this entry
-Repeated entry---line 1791 of file paper.bib
+Repeated entry---line 1593 of file paper.bib
+ : @book{tan2017principles
+ :                        ,
+I'm skipping whatever remains of this entry
+Repeated entry---line 1842 of file paper.bib
  : @article{necula2005ccured
  :                          ,
 I'm skipping whatever remains of this entry
@@ -17,46 +21,48 @@ Repeated entry---line 66 of file sources.bib
  : @inproceedings{duanrefactoring
  :                               ,
 I'm skipping whatever remains of this entry
+Warning--empty booktitle in bittau2008wedge
+Warning--can't use both volume and number fields in brumley2004privtrans
 Warning--empty journal in mergendahlcross
 You've used 46 entries,
             2773 wiz_defined-function locations,
-            1273 strings with 21679 characters,
-and the built_in function-call counts, 25191 in all, are:
-= -- 2253
-> -- 1720
-< -- 25
-+ -- 581
-- -- 533
-* -- 2132
-:= -- 3869
-add.period$ -- 196
+            1250 strings with 21564 characters,
+and the built_in function-call counts, 25679 in all, are:
+= -- 2258
+> -- 1803
+< -- 26
++ -- 608
+- -- 560
+* -- 2180
+:= -- 3924
+add.period$ -- 182
 call.type$ -- 46
-change.case$ -- 315
+change.case$ -- 323
 chr.to.int$ -- 44
-cite$ -- 93
-duplicate$ -- 1076
-empty$ -- 1853
-format.name$ -- 588
-if$ -- 5331
+cite$ -- 95
+duplicate$ -- 1091
+empty$ -- 1890
+format.name$ -- 616
+if$ -- 5426
 int.to.chr$ -- 3
 int.to.str$ -- 1
 missing$ -- 40
-newline$ -- 284
+newline$ -- 273
 num.names$ -- 182
-pop$ -- 642
+pop$ -- 679
 preamble$ -- 1
-purify$ -- 270
+purify$ -- 277
 quote$ -- 0
-skip$ -- 860
+skip$ -- 877
 stack$ -- 0
-substring$ -- 673
-swap$ -- 187
-text.length$ -- 12
+substring$ -- 704
+swap$ -- 191
+text.length$ -- 14
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 496
-warning$ -- 1
-while$ -- 184
+type$ -- 501
+warning$ -- 3
+while$ -- 189
 width$ -- 0
-write$ -- 700
-(There were 3 error messages)
+write$ -- 672
+(There were 4 error messages)

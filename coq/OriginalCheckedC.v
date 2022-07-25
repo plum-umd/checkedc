@@ -3563,7 +3563,7 @@ Qed.
       @well_typed D H' env' Checked e t.
   Proof.
     intros env env' x t' e t D H H' Henv Hheap Hfind Hwt.
-    
+    Admitted.
              
 Lemma preservation : forall D s H env e t s' H' e',
     @structdef_wf D ->
@@ -3610,7 +3610,9 @@ Proof with eauto 20 with Preservation.
     + clear H1. edestruct IH1... inv HEwf; eauto. (* Uses heap_wf *)
       exists x0. destruct H0 as [He [Hs' [Hh Hwt]]]. split. eauto. split.
       eauto. split. eauto. inv HEwf. econstructor. inv He.
-      * econstructor; eauto. apply HTy2.
+      * admit.
+      * admit.
+      * admit.
   (* T-FieldAddr *)
   - inv Hreduces.
     destruct E; inversion H2; simpl in *; subst. exists env. 
@@ -3644,8 +3646,8 @@ Proof with eauto 20 with Preservation.
 
         (* The fact that n^(ptr C struct T) is well-typed is all we need *)
         split; eauto.
-        inv HHwf.
-        constructor. eapply preservation_fieldaddr; eauto. omega.
+        admit.
+        admit.
       * inv HTy.
         (* Gotta prove some equalities *)
         assert (fs = fs0).
@@ -3663,16 +3665,14 @@ Proof with eauto 20 with Preservation.
         rename i0 into i.
         subst; rename ti0 into ti.
         (* Since it is an unchecked pointer, well-typedness is easy *)
-        idtac...
+        idtac... admit.
     + clear H2. rename e0 into e1_redex. rename e'0 into e1_redex'.
       edestruct IH; eauto.
-      inv HHwf; eauto.
+      admit. admit.
   (* T-Plus *)
   - inv Hreduces.
     destruct E; inversion H1; simpl in *; subst.
-    + clear H0. clear H7. rename e'0 into e'. inv H4.
-      * inversion HTy1.
-      * inv HTy1...
+    + clear H0. admit.
     + clear H1. rename e into e1_redex. rename e'0 into e1_redex'. edestruct IH1; idtac...
       inv HHwf; eauto.
     + clear H1. rename e into e2_redex. rename e'0 into e2_redex'. edestruct IH2; idtac...
