@@ -25,29 +25,31 @@
 ;; Syntax
 
 (define-language CoreChkC+
-  (m ::= c u)
+  (m ::= c t u)
   (τ ::= int (ptr m ω))
   (ω ::= τ (struct T)
-     ;; CHANGED:
      (array le he τ)
+     (ntarray le he τ)
      ;; NEW:
-     (ntarray le he τ))
+     (fun (x ...) τ (τ ...)))
 
   ;; NEW
   ;; normalized types
   (vτ ::= int (ptr m vω))
   (vω ::= vτ (struct T)
      (array l h vτ)
-     (ntarray l h vτ))
+     (ntarray l h vτ)
+     ;; NEw:
+     (fun (x ...) τ (τ ...)))
 
   (e ::= (n : τ) x (let x = e in e) (malloc m ω) (cast τ e)
-     (e + e) (& e → f) (* e) (* e = e) (unchecked e)
-     ;; NEW:
+     (e + e) (& e → f) (* e) (* e = e)
+     ;; NEW checked expr
+     (unchecked (x ...) e) (checked (x ...) e)
      (if e e e)
      (strlen e)
      (dyn-bound-cast τ e)
-     ;; NEW functions
-     (call n e ...))
+     (call e e ...))
 
   ;; erased expressions
   (ee ::=  i eS)
@@ -57,6 +59,7 @@
   (ls hs ::= (x + l))
 
   ;;NEW functions
+  (Fs ::= (F F))
   (F ::= ((defun ((x : τ) ... e) : τ) ...))
 
   (n k ::= natural)
@@ -71,20 +74,21 @@
   (eHs ::= (eH eH))
   (eH ::= (n ...))
   (eFs ::= (eF eF))
-  (eF ::= ((defun x ... ee) ...))
+  (eF ::= ((defun ee x ... ee) ...))
   ;;NEW functions
   (r ::= e ε)
   (er ::= ee ε)
   (ε ::= Null Bounds)
   (E ::= hole (let x = E in e) (let x = (n : vτ) in E) (E + e) ((n : vτ) + E)
-     (& E → f) (dyn-bound-cast Eτ e) (dyn-bound-cast vτ E) (cast Eτ e) (cast vτ E) (* E) (* E = e) (* (n : vτ) = E) (unchecked E)
-     ;; NEW:
+     (& E → f) (dyn-bound-cast Eτ e) (dyn-bound-cast vτ E) (cast Eτ e) (cast vτ E) (* E) (* E = e) (* (n : vτ) = E)
+     (unchecked (x ...) E) (checked (x ...) E)
      (if E e e)
      (strlen E)
      (malloc m Eω)
      (n : Eτ)
      ;;New for functions
-     (call n (n : vτ) ... E e ...))
+     (call E e ...)
+     (call (n : vτ) (n : vτ) ... E e ...))
 
   (Eω ::= (array hole he τ)
        (array l hole τ)
@@ -108,13 +112,15 @@
       (* (n : vτ))
       (* (n : vτ) = (n_1 : vτ_1))
       (strlen (n : vτ))
-      (call n_1 (n_args : vτ_args) ...)
+      (call (n_1 : vτ_1) (n_args : vτ_args) ...)
       (dyn-bound-cast vτ (n : vτ_′))
       ((n_1 : vτ_1) + (n_2 : vτ_2))
       (cast vτ (n : vτ_′))
       (& (n : vτ) → f_i)
       (malloc m vω)
-      (unchecked (n : vτ))
+      (unchecked (x ...) (n : vτ))
+      ;; NEW checked expr
+      (checked (x ...) (n : vτ))
       (if (n : vτ) e_1 e_2))
 
  ;; result
@@ -134,7 +140,7 @@
 
       ;;New for functions
       (call eE ee ...)
-      (call n n ... eE ee ...))
+      (call ee ee ... eE ee ...))
 
 
   ;; erased serious terms
@@ -156,18 +162,25 @@
 ;; TODO: star-l and star-r
   (eK ::= hole
       pop
-      (malloc [])
+      (malloc-l [])
+      (malloc-r [])
       ([] + ee) (i + [])
       (x = [])
       ([] - ee) (i - [])
-      (* []) (* [] = ee) (* i = [])
+      (star-l []) (star-r [])
+      (star-l [] = ee) (star-r [] = ee)
+      (star-l i = []) (star-r i = [])
       ([] <=? ee)
       (i <=? [])
       (if [] ee ee)
-      (strlen [])
+      (strlen-l [])
+      (strlen-r [])
       (let x = [] in ee)
       ;;New for functions
-      (call n n ... [] ee ...))
+      (call-l [] ee ...)
+      (call-l ee ee ... [] ee ...)
+      (call-r [] ee ...)
+      (call-r ee ee ... [] ee ...))
 
 
   (eΣ ::= ((x_!_0 i_0) ...))
@@ -193,8 +206,8 @@
   (let x = e in e_body #:refers-to x)
   ; ':' can't appear twice. yet another redex bug?
   ; modified to allow let*-like behavior
-  (defun ((x : τ) #:...bind (args x (shadow args x)) e_body #:refers-to args) _ τ_res #:refers-to args)
-  (defun x ... ee #:refers-to (shadow x ...))
+  (defun e ((x : τ) #:...bind (args x (shadow args x)) e_body #:refers-to args) _ τ_res #:refers-to args)
+  (defun ee x ... ee #:refers-to (shadow x ...))
   (eH ((x i) ...) ee #:refers-to (shadow x ...) eH))
 
 (default-language CoreChkC+)
@@ -300,9 +313,9 @@
    (side-condition ,(and (<= (term l) 0) (<= 0 (term h))))
    E-Str]
 
-  [(⊢↝/name (Hs (call (n_1 : vτ_1) (n_args : vτ_args) ..._1))  (Hs (⊢build-call-stack e (x (n_args : vτ_args)) ...) E-Fun))
+  [(⊢↝/name (Hs (call (n_1 : vτ_1) (n_args : vτ_args) ..._1))  (Hs (⊢build-call-stack e_′ (x (n_args : vτ_args)) ...) E-Fun))
    (where (ptr m (fun _ _ _)) vτ_1) 
-   (where (defun ((x : τ_2′) ..._1 e) : τ) (⊢fun-lookup (⊢fheap-by-mode m) n_1))
+   (where (defun ((x : τ_2′) ..._1 e_′) : τ) (⊢fun-lookup (⊢fheap-by-mode m) n_1)) ;; defun no vτ_1
    E-Fun]
 
   [(⊢↝/name (Hs (dyn-bound-cast vτ (n : vτ_′))) (Hs (n : vτ_′) E-DynCast)) ;; note that the annotation does not change
@@ -594,9 +607,9 @@
 
 (define-metafunction CoreChkC+
   ⊢fheap-by-mode : m -> F
-  [(⊢fheap-by-mode c) (car *Fs*)]
-  [(⊢fheap-by-mode t) (car (cdr *Fs*))]
-  [(⊢fheap-by-mode u) (cdr (cdr *Fs*))])
+  [(⊢fheap-by-mode c) ,(list-ref (*Fs*) 0)]
+  [(⊢fheap-by-mode t) ,(list-ref (*Fs*) 1)]
+  [(⊢fheap-by-mode u) ,(list-ref (*Fs*) 1)])
 
 
 (define-metafunction CoreChkC+
@@ -606,12 +619,20 @@
          (positive? (term n))
          (list-ref (term H) (sub1 (term n))))])
 
+;(define-metafunction CoreChkC+
+;  ⊢fun-lookup : F n -> (defun e ((x : τ) ... e) : τ) or #f
+;  [(⊢fun-lookup ((defun (n : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) _ ...) n)
+;          (defun (n : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 )]
+;  [(⊢fun-lookup (_ (defun (n_′ : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) ...) n)
+;          (⊢fun-lookup ((defun (n_′ : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) ...) n)]
+;  )
 (define-metafunction CoreChkC+
   ⊢fun-lookup : F n -> (defun ((x : τ) ... e) : τ) or #f
   [(⊢fun-lookup F n)
    ,(and (<= (term n) (length (term F)))
          (positive? (term n))
          (list-ref (term F) (sub1 (term n))))])
+
 
 (define-metafunction CoreChkC+
   ⊢efun-lookup : eF n -> (defun x ... ee) or #f
@@ -1100,5 +1121,51 @@
            (term ((((0 : int)) ()) Bounds)))
 
   )
+
+(module+ test
+  (parameterize ((*Fs* (term (((defun  ((x : int) (x + (1 : int))) : int)      ; (fun (x ...) τ (τ ...)))
+                             (defun ((y : int) (y + (2 : int))) : int)      ; (+2) at position 1
+                             (defun ((p : int) (q : int) (p + q)) : int)
+                             )
+                             ((defun ((x : int) (x + (1 : int))) : int)      ; (+1) at position 0
+                             (defun ((y : int) (y + (2 : int))) : int)      ; (+2) at position 1
+                             (defun ((p : int) (q : int) (p + q)) : int)
+                             )))))        ; (+)  at position 2
+    (test--> (---> 'c)
+           (term ((() ()) (call (0 : (ptr c (fun (x) int (int)))) (4 : int))))
+           (term ((() ()) (let y = (4 : int) in (y + (1 : int))))))
+    (test--> (---> 'c)
+           (term ((() ()) (call (2 : (ptr c (fun (p q) int (int int)))) (4 : int) (5 : int))))
+           (term ((() ()) (let p = (4 : int) in (let q = (5 : int) in (p + q))))))
+    )
+
+   (parameterize ((*Fs* (term (((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                    ;; need the cast for it to typecheck
+                                    ;; evaluation should go through even without
+                                              (call (1 : (ptr c (fun (x) int (ptr c (ntarray 0 0 int)))))
+                                          (cast (ptr c (ntarray 0 0 int)) (x + (1 : int)))))
+                                       (0 : int))) : int))
+                               ((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                    ;; need the cast for it to typecheck
+                                    ;; evaluation should go through even without
+                                              (call (1 : (ptr c (fun (x) int (ptr c (ntarray 0 0 int)))))
+                                          (cast (ptr c (ntarray 0 0 int)) (x + (1 : int)))))
+                                       (0 : int))) : int))))))
+    (test-->>
+     (---> 'c)
+
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (0 : int)))
+            (call (0 : (ptr c (fun (x) int ((ptr c (ntarray 0 0 int)))))) ((1 : (ptr c (ntarray 0 0 int)))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (0 : int)))
+            (3 : int))))
+     )
+
+  )
+
+ 
 
 (print "tests pass")
