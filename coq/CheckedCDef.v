@@ -2711,6 +2711,12 @@ Proof.
   - constructor.
 Admitted.
 
+Lemma eq_subtype_mode_same :forall D Q m t m' t', eq_subtype D Q (TPtr m t) (TPtr m' t') -> m = m'.
+Proof.
+  intros. inv H. inv H0. inv H. inv H1.
+  inv H; try easy. easy. easy.
+Qed.
+
 
 (*
 Inductive gen_env : env -> list (var * type) -> env -> Prop :=

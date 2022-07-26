@@ -209,6 +209,37 @@ Lemma well_typed_args_sub : forall D F Q R R' env m es xl ts tlb t tb ta,
 Proof.
 Admitted.
 
+Lemma well_typed_arg_consist: forall D Q F R env env' m e t, env_consistent D Q env env'
+      -> well_typed_arg D F R env m e t ->
+         well_typed_arg D F R env' m e t.
+Proof.
+ intros. inv H0. constructor; try easy.
+ constructor; try easy.
+ destruct H as [X1 [X2 X3]].
+ destruct (X1 x).
+ assert (Env.In x env). exists t'. easy.
+ apply H in H3. destruct H3.
+ assert (is_nt_ptr t \/ ~ is_nt_ptr t).
+ destruct t; try (right ; easy).
+ destruct t; try (right; easy). left; easy.
+ destruct H4.
+ apply X3 with (t' := x0) in H1; try easy.
+ apply ArgVar with (t' := x0); try easy.
+ exists x0. split. apply type_eq_refl. constructor.
+ constructor; try easy. induction H0; simpl in *; try easy.
+ constructor. constructor; try easy.
+ constructor; try easy.
+Qed.
+
+Lemma well_typed_args_consist: forall D Q F R env env' m es ts xl t ta, env_consistent D Q env env'
+      -> @well_typed_args D F R env m es ts xl t ta ->
+        @well_typed_args D F R env' m es ts xl t ta.
+Proof.
+ intros. induction H0; simpl in *; try easy.
+ constructor. constructor; try easy.
+ constructor; try easy.
+Qed.
+
 Lemma replicate_gt_eq : forall x t, 0 < x -> Z.of_nat (length (Zreplicate (x) t)) = x.
 Proof.
   intros.
@@ -249,13 +280,14 @@ Section Preservation.
       reduce D F
         (s, R) e Checked
         (s', R') (RExpr e') ->
-      exists t',
-        sub_domain env s'
-        /\ stack_wf D Q env s'
-        /\ theta_wt Q env s'
+      exists env' t',
+        sub_domain env' s'
+        /\ stack_wf D Q env' s'
+        /\ theta_wt Q env' s'
         /\ stack_rheap_consistent D F R s'
         /\ rheap_consistent D F R' R
-        /\ well_typed D F R' env Q Checked e' t'
+        /\ env_consistent D Q env env'
+        /\ well_typed D F R' env' Q Checked e' t'
         /\ eq_subtype D Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
@@ -270,7 +302,7 @@ Section Preservation.
         env Q m x t Hx                                             | (* Variables *)
         env Q m m' es x xl ts t ta HMode Wb HTyf IH1 HArgs         | (* Call *)
         env Q x m m' h l t Wb HMode                                | (* Strlen *)
-        env Q m x y e l h t ta Alpha Wb HTy IH Hx                  | (* LetStrlen *)
+        env Q m m' x y e l h t ta HMode Wb HTy HIn Hx              | (* LetStrlen *)
         env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hx Hdept             | (* Let-Nat-Expr *)
         env Q m x e1 t1 e2 t HTy1 IH1 HTy2 IH2 Hx                  | (* Let-Expr *)
         env Q m x na a e t HIn Hx HTy1 IH1                         | (* RetNat *)
@@ -308,9 +340,9 @@ Section Preservation.
     - inv Hreduces; solve_ctxt.
     (* T-Var *)
     -  inv Hreduces; solve_ctxt.
-      inv H5. exists t0.
+      inv H5. exists env, t0.
       destruct R' as [Hchk Htnt]; subst; intuition...
-      cbn.
+      cbn. apply env_consist_refl.
       apply Hswt in H4 as eq1. destruct eq1 as [X1 [X2 X3]].
       inv X1.
       constructor. constructor. constructor.
@@ -337,10 +369,11 @@ Section Preservation.
       inv Y1.
       apply subtype_fun_1 in H10 as X2; try easy.
       destruct X2 as [X2 [X3 X4]]; subst.
-      exists ta'.
+      exists env,ta'.
       split; try easy. split; try easy.
       split; try easy. split; try easy.
       split. apply rheap_consistent_refl.
+      split. apply env_consist_refl.
       apply eval_el_vl_1 in H12 as X5.
       destruct X5 as [vl X5].
       apply eval_el_vl with (xl := (get_xl tvl0)) (tvl := tvl0) (e := e0) 
@@ -370,10 +403,11 @@ Section Preservation.
       inv Y1.
       apply subtype_fun_1 in H13 as X2; try easy.
       destruct X2 as [X2 [X3 X4]]; subst.
-      exists ta'.
+      exists env,ta'.
       split; try easy. split; try easy.
       split; try easy. split; try easy.
       split. apply rheap_consistent_refl.
+      split. apply env_consist_refl.
       apply eval_el_vl_1 in H14 as X5.
       destruct X5 as [vl X5].
       apply eval_el_vl with (xl := (get_xl tvl0)) (tvl := tvl0) (e := e0) 
@@ -395,12 +429,13 @@ Section Preservation.
       inv H2.
       edestruct IH1; try easy.
       inv HEwf; easy. apply step_implies_reduces_1; try easy. apply H5.
-      destruct H2 as [X1 [X2 [X3 [X4 [X5 [X6 X7]]]]]].
-      simpl. apply eq_subtype_fun in X7.
-      destruct X7 as [tb [tlb [X8 [X9 X10]]]];subst; try easy.
+      destruct H2 as [ta' [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      simpl. apply eq_subtype_fun in X8.
+      destruct X8 as [tb [tlb [X8 [X9 X10]]]];subst; try easy.
       apply well_typed_args_sub with (tlb := tlb) (tb := tb) (Q := Q) (R' := R') in HArgs as X11; try easy.
       destruct X11 as [ta' [X11 X12]].
-      exists ta'.
+      exists x,ta'.
+      split; try easy.
       split; try easy.
       split; try easy.
       split; try easy.
@@ -663,11 +698,86 @@ Section Preservation.
       eapply HsHwf. apply H1. apply H4.
       destruct (Nat.eq_dec x x0); subst.
       apply Stack.mapsto_add1 in H4. inv H4.
-      destruct (Z.eq_dec n' 0). subst.
-      rewrite Z.add_0_r in H17.
-      apply TyLitC_T with (w := ((TNTArray (Num 0) (Num 0) t0)))
-       (b := 0) (ts := (Zreplicate 1 t0)); eauto.
-
+      apply TyLitU_C. easy.
+      apply Stack.add_3 in H4.
+      eapply HsHwf. apply H1. apply H4.
+      easy.
+      split.
+      unfold rheap_consistent. intros.
+      inv H1. inv H4. unfold heap_consistent_checked. intros. easy.
+      split. constructor. constructor. easy. constructor.
+      exists TNat. split. apply type_eq_refl. constructor. constructor.      
+    * apply Hswf in Wb. destruct Wb as [va [ta [X1 X2]]].
+      apply Stack.mapsto_always_same with (v1 := (va, ta)) in H13; try easy.
+      inv H13. apply eq_subtype_mode_same in X1. subst.
+      assert (Checked = Checked) by easy. apply H in H1. easy.
+    (*T-Strlen*)
+   -  inv HMode. inv Hreduces.
+      destruct E; inv H1; simpl in *; subst. inv H4.
+      destruct E;inv H5; simpl in *; subst.
+      inv H4;auto.
+      inv H7. 
+     *
+      exists TNat; simpl in *.
+      unfold stack_wf in Hswf.
+      apply Hswf in Wb as X1; try easy.
+      destruct X1 as [va [ta [X1 X2]]].
+      apply Stack.mapsto_always_same with (v1 := (va, ta)) in H15 as X3; try easy.
+      inv X3.
+      split.
+      unfold sub_domain,change_strlen_stack; intros.
+      destruct (n' <=? h0 ) eqn:eq1.
+      apply HsubDom; easy.
+      destruct (Nat.eq_dec x0 x); subst.
+      exists (n, TPtr Checked (TNTArray (Num l0) (Num n') t0)).
+      apply Stack.add_1. easy.
+      apply HsubDom in H1. destruct H1.
+      exists x1.
+      apply Stack.add_2. lia. easy.
+      split. unfold stack_wf,change_strlen_stack in *. intros.
+      destruct (Nat.eq_dec x0 x); subst.
+      apply Env.mapsto_always_same with (v1 := t2) in Wb as X4; try easy;subst.
+      destruct (n' <=? h0 ) eqn:eq1.
+      exists n,(TPtr Checked (TNTArray (Num l0) (Num h0) t0)); easy.
+      exists n,(TPtr Checked (TNTArray (Num l0) (Num n') t0)).
+      split. apply eq_subtype_trans with (t2:=(TPtr Checked (TNTArray (Num l0) (Num h0) t0))); try easy.
+      unfold eq_subtype. exists (TPtr Checked (TNTArray (Num l0) (Num n') t0)).
+      split. apply type_eq_refl.
+      constructor. apply SubTyNtSubsume; try easy.
+      constructor. easy.
+      constructor. lia.
+      apply Stack.add_1. easy.
+      apply Hswf in H1. destruct H1 as [va [ta [Y1 Y2]]].
+      exists va, ta; try easy.
+      split. easy.
+      destruct (n' <=? h0). try easy.
+      apply Stack.add_2. lia. easy.
+      split. unfold theta_wt in *.
+      destruct HQt.
+      split. easy. split.
+      destruct H4. intros.
+      unfold change_strlen_stack in *.
+      destruct (n' <=? h0).
+      apply H4 with (x := x0); try easy.
+      destruct (Nat.eq_dec x x0). subst.
+      apply Stack.mapsto_add1 in H7. inv H7.
+      apply Stack.add_3 in H7.
+      apply H4 with (x := x0); try easy. easy.
+      intros.
+      unfold change_strlen_stack in *. destruct H4.
+      destruct (n' <=? h0). 
+      apply H6 with (x := x0); try easy.
+      destruct (Nat.eq_dec x x0). subst.
+      apply Stack.mapsto_add1 in H5. inv H5.
+      apply Stack.add_3 in H5.
+      apply H6 with (x := x0); try easy. easy.
+      split.
+      unfold stack_rheap_consistent, change_strlen_stack in *.
+      intros.
+      destruct (n' <=? h0) eqn:eq1.
+      eapply HsHwf. apply H1. apply H4.
+      destruct (Nat.eq_dec x x0); subst.
+      apply Stack.mapsto_add1 in H4. inv H4.
       apply HsHwf with (Hchk := Hchk) (Htnt := Htnt) in X2; try easy. inv H1.
       apply Hswt in H15. destruct H15 as [Y3 [Y4 Y5]].
       inv X2; try easy. apply TyLitZero_C. 
@@ -795,36 +905,81 @@ Section Preservation.
       easy. unfold rheap_consistent.
       split. intros. inv H1. inv H4. unfold heap_consistent_checked. intros. easy.
       split. constructor. constructor. easy. constructor.
-      exists TNat. split. apply type_eq_refl. constructor. constructor. 
-
-      apply TyLitC_C with (w := ((TNTArray (Num l0) (Num n') t0)))
-        (b := l0) (ts := (Zreplicate (n' - l0 + 1) t0)); eauto.
-      constructor. constructor. simpl. easy. apply SubTyRefl.
-       intros.
-      unfold scope_set_add.
-
-
-      apply checked_subtype_well_type with (t := (TPtr Checked (TNTArray (Num l0) (Num h0) t0))); try easy.
-      inv Y4; try easy. inv H3. constructor. constructor; try easy.
-      unfold eq_subtype. exists (TPtr Checked (TNTArray (Num l0) (Num n') t0)).
+      exists TNat. split. apply type_eq_refl. constructor. constructor.      
+    *
+      exists TNat; simpl in *.
+      unfold stack_wf in Hswf.
+      apply Hswf in Wb as X1; try easy.
+      destruct X1 as [va [ta [X1 X2]]].
+      apply Stack.mapsto_always_same with (v1 := (va, ta)) in H15 as X3; try easy.
+      inv X3.
+      split.
+      unfold sub_domain,change_strlen_stack; intros.
+      destruct (n' <=? h0 ) eqn:eq1.
+      apply HsubDom; easy.
+      destruct (Nat.eq_dec x0 x); subst.
+      exists (n, TPtr Tainted (TNTArray (Num l0) (Num n') t0)).
+      apply Stack.add_1. easy.
+      apply HsubDom in H1. destruct H1.
+      exists x1.
+      apply Stack.add_2. lia. easy.
+      split. unfold stack_wf,change_strlen_stack in *. intros.
+      destruct (Nat.eq_dec x0 x); subst.
+      apply Env.mapsto_always_same with (v1 := t2) in Wb as X4; try easy;subst.
+      destruct (n' <=? h0 ) eqn:eq1.
+      exists n,(TPtr Tainted (TNTArray (Num l0) (Num h0) t0)); easy.
+      exists n,(TPtr Tainted (TNTArray (Num l0) (Num n') t0)).
+      split. apply eq_subtype_trans with (t2:=(TPtr Tainted (TNTArray (Num l0) (Num h0) t0))); try easy.
+      unfold eq_subtype. exists (TPtr Tainted (TNTArray (Num l0) (Num n') t0)).
       split. apply type_eq_refl.
       constructor. apply SubTyNtSubsume; try easy.
-
-      apply HsubDom; easy.
-
-      destruct R' as [Hchk Htnt]; subst; intuition...
-      cbn.
-      apply Hswt in H4 as eq1. destruct eq1 as [X1 [X2 X3]].
-      inv X1.
-      constructor. constructor. constructor.
-      constructor. destruct m;try easy.
-      constructor. constructor. easy.
-      intuition...
-      apply TyLitTainted. intros R. inv R. easy.
-      apply TyLitTainted. intros R. inv R. easy.
-      apply Hswf in Hx. destruct Hx as [v1 [t1 [HSub1 HM]]]. 
-      apply Stack.mapsto_always_same with (v1 := (v1, t1)) in H4; try easy.
-      inv H4. easy.
+      constructor. easy.
+      constructor. lia.
+      apply Stack.add_1. easy.
+      apply Hswf in H1. destruct H1 as [va [ta [Y1 Y2]]].
+      exists va, ta; try easy.
+      split. easy.
+      destruct (n' <=? h0). try easy.
+      apply Stack.add_2. lia. easy.
+      split. unfold theta_wt in *.
+      destruct HQt.
+      split. easy. split.
+      destruct H4. intros.
+      unfold change_strlen_stack in *.
+      destruct (n' <=? h0).
+      apply H4 with (x := x0); try easy.
+      destruct (Nat.eq_dec x x0). subst.
+      apply Stack.mapsto_add1 in H8. inv H8.
+      apply Stack.add_3 in H8.
+      apply H4 with (x := x0); try easy. easy.
+      intros.
+      unfold change_strlen_stack in *. destruct H4.
+      destruct (n' <=? h0). 
+      apply H6 with (x := x0); try easy.
+      destruct (Nat.eq_dec x x0). subst.
+      apply Stack.mapsto_add1 in H5. inv H5.
+      apply Stack.add_3 in H5.
+      apply H6 with (x := x0); try easy. easy.
+      split.
+      unfold stack_rheap_consistent, change_strlen_stack in *.
+      intros.
+      destruct (n' <=? h0) eqn:eq1.
+      eapply HsHwf. apply H1. apply H4.
+      destruct (Nat.eq_dec x x0); subst.
+      apply Stack.mapsto_add1 in H4. inv H4.
+      apply TyLitU_C. easy.
+      apply Stack.add_3 in H4.
+      eapply HsHwf. apply H1. apply H4.
+      easy.
+      split.
+      unfold rheap_consistent. intros.
+      inv H1. inv H4. unfold heap_consistent_checked. intros. easy.
+      split. constructor. constructor. easy. constructor.
+      exists TNat. split. apply type_eq_refl. constructor. constructor.      
+    * apply Hswf in Wb. destruct Wb as [va [ta [X1 X2]]].
+      apply Stack.mapsto_always_same with (v1 := (va, ta)) in H13; try easy.
+      inv H13. apply eq_subtype_mode_same in X1. subst.
+      assert (Checked = Checked) by easy. apply H in H1. easy.
   Abort.
 
 

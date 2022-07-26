@@ -157,8 +157,30 @@ End StackProp.
 
 
 (* Env consistency *)
-Definition env_consistent (e: expression) (env env' : env) := 
-      forall x t, In x (freeVars e) -> Env.MapsTo x t env -> Env.MapsTo x t env'.
+Definition env_consistent D Q (env env' : env) := 
+      (forall x, Env.In x env <-> Env.In x env')
+      /\ (forall x t , ~ is_nt_ptr t -> Env.MapsTo x t env ->  Env.MapsTo x t env')
+      /\ (forall x t t', is_nt_ptr t -> Env.MapsTo x t env 
+                 ->  Env.MapsTo x t' env' -> subtype_core D Q t' t).
+
+Lemma env_consist_refl : forall D Q env, env_consistent D Q env env.
+Proof.
+  intros. unfold env_consistent. split.
+  intros. split. intros. easy. intros; easy.
+  split. intros. easy.
+  intros. apply Env.mapsto_always_same with (v1:= t') in H0; try easy. subst.
+  constructor.
+Qed.
+
+Lemma env_wf_consist: forall es D Q env env', env_consistent D Q env env' ->
+      Forall (fun e => env_wf e env) es -> Forall (fun e => env_wf e env') es.
+Proof.
+  induction es;intros;simpl in *;try easy.
+  inv H0. inv H. constructor.
+  unfold env_wf in *. intros. apply H3 in H.
+  apply H0 in H. easy.
+  apply (IHes D Q env); easy.
+Qed.
 
 Definition simple_means_not_freeVars:
    forall t, simple_type t -> freeTypeVars t = [].
