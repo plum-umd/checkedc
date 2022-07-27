@@ -49,7 +49,7 @@
      (if e e e)
      (strlen e)
      (dyn-bound-cast τ e)
-     (call e (e ...)))
+     (call e e ...))
 
   ;; erased expressions
   (ee ::=  i eS)
@@ -87,8 +87,8 @@
      (malloc m Eω)
      (n : Eτ)
      ;;New for functions
-     (call E (e ...))
-     (call (n : vτ) ((n : vτ) ... E e ...)))
+     (call E e ...)
+     (call (n : vτ) (n : vτ) ... E e ...))
 
   (Eω ::= (array hole he τ)
        (array l hole τ)
@@ -206,8 +206,8 @@
   (let x = e in e_body #:refers-to x)
   ; ':' can't appear twice. yet another redex bug?
   ; modified to allow let*-like behavior
-  (defun e ((x : τ) #:...bind (args x (shadow args x)) e_body #:refers-to args) _ τ_res #:refers-to args)
-  (defun ee x ... ee #:refers-to (shadow x ...))
+  (defun ((x : τ) #:...bind (args x (shadow args x)) e_body #:refers-to args) _ τ_res #:refers-to args)
+  (defun x ... ee #:refers-to (shadow x ...))
   (eH ((x i) ...) ee #:refers-to (shadow x ...) eH))
 
 (default-language CoreChkC+)
@@ -278,7 +278,7 @@
    E-VarNT-Sub]
 
   ;; this are just like their array counterparts
-  [(⊢↝/name (H (* (n : vτ))) (H Bounds X-NTDerefOOB))
+  [(⊢↝/name (Hs (* (n : vτ))) (Hs Bounds X-NTDerefOOB))
    (where (ptr c (ntarray l h vτ_1)) vτ)
    (side-condition ,(not (zero? (term n))))
    (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
@@ -313,9 +313,9 @@
    (side-condition ,(and (<= (term l) 0) (<= 0 (term h))))
    E-Str]
 
-  [(⊢↝/name (Hs (call (n_1 : vτ_1) (n_args : vτ_args) ..._1))  (Hs (⊢build-call-stack e_′ (x (n_args : vτ_args)) ...) E-Fun))
+  [(⊢↝/name (Hs (call (n_1 : vτ_1) (n_args : vτ_args) ..._1))  (Hs (⊢build-call-stack e (x (n_args : vτ_args)) ...) E-Fun))
    (where (ptr m (fun _ _ _)) vτ_1) 
-   (where (defun ((x : τ_2′) ..._1 e_′) : τ) (⊢fun-lookup (⊢fheap-by-mode m) n_1)) ;; defun no vτ_1
+   (where (defun ((x : τ_2′) ..._1 e) : τ) (⊢fun-lookup (⊢fheap-by-mode m) n_1)) ;; defun no vτ_1
    E-Fun]
 
   [(⊢↝/name (Hs (dyn-bound-cast vτ (n : vτ_′))) (Hs (n : vτ_′) E-DynCast)) ;; note that the annotation does not change
@@ -682,6 +682,7 @@
   [(⊢deref-ok? (ptr u ω)) #t]
   [(⊢deref-ok? (ptr c τ)) #t]
   [(⊢deref-ok? (ptr c (struct T))) #t]
+  [(⊢deref-ok? (ptr c (fun _ _ _))) #t]
   [(⊢deref-ok? (ptr c (array l h τ)))
    #t
    (side-condition (and (<= (term l) 0) (< 0 (term h))))]
@@ -696,6 +697,7 @@
   [(⊢assign-ok? (ptr u ω)) #t]
   [(⊢assign-ok? (ptr c τ)) #t]
   [(⊢assign-ok? (ptr c (struct T))) #t]
+  [(⊢assign-ok? (ptr c (fun _ _ _))) #t]
   [(⊢assign-ok? (ptr c (array l h τ)))
    #t
    (side-condition (and (<= (term l) 0) (< 0 (term h))))]
@@ -767,7 +769,7 @@
   [(⊢mode (x = E))          (⊢mode E)]
   [(⊢mode (if E e_1 e_2))   (⊢mode E)]
   ;;NEW
-  [(⊢mode (call n (n_0 : vτ) ... E e ...))
+  [(⊢mode (call (n_0 : vτ) (n_1 : vτ2) ... E e ...))
    (⊢mode E)]
   [(⊢mode (strlen E))
    (⊢mode E)])
@@ -918,6 +920,33 @@
   [(⊢sizeof (ntarray 0 i _)) ,(+ 1 (term i))]
   [(⊢sizeof _) ,(raise 'impossible)])
 
+(define-metafunction CoreChkC+
+  ⊢base? : n τ -> #t or #f
+  [(⊢base? n int) #t]
+  [(⊢base? n (ptr u ω)) #t]
+  [(⊢base? 0 τ) #t]
+  [(⊢base? n (ptr c (array 0 0 τ_′))) #t]
+  [(⊢base? n (ptr c (ntarray 0 0 τ_′))) #t]
+  [(⊢base? _ _) #f])
+
+(define-metafunction CoreChkC+
+  ⊢deref-type-dyn : D τ -> τ
+  [(⊢deref-type-dyn _ int) int]
+  [(⊢deref-type-dyn _ (ptr m τ)) τ]
+  [(⊢deref-type-dyn _ (ptr m (ntarray _ _ τ))) τ]
+  [(⊢deref-type-dyn _ (ptr m (array _ _ τ))) τ]
+  [(⊢deref-type-dyn _ (ptr m (fun _ τ _))) τ]
+  [(⊢deref-type-dyn D (ptr m (struct T)))
+   τ_1
+   (where ((τ_1 _) _ ...) (⊢struct-lookup D T))])
+
+(define-metafunction CoreChkC+
+  ⊢deref-type : ω -> τ
+  [(⊢deref-type τ) τ]
+  [(⊢deref-type (array le he τ)) τ]
+  [(⊢deref-type (ntarray le he τ)) τ])
+
+
 
 (module+ test
   (test--> (---> 'c)
@@ -980,13 +1009,12 @@
                    (let x = (2 : (ptr c (ntarray 0 4 int))) in (strlen x))))
             (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)))
                    (let x = (2 : (ptr c (ntarray 0 4 int))) in (3 : int)))))
-
-; TODO: failed test case  
-;  (test-->> (---> 'c)
-;            (term ((((8 : int) (0 : int)) ((8 : int) (0 : int)))
-;                   (let x = (1 : int) in
-;                        (let y = (2 : (ptr c (ntarray 0 0 int))) in (* y)))))
-;            (term ((((8 : int) (0 : int)) ((8 : int) (0 : int))) (0 : int))))
+ 
+  (test-->> (---> 'c)
+            (term ((((8 : int) (0 : int)) ((8 : int) (0 : int)))
+                   (let x = (1 : int) in
+                        (let y = (2 : (ptr c (ntarray 0 0 int))) in (* y)))))
+            (term ((((8 : int) (0 : int)) ((8 : int) (0 : int))) (0 : int))))
 
    (test-->> (---> 'c)
             (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)))
@@ -1123,57 +1151,202 @@
   )
 
 (module+ test
-  (parameterize ((*Fs* (term (((defun  ((x : int) (x + (1 : int))) : int)
-                             (defun ((y : int) (y + (2 : int))) : int)      
+  (parameterize ((*Fs* (term (((defun  ((x : int) (x + (1 : int))) : int)      ; (fun (x ...) τ (τ ...)))
+                             (defun ((y : int) (y + (2 : int))) : int)      ; (+2) at position 1
                              (defun ((p : int) (q : int) (p + q)) : int)
                              )
-                             ((defun ((x : int) (x + (1 : int))) : int)      
-                             (defun ((y : int) (y + (2 : int))) : int)      
+                             ((defun ((x : int) (x + (1 : int))) : int)      ; (+1) at position 0
+                             (defun ((y : int) (y + (2 : int))) : int)      ; (+2) at position 1
                              (defun ((p : int) (q : int) (p + q)) : int)
-                             )))))       
+                             )))))        ; (+)  at position 2
     (test--> (---> 'c)
-           (term ((() ()) (call (1 : (ptr c (fun (x) int (int)))) (4 : int))))
+           (term ((() ()) (call (1 : (ptr c (fun () int (int)))) (4 : int))))
            (term ((() ()) (let y = (4 : int) in (y + (1 : int))))))
     (test--> (---> 'c)
-           (term ((() ()) (call (3 : (ptr c (fun (p q) int (int int)))) (4 : int) (5 : int))))
+           (term ((() ()) (call (3 : (ptr c (fun () int (int int)))) (4 : int) (5 : int))))
            (term ((() ()) (let p = (4 : int) in (let q = (5 : int) in (p + q))))))
     )
 
-   (parameterize ((*Fs* (term (((defun ((x : (ptr c (ntarray 0 0 int)))    
+   (parameterize ((*Fs* (term (((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen
                                (if (* x)
                                    ((1 : int) +
-                                       (call (1 : (ptr c (fun (x) int (ptr c (ntarray 0 0 int)))))
+                                          (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
                                           (cast (ptr c (ntarray 0 0 int)) (x + (1 : int)))))
                                        (0 : int))) : int))
-                               ((defun ((x : (ptr c (ntarray 0 0 int)))    
+                               ((defun ((x : (ptr t (ntarray 0 0 int)))    ;strlen
                                (if (* x)
                                    ((1 : int) +
-                                    ;; need the cast for it to typecheck
-                                    ;; evaluation should go through even without
-                                              (call (1 : (ptr c (fun () int (ptr c (ntarray 0 0 int)))))
-                                          (cast (ptr c (ntarray 0 0 int)) (x + (1 : int)))))
+                                          (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (cast (ptr t (ntarray 0 0 int)) (x + (1 : int)))))
                                        (0 : int))) : int))))))
 
-
-  (e ::= (n : τ) x (let x = e in e) (malloc m ω) (cast τ e)
-     (e + e) (& e → f) (* e) (* e = e)
-     ;; NEW checked expr
-     (unchecked (x ...) e) (checked (x ...) e)
-     (if e e e)
-     (strlen e)
-     (dyn-bound-cast τ e)
-     (call e e ...))
-
-
     (test-->> (---> 'c)
-     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
-            (call (1 : (ptr c (fun (x) int ((ptr c (ntarray 0 0 int)))))) ((1 : (ptr c (ntarray 0 0 int)))))))
-     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (0 : int)))
-            (3 : int))))
+           (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+                  (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int)))))) (1 : (ptr c (ntarray 0 0 int))))))
+           (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+                  (3 : int))))
      )
 
-  )
+ (parameterize ((*Fs* (term (((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                              (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                       (0 : int))) : int))
+                            ((defun ((x : (ptr t (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                              (call (1 : (ptr t (fun () int ((ptr t (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                       (0 : int))) : int))))))
+    (test-->>
+     (---> 'c)
 
- 
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int)))))) (1 : (ptr c (ntarray 0 0 int))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (3 : int)))))
+
+   ;; arity
+  (parameterize ((*Fs* (term (((defun ((x : int)
+                               (x + (1 : int))) : int))
+                              ((defun ((x : int)
+                               (x + (1 : int))) : int))))))
+    (test-->>
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (call (1 : (ptr c (fun () int (int)))) (2 : int) (2 : int) )))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (call (1 : (ptr c (fun () int (int)))) (2 : int) (2 : int) ))))
+    (test-->>
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (call (1 : (ptr c (fun () int (int)))) (2 : int) )))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (3 : int)))))
+
+  (parameterize ((*Fs* (term (((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                              (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                       (0 : int))) : int))
+                              ((defun ((x : (ptr t (ntarray 0 0 int)))    ;strlen
+                               (if (* x)
+                                   ((1 : int) +
+                                              (call  (1 : (ptr t (fun () int ((ptr t (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                       (0 : int))) : int))))))
+    (test-->
+     (---> 'c)
+
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (call  (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int)))))) (1 : (ptr c (ntarray 0 0 int))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 0 int))) in
+                 (if (* x)
+                     ((1 : int) +
+                                (call  (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                            (x + (1 : int))))
+                     (0 : int))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 0 int))) in
+                 (if (* x)
+                     ((1 : int) +
+                                (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                            (x + (1 : int))))
+                     (0 : int)))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 (if (1 : int)
+                     ((1 : int) +
+                                (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                            (x + (1 : int))))
+                     (0 : int))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 (if (1 : int)
+                     ((1 : int) +
+                                (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                            (x + (1 : int))))
+                     (0 : int)))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        (x + (1 : int))))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        (x + (1 : int)))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        ((1 : (ptr c (ntarray 0 1 int))) + (1 : int))))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        ((1 : (ptr c (ntarray 0 1 int))) + (1 : int)))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        (2 : (ptr c (ntarray -1 0 int)))))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                        (2 : (ptr c (ntarray -1 0 int))))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                  (let x = (2 : (ptr c (ntarray -1 0 int))) in
+                       (if (* x)
+                                   ((1 : int) +
+                                              (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                   (0 : int))))))))
+
+    (test-->
+     (---> 'c)
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                  (let x = (2 : (ptr c (ntarray -1 0 int))) in
+                       (if (* x)
+                                   ((1 : int) +
+                                              (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                   (0 : int)))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ())
+            (let x = (1 : (ptr c (ntarray 0 1 int))) in
+                 ((1 : int) +
+                  (let x = (2 : (ptr c (ntarray -1 1 int))) in
+                       (if (1 : int)
+                                   ((1 : int) +
+                                              (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int))))))
+                                          (x + (1 : int))))
+                                       (0 : int))))))))
+    )
+)
+
 
 (print "tests pass")
