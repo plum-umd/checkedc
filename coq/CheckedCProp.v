@@ -207,6 +207,7 @@ Proof.
  apply IHes; try easy.
  destruct H1;subst.
  unfold Env.In,Env.Raw.PX.In. exists (TPtr m' (TNTArray h l t)); easy. easy.
+(*
  destruct H3;subst.
  unfold Env.In,Env.Raw.PX.In. exists (TPtr m' (TNTArray l h ta)); easy.
  apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
@@ -219,6 +220,7 @@ Proof.
  destruct (Nat.eq_dec x0 y); subst.
  exists (TPtr m' (TNTArray l h ta)). easy.
  apply Env.add_3 in H3 ; try easy. exists x1. easy. lia.
+*)
  apply ListSet.set_diff_iff in H1. destruct H1. simpl in *.
  apply not_or_and in H2. destruct H2.
  specialize (IHwell_typed2 x0).

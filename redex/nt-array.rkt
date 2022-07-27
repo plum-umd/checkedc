@@ -1371,7 +1371,15 @@
      (term (((1 : int) (1 : int) (1 : int) (0 : int))
             (call 1 (1 : (ptr c (ntarray 0 0 int))))))
      (term (((1 : int) (1 : int) (1 : int) (0 : int))
-            (3 : int)))))
+            (3 : int))))
+
+    (test-->> (---> 'c)
+
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (0 : int)))
+            (call (1 : (ptr c (fun () int ((ptr c (ntarray 0 0 int)))))) ((1 : (ptr c (ntarray 0 0 int)))))))
+     (term ((((1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (0 : int)))
+            (3 : int))))
+)
 
   ;; still works with messed up annotations
   (parameterize ((*F* (term ((defun ((x : (ptr c (ntarray 0 0 int)))    ;strlen

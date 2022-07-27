@@ -68,5 +68,36 @@ Module Make (X : OrderedType) <: MapS.S X.
       assumption.
     Qed.
 
+Lemma find_add1 : forall x (t : elt) env,
+    find (elt := elt) x (add x t env) = Some t.
+Proof.
+  intros.
+  apply find_1.
+  apply add_1.
+  reflexivity.
+Qed.
+
+Lemma find1 : forall x env,
+    find x env = None -> (forall (t : elt), ~ MapsTo (elt := elt) x t env).
+Proof.
+  intros.
+  unfold not.
+  intros.
+  apply find_1 in H0.
+  rewrite -> H0 in H.
+  inversion H.
+Qed.
+
+Lemma find2 : forall x env,
+    (forall (t : elt), ~ MapsTo x t env) -> find x env = None.
+Proof.
+  intros.
+  destruct (find (elt := elt) x env) eqn:Hd.
+  - exfalso. eapply H.
+    apply find_2 in Hd.
+    apply Hd.
+  - reflexivity.
+Qed.
+
   End elt.
 End Make.
