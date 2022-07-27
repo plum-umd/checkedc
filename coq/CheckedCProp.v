@@ -195,7 +195,7 @@ Proof.
  apply simple_means_not_freeVars in H0. rewrite H0 in H2. simpl in *. easy.
  apply simple_means_not_freeVars in H0. rewrite H0 in H1. simpl in *. easy.
  apply simple_means_not_freeVars in H. rewrite H in H0. simpl in *. easy.
- destruct H0;subst.
+ destruct H1;subst.
  unfold Env.In,Env.Raw.PX.In. exists t; easy. easy.
  apply in_app_iff in H3. destruct H3.
  unfold env_wf in *. apply IHwell_typed; easy.
@@ -221,14 +221,6 @@ Proof.
  exists (TPtr m' (TNTArray l h ta)). easy.
  apply Env.add_3 in H3 ; try easy. exists x1. easy. lia.
 *)
- apply ListSet.set_diff_iff in H1. destruct H1. simpl in *.
- apply not_or_and in H2. destruct H2.
- specialize (IHwell_typed2 x0).
- apply IHwell_typed2 in H1.
- unfold Env.In, Env.Raw.PX.In in *.
- destruct H1.
- apply Env.add_3 in H1 ; try easy.
- exists x1. easy.
  apply in_app_iff in H3. destruct H3.
  apply IHwell_typed1; easy.
  apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
@@ -256,7 +248,7 @@ Proof.
  exists x1. easy.
  apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
  apply in_app_iff in H2. destruct H2.
- apply simple_means_not_freeVars in H0. rewrite H0 in H2. simpl in *. easy.
+ apply simple_means_not_freeVars in H0 ; simpl in *. rewrite H0 in H2. simpl in *. easy.
  apply not_or_and in H3. destruct H3.
  apply IHwell_typed in H2.
  unfold Env.In, Env.Raw.PX.In in *.
@@ -566,6 +558,18 @@ Section TypeProp.
     destruct b0. easy. simpl in *. inv H0.
     apply IHt;try easy.
     constructor.
+  Qed.
+
+  Lemma eval_type_bound_preserve : forall s t t' t'',
+      eval_type_bound s t t' -> eval_type_bound s t t'' -> t' = t''.
+  Proof with auto.
+    intros. generalize dependent t''. induction H; intros; try easy... inv H0. easy.
+    inv H0. apply IHeval_type_bound in H4; try easy. subst. easy.
+    inv H2. rewrite H in H6. rewrite H0 in H8. inv H6. inv H8.
+    apply IHeval_type_bound in H9; try easy; subst. easy.
+    inv H2. rewrite H in H6. rewrite H0 in H8. inv H6. inv H8.
+    apply IHeval_type_bound in H9; try easy; subst. easy.
+    inv H0. easy. inv H0. easy.
   Qed.
 
 (*

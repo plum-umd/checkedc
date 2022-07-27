@@ -397,7 +397,7 @@ Definition structdef_wf (D : structdef) : Prop :=
     fields_wf D fs.
 
 
-Inductive theta_elem : Type := NumEq (n:Z) | GeZero.
+Inductive theta_elem : Type := NumEq (n:bound) | GeZero.
 
 Module Theta := Map.Make Nat_as_OT.
 Module ThetaFacts := FMapFacts.Facts (Theta).
@@ -478,6 +478,29 @@ Proof.
   repeat (try rewrite Theta.find_add1; auto; try rewrite theta_find_add2; auto).    
 Qed.
 
+Lemma theta_remove_eq : forall Q Q' x,
+     @Theta.Equal theta_elem Q Q' -> Theta.Equal (Theta.remove x Q) (Theta.remove x Q').
+Proof.
+  intros. 
+  apply ThetaFacts.Equal_mapsto_iff.
+  intros.
+  destruct (Nat.eq_dec k x); subst.
+  split; intros.
+  assert (~ Theta.In x (Theta.remove (elt:=theta_elem) x Q)).
+  apply Theta.remove_1. easy. 
+  assert (Theta.In x (Theta.remove (elt:=theta_elem) x Q)).
+  exists e. easy. easy.
+  assert (~ Theta.In x (Theta.remove (elt:=theta_elem) x Q')).
+  apply Theta.remove_1. easy. 
+  assert (Theta.In x (Theta.remove (elt:=theta_elem) x Q')).
+  exists e. easy. easy.
+  split. intros. apply Theta.remove_3 in H0.
+  apply Theta.remove_2. lia. eapply Theta.mapsto_equal; eauto.
+  intros. apply Theta.remove_3 in H0.
+  apply Theta.remove_2. lia. eapply Theta.mapsto_equal; eauto.
+  apply ThetaFacts.Equal_sym. easy.
+Qed.
+
 
 (* This defines the subtyping relation. *)
 Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
@@ -485,12 +508,11 @@ Inductive nat_leq (T:theta) : bound -> bound -> Prop :=
 | nat_leq_var : forall x l h, l <= h -> nat_leq T (Var x l) (Var x h)
 | nat_leq_num_var : forall x l h,
     Theta.MapsTo x GeZero T -> l <= h -> nat_leq T (Num l) (Var x h)
-| nat_leq_var_1: forall x n l v, Theta.MapsTo x (NumEq ( n)) T -> nat_leq T (Num (n+l)) v -> nat_leq T (Var x l) v
-| nat_leq_var_2: forall x n l v, Theta.MapsTo x (NumEq ( n)) T -> nat_leq T v (Num (n+l)) -> nat_leq T v (Var x l).
-(*
+| nat_leq_var_1: forall x n l v, Theta.MapsTo x (NumEq (Num n)) T -> nat_leq T (Num (n+l)) v -> nat_leq T (Var x l) v
+| nat_leq_var_2: forall x n l v, Theta.MapsTo x (NumEq (Num n)) T -> nat_leq T v (Num (n+l)) -> nat_leq T v (Var x l)
 | nat_leq_var_3: forall x y n l v, Theta.MapsTo x (NumEq (Var y n)) T -> nat_leq T (Var y (n+l)) v -> nat_leq T (Var x l) v
 | nat_leq_var_4: forall x y n l v, Theta.MapsTo x (NumEq (Var y n)) T -> nat_leq T v (Var y (n+l)) -> nat_leq T v (Var x l).
-*)
+
 Lemma nat_leq_refl : forall T a, nat_leq T a a.
 Proof.
   intros. induction a.
@@ -498,7 +520,8 @@ Proof.
   constructor. easy.
 Qed.
 
-Lemma nat_leq_trans : forall a b c T,  nat_leq T a b -> nat_leq T b c -> nat_leq T a c.
+Axiom nat_leq_trans : forall a b c T,  nat_leq T a b -> nat_leq T b c -> nat_leq T a c.
+(*
 Proof.
   intros.  generalize dependent c. induction H;intros;simpl in *.
   inv H0. constructor. lia. 
@@ -545,11 +568,14 @@ Proof.
   inv H5.
   apply nat_leq_var_2 with (n := n0); try easy.
 Qed.
+*)
 
 Lemma nat_leq_q_empty: forall Q n n', nat_leq empty_theta n n' -> nat_leq Q n n'.
 Proof.
   intros. remember empty_theta as Q'. induction H;intros;simpl in *;subst.
   constructor. easy. constructor. easy.
+  apply ThetaFacts.empty_mapsto_iff in H. easy.
+  apply ThetaFacts.empty_mapsto_iff in H. easy.
   apply ThetaFacts.empty_mapsto_iff in H. easy.
   apply ThetaFacts.empty_mapsto_iff in H. easy.
   apply ThetaFacts.empty_mapsto_iff in H. easy.
@@ -729,10 +755,14 @@ Proof.
   eapply Theta.mapsto_equal. apply H0. easy.
   apply nat_leq_var_2 with (n := n); try easy.
   eapply Theta.mapsto_equal. apply H0. easy.
+  apply nat_leq_var_3 with (y := y) (n := n); try easy.
+  eapply Theta.mapsto_equal. apply H0. easy.
+  apply nat_leq_var_4 with (y := y) (n := n); try easy.
+  eapply Theta.mapsto_equal. apply H0. easy.
 Qed.
 
 Lemma nat_leq_q_conv: forall Q a b x v, 0 <= v ->
-      nat_leq (Theta.add x GeZero Q) a b -> nat_leq (Theta.add x (NumEq v) Q) a b.
+      nat_leq (Theta.add x GeZero Q) a b -> nat_leq (Theta.add x (NumEq (Num v)) Q) a b.
 Proof.
   intros. induction H0;try easy.
   constructor. easy. constructor. easy.
@@ -751,6 +781,16 @@ Proof.
   apply Theta.mapsto_add1 in H0. inv H0.
   apply Theta.add_3 in H0; try lia.
   apply nat_leq_var_2 with (n := n); try easy.
+  apply Theta.add_2. lia. easy.
+  destruct (Nat.eq_dec x0 x); subst.
+  apply Theta.mapsto_add1 in H0. inv H0.
+  apply Theta.add_3 in H0; try lia.
+  apply nat_leq_var_3 with (y := y) (n := n); try easy.
+  apply Theta.add_2. lia. easy.
+  destruct (Nat.eq_dec x0 x); subst.
+  apply Theta.mapsto_add1 in H0. inv H0.
+  apply Theta.add_3 in H0; try lia.
+  apply nat_leq_var_4 with (y := y) (n := n); try easy.
   apply Theta.add_2. lia. easy.
 Qed.
 
@@ -776,7 +816,7 @@ Proof.
 Qed.
 
 Lemma type_eq_q_conv: forall Q t t' x v, 0 <= v ->
-     type_eq (Theta.add x GeZero Q) t t' -> type_eq (Theta.add x (NumEq v) Q) t t'.
+     type_eq (Theta.add x GeZero Q) t t' -> type_eq (Theta.add x (NumEq (Num v)) Q) t t'.
 Proof.
   intros. induction H0; intros;simpl in *. constructor.
   constructor. easy. constructor. constructor; try easy.
@@ -890,12 +930,9 @@ Section Subtype.
   Qed.
  
   Lemma subtype_core_trans : forall Q t t1 t',
-      word_type t1 ->
       @subtype_core Q t t1 -> @subtype_core Q t1 t' -> @subtype_core Q t t'.
   Proof with (eauto with ty; try easy). 
-    intros. apply subtype_core_word_type_1 in H0 as X1; try easy.
-    apply subtype_core_word_type in H1 as X2; try easy.
-    inv H; inv H1; inv H0...
+    intros. inv H; inv H0...
   Qed.
 
 
@@ -1046,7 +1083,6 @@ Section Subtype.
     intros. induction H using subtype_type_ind3.
     - constructor.
       apply subtype_core_trans with (t1 := t2); try easy.
-      apply subtype_core_word_type with (Q:=Q) (t1 := t1); try easy.
     - inv H0. inv H10. easy. inv H1... inv H0...
       apply SubTypeFunChecked; try easy. apply IHsubtype_order; try easy.
       induction H9. constructor.
@@ -1176,7 +1212,7 @@ Qed.
 
 Lemma subtype_core_q_conv: forall Q t t' x v, 0 <= v ->
       subtype_core (Theta.add x GeZero Q) t t'
-        -> subtype_core (Theta.add x (NumEq v) Q) t t'.
+        -> subtype_core (Theta.add x (NumEq (Num v)) Q) t t'.
 Proof with (eauto with ty; try easy). 
   intros. induction H0;try easy.
   constructor.
@@ -1215,13 +1251,20 @@ Qed.
 
 Lemma subtype_q_conv: forall Q t t' x v, 0 <= v ->
       subtype (Theta.add x GeZero Q) t t' 
-      -> subtype (Theta.add x (NumEq v) Q) t t'.
+      -> subtype (Theta.add x (NumEq (Num v)) Q) t t'.
 Proof.
   intros. remember (Theta.add x GeZero Q) as Q'.
   induction H0;try easy; subst.
   constructor. eapply subtype_core_q_conv; eauto.
   apply SubTypeFunChecked; try easy.
   apply SubTypeFunTainted; try easy.
+Qed.
+
+Lemma subtype_core_nt: forall Q m l h t t', subtype_core Q t' (TPtr m (TNTArray l h t)) 
+      -> (exists l' h', t' = TPtr m (TNTArray l' h' t)).
+Proof.
+  intros. inv H. exists l,h. easy.
+  inv H2. inv H2. exists l0,h0. easy. 
 Qed.
 
 End Subtype.
@@ -1252,7 +1295,7 @@ Definition theta_wt (Q:theta) (env:env) (S:stack) :=
   (forall x, Theta.In x Q -> Env.In x env)
   /\ (forall x n, Theta.MapsTo x GeZero Q ->
                      Stack.MapsTo x (n,TNat) S -> 0 <= n)
-  /\ (forall x n, Stack.MapsTo x (n,TNat) S -> Theta.MapsTo x (NumEq n) Q).
+  /\ (forall x n, Stack.MapsTo x (n,TNat) S -> Theta.MapsTo x (NumEq (Num n)) Q).
 
 (*
 Definition dyn_env := Stack.t type.
@@ -2015,6 +2058,47 @@ Fixpoint get_var_stack (S:stack) (l:list var) :=
                         end
    end.
 
+Lemma nat_leq_q_subst: forall Q t x y v, Theta.MapsTo y (NumEq (Num v)) Q ->
+              nat_leq Q (subst_bound t x (Num v)) (subst_bound t x (Var y 0)).
+Proof.
+  intros. induction t;simpl in *;subst. constructor. easy.
+  destruct (v0 =? x)%nat eqn:eq1.
+  apply Nat.eqb_eq in eq1; subst.
+  apply nat_leq_var_2 with (n := v); try easy.
+  constructor. lia. apply nat_leq_var. lia.
+Qed.
+
+Lemma nat_leq_q_subst_1: forall Q t x y v, Theta.MapsTo y (NumEq (Num v)) Q ->
+              nat_leq Q (subst_bound t x (Var y 0)) (subst_bound t x (Num v)).
+Proof.
+  intros. induction t;simpl in *;subst. constructor. easy.
+  destruct (v0 =? x)%nat eqn:eq1.
+  apply Nat.eqb_eq in eq1; subst.
+  apply nat_leq_var_1 with (n := v); try easy.
+  constructor. lia. apply nat_leq_var. lia.
+Qed.
+
+Lemma nat_eq_q_subst: forall Q t x y v, Theta.MapsTo y (NumEq (Num v)) Q ->
+              nat_eq Q (subst_bound t x (Num v)) (subst_bound t x (Var y 0)).
+Proof.
+  intros. split. apply nat_leq_q_subst.  easy. 
+  apply nat_leq_q_subst_1; easy.
+Qed. 
+
+
+Lemma type_eq_q_subst: forall Q t x y v, Theta.MapsTo y (NumEq (Num v)) Q ->
+              type_eq Q (subst_type t x (Num v)) (subst_type t x (Var y 0)).
+Proof.
+  intros. induction t; intros;simpl in *. constructor.
+  constructor. easy. constructor. constructor; try easy.
+  apply nat_eq_q_subst; easy.
+  apply nat_eq_q_subst; easy.
+  constructor; try easy.
+  apply nat_eq_q_subst; easy.
+  apply nat_eq_q_subst; easy.
+  constructor.
+Qed.
+
 
 (* cast bounds. 
 Definition  cast_bound (Q:theta) (b:bound) : bound :=
@@ -2450,7 +2534,7 @@ Inductive step
     eval_type_bound s t t' ->
     step D F
       (s, R) (ELet x (ELit n t) e)
-      (Stack.add x (n,t') s,  R)
+      (s,  R)
       (RExpr (ERet x (n,t') e))
 
 | SRetSome : forall s R s' R' x nb tb nb' tb' a' ta' e re,
@@ -2879,7 +2963,7 @@ Qed.
 
 Lemma eq_subtype_q_conv: forall D Q t t' x v, 0 <= v -> 
    eq_subtype D (Theta.add x GeZero Q) t t' 
-        -> eq_subtype D (Theta.add x (NumEq v) Q) t t'.
+        -> eq_subtype D (Theta.add x (NumEq (Num v)) Q) t t'.
 Proof.
   intros. unfold eq_subtype in *.
   destruct H0. destruct H0.
@@ -2931,6 +3015,10 @@ Proof.
    intros. inv H. destruct H0. inv H. inv H0. inv H. easy.
 Qed.
 
+Lemma eq_subtype_nat_1 : forall D Q t, eq_subtype D Q t TNat -> t = TNat.
+Proof.
+   intros. inv H. destruct H0. inv H0. inv H1. inv H. easy.
+Qed.
 
 Lemma eq_subtype_fun : forall D Q m xl t ts ta,
       eq_subtype D Q ta (TPtr m (TFun xl t ts)) ->
@@ -3167,9 +3255,10 @@ Section Typing.
   | TyLitUnChecked : forall env Q n t,
       simple_type t ->
       well_typed env Q Unchecked (ELit n t) t
-  | TyVar : forall env Q m x t,
+  | TyVar : forall env Q m x t t',
       Env.MapsTo x t env ->
-      well_typed env Q m (EVar x) t
+      subtype_core D Q t t' ->
+      well_typed env Q m (EVar x) t'
 
   | TyCall : forall env Q m m' es x xl ts t ta,
       mode_leq m' m ->
@@ -3201,16 +3290,11 @@ Section Typing.
       ~ In x (freeTypeVars t) ->
       well_typed env Q m (ELet x (EStrlen y) e) t
 *)
-  | TyLetNatA : forall env Q m x n e2 t,
-      well_typed env Q m (ELit n TNat) TNat ->
-      well_typed (Env.add x TNat env) (Theta.add x (NumEq n) Q) m e2 t ->
-      well_typed env Q m (ELet x (ELit n TNat) e2) (subst_type t x (Num n))
-
-  | TyLetNatB : forall env Q m x e1 e2 t b,
-      ~ literal e1 ->
+  | TyLetNat : forall env Q m x e1 e2 t b,
       well_typed env Q m e1 TNat ->
-      well_typed (Env.add x TNat env) Q m e2 t ->
+      well_typed (Env.add x TNat env) (Theta.add x (NumEq b) Q) m e2 t ->
       get_good_dept e1 = Some b ->
+      ~ Theta.In x Q ->
       well_typed env Q m (ELet x e1 e2) (subst_type t x b)
 
   (* | TyLetPtrSame1 : forall env Q m m' x e1 t1 e2 t, *)
@@ -3223,18 +3307,18 @@ Section Typing.
   | TyLet : forall env Q m x e1 m' t1 e2 t,
       mode_leq m' m ->
       well_typed env Q m e1 (TPtr m' t1) ->
-      well_typed (Env.add x t1 env) Q m e2 t ->
+      well_typed (Env.add x (TPtr m' t1) env) Q m e2 t ->
       well_typed env Q m (ELet x e1 e2) t
 
   | TyRetTNat : forall env Q m x na e t,
-      well_typed (Env.add x TNat env) (Theta.add x (NumEq na) Q) m e t ->
+      well_typed (Env.add x TNat env) (Theta.add x (NumEq (Num na)) Q) m e t ->
       well_typed env Q m (ERet x (na,TNat) e) (subst_type t x (Num na))
 
-  | TyRet : forall env Q m x na ta e t,
-      ta <> TNat ->
-      simple_type ta ->
-      well_typed (Env.add x ta env) Q m e t ->
-      well_typed env Q m (ERet x (na,ta) e) t
+  | TyRet : forall env Q m m' x na ta e t,
+      mode_leq m' m ->
+      simple_type (TPtr m' ta) ->
+      well_typed (Env.add x (TPtr m' ta) env) Q m e t ->
+      well_typed env Q m (ERet x (na,TPtr m' ta) e) t
 
   | TyPlus : forall env Q m e1 e2,
       well_typed env Q m e1 (TNat) ->
