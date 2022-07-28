@@ -718,6 +718,7 @@
 (define-metafunction CoreChkC+
   ⊢types : D ω -> (τ ...)
   [(⊢types D τ) (τ)]
+  [(⊢types D (fun _ τ _)) (τ)]
   [(⊢types D (array l h τ))
    ,(make-list (term n) (term τ))
    (where n ,(- (term h) (term l)))
@@ -1347,6 +1348,40 @@
                                        (0 : int))))))))
     )
 )
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;Test functions
+
+(module+ test
+  (test-equal (term (⊢types () (ntarray 0 0 int))) (term (int)))
+  (test-equal (term (⊢types () (ntarray 0 1 int))) (term (int int)))
+
+  (test--> ~~>
+           (term ((((8 : int) (0 : int)) ())
+                  (let x = (1 : (ptr c (ntarray 0 0 int))) in (* x))))
+           (term ((((8 : int) (0 : int)) ())
+                  (let x = (1 : (ptr c (ntarray 0 1 int))) in (8 : int)))))
+
+  (test-->>∃ ~~>
+             (term ((((8 : int) (0 : int)) ())
+                    (let x = (1 : (ptr c (ntarray 0 0 int))) in (* x))))
+             (curry (default-equiv)
+                    (term ((((8 : int) (0 : int)) ())
+                           (let x = (1 : (ptr c (ntarray 0 1 int))) in (8 : int))))))
+
+  (test-->> (---> 'c)
+            (term ((((8 : int) (0 : int)) ())
+                   (let x = (1 : (ptr c (ntarray 0 0 int))) in
+                        (if (* x)
+                            (let y = (x + (1 : int)) in
+                                 (* y))
+                            (1 : int)))))
+            (term ((((8 : int) (0 : int)) ()) (0 : int))))
+  (test-->> (---> 'c)
+            (term ((((8 : int) (0 : int)) ())
+                   (if (5 : int) (2 : int) (3 : int))))
+            (term ((((8 : int) (0 : int)) ()) (2 : int)))))
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 
 (print "tests pass")
