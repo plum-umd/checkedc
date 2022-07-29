@@ -320,6 +320,9 @@ Proof.
   apply ThetaFacts.Equal_sym. easy.
   eapply TyLet; eauto.
   eapply TyRetTNat; eauto.
+  intros R1. destruct R1. apply Theta.mapsto_equal with (s2 := Q) in H2.
+  assert (Theta.In x Q). exists x0. easy. easy.
+  apply ThetaFacts.Equal_sym. easy.
   apply IHwell_typed.
   apply equiv_theta_add. easy.
   apply TyRet; eauto.
@@ -457,6 +460,19 @@ Proof.
   assert (Theta.In x0 Q0). exists x1. easy. easy. lia.
   eapply TyLet; eauto.
   eapply TyRetTNat; eauto.
+  intros R1. destruct R1.
+  destruct (Nat.eq_dec x0 x); subst.
+  assert (Theta.In x Q).
+  exists GeZero.
+  apply Theta.mapsto_equal with (s1 := (Theta.add x GeZero Q0)); try easy.
+  apply Theta.add_1. easy. easy.
+  assert (~ Theta.In x0 Q0).
+  intros R2. destruct R2.
+  apply Theta.add_2 with (x := x) (e' := GeZero) in H4; try easy.
+  apply Theta.mapsto_equal with (s2 := Q) in H4; try easy. 
+  assert (Theta.In x0 Q). exists x2. easy. easy. lia.
+  apply Theta.add_3 in H3.
+  assert (Theta.In x0 Q0). exists x1. easy. easy. lia.
   assert (Theta.Equal (Theta.add x0 (NumEq (Num na)) Q) (Theta.add x0 (NumEq (Num na)) (Theta.add x GeZero Q0))).
   apply equiv_theta_add. easy.
   destruct (Nat.eq_dec x0 x); subst.
@@ -525,12 +541,6 @@ Lemma well_typed_q_real: forall D F R env Q m e t x y v, Theta.MapsTo y (NumEq (
 Proof.
 Admitted.
 
-Lemma or_nt_ptr: forall t, is_nt_ptr t \/ ~ is_nt_ptr t.
-Proof.
-  intros. destruct t; simpl in *; try (right;easy).
-  destruct t; try (right;easy). left. easy.
-Qed.
-
 Lemma well_typed_env_consist: forall D F R env env' Q m e t,
    env_consistent D Q env env' ->
    well_typed D F R env Q m e t -> well_typed D F R env' Q m e t.
@@ -568,6 +578,47 @@ Proof.
   apply IHwell_typed2; try easy.
 Admitted.
 
+Lemma well_typed_env_consist_1: forall D F R env Q m e t x v,
+   Theta.MapsTo x (NumEq (Num v)) Q ->
+   well_typed D F R env Q m e t -> well_typed D F R (subst_env env x (Num v)) Q m e t.
+Proof.
+  intros. 
+  induction H0; intros; simpl in *; try easy.
+  constructor;try easy.
+  apply TyLitTainted; try easy.
+  apply TyLitUnChecked; try easy.
+  apply TyVar with (t := subst_type t x (Num v)); try easy.
+  apply EnvFacts.map_mapsto_iff. exists t. easy.
+Admitted.
+
+Lemma well_typed_heap_consist: forall D F R R' env Q m e t,
+   rheap_consistent D F R' R ->
+   well_typed D F R env Q m e t -> well_typed D F R' env Q m e t.
+Proof.
+  intros.
+  induction H0; intros; simpl in *; try easy.
+  constructor;try easy.
+  unfold rheap_consistent in *. destruct R. destruct R'.
+  specialize (H h1 h2 h h0). unfold heap_consistent_checked in *.
+  simpl in *. apply H; try easy.
+  apply TyLitTainted; try easy.
+  apply TyLitUnChecked; try easy.
+  apply TyVar with (t := t); try easy.
+  eapply TyCall; try easy. apply H0. apply IHwell_typed.
+Admitted.
+
+
+Lemma well_typed_env_grow: forall D F R env env' Q m e t,
+   (forall x t t', Env.MapsTo x t env -> Env.MapsTo x t' env' -> eq_subtype D Q t' t) ->
+   well_typed D F R env Q m e t -> well_typed D F R env' Q m e t.
+Proof.
+  intros.
+  induction H0; intros; simpl in *; try easy.
+  constructor;try easy.
+  apply TyLitTainted; try easy.
+  apply TyLitUnChecked; try easy.
+Admitted.
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
@@ -580,7 +631,6 @@ Section Preservation.
       stack_wt D Checked s ->
       env_wt D Checked env ->
       theta_wt Q env s ->
-      sub_domain env s ->
       stack_wf D Q env s ->
       stack_rheap_consistent D F R s ->
       fun_wf D F R ->
@@ -589,8 +639,7 @@ Section Preservation.
         (s, R) e Checked
         (s', R') (RExpr e') ->
       exists env' t',
-        sub_domain env' s'
-        /\ stack_wf D Q env' s'
+           stack_wf D Q env' s'
         /\ theta_wt Q env' s'
         /\ stack_rheap_consistent D F R s'
         /\ rheap_consistent D F R' R
@@ -599,8 +648,9 @@ Section Preservation.
         /\ eq_subtype D Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
-      HRwf HRWt HEwf Hswt Henvt HQt HsubDom Hswf HsHwf Hwf Hwt.
+      HRwf HRWt HEwf Hswt Henvt HQt Hswf HsHwf Hwf Hwt.
     generalize dependent R'. generalize dependent s'.  generalize dependent e'.
+    generalize dependent s.
     remember Checked as m.
     induction Hwt as
       [
@@ -613,8 +663,8 @@ Section Preservation.
        (* env Q m m' x y e l h t ta HMode Wb HTy HIn Hx              | (* LetStrlen *) *)
         env Q m x e1 e2 t b HTy1 IH1 HTy2 IH2 Hdept Hx             | (* Let-Nat-Expr *)
         env Q m x e1 m' t1 e2 t HMode HTy1 IH1 HTy2 IH2            | (* Let-Expr *)
+        env Q m x na e t Hx HTy1 IH1                               | (* RetTNat *)
 
-        env Q m x na ta a e t HIn HTy1 IH1 Hx                      | (* Ret *)
         env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
         env Q m t e1 e2 HTyfun HTy1 IH1 HTy2 IH2                   | (* Addition Index *)
         env Q m e m' T fs i fi ti HTy IH HWf1 HWf2                 | (* Field Addr *)
@@ -639,7 +689,7 @@ Section Preservation.
         env Q m m' x t t1 e1 e2 t2 t3 t4 HEnv TSub HPtr HTy1 IH1 HTy2 IH2 HJoin HMode  | (* IfDef *)
         env Q m m' x l t e1 e2 t2 t3 t4 HEnv HTy1 IH1 HTy2 IH2 HJoin HMode             | (* IfDefNT *)
         env Q m e1 e2 e3 t2 t3 t4 HTy1 IH1 HTy2 IH2 HTy3 IH3 HJoin                       (* If *)
-      ]; intros e' s' R' Hreduces; subst.
+      ]; intros s Hswt HQt Hswf HsHwf e' s' R' Hreduces; subst.
     (* T-Lit, impossible because values do not step *)
     - inv Hreduces; solve_ctxt.
     (* T-LitTainted *)
@@ -665,6 +715,179 @@ Section Preservation.
       inv H4. apply eq_subtype_trans with (t2 := t); try easy. 
       unfold eq_subtype. exists t. split. apply type_eq_refl.
       constructor. easy.
+ - admit.
+ - admit.
+ - admit.
+ - admit.
+    (* T-RetNat *)
+   - assert (X1 := Hreduces). inv Hreduces. destruct E;inv H; simpl in *; subst; try easy.
+     assert (Env.In x env \/ ~ Env.In x env) as G1.
+     destruct (Env.find x env) eqn:eq1. apply Env.find_2 in eq1. left. exists t0. easy.
+     apply EnvFacts.not_find_in_iff in eq1. right. easy.
+     destruct G1 as [G1 | G1].
+     inv H2. unfold inject_ret in *; destruct re; try easy; inv H10.
+     inv HEwf.
+     assert (env_wt D Checked (Env.add x TNat env)).
+     unfold env_wt in *. intros. destruct (Nat.eq_dec x0 x); subst.
+     apply Env.mapsto_add1 in H; subst. split. easy. split. constructor.
+     unfold well_type_bound_in. intros. simpl in *. easy.
+     apply Env.add_3 in H. apply Henvt in H. destruct H as [X2 [X3 X4]].
+     split. easy. split. easy. unfold well_type_bound_in. intros.
+     destruct (Nat.eq_dec x1 x); subst. apply Env.add_1. easy.
+     apply X4 in H. apply Env.add_2. lia. easy. lia.
+     assert (Checked = Checked) by easy.
+     specialize (IH1 H0 H6 H (Stack.add x (na, TNat) s)).
+     edestruct IH1; eauto.
+     unfold stack_wt in *. intros. destruct (Nat.eq_dec x0 x); subst. apply Stack.mapsto_add1 in H1.
+     inv H1. split. easy. split. constructor. easy.
+     apply Stack.add_3 in H1. apply Hswt in H1; try easy. lia.
+     destruct HQt as [A1 [A2 A3]].
+     unfold theta_wt in *. split. intros. split. intros.
+     destruct (Nat.eq_dec x0 x); subst. apply Env.add_1. easy.
+     destruct H1. apply Theta.add_3 in H1. assert (Theta.In x0 Q). exists x1. easy.
+     apply A1 in H3. apply Env.add_2. lia. easy. lia.
+     intros. destruct (Nat.eq_dec x0 x); subst. exists (NumEq (Num na)). apply Theta.add_1. easy.
+     apply Env.add_3 in H1. apply A1 in H1. destruct H1. exists x1.
+     apply Theta.add_2; try lia. easy. lia.
+     split. intros. destruct (Nat.eq_dec x0 x); subst. apply Theta.mapsto_add1 in H1.
+     inv H1. apply Theta.add_3 in H1. apply Stack.add_3 in H3. eapply A2; eauto. lia. lia.
+     intros. destruct (Nat.eq_dec x0 x); subst. apply Stack.mapsto_add1 in H1.
+     inv H1. apply Theta.add_1. easy. apply Stack.add_3 in H1. apply Theta.add_2. lia.
+     apply A3 in H1. easy. lia.
+     unfold stack_wf in *. intros.
+     destruct (Nat.eq_dec x0 x); subst. apply Env.mapsto_add1 in H1. subst.
+     exists na, TNat. split. exists TNat. split. apply type_eq_refl. constructor. constructor.
+     apply Stack.add_1. easy. apply Env.add_3 in H1. apply Hswf in H1.
+     destruct H1 as [va [ta [B1 B2]]]. exists va,ta. split. destruct B1. destruct H1.
+     exists x1. split. apply type_eq_q_add; try easy. apply subtype_q_add; try easy.
+     apply Stack.add_2. lia. easy. lia.
+     unfold stack_rheap_consistent in *. intros.
+     destruct (Nat.eq_dec x0 x); subst. apply Stack.mapsto_add1 in H3. inv H3.
+     constructor. eapply HsHwf; eauto. apply Stack.add_3 in H3; try easy. apply H3. lia.
+     apply step_implies_reduces_1 with (E := CHole) (m := Checked) in H12. simpl in *. apply H12. easy.
+     destruct H1 as [ta [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 Y7]]]]]]].
+     apply step_stack_consist in H12 as Y9. simpl in *.
+     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
+          apply Stack.mapsto_add1 in H1;subst. inv H1. split. easy. split. easy. easy.
+          apply Stack.add_3 in H1. apply Hswt in H1. easy. lia.
+        }
+     assert (nb' = na /\ tb' = TNat).
+     destruct Y9 as [B1 [B2 B3]].
+     assert (Stack.MapsTo x (na, TNat) (Stack.add x (na, TNat) s)). apply Stack.add_1. easy.
+     apply B2 in H1; try easy. apply Stack.mapsto_always_same with (v1 := (na,TNat)) in H11; try easy. inv H11. easy.
+     destruct H1 as [B1 B2];subst.
+     destruct G1 as [tc G1]. apply Hswf in G1 as G2. destruct G2 as [vc [tc' [G2 G3]]].
+     apply Stack.mapsto_always_same with (v1 := (vc,tc')) in H4; try easy. inv H4.
+     exists (Env.add x tc (subst_env x0 x (Num na))),(subst_type ta x (Num na)).
+     split. unfold stack_wf in *. intros.
+     destruct (Nat.eq_dec x1 x); subst. apply Env.mapsto_add1 in H1; subst.
+     exists a',ta'. split. easy. apply Stack.add_1. easy.
+     apply Env.add_3 in H1; try lia.
+     apply EnvFacts.map_mapsto_iff in H1 as G4.
+     destruct G4 as [t0a [G4 G5]]; subst. apply Y1 in G5 as G6. destruct G6 as [va [t0b [G6 G7]]].
+     apply eq_subtype_subst_1 in G6; try easy.
+     apply Y10 in G7 as G8. destruct G8 as [G8 [G9 G10]].
+     rewrite simple_subst_type_same in G6; try easy.
+     exists va,t0b. split. easy. apply Stack.add_2; try lia. easy.
+     split. unfold theta_wt in *.
+     destruct Y2 as [B1 [B2 B3]]. split. intros. split. intros.
+     destruct (Nat.eq_dec x1 x); subst. easy.
+     specialize (B1 x1). assert (Theta.In (elt:=theta_elem) x1 (Theta.add x (NumEq (Num na)) Q)).
+     destruct H1. exists x2. apply Theta.add_2. lia. easy.
+     apply B1 in H3. apply Env.add_2. lia.
+     apply Env.map_1 with (f := (fun t => subst_type t x (Num na))) in H3. eauto.
+     intros. destruct (Nat.eq_dec x1 x); subst. apply Env.mapsto_add1 in H1; subst.
+     destruct HQt. apply H1 in G1. easy.
+     apply Env.add_3 in H1; try lia.
+     unfold subst_env in H1. apply EnvFacts.map_mapsto_iff in H1.
+     destruct H1. destruct H1. destruct x2; try easy.
+     apply B1 in H3.
+     destruct H3. apply Theta.add_3 in H3; try lia. exists x2; try easy.
+     split. intros.
+     assert (x1 <> x). intros R1; subst.
+     assert (Theta.In x Q). exists GeZero. easy. easy.
+     assert (Theta.MapsTo x1 GeZero (Theta.add x (NumEq (Num na)) Q)).
+     apply Theta.add_2. lia. easy. apply B2 with (n := n) in H7; try easy.
+     apply Stack.add_3 in H3; try easy. lia.
+     intros. 
+     destruct (Nat.eq_dec x1 x); subst.
+     apply Stack.mapsto_add1 in H1. inv H1.
+     destruct HQt as [B4 [B5 B6]].
+     apply B6 in G3; try easy.
+     apply Stack.add_3 in H1; try lia. apply B3 in H1; try easy.
+     apply Theta.add_3 in H1; try easy. lia.
+     split. unfold stack_rheap_consistent in *. intros.
+     destruct (Nat.eq_dec x1 x); subst. apply Stack.mapsto_add1 in H3. inv H3.
+     apply (HsHwf Hchk Htnt) in G3; try easy.
+     apply Stack.add_3 in H3. apply (Y3 Hchk Htnt) in H3; try easy. lia.
+     split. easy. split. 
+     unfold env_consistent in *. destruct Y5 as [B1 [B2 B3]].
+     split. intros. split. intros.
+     destruct (Nat.eq_dec x1 x); subst. exists tc.
+     apply Env.add_1. easy.
+     assert (Env.In (elt:=type) x1 (Env.add x TNat env)).
+     destruct H1. exists x2. apply Env.add_2; try lia. easy.
+     apply B1 in H3. destruct H3. exists (subst_type x2 x (Num na)).
+     apply Env.add_2; try lia.
+     unfold subst_env. apply Env.map_1 with (f := (fun t0 => subst_type t0 x (Num na))) in H3; try easy.
+     intros. destruct H1.
+     destruct (Nat.eq_dec x1 x); subst. exists tc; easy.
+     apply Env.add_3 in H1; try lia.
+     apply EnvFacts.map_mapsto_iff in H1. destruct H1 as [tb [B4 B5]];subst.
+     assert (Env.In x1 x0). exists tb. easy. apply B1 in H1.
+     destruct H1. apply Env.add_3 in H1; try lia. exists x2. easy.
+     split; intros. destruct (Nat.eq_dec x1 x); subst.
+     apply Env.mapsto_always_same with (v1 := tc) in H3; subst. apply Env.add_1. easy.
+     easy. apply Env.add_2; try lia. apply Henvt in H3 as B4.
+     destruct B4 as [B4 [B5 B6]].
+     unfold well_type_bound_in in B6.
+     assert (~ Env.MapsTo x TNat env). intros R1.
+     destruct HQt. apply H4 in R1. easy.
+     assert (~ In x (freeTypeVars t0)). intros R1. apply B6 in R1. easy.
+     rewrite <- not_in_subst_same with (t := t0) (x := x) (v := (Num na)); try easy.
+     assert (Env.MapsTo x1 t0 (Env.add x TNat env)).
+     apply Env.add_2; try lia. easy. apply B2 in H8.
+     apply Env.map_1 with (f := fun a => subst_type a x (Num na)) in H8. eauto. easy.
+     destruct (Nat.eq_dec x1 x); subst. 
+     apply Env.mapsto_always_same with (v1 := tc) in H3; try easy; subst.
+     apply Env.mapsto_add1 in H4; subst.
+     constructor. apply Env.add_3 in H4; try lia.
+     apply EnvFacts.map_mapsto_iff in H4 as A1.
+     destruct A1 as [td [A1 A2]]; subst.
+     apply B3 with (t := t0) in A2 ; try easy.
+     apply subtype_core_q_subst in A2; try easy. destruct HQt.
+     assert (~ Env.MapsTo x TNat env). intros R1. apply H7 in R1. easy.
+     assert (~ In x (freeTypeVars t0)). intros R1. apply Henvt in H3.
+     destruct H3 as [A3 [A4 A5]]. unfold well_type_bound_in in A5. apply A5 in R1. easy.
+     rewrite (not_in_subst_same t0) in A2; try easy. apply Env.add_2; try easy. lia.
+     split. apply TyRetTNat; try easy.
+     apply well_typed_env_consist with (env0 := (subst_env x0 x (Num na))).
+     unfold env_consistent. split. intros.
+     split. intros. destruct H1. destruct (Nat.eq_dec x1 x); subst. exists TNat.
+     apply Env.add_1. easy. exists x2. repeat apply Env.add_2; try lia. easy.
+     intros. destruct (Nat.eq_dec x1 x); subst. destruct H1. 
+     destruct Y5. specialize (H3 x). assert (Env.In x (Env.add x TNat env)). exists TNat.
+     apply Env.add_1. easy. apply H3 in H7. destruct H7. exists (subst_type x2 x (Num na)).
+     apply EnvFacts.map_mapsto_iff. exists x2; try easy.
+     destruct H1. apply Env.add_3 in H1; try lia. apply Env.add_3 in H1; try lia.
+     exists x2. easy. split; intros. destruct (Nat.eq_dec x1 x); subst.
+     destruct Y5. destruct H7. assert (Env.MapsTo x TNat (Env.add x TNat env)).
+     apply Env.add_1. easy. apply H7 in H9; try easy.
+     apply Env.map_1 with (f := fun a => subst_type a x (Num na)) in H9; try easy.
+     simpl in H9. unfold subst_env in H3. apply Env.mapsto_always_same with (v1 := t0) in H9; try easy; subst.
+     apply Env.add_1. easy.
+     repeat apply Env.add_2; try lia. easy.
+     destruct (Nat.eq_dec x1 x); subst.
+     apply Env.mapsto_add1 in H4; subst.
+     destruct Y5. destruct H7. assert (Env.MapsTo x TNat (Env.add x TNat env)).
+     apply Env.add_1. easy. apply H7 in H9; try easy.
+     apply Env.map_1 with (f := fun a => subst_type a x (Num na)) in H9; try easy.
+     simpl in H9. unfold subst_env in H3. apply Env.mapsto_always_same with (v1 := t0) in H9; try easy; subst.
+     constructor. apply Env.add_3 in H4; try lia. apply Env.add_3 in H4; try lia.
+     apply Env.mapsto_always_same with (v1 := t0) in H4; try easy; subst. constructor.
+     apply well_typed_env_consist_1. apply Theta.add_1. easy. easy.
+     apply eq_subtype_subst_1; try easy.
     (*T-Call*)
     - destruct HMode. assert (Checked = Checked) by easy.
       apply H in H1.
@@ -1105,7 +1328,42 @@ Section Preservation.
      split; try easy.
      split; try easy.
      split; try easy.
-     split.
+     split. apply eq_subtype_ptr in X8 as X9. destruct X9; subst.
+     apply TyLet with (m' := m') (t1 := x1); try easy.
+     apply well_typed_env_grow with (env := (Env.add x (TPtr m' t1) x0)).
+     intros. destruct (Nat.eq_dec x2 x); subst.
+     apply Env.mapsto_add1 in H0.
+     apply Env.mapsto_add1 in H. subst. easy.
+     apply Env.add_3 in H. apply Env.add_3 in H0.
+     apply Env.mapsto_always_same with (v1 := t') in H; try easy; subst.
+     exists t0. split. apply type_eq_refl. constructor. constructor. lia. lia.
+     apply well_typed_env_consist with (env0 := (Env.add x (TPtr m' t1) env)); try easy.
+     unfold env_consistent in *. destruct X6.
+     split. intros. split. intros.
+     destruct (Nat.eq_dec x2 x); subst.
+     destruct H1. apply Env.mapsto_add1 in H1;subst.
+     exists (TPtr m' t1). apply Env.add_1. easy.
+     destruct H1. apply Env.add_3 in H1; try lia.
+     assert (Env.In x2 env). exists x3. easy. apply H in H3. destruct H3.
+     exists x4. apply Env.add_2; try easy. lia.
+     intros.
+     destruct (Nat.eq_dec x2 x); subst.
+     destruct H1. apply Env.mapsto_add1 in H1;subst.
+     exists (TPtr m' t1). apply Env.add_1. easy.
+     destruct H1. apply Env.add_3 in H1; try lia.
+     assert (Env.In x2 x0). exists x3. easy. apply H in H3. destruct H3.
+     exists x4. apply Env.add_2; try easy. lia.
+     destruct H0. split. intros.
+     destruct (Nat.eq_dec x2 x); subst. apply Env.mapsto_add1 in H4; subst.
+     apply Env.add_1. easy. apply Env.add_3 in H4 ; try lia.
+     apply Env.add_2; try lia. apply H0; try easy.
+     intros. destruct (Nat.eq_dec x2 x); subst.
+     apply Env.mapsto_add1 in H6. apply Env.mapsto_add1 in H4. subst.
+     constructor. apply Env.add_3 in H6. apply Env.add_3 in H4.
+     eapply H1; try easy. apply H4. apply H6. lia. lia.
+     apply well_typed_heap_consist with (R := R); try easy.
+     exists t. split. apply type_eq_refl. constructor. constructor.
+
   Abort.
 
 

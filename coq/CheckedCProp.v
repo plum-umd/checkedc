@@ -239,12 +239,12 @@ Proof.
  destruct H2.
  apply Env.add_3 in H2 ; try easy.
  exists x1. easy.
- apply ListSet.set_diff_iff in H0. destruct H0. simpl in *.
- apply not_or_and in H1. destruct H1.
- apply IHwell_typed in H0.
+ apply ListSet.set_diff_iff in H1. destruct H1. simpl in *.
+ apply not_or_and in H2. destruct H2.
+ apply IHwell_typed in H1.
  unfold Env.In, Env.Raw.PX.In in *.
- destruct H0.
- apply Env.add_3 in H0 ; try easy.
+ destruct H1.
+ apply Env.add_3 in H1 ; try easy.
  exists x1. easy.
  apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
  apply in_app_iff in H2. destruct H2.
@@ -262,18 +262,21 @@ Proof.
  apply IHwell_typed1; easy.
  apply IHwell_typed2; easy.
  apply in_app_iff in H2. destruct H2.
- apply H. easy.
+ apply H in H2. exists TNat. easy.
  apply IHwell_typed; easy.
  apply in_app_iff in H2. destruct H2.
- apply H. easy.
+ apply H in H2. exists TNat. easy.
  apply IHwell_typed; easy.
  apply in_app_iff in H3. destruct H3.
+ exists TNat.
  apply H. simpl. easy.
  apply IHwell_typed; easy.
  apply in_app_iff in H4. destruct H4.
+ exists TNat.
  apply H1. simpl. easy.
  apply IHwell_typed; easy.
  apply in_app_iff in H3. destruct H3.
+ exists TNat.
  apply H. simpl. easy.
  apply IHwell_typed; easy.
  apply in_app_iff in H4. destruct H4.
@@ -322,6 +325,283 @@ Qed.
 
 (* theta and stack relationship *)
 Definition stack_theta_wf s Q := forall x v, Stack.MapsTo x (v,TNat) s -> Theta.MapsTo x (NumEq v) Q.
+
+Definition stack_consist D (s s': stack) := 
+    (forall x, Stack.In x s <-> Stack.In x s')
+   /\ (forall x v t, ~ is_nt_ptr t
+              -> Stack.MapsTo x (v,t) s -> Stack.MapsTo x (v,t) s')
+   /\ (forall x v v' t t', is_nt_ptr t
+              -> Stack.MapsTo x (v,t) s -> Stack.MapsTo x (v',t') s' -> v = v' /\ eq_subtype D empty_theta t' t).
+
+Lemma stack_consist_refl: forall D s, stack_consist D s s.
+Proof.
+  intros. unfold stack_consist.
+  split. intros. split;intros; easy.
+  split. intros. easy.
+  intros. apply Stack.mapsto_always_same with (v1:= (v,t)) in H1; try easy. inv H1. split; try easy.
+  exists t'. split. apply type_eq_refl. constructor. constructor.
+Qed. 
+
+Lemma or_nt_ptr: forall t, is_nt_ptr t \/ ~ is_nt_ptr t.
+Proof.
+  intros. destruct t; simpl in *; try (right;easy).
+  destruct t; try (right;easy). left. easy.
+Qed.
+
+Lemma type_eq_word: forall Q t t', word_type t -> type_eq Q t' t -> word_type t'.
+Proof.
+  intros. inv H0; try easy.
+Qed.
+
+Lemma subtype_core_word: forall D Q t t', word_type t -> subtype_core D Q t' t -> word_type t'.
+Proof with (try eauto with ty; try easy).
+  intros. inv H0...
+Qed.
+
+Lemma subtype_word: forall D Q t t', word_type t -> subtype D Q t' t -> word_type t'.
+Proof with (try eauto with ty; try easy).
+  intros. inv H0; inv H1...
+Qed.
+
+Lemma eq_subtype_word: forall D Q t t', word_type t -> eq_subtype D Q t' t -> word_type t'.
+Proof.
+  intros. destruct H0. destruct H0. apply subtype_word in H1; try easy.
+  apply type_eq_word in H0; try easy.
+Qed.
+
+
+Lemma type_eq_type_wf: forall D m t t', type_wf D m t -> type_eq empty_theta t' t -> type_wf D m t'.
+Proof with (try eauto with ty; try easy).
+  intros. generalize dependent m. induction H0; intros...
+  inv H. constructor. apply IHtype_eq; try easy.
+  apply WFTPtrUnChecked; try easy. apply IHtype_eq; try easy.
+  inv H2. constructor. apply type_eq_word with (Q := empty_theta) (t := t2); try easy.
+  apply IHtype_eq. easy.
+  inv H2. constructor. apply type_eq_word with (Q := empty_theta) (t := t2); try easy.
+  apply IHtype_eq. easy.
+Qed.
+
+Lemma subtype_core_type_wf: forall D m t t', type_wf D m t -> subtype_core D empty_theta t' t -> type_wf D m t'.
+Proof with (try eauto with ty; try easy).
+  intros. generalize dependent m. induction H0; intros...
+  destruct (m0); try easy.
+  apply WFTPtrChecked. inv H2. inv H5; try easy. inv H8; try easy.
+  apply WFTPtrUnChecked; try easy. inv H2; try easy.
+  inv H2;try easy. inv H8; try easy.
+  apply WFTPtrUnChecked; try easy. inv H2; try easy.
+  inv H2;try easy. inv H8; try easy.
+  destruct (m0); try easy.
+  apply WFTPtrChecked. inv H2. constructor; try easy. 
+  constructor; try easy. 
+  apply WFTPtrUnChecked; try easy. inv H2; try easy.
+  inv H2;try easy.
+  constructor; try easy. 
+  apply WFTPtrUnChecked; try easy. inv H2; try easy.
+  inv H2;try easy.
+  constructor; try easy. 
+  inv H2;try easy. 
+  constructor; try easy. 
+  constructor; try easy. 
+  constructor; try easy. 
+  constructor; try easy. 
+  destruct (m0); try easy.
+  apply WFTPtrChecked. inv H1. inv H4; try easy.
+  constructor; try easy.
+  inv H7; try easy. inv H1; try easy. 
+  constructor; try easy. 
+  inv H7;try easy. 
+  constructor; try easy. 
+  apply WFTPtrUnChecked; try easy. inv H1; try easy.
+  inv H1;try easy.
+  inv H7;try easy. 
+  constructor; try easy. 
+  destruct (m0); try easy.
+  apply WFTPtrChecked. inv H1. inv H4; try easy.
+  constructor; try easy.
+  inv H7; try easy. inv H1; try easy. 
+  constructor; try easy. 
+  inv H7;try easy. 
+  constructor; try easy. 
+  apply WFTPtrUnChecked; try easy. inv H1; try easy.
+  inv H1;try easy.
+  inv H7;try easy. 
+  constructor; try easy. 
+  destruct (m0); try easy.
+  apply WFTPtrChecked. inv H1. inv H4; try easy.
+  constructor; try easy.
+  inv H7; try easy. inv H1; try easy. 
+  constructor; try easy. 
+  inv H7;try easy. 
+  constructor; try easy. 
+  apply WFTPtrUnChecked; try easy. inv H1; try easy.
+  inv H1;try easy.
+  inv H7;try easy. 
+  constructor; try easy. 
+  destruct (m0); try easy.
+  apply WFTPtrChecked. constructor. exists fs. easy.
+  inv H1.
+  apply WFTPtrUnChecked; try easy. constructor. exists fs. easy.
+  inv H1.
+  apply WFTPtrUnChecked; try easy. constructor. exists fs. easy.
+  destruct (m0); try easy.
+  apply WFTPtrChecked. constructor. exists fs. easy.
+  inv H3.
+  apply WFTPtrUnChecked; try easy. constructor. exists fs. easy.
+  inv H3.
+  apply WFTPtrUnChecked; try easy. constructor. exists fs. easy.
+Qed.
+
+Lemma subtype_type_wf: forall D m t t', type_wf D m t -> subtype D empty_theta t' t -> type_wf D m t'.
+Proof with (try eauto with ty; try easy).
+  intros. generalize dependent m. remember empty_theta as Q. induction H0; intros; subst...
+  eapply subtype_core_type_wf; eauto.
+  inv H3. constructor. inv H6. constructor; try easy.
+  apply IHsubtype; try easy.
+Admitted.
+
+
+Lemma eq_subtype_type_wf: forall D m t t', type_wf D m t -> eq_subtype D empty_theta t' t -> type_wf D m t'.
+Proof.
+  intros. destruct H0. destruct H0. eapply subtype_type_wf in H1; eauto.
+  eapply type_eq_type_wf in H0; eauto.
+Qed.
+
+Lemma simple_nat_leq: forall b b', freeBoundVars b = [] -> nat_leq empty_theta b' b -> freeBoundVars b' = [].
+Proof.
+  intros. inv H0;simpl in *; eauto.
+  apply Theta.find_1 in H1. simpl in *.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+Qed.
+
+Lemma simple_nat_leq_1: forall b b', freeBoundVars b = [] -> nat_leq empty_theta b b' -> freeBoundVars b' = [].
+Proof.
+  intros. inv H0;simpl in *; eauto.
+  apply Theta.find_1 in H1. simpl in *.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+  apply Theta.find_1 in H1.
+  rewrite ThetaFacts.empty_o in H1. inv H1.
+Qed.
+
+Lemma type_eq_simple: forall t t', simple_type t -> type_eq empty_theta t' t -> simple_type t'.
+Proof with (try eauto with ty; try easy).
+  intros. induction H0; unfold simple_type in *; intros; simpl in *...
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H3. destruct H3.
+  destruct H1. destruct H2.
+  apply simple_nat_leq in H1; try easy.
+  apply simple_nat_leq in H2; try easy. rewrite H1. rewrite H2.
+  simpl. eauto.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H3. destruct H3.
+  destruct H1. destruct H2.
+  apply simple_nat_leq in H1; try easy.
+  apply simple_nat_leq in H2; try easy. rewrite H1. rewrite H2.
+  simpl. eauto.
+Qed.
+
+Lemma subtype_core_simple: forall D t t', simple_type t -> subtype_core D empty_theta t' t -> simple_type t'.
+Proof with (try eauto with ty; try easy).
+  intros. induction H0; unfold simple_type in *; intros; simpl in *...
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H3. destruct H3.
+  apply simple_nat_leq_1 in H1; try easy.
+  apply simple_nat_leq in H1; try easy.
+  apply simple_nat_leq_1 in H2; try easy. rewrite H1. rewrite H2.
+  simpl. eauto.
+  apply simple_nat_leq in H1; try easy.
+  apply simple_nat_leq_1 in H2; try easy. rewrite H1. rewrite H2.
+  simpl. eauto.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H2. destruct H2.
+  apply simple_nat_leq in H0; try easy.
+  apply simple_nat_leq_1 in H1; try easy. rewrite H0. rewrite H1.
+  eauto.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H2. destruct H2.
+  apply simple_nat_leq in H0; try easy.
+  apply simple_nat_leq_1 in H1; try easy. rewrite H0. rewrite H1.
+  eauto.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H2. destruct H2.
+  apply simple_nat_leq in H0; try easy.
+  apply simple_nat_leq_1 in H1; try easy. rewrite H0. rewrite H1.
+  eauto.
+Qed.
+
+Lemma subtype_simple: forall D t t', simple_type t -> subtype D empty_theta t' t -> simple_type t'.
+Proof with (try eauto with ty; try easy).
+  intros. remember empty_theta as Q.
+  induction H0; unfold simple_type in *; intros; simpl in *; subst...
+  eapply subtype_core_simple; eauto.
+Admitted.
+
+Lemma eq_subtype_simple: forall D t t', simple_type t -> eq_subtype D empty_theta t' t -> simple_type t'.
+Proof.
+  intros. destruct H0. destruct H0. eapply subtype_simple in H1; eauto.
+  eapply type_eq_simple in H0; eauto.
+Qed.
+
+Lemma stack_consist_wt: forall D m s s', stack_consist D s s' -> stack_wt D m s -> stack_wt D m s'.
+Proof.
+  intros. unfold stack_consist, stack_wt in *. intros.
+  destruct H as [X1 [X2 X3]].
+  assert (Stack.In x s'). exists (v,t). easy.
+  apply X1 in H as X5. destruct X5. destruct x0.
+  specialize (or_nt_ptr t0) as X4. destruct X4.
+  apply H0 in H2 as X6.
+  apply X3 with (t' := t) (v' := v) in H2; try easy. destruct H2; subst.
+  destruct X6 as [B1 [B2 B3]].
+  split. eapply eq_subtype_word; eauto.
+  split. eapply eq_subtype_type_wf; eauto.
+  eapply eq_subtype_simple; eauto.
+  apply H0 in H2 as X5.
+  apply X2 in H2; eauto.
+  apply Stack.mapsto_always_same with (v1 := (z, t0)) in H1; eauto. inv H1. easy. 
+Qed. 
+
+#[export] Hint Resolve stack_consist_refl : ty.
+
+Lemma step_stack_consist: forall D F M e M' r,
+       step D F M e M' r -> stack_consist D (fst M) (fst M').
+Proof with (eauto with ty; try easy).
+  intros. induction H; simpl in *...
+  unfold stack_consist in *.
+  split. intros. admit. admit. admit.
+Admitted.
+
+Lemma simple_subst_bound_same: forall t x v, freeBoundVars t = [] -> subst_bound t x v = t.
+Proof with (try eauto with ty; try easy).
+  induction t;intros;simpl in *... 
+Qed.
+
+Lemma simple_subst_type_same: forall t x v, simple_type t -> subst_type t x v = t.
+Proof with (try eauto with ty; try easy).
+  induction t;intros;simpl in *... rewrite IHt; try easy.
+  unfold simple_type in H. simpl in *.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H0. destruct H0.
+  rewrite simple_subst_bound_same; try easy.
+  rewrite simple_subst_bound_same; try easy.
+  rewrite IHt; try easy.
+  unfold simple_type in H. simpl in *.
+  apply app_eq_nil in H. destruct H.
+  apply app_eq_nil in H0. destruct H0.
+  rewrite simple_subst_bound_same; try easy.
+  rewrite simple_subst_bound_same; try easy.
+  rewrite IHt; try easy.
+Qed.
 
 
 Ltac find_Hstep :=
@@ -463,22 +743,23 @@ Section TypeProp.
   Qed.
 
   Lemma eval_bound_valid:
-     forall env s b, sub_domain env s -> well_bound_in env b -> (exists b', eval_bound s b = Some b').
+     forall env s b, stack_wf D Q env s -> well_bound_in env b -> (exists b', eval_bound s b = Some b').
   Proof.
    intros. 
-   unfold sub_domain, well_bound_in,eval_bound in *.
+   unfold stack_wf, well_bound_in,eval_bound in *.
    destruct b. exists (Num z). easy.
    destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
    exists ((Num (z0 + z))). easy.
    specialize (H0 v). simpl in H0.
    assert (v = v \/ False). left. easy.
-   apply H0 in H1. apply H in H1. destruct H1.
-   apply Stack.find_1 in H1.
-   rewrite eq1 in H1. easy.
+   apply H0 in H1. apply H in H1. destruct H1 as [va [ta [X1 X2]]].
+   inv X1. destruct H1. inv H2. inv H3. inv H1.
+   apply Stack.find_1 in X2.
+   rewrite eq1 in X2. easy.
   Qed.
 
   Lemma eval_type_bound_valid:
-     forall env s t, sub_domain env s -> well_type_bound_in env t -> (exists t', eval_type_bound s t t').
+     forall env s t, stack_wf D Q env s -> well_type_bound_in env t -> (exists t', eval_type_bound s t t').
   Proof.
     intros.
     induction t;intros;simpl in *; try easy.
@@ -501,7 +782,7 @@ Section TypeProp.
     apply in_app_iff. left. easy.
     apply X2 in H2. destruct H2.
     assert ((forall x : var,
-       In x (freeTypeVars t) -> Env.In (elt:=type) x env)).
+       In x (freeTypeVars t) -> Env.MapsTo (elt:=type) x TNat env)).
     intros.
     apply H0.
     apply in_app_iff. right.
@@ -523,7 +804,7 @@ Section TypeProp.
     apply in_app_iff. left. easy.
     apply X2 in H2. destruct H2.
     assert ((forall x : var,
-       In x (freeTypeVars t) -> Env.In (elt:=type) x env)).
+       In x (freeTypeVars t) -> Env.MapsTo (elt:=type) x TNat env)).
     intros.
     apply H0.
     apply in_app_iff. right.

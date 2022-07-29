@@ -5,6 +5,7 @@ From CHKC Require Import
   ListUtil
   Map.
 Require Import Coq.Lists.ListSet.
+Require Import Coq.Logic.Classical_Prop.
 
 (** * Document Conventions *)
 
@@ -285,10 +286,10 @@ Section EnvWt.
   Variable m : mode.
 
   Definition well_bound_in (env:env) (b:bound) :=
-    (forall x, In x (freeBoundVars b) -> Env.In x env).
+    (forall x, In x (freeBoundVars b) -> Env.MapsTo x TNat env).
 
   Definition well_type_bound_in (env:env) (t:type) :=
-    (forall x, In x (freeTypeVars t) -> Env.In x env).
+    (forall x, In x (freeTypeVars t) -> Env.MapsTo x TNat env).
 
   Definition env_wt (env : env) :=
     forall x t,
@@ -836,6 +837,49 @@ Proof.
   constructor.
 Qed.
 
+
+Lemma nat_leq_q_add: forall Q t t' x v, ~ Theta.In x Q ->
+    nat_leq Q t t' -> nat_leq (Theta.add x v Q) t t'.
+Proof.
+  intros. induction H0;simpl in *; try easy.
+  constructor. lia. constructor. lia.
+  constructor. destruct (Nat.eq_dec x0 x); subst.
+  assert (Theta.In x Q). exists GeZero. easy. easy.
+  apply Theta.add_2. lia. easy. lia.
+  apply nat_leq_var_1 with (n := n); try lia.
+  destruct (Nat.eq_dec x0 x); subst. assert (Theta.In x Q). exists (NumEq (Num n)).
+  easy. easy. apply Theta.add_2. lia. easy. auto.
+  apply nat_leq_var_2 with (n := n); try lia.
+  destruct (Nat.eq_dec x0 x); subst. assert (Theta.In x Q). exists (NumEq (Num n)).
+  easy. easy. apply Theta.add_2. lia. easy. auto.
+  apply nat_leq_var_3 with (y := y) (n := n); try lia.
+  destruct (Nat.eq_dec x0 x); subst. assert (Theta.In x Q). exists (NumEq (Var y n)).
+  easy. easy. apply Theta.add_2. lia. easy. auto.
+  apply nat_leq_var_4 with (y := y) (n := n); try lia.
+  destruct (Nat.eq_dec x0 x); subst. assert (Theta.In x Q). exists (NumEq (Var y n)).
+  easy. easy. apply Theta.add_2. lia. easy. auto.
+Qed.
+
+
+Lemma type_eq_q_add: forall Q t t' x v, ~ Theta.In x Q ->
+    type_eq Q t t' -> type_eq (Theta.add x v Q) t t'.
+Proof.
+  intros. induction H0; simpl in *; try easy.
+  constructor. constructor; try easy.
+  constructor. constructor; try easy.
+  split. apply nat_leq_q_add. easy. destruct H1; easy.
+  apply nat_leq_q_add. easy. destruct H1; easy.
+  split. apply nat_leq_q_add. easy. destruct H2; easy.
+  apply nat_leq_q_add. easy. destruct H2; easy.
+  constructor; try easy.
+  split. apply nat_leq_q_add. easy. destruct H1; easy.
+  apply nat_leq_q_add. easy. destruct H1; easy.
+  split. apply nat_leq_q_add. easy. destruct H2; easy.
+  apply nat_leq_q_add. easy. destruct H2; easy.
+  constructor.
+Qed.
+
+
 (*
 Definition union := list (list var).
 
@@ -1267,6 +1311,46 @@ Proof.
   inv H2. inv H2. exists l0,h0. easy. 
 Qed.
 
+Lemma subtype_core_q_add: forall Q t t' x v, ~ Theta.In x Q ->
+    subtype_core Q t t' -> subtype_core (Theta.add x v Q) t t'.
+Proof.
+  intros. induction H0; simpl in *; eauto with ty.
+  apply SubTyBot; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  apply SubTyOne; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  apply SubTyOneNT; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  apply SubTySubsume; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  apply SubTyNtArray; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  apply SubTyNtSubsume; try easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+  eapply SubTyStructArrayField_2; try easy. apply H0. easy.
+  apply nat_leq_q_add; try easy.
+  apply nat_leq_q_add; try easy.
+Qed.
+
+
+Lemma subtype_core_q_add_1: forall Q t t' x v, ~ In x (freeTypeVars t) -> ~ In x (freeTypeVars t) ->
+    subtype_core (Theta.add x v Q) t t' -> subtype_core Q t t'.
+Proof.
+Admitted.
+
+Lemma subtype_q_add: forall Q t t' x v, ~ Theta.In x Q ->
+    subtype Q t t' -> subtype (Theta.add x v Q) t t'.
+Proof.
+  intros. induction H0; simpl in *; eauto with ty.
+  constructor. apply subtype_core_q_add; try easy.
+Qed.
+
 End Subtype.
 
 #[export] Hint Constructors subtype_core : ty.
@@ -1292,7 +1376,7 @@ Section StackWt.
 End StackWt.
 
 Definition theta_wt (Q:theta) (env:env) (S:stack) :=
-  (forall x, Theta.In x Q -> Env.In x env)
+  (forall x, Theta.In x Q <-> Env.MapsTo x TNat env)
   /\ (forall x n, Theta.MapsTo x GeZero Q ->
                      Stack.MapsTo x (n,TNat) S -> 0 <= n)
   /\ (forall x n, Stack.MapsTo x (n,TNat) S -> Theta.MapsTo x (NumEq (Num n)) Q).
@@ -2051,6 +2135,9 @@ Fixpoint subst_type (t:type) (x:var) (b:bound) :=
             | TFun xl t tl => TFun xl t tl
   end.
 
+Definition subst_env (env:env) (x:var) (b:bound) :=
+      Env.map (fun t => subst_type t x b) env.
+
 Fixpoint get_var_stack (S:stack) (l:list var) :=
    match l with [] => []
            | (x::xs) => match Stack.find x S with None => get_var_stack S xs
@@ -2099,6 +2186,41 @@ Proof.
   constructor.
 Qed.
 
+Lemma not_in_subst_bound_same: forall t x v, ~ In x (freeBoundVars t) -> subst_bound t x v = t.
+Proof.
+  induction t;intros;simpl in *; eauto.
+  apply not_or_and in H. destruct H.
+  destruct (v =? x)%nat eqn:eq1.
+   apply Nat.eqb_eq in eq1. subst. easy. easy.
+Qed.
+
+Lemma not_in_subst_same: forall t x v, ~ In x (freeTypeVars t) -> subst_type t x v = t.
+Proof.
+  induction t;intros;simpl in *; eauto.
+  rewrite IHt. easy. easy.
+  setoid_rewrite in_app_iff in H.
+  apply not_or_and in H.
+  destruct H. 
+  setoid_rewrite in_app_iff in H0.
+  apply not_or_and in H0. destruct H0.
+  rewrite not_in_subst_bound_same; try easy.
+  rewrite not_in_subst_bound_same; try easy.
+  rewrite IHt; try easy.
+  setoid_rewrite in_app_iff in H.
+  apply not_or_and in H.
+  destruct H. 
+  setoid_rewrite in_app_iff in H0.
+  apply not_or_and in H0. destruct H0.
+  rewrite not_in_subst_bound_same; try easy.
+  rewrite not_in_subst_bound_same; try easy.
+  rewrite IHt; try easy.
+Qed.
+
+Lemma subtype_core_q_subst: forall D Q t t' x v, 
+              subtype_core D (Theta.add x (NumEq (Num v)) Q) t t' ->
+              subtype_core D Q (subst_type t x (Num v)) (subst_type t' x (Num v)).
+Proof.
+Admitted.
 
 (* cast bounds. 
 Definition  cast_bound (Q:theta) (b:bound) : bound :=
@@ -2543,7 +2665,7 @@ Inductive step
     step D F (Stack.add x (nb,tb) s, R) e (s',R') re ->
     step D F
       (s, R) (ERet x (nb,tb) e)
-      (Stack.add x (a',ta') s, R) (inject_ret x (nb',tb') re)
+      (Stack.add x (a',ta') s', R') (inject_ret x (nb',tb') re)
 | SRetNone : forall s R s' R' x nb tb nb' tb' e re,
     ~ Stack.In x s ->
     Stack.MapsTo x (nb',tb') s' ->
@@ -2552,6 +2674,10 @@ Inductive step
       (s, R)
       (ERet x (nb,tb) e)
       (Stack.remove x s', R) (inject_ret x (nb',tb') re)
+| SRetEnd : forall s R x n t nb tb,
+    step D F
+      (s, R)
+      (ERet x (nb,tb) (ELit n t)) (s,R) (RExpr (ELit n t))
 | SPlusChecked : forall s R n1 t1 n2,
     n1 > 0 -> is_check_array_ptr t1 ->
     step D F
@@ -2971,6 +3097,15 @@ Proof.
   eapply subtype_q_conv;eauto.
 Qed.
 
+
+Lemma eq_subtype_subst_1: forall D Q t t' x b, ~ Theta.In x Q ->
+          eq_subtype D (Theta.add x (NumEq b) Q) t t' ->
+          eq_subtype D Q (subst_type t x b) (subst_type t' x b).
+Proof.
+Admitted.
+
+
+(* well_typed definition. *)
 Inductive well_typed_arg (D: structdef) (F:FEnv) (R : real_heap) (Q: theta)
   (env:env) : mode -> expression -> type -> Prop :=
 | ArgLitChecked : forall n t t',
@@ -3019,6 +3154,14 @@ Lemma eq_subtype_nat_1 : forall D Q t, eq_subtype D Q t TNat -> t = TNat.
 Proof.
    intros. inv H. destruct H0. inv H0. inv H1. inv H. easy.
 Qed.
+
+Lemma eq_subtype_ptr : forall D Q t m' ta, eq_subtype D Q t (TPtr m' ta) -> (exists tb, t = TPtr m' tb).
+Proof with (eauto with ty; try easy).
+   intros. inv H. destruct H0. inv H0. inv H1; inv H... inv H. inv H2.
+   exists (TFun xl t0 tl). easy.
+   inv H. inv H2. exists (TFun xl t0 tl). easy.
+Qed.
+
 
 Lemma eq_subtype_fun : forall D Q m xl t ts ta,
       eq_subtype D Q ta (TPtr m (TFun xl t ts)) ->
@@ -3311,6 +3454,7 @@ Section Typing.
       well_typed env Q m (ELet x e1 e2) t
 
   | TyRetTNat : forall env Q m x na e t,
+      ~ Theta.In x Q ->
       well_typed (Env.add x TNat env) (Theta.add x (NumEq (Num na)) Q) m e t ->
       well_typed env Q m (ERet x (na,TNat) e) (subst_type t x (Num na))
 

@@ -1309,7 +1309,7 @@ Inductive well_typed_arg (D: structdef) (Q:theta) (H : heap) (env:env):
       well_typed_arg D Q H env (ELit n t') t
      | ArgVar : forall x t t',
       Env.MapsTo x t' env -> 
-      well_type_bound_in env t ->
+       well_type_bound_in env t ->
       subtype D Q t' t ->
       well_typed_arg D Q H env (EVar x) t.
 
