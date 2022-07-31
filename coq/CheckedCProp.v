@@ -157,11 +157,13 @@ End StackProp.
 
 
 (* Env consistency *)
+Definition both_simple (t t' :type) := simple_type t -> simple_type t'.
+
 Definition env_consistent D Q (env env' : env) := 
       (forall x, Env.In x env <-> Env.In x env')
       /\ (forall x t , ~ is_nt_ptr t -> Env.MapsTo x t env ->  Env.MapsTo x t env')
       /\ (forall x t t', is_nt_ptr t -> Env.MapsTo x t env 
-                 ->  Env.MapsTo x t' env' -> subtype_core D Q t' t).
+                 ->  Env.MapsTo x t' env' -> subtype_core D Q t' t /\ both_simple t t').
 
 Lemma env_consist_refl : forall D Q env, env_consistent D Q env env.
 Proof.
@@ -169,7 +171,8 @@ Proof.
   intros. split. intros. easy. intros; easy.
   split. intros. easy.
   intros. apply Env.mapsto_always_same with (v1:= t') in H0; try easy. subst.
-  constructor.
+  split.
+  constructor. unfold both_simple; intros; easy.
 Qed.
 
 Lemma env_wf_consist: forall es D Q env env', env_consistent D Q env env' ->
@@ -187,6 +190,7 @@ Definition simple_means_not_freeVars:
 Proof.
   intros. induction H;simpl in *. easy.
 Qed.
+  
 
 Lemma well_typed_bound : forall D F R env Q m e t,
       well_typed D F R env Q m e t ->  env_wf e env.
@@ -194,7 +198,6 @@ Proof.
  intros. induction H;unfold env_wf;intros;simpl in *; eauto.
  apply simple_means_not_freeVars in H0. rewrite H0 in H2. simpl in *. easy.
  apply simple_means_not_freeVars in H0. rewrite H0 in H1. simpl in *. easy.
- apply simple_means_not_freeVars in H. rewrite H in H0. simpl in *. easy.
  destruct H1;subst.
  unfold Env.In,Env.Raw.PX.In. exists t; easy. easy.
  apply in_app_iff in H3. destruct H3.
@@ -230,14 +233,14 @@ Proof.
  destruct H3.
  apply Env.add_3 in H3 ; try easy.
  exists x1. easy.
- apply in_app_iff in H2. destruct H2.
+ apply in_app_iff in H3. destruct H3.
  apply IHwell_typed1; easy.
- apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
- apply not_or_and in H3. destruct H3.
- apply IHwell_typed2 in H2.
+ apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
+ apply not_or_and in H4. destruct H4.
+ apply IHwell_typed2 in H3.
  unfold Env.In, Env.Raw.PX.In in *.
- destruct H2.
- apply Env.add_3 in H2 ; try easy.
+ destruct H3.
+ apply Env.add_3 in H3 ; try easy.
  exists x1. easy.
  apply ListSet.set_diff_iff in H1. destruct H1. simpl in *.
  apply not_or_and in H2. destruct H2.
@@ -246,14 +249,23 @@ Proof.
  destruct H1.
  apply Env.add_3 in H1 ; try easy.
  exists x1. easy.
- apply ListSet.set_diff_iff in H2. destruct H2. simpl in *.
- apply in_app_iff in H2. destruct H2.
- apply simple_means_not_freeVars in H0 ; simpl in *. rewrite H0 in H2. simpl in *. easy.
- apply not_or_and in H3. destruct H3.
- apply IHwell_typed in H2.
+ apply ListSet.set_diff_iff in H3. destruct H3. simpl in *.
+ apply in_app_iff in H3. destruct H3.
+ apply simple_means_not_freeVars in H0 ; simpl in *. rewrite H0 in H3. simpl in *. easy.
+ apply not_or_and in H4. destruct H4.
+ apply IHwell_typed in H3.
  unfold Env.In, Env.Raw.PX.In in *.
- destruct H2.
- apply Env.add_3 in H2 ; try easy.
+ destruct H3.
+ apply Env.add_3 in H3 ; try easy.
+ exists x1. easy.
+ apply ListSet.set_diff_iff in H4. destruct H4. simpl in *.
+ apply in_app_iff in H4. destruct H4.
+ apply simple_means_not_freeVars in H2 ; simpl in *. rewrite H2 in H4. simpl in *. easy.
+ apply not_or_and in H5. destruct H5.
+ apply IHwell_typed in H4.
+ unfold Env.In, Env.Raw.PX.In in *.
+ destruct H4.
+ apply Env.add_3 in H4 ; try easy.
  exists x1. easy.
  apply in_app_iff in H1. destruct H1.
  apply IHwell_typed1; easy.

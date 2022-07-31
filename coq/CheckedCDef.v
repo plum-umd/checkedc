@@ -2673,7 +2673,7 @@ Inductive step
     step D F
       (s, R)
       (ERet x (nb,tb) e)
-      (Stack.remove x s', R) (inject_ret x (nb',tb') re)
+      (Stack.remove x s', R') (inject_ret x (nb',tb') re)
 | SRetEnd : forall s R x n t nb tb,
     step D F
       (s, R)
@@ -3104,6 +3104,19 @@ Lemma eq_subtype_subst_1: forall D Q t t' x b, ~ Theta.In x Q ->
 Proof.
 Admitted.
 
+Lemma type_eq_simple_same: forall Q t t', simple_type t -> simple_type t' -> 
+        type_eq Q t t' -> t = t'.
+Proof.
+  intros. induction H1; intros;simpl in *; try easy. 
+  inv H. inv H0. rewrite IHtype_eq; try easy.
+Admitted.
+
+Lemma eq_subtype_simple_same : forall D Q t t', simple_type t -> simple_type t' ->
+          eq_subtype D Q t t' -> subtype D Q t t'.
+Proof.
+  intros. destruct H1. destruct H1. apply type_eq_simple_same in H1; subst. easy. easy.
+Admitted.
+
 
 (* well_typed definition. *)
 Inductive well_typed_arg (D: structdef) (F:FEnv) (R : real_heap) (Q: theta)
@@ -3162,6 +3175,18 @@ Proof with (eauto with ty; try easy).
    inv H. inv H2. exists (TFun xl t0 tl). easy.
 Qed.
 
+
+Lemma eq_subtype_nt_ptr : forall D Q t t', is_nt_ptr t' -> eq_subtype D Q t t' -> is_nt_ptr t.
+Proof with (eauto with ty; try easy).
+   intros. unfold is_nt_ptr in *. destruct t'... destruct t'... 
+   inv H0. destruct H1. inv H1. inv H2; inv H0... inv H3. easy. inv H3. easy.
+Qed.
+
+Lemma subtype_nt_ptr_1 : forall D Q t t', is_nt_ptr t' -> subtype D Q t t' -> subtype_core D Q t t'.
+Proof with (eauto with ty; try easy).
+   intros. unfold is_nt_ptr in *. destruct t'... destruct t'... 
+   inv H0. easy.
+Qed.
 
 Lemma eq_subtype_fun : forall D Q m xl t ts ta,
       eq_subtype D Q ta (TPtr m (TFun xl t ts)) ->
@@ -3391,13 +3416,10 @@ Section Typing.
       simple_type t ->
       well_typed_lit_checked D F (fst H) empty_scope n t ->
       well_typed env Q Checked (ELit n t) t
-  | TyLitTainted : forall env Q n t,
+  | TyLitTainted : forall env Q m n t,
       ~ is_checked t ->
       simple_type t ->
-      well_typed env Q Checked (ELit n t) t
-  | TyLitUnChecked : forall env Q n t,
-      simple_type t ->
-      well_typed env Q Unchecked (ELit n t) t
+      well_typed env Q m (ELit n t) t
   | TyVar : forall env Q m x t t',
       Env.MapsTo x t env ->
       subtype_core D Q t t' ->
@@ -3448,6 +3470,7 @@ Section Typing.
   (*     well_typed env Q m (ELet x e1 e2) t *)
 
   | TyLet : forall env Q m x e1 m' t1 e2 t,
+      ~ Theta.In x Q ->
       mode_leq m' m ->
       well_typed env Q m e1 (TPtr m' t1) ->
       well_typed (Env.add x (TPtr m' t1) env) Q m e2 t ->
@@ -3458,7 +3481,16 @@ Section Typing.
       well_typed (Env.add x TNat env) (Theta.add x (NumEq (Num na)) Q) m e t ->
       well_typed env Q m (ERet x (na,TNat) e) (subst_type t x (Num na))
 
+  | TyRetChecked : forall env Q x na ta e t,
+      ~ Theta.In x Q ->
+      simple_type (TPtr Checked ta) ->
+      well_typed_lit_checked D F (fst H) empty_scope na (TPtr Checked ta) ->
+      well_typed (Env.add x (TPtr Checked ta) env) Q Checked e t ->
+      well_typed env Q Checked (ERet x (na,TPtr Checked ta) e) t
+
   | TyRet : forall env Q m m' x na ta e t,
+      ~ Theta.In x Q ->
+      m' <> Checked ->
       mode_leq m' m ->
       simple_type (TPtr m' ta) ->
       well_typed (Env.add x (TPtr m' ta) env) Q m e t ->
@@ -3652,6 +3684,8 @@ Definition fun_wf (D : structdef) (F:FEnv) (H:real_heap) :=
 Definition sub_domain (env: env) (S:stack) := forall x,
     Env.In x env -> Stack.In x S.
 
+Definition same_domain (env: env) (S:stack) := forall x,
+    Env.In x env <-> Stack.In x S.
 
 Local Close Scope Z_scope.
 Local Open Scope nat_scope.

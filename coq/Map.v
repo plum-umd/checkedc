@@ -67,6 +67,11 @@ Module Make (X : OrderedType) <: MapS.S X.
       apply find_1.
       assumption.
     Qed.
+    
+    Lemma mapsto_in:forall k v s1, MapsTo (elt := elt) k v s1 -> In k s1.
+    Proof.
+     intros. exists v. easy.
+    Qed.
 
 Lemma find_add1 : forall x (t : elt) env,
     find (elt := elt) x (add x t env) = Some t.
