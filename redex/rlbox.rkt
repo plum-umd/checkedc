@@ -305,6 +305,15 @@
    (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
    X-StrOOB]
 
+  [(⊢↝/name (Hs (strlen (n : vτ))) (Hs Null X-StrTainted))
+   (where (ptr t (ntarray l h vτ_1)) vτ)
+   (where H (⊢heap-by-mode Hs t))
+   (where n_1 (⊢strlen n H))
+   (where #f (⊢check-heap-by-mode H n_1))
+   (side-condition ,(not (zero? (term n))))
+   (side-condition ,(not (and (<= (term l) 0) (<= 0 (term h)))))
+   X-StrTainted] 
+
   [(⊢↝/name (Hs (strlen (n : vτ))) (Hs (n_1 : int) E-Str))
    (where (ptr m (ntarray l h vτ_1)) vτ)
    (where H (⊢heap-by-mode Hs m))
@@ -752,6 +761,20 @@
   [(⊢check-mode m m) #t]
   [(⊢check-mode _ _) #f])
 
+;(define-metafunction CoreChkC+ ;;use as reference
+;  ⊢fun-lookup : F n -> (defun e ((x : τ) ... e) : τ) or #f
+;  [(⊢fun-lookup ((defun (n : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) _ ...) n)
+;          (defun (n : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 )]
+;  [(⊢fun-lookup (_ (defun (n_′ : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) ...) n)
+;          (⊢fun-lookup ((defun (n_′ : τ_2) ((x_1 : τ_1) ... e_1) : τ_3 ) ...) n)]
+;  )
+
+(define-metafunction CoreChkC+
+  ⊢check-heap-by-mode : m H n -> #t or #f
+  [(⊢check-heap-by-mode c _ _) #t]
+  [(⊢check-heap-by-mode u _ _) #t]
+  [(⊢check-heap-by-mode t H n) (if (not (⊢heap-lookup H n)) #t #f)])
+
 ;; need to include the extra cases for type-level redex
 (define-metafunction CoreChkC+
   ⊢mode : E -> m
@@ -990,6 +1013,13 @@
             (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)))
                    (strlen (2 : (ptr c (ntarray 0 0 int))))))
             (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)))
+                   (3 : int))))
+
+  ;;test should be failed
+    (test-->> (---> 'c)
+            (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ())
+                   (strlen (2 : (ptr t (ntarray 0 0 int))))))
+            (term ((((1 : int) (1 : int) (1 : int) (1 : int) (0 : int)) ())
                    (3 : int))))
 
   (test-->> (---> 'c)
