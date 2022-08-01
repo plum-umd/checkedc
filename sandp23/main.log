@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  31 JUL 2022 23:36
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  1 AUG 2022 18:01
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1495,23 +1495,12 @@ t/10 e$\OT1/ptm/m/n/10.03749 , heap $\OT1/pzc/mb/it/10.03749 H$\OT1/ptm/m/n/10.
  []
 
 ) (./compilation.tex [10]
-Underfull \hbox (badness 2460) in paragraph at lines 284--299
-[]\OT1/ptm/b/n/10.03749 Checked and Unchecked Blocks\OT1/ptm/m/n/10.03749 . In 
-the im-ple-
- []
-
-
-Underfull \hbox (badness 1558) in paragraph at lines 284--299
-\OT1/ptm/m/n/10.03749 men-ta-tion, $[]$ and $[]$ blocks are com-
- []
-
-
-Underfull \hbox (badness 1728) in paragraph at lines 284--299
-\OT1/ptm/m/n/10.03749 piled as con-text switch-ing func-tions pro-vided by the
+Overfull \hbox (1.63727pt too wide) in paragraph at lines 62--76
+[]|  [] 
  []
 
 [11] [12]
-Underfull \hbox (badness 3281) in paragraph at lines 507--507
+Underfull \hbox (badness 3281) in paragraph at lines 503--503
 []\OT1/ptm/m/n/10.03749 Figure 15: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
 49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
  []
@@ -1656,7 +1645,7 @@ w/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmbi8a
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/shar
 e/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (23 pages, 472811 bytes).
+Output written on main.pdf (23 pages, 472901 bytes).
 PDF statistics:
  243 PDF objects out of 1000 (max. 8388607)
  167 compressed objects within 2 object streams

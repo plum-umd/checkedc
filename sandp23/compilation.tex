@@ -59,11 +59,12 @@ The latter is done by introducing additional shadow variables for storing (NT-)a
 
 \begin{figure}[t!]
 {\small
+\hspace*{-0.5em}
 \begin{tabular}{|c|c|c|c|}
 \hline
 & \cmode & \tmode & \umode \\
 \hline
-& \text{Impl} / \text{Foml} & \text{Impl} / \text{Foml} & \text{Impl} / \text{Foml} \\
+& \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} \\
 \hline
 \cmode & $\estar{x}$ / $\getstar{\cmode}{x}$ 
  & $\texttt{sand\_get}(x)$ / $\getstar{\umode}{x}$ &  $\times$ \\
@@ -79,25 +80,18 @@ The latter is done by introducing additional shadow variables for storing (NT-)a
 \end{figure}
 
 In \systemname, context and pointer modes determine the particular heap/function store that a pointer points to,
-i.e., \cmode pointer points to checked regions, while \tmode and \umode pointers point to unchecked regions.
+i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions.
 Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
 In the compiled LLVM code, pointer access operations have different syntax when the modes are different.
-\Cref{fig:flagtable} lists the different compiled syntax for a deference operation ($\estar{x}$) for the compiler implementation (\text{Impl}) and formalism (\text{Foml}). The columns represent different pointer modes and the rows represent context modes.
-For example, when we have a \tmode pointer in a \cmode-mode region, we use the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data. In formalism, we create a new deference data-structure in LLVM on top of the existing $\estar{x}$ operation: $\getstar{m}{x}$. if the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
+\Cref{fig:flagtable} lists the different compiled syntax for a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
+For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. if the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
-In the compilation, we use a function \code{mode} to get the pointer mode of a function learning from the pointer's type.
-Thus, the compiler can determine the correct compiled syntax for a pointer access operation with 
-the knowledge of the current context mode.
-We also build a context switching mechanism to change 
-the context mode when we meet $\echeckedtext$ and $\euncheckedtext$ blocks.
-We describe the mechanism shortly.
-
-This section shows how \systemname deals with pointer modes, mode switching and function pointer compilations, 
+This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
 with no loss of expressiveness;
 as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
 For the compiler formalism, 
 we present a compilation algorithm that converts from
-\systemname to \elang, an untyped language without metadata
+\lang to \elang, an untyped language without metadata
 annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
 In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
 $\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
@@ -201,7 +195,7 @@ $
 
 This simplifies the management of effects from subexpressions. The
 next two steps of compilation are more interesting.
-We state them based on different \systemname operations.
+We state them based on different \lang operations.
 
 \begin{figure}[t!]
   \begin{small}
@@ -233,7 +227,8 @@ deref_array(int n, int* p, int * q) {
   assert(p_lo <= 0 && 0 <= p_hi);
   assert(p != 0);
   *(mode(p) $\wedge$ m,p);
-  verify(q, not_null && q_lo <= 0 && 0 <= q_hi);
+  verify(q, not_null(m, q_lo, q_hi) 
+             && q_lo <= 0 && 0 <= q_hi);
   *(mode(q) $\wedge$ m,q)=1;
 }
 ...
@@ -266,11 +261,12 @@ In every declaration (or the beginning of a function body) of a pointer,
 if the poniter is an (NT-)array one,
 we first allocates two \emph{shadow variables}
 to track the lower and upper bounds potentially changed for pointer arithmetic and NT-array bound widening.
-We also associated with every \cmode-mode pointer variable according to its type;
+We also associated with every $\cmode$-mode pointer variable according to its type;
 we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
-In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9), 
+In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9 and 10), 
 there is an inserted verification step similar to \Cref{fig:const-type},
-which checks a pointer is well defined in the heap for every element in its defined range.
+which checks a pointer is well defined in the heap (\code{not_null}) and the spatial safety.
+Predicate \code{not_null} checks that every element in the pointer's range (\code{p_lo} and \code{p_hi}) is well defined in the heap.  
 In implementation, we actually optimize the verification away and substitute it
 with the bounds and null-pointer checks.
 Because tainted pointer is checked every time before it is used,
@@ -283,7 +279,7 @@ operation ($\wedge$) of the pointer mode (e.g. \code{mode(p)}) and the current c
 
 \myparagraph{Checked and Unchecked Blocks}
 %
-In the implementation,
+In the \systemname implementation,
 $\euncheckedtext$ and $\echeckedtext$ blocks 
 are compiled as context switching functions provided by the sandbox mechanism.
 $\eunchecked{\overline{x}}{e}$ is compiled to 
@@ -313,17 +309,17 @@ guarantee the context switching without creating the extra function calls for si
 %
 Function pointers are dealt with similarly to normal pointers,
 but we insert checks to check if the pointer address is not null in 
-the function store and if the type is correctly represented, 
+the function store instead of heap, and whether or not the type is correctly represented, 
 for both $\cmode$ and $\tmode$ mode pointers 
 \footnote{$\cmode$-mode pointers are checked once in the beginning and $\tmode$-mode pointers are checked every time when use}.
-Fpr example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
-we place a check \code{verify_fun(cmp, not_null && type_match)},
+For example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
+we place a check \code{verify_fun(cmp, not_null(c, p_lo, p_hi) && type_match)},
 and we place a similar check before \Cref{fig:checkedc-example-3} line 7 to check the tainted \code{cmp} when it is used. 
 The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
 is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
 
 For compiling dependent function calls,
-\Cref{fig:compilationexample1} also shows an example.
+\Cref{fig:compilationexample1} provides a hint.
 Notice that the bounds for the array pointer \code{p} are not passed as
 arguments. Instead, they are initialized according to \code{p}'s
 type---see line~4 of the original \lang program at the top of the figure.
@@ -466,8 +462,8 @@ where $e_0$ is stuck, because Theorem~\ref{thm:progress} guarantees
 that $e_0$ will never enter a stuck state if it is well-typed in
 checked mode.
 
-The current version of the Redex model has been tested against $20000$
-expressions with depth less than $10$. Each expression can
+The current version of the Redex model has been tested against $23000$
+expressions with depth less than $11$. Each expression can
 reduce multiple steps, and we test simulation between every two
 adjacent steps to cover a wider range of programs, particularly the
 ones that have a non-empty heap.
