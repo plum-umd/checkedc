@@ -630,16 +630,34 @@
   [(⊢update-heap-by-mode Hs H u) (,(list-ref (term Hs) 0) H)])
 
 (define-metafunction CoreChkC+
+  ⊢update-eheap-by-mode : eHs eH m -> eHs
+  [(⊢update-eheap-by-mode eHs eH c) (eH ,(list-ref (term eHs) 1))]
+  [(⊢update-eheap-by-mode eHs eH t) (,(list-ref (term eHs) 0) eH)]
+  [(⊢update-eheap-by-mode eHs eH u) (,(list-ref (term eHs) 0) eH)])
+
+(define-metafunction CoreChkC+
   ⊢heap-by-mode : Hs m -> H
   [(⊢heap-by-mode Hs c) ,(list-ref (term Hs) 0)]
   [(⊢heap-by-mode Hs t) ,(list-ref (term Hs) 1)]
   [(⊢heap-by-mode Hs u) ,(list-ref (term Hs) 1)])
 
 (define-metafunction CoreChkC+
+  ⊢eheap-by-mode : eHs m -> eH
+  [(⊢eheap-by-mode eHs c) ,(list-ref (term eHs) 0)]
+  [(⊢eheap-by-mode eHs t) ,(list-ref (term eHs) 1)]
+  [(⊢eheap-by-mode eHs u) ,(list-ref (term eHs) 1)])
+
+(define-metafunction CoreChkC+
   ⊢fheap-by-mode : m -> F
   [(⊢fheap-by-mode c) ,(list-ref (*Fs*) 0)]
   [(⊢fheap-by-mode t) ,(list-ref (*Fs*) 1)]
   [(⊢fheap-by-mode u) ,(list-ref (*Fs*) 1)])
+
+(define-metafunction CoreChkC+
+  ⊢efheap-by-mode : m -> F
+  [(⊢efheap-by-mode c) ,(list-ref (*eFs*) 0)]
+  [(⊢efheap-by-mode t) ,(list-ref (*eFs*) 1)]
+  [(⊢efheap-by-mode u) ,(list-ref (*eFs*) 1)])
 
 
 (define-metafunction CoreChkC+
@@ -650,6 +668,7 @@
          (positive? (term n))
          (list-ref (term H) (sub1 (term n))))]
   )
+
 
 ;(define-metafunction CoreChkC+
 ;  ⊢fun-lookup : F n -> (defun e ((x : τ) ... e) : τ) or #f
@@ -692,9 +711,11 @@
    #f])
 
 (define-metafunction CoreChkC+
-  ⊢eheap-update : eH n n -> eH
-  [(⊢eheap-update eH n n_1)
-   ,(list-set (term eH) (sub1 (term n)) (term n_1))])
+  ⊢eheap-update : eHs m n n -> eHs
+  [(⊢eheap-update (eH_1 eH_2) c n n_1)
+   (,(list-set (term eH_1) (sub1 (term n)) (term n_1)) eH_2)]
+  [(⊢eheap-update (eH_1 eH_2) _ n n_1)
+   (eH_1 ,(list-set (term eH_2) (sub1 (term n)) (term n_1)))])
 
 (define-metafunction CoreChkC+
   ⊢heap-from : H n vω -> H
@@ -1493,7 +1514,7 @@
         (side-condition (positive? (term n_1)))
         (where eH (⊢eheap-by-mode eHs c))
         (where eH_′ ,(append (term eH) (build-list (term n_1) (const 0))))
-        (where eHs_′ (⊢eheap-update-by-mode eHs eH_′ c))
+        (where eHs_′ (⊢update-eheap-by-mode eHs eH_′ c))
         (where n_2 ,(add1 (length (term eH))))
         eE-MallocLeft)
 
@@ -1502,7 +1523,7 @@
         (side-condition (positive? (term n_1)))
         (where eH (⊢eheap-by-mode eHs u))
         (where eH_′ ,(append (term eH) (build-list (term n_1) (const 0))))
-        (where eHs_′ (⊢eheap-update-by-mode eHs eH_′ u))
+        (where eHs_′ (⊢update-eheap-by-mode eHs eH_′ u))
         (where n_2 ,(add1 (length (term eH))))
         eE-MallocRight)
 
