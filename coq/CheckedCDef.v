@@ -3500,11 +3500,6 @@ Section Typing.
       well_typed env Q m e1 (TNat) ->
       well_typed env Q m e2 (TNat) ->
       well_typed env Q m (EPlus e1 e2) TNat
-  | TyPlusIndex : forall env Q m t e1 e2,
-      ~ is_fun_type t ->
-      well_typed env Q m e1 (TPtr m t) ->
-      well_typed env Q m e2 (TNat) ->
-      well_typed env Q m (EPlus e1 e2) (TPtr m t)
 
   | TyFieldAddr : forall env Q m e m' T fs i fi ti,
       mode_leq m' m ->
@@ -3514,13 +3509,10 @@ Section Typing.
       List.nth_error (Fields.this fs) i = Some (fi, ti) ->
       well_typed env Q m (EFieldAddr e fi) (TPtr m' ti)
 
-  (* add tainted pointer to type context here 
-  | TyMalloc : forall env x m mr Q w t e2,
-      mode_comp m mr ->
+  | TyMalloc : forall env Q m m' w,
+      mode_leq m' m ->
       well_type_bound_in env w ->
-      well_typed (Env.add x (TPtr m w) env) Q mr e2 t ->
-      well_typed env Q mr (ELet x (EMalloc m w) e2) t
-*)
+      well_typed env Q m (EMalloc m' w) (TPtr m' w)
 
   | TyUnchecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
@@ -3539,16 +3531,16 @@ Section Typing.
       well_typed env Q m (Echecked vl t e) t
 
 
-  | TyCast1 : forall env Q m t e t',
+  | TyCast1 : forall env Q t e t',
       well_type_bound_in env t ->
-      match_mode_ptr t m ->
-      well_typed env Q m e t' ->
-      well_typed env Q m (ECast t e) t
-  | TyCast2 : forall env Q m m' t e t',
+      match_mode_ptr t Unchecked ->
+      well_typed env Q Unchecked e t' ->
+      well_typed env Q Unchecked (ECast t e) t
+  | TyCast2 : forall env Q m t e t',
       well_type_bound_in env t ->
       well_typed env Q Checked e t' ->
-      eq_subtype D Q t' (TPtr m' t) ->
-      well_typed env Q Checked (ECast (TPtr m t) e) (TPtr m' t)
+      eq_subtype D Q t' (TPtr m t) ->
+      well_typed env Q Checked (ECast (TPtr m t) e) (TPtr m t)
 
   | TyDynCast1 : forall env Q m e x y u v t t',
       well_type_bound_in env (TPtr m (TArray x y t)) ->

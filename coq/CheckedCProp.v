@@ -270,9 +270,7 @@ Proof.
  apply in_app_iff in H1. destruct H1.
  apply IHwell_typed1; easy.
  apply IHwell_typed2; easy.
- apply in_app_iff in H2. destruct H2.
- apply IHwell_typed1; easy.
- apply IHwell_typed2; easy.
+ apply H0 in H1. exists TNat. easy.
  apply in_app_iff in H2. destruct H2.
  apply H in H2. exists TNat. easy.
  apply IHwell_typed; easy.

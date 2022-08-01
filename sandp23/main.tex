@@ -248,12 +248,12 @@
 \newcommand{\elet}[3]{\ensuremath{\kw{let}~#1\, \texttt{=}\, #2~\kw{in}\;{#3}}}
 \newcommand{\elettext}{\ensuremath{\kw{let}}}
 \newcommand{\ebinop}[2]{\ensuremath{#1 \plus #2}}
-\newcommand{\eassign}[2]{\ensuremath{\texttt{*}{#1}\,\texttt{=}\, {#2}}}
+\newcommand{\eassign}[2]{\ensuremath{\texttt{*}~{#1}\,\texttt{=}\, {#2}}}
 \newcommand{\elassign}[3]{\ensuremath{\texttt{*}{(#1,#2)}\,\texttt{=}\, {#3}}}
 
 \newcommand{\eassignstack}[2]{\ensuremath{{#1}\,\texttt{=}\, {#2}}}
 \newcommand{\efield}[2]{\ensuremath{{#1}\kw{\rightarrow}{#2}}}
-\newcommand{\estar}[1]{\ensuremath{\texttt{*}{#1}}}
+\newcommand{\estar}[1]{\ensuremath{\texttt{*}~{#1}}}
 \newcommand{\getstar}[2]{\ensuremath{\texttt{*}({#1},{#2})}}
 
 \newcommand{\eamper}[2]{\ensuremath{\kw{\&}{#1}\kw{\rightarrow}{#2}}}
@@ -292,6 +292,7 @@
 \newcommand{\estrcat}{\ensuremath{\mathtt{strcat}}}
 \newcommand{\estrcatbad}{\ensuremath{\mathtt{strcat\_b}}}
 \newcommand{\heap}{\ensuremath{\mathpzc{H}}}
+\newcommand{\heapup}[3]{\ensuremath{\mathpzc{H}}(#1)[#2 \mapsto #3]}
 \newcommand{\eret}[3]{\ensuremath{\kw{ret}({#1},{#2},{#3})}}
 \newcommand{\erettext}{\ensuremath{\kw{ret}}}
 

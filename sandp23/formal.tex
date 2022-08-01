@@ -140,35 +140,37 @@
 %   Coq file?}
 % \liyi{The detailed explanation is in the appendix.}
 
-This section describes the formal model of \systemname, called
+This section describes the formal model of \systemname, named
 \lang, making precise its syntax, semantics, and type system. It also
-develops \lang's meta-theory, including type soundness, the non-exposure, and the non-crashing
-theorem.
+develops \lang's meta-theory, including the type soundness, non-exposure, and non-crashing
+theorems.
 
 \subsection{Syntax}\label{sec:syntax}
 
 The syntax of \lang is given by the expression-based
 language presented in Fig.~\ref{fig:checkc-syn}.
 
-There are two notions of type in \lang.  Types $\tau$ classify
+There are two type notions in \lang.  Types $\tau$ classify
 word-sized values including integers and pointers, while types
 $\omega$ classify multi-word values such as arrays, null-terminated
 arrays, functions, and single-word-size values.
 %
-Pointer types ($\tptr{\omega}{m}$) include a mode annotation ($m$)
-which is either checked (\cmode) or unchecked (\umode) and a type
-($\omega$) denoting valid values that can be pointed to. Array types include both the type of
+Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
+($\xi$, the difference between context and pointer modes is introduced shortly below)
+that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
+and a type ($\omega$) denoting valid values that can be pointed to.
+Array types include both the type of
 elements ($\tau$) and a bound ($\bvar$) comprised of an upper and
 lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
 limited to integer literals $n$ and expressions $x + n$.
 Whether an array pointer is null terminated or not is determined by annotation
 $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
-otherwise (we elide the $\cdot$ when writing the type).
-\systemname function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
-reflect its dependent function declrations,
+otherwise (we elide $\cdot$ when writing types).
+\lang function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
+reflect its dependent function declarations,
 where $\overline{x}$ represents
-a list of \tint type variables in a dependent function header,
-which bind all bounds appearing in $\overline{\tau}$ and $\tau$.
+a list of \tint type variables in a dependent function header
+that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
 We have a well-formed requirement for a function type,
 such that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 Here is the
@@ -210,9 +212,9 @@ unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecke
 % \mwh{Added reference back to Section 2-B}
 
 Integer literals $n$ are annotated with a type $\tau$ which can be either
-$\tint$, or $\tptr{\omega}{m}$ in the case $n$ is being used as 
+$\tint$, or $\tptr{\omega}{\xi}$ in the case $n$ is being used as 
 a heap address (this is useful for the semantics);
-$\evalue{0}{\tptr{\omega}{m}}$ (for any $m$ and $\omega$) represents the $\enull$ pointer, as usual. 
+$\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer, as usual. 
 The $\texttt{strlen}$ expression operates on variables $x$
 rather than arbitrary expressions to simplify managing
 bounds information in the type system; the more general case can be
@@ -228,22 +230,24 @@ Compared to the former \checkedc model \cite{li22checkedc},
 there are four differences.
 First, the \systemname type annotations have well-formed restrictions in \Cref{fig:wftypes}, 
 for maintaining non-exposure.
-Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi'} ...)}{\xi}$, if the outside mode $\xi$ is 
-$\tmode$ or $\umode$, the inside mode $\xi'$ cannot be $\cmode$.
+Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi'} ...)}{\xi}$, $\xi'\le \xi$.
 It is worth noting that pointer modes are a three point partial order ($\le$),
 where $\tmode$ is the infimum, and
 $\xi\wedge m$ is a special meet operation that projects pointer modes onto context modes,
-such that a pointer mode $\tmode$ is projected as $\umode$.
+such that $\tmode$ is projected as $\umode$.
 Second, $\emalloc{\xi}{\omega}$ includes a mode flag
 $\xi$ for allocating different pointers in different heap mode regions.
-For simplicity, we disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$),
+We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
 Third, the first expression $e$ in a function call ($\ecall{e}{\overline{e}}$) represents a function pointer.
-Fourth, we update $\eunchecked{\overline{x}}{e}$ 
-to specify $\overline{x}$ restricting all free variables appearing in $e$.
-Additionally, we create $\echeckedtext$ blocks indicating the context mode change from $\umode$ to $\cmode$.
-Both the free variables in the $\euncheckedtext$ and $\echeckedtext$ blocks
-and the return types cannot be $\cmode$ mode for maintaining non-exposure,
-i.e., no checked pointer can be communicated between $\euncheckedtext$ and $\echeckedtext$ blocks.
+Fourth, $\echeckedtext$ blocks are added to the system, 
+which permits the nested switching between $\echeckedtext$ (represented by context mode $\cmode$)
+and $\euncheckedtext$ (represented by context mode $\umode$) code regions.
+One example usage of the nested switching is the checked function callbacks inside 
+an unsafe region in \Cref{fig:checkedc-example-2} and \ref{fig:checkedc-example-3}.
+To guarantee the non-exposure safety,
+ we extend the $\echeckedtext$ and $\euncheckedtext$ block syntax to be 
+$\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$:
+$\overline{x}$ restricts all free variables appearing in $e$, and they cannot be checked pointers.
 
 \lang aims to be simple enough to work with, but powerful enough to
 encode realistic \systemname idioms. For example, mutable local
@@ -259,7 +263,6 @@ the supplemental report~\cite{checkedc-tech-report}.
 \fi
 C-style \code{union}s have no safe typing
 in \checkedc, so we omit them.
-Additional syntactic descrition is listed in the \checkedc formalism paper \cite{li22checkedc}.
 
 
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
@@ -286,8 +289,7 @@ Additional syntactic descrition is listed in the \checkedc formalism paper \cite
 $\hspace*{-1.2em}
     \begin{array}{l}
     \begin{array}{lll}
-\mu & ::= & \evalue{n}{\tau}\\
-e & ::= & \ldots \mid \ret{x}{\mu}{e}\\
+e & ::= & \ldots \mid \ret{x}{\evalue{n}{\tau}}{e}\\
 r & ::= & e \mid \enull \mid \ebounds\\
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
 &&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid \eif{E}{e}{e}\\[0.2em]
@@ -364,9 +366,11 @@ transition relation with the judgment $ (\varphi,\heap,e)
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
 $\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ regions), each of which
 maps addresses (integer literals) to values $\evalue{n}{\tau}$.
-If a pointer has mode $\cmode$, it lives in the $\cmode$ region; otherwise, it lives in the $\umode$ region.
+A $\cmode$pointer is mapped to a heap location in the $\cmode$ region, 
+while a $\tmode$ and $\umode$ pointer represents a $\umode$ region location.
 We wrote $\heap(m,n)$ to retrieve the $n$-location heap value in the $m$ region,
-and $\heap(m)[n\mapsto \mu]$ to update location $n$ with the value $\mu$.
+and $\heapup{m}{n}{\evalue{n'}{\tau}}$ 
+to update location $n$ with the value $\evalue{n'}{\tau}$ in the $m$ region.
 It is worth noting that \systemname is not a fat-pointer system;
 thus, in every heap update, the value type annotation remains the same through program executions.
 Additionally, for both stack and heap, 
@@ -386,12 +390,12 @@ respectively. Such failures are a \emph{good} outcome; stuck states
 (non-value expressions that cannot transition to a result $r$)
 characterize undefined behavior.
 %
-The context mode $m$ indicates whether the
+The context mode $m$ (in $\longrightarrow_{m}$) indicates whether the
 stepped redex within $e$ was in a checked ($\cmode$) or
 unchecked ($\umode$) region.
 
 The rules for the main operational semantics
-judgment---\emph{evaluation}---are given at the bottom of
+judgment---\emph{evaluation}---are given at the middle of
 Fig.~\ref{fig:c-context}.
 The first rule takes an expression $e$, decomposes
 it into an \emph{evaluation context} $E$ and a sub-expression $e'$
@@ -402,10 +406,12 @@ whose rules are given in Fig.~\ref{fig:semantics}, discussed
 shortly. 
 The second rule describes the exception handling 
 for possible crashing behaviors in unchecked region.
-A program in $\umode$ mode can non-deterministically crash
-and the \systemname sandbox mechanism recorvers
+A $\umode$ mode operation can non-deterministically crash
+and the \systemname sandbox mechanism recovers
 the program to a safe point ($\evalue{0}{\tau}$)
 and continues with the existing program state.
+Evaluation contexts $E$ define a standard left-to-right evaluation order. (We explain the
+$\ret{x}{\mu}{e}$ syntax shortly.)
 There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
 
 %\footnote{This approach is that of the PLT Redex model of \lang; the Coq
@@ -417,16 +423,17 @@ There are other rules for describing the halts of evaluation to $\enull$ and $\e
 % \mwh{Don't follow the above. I don't see this ``context transition
 %   rule'' anywhere, and I'm not sure how it would fire, if we had it.}
 % \liyi{The comment seems to confuse the meaning of the text about the if-then-else rules. Making the rule specific will help. }
-The $\mode$ function
-determines the context mode when evaluating $e'$ based on the context $E$.
-For any program execution, the top context mode always starts with $\cmode$ ($\mode(E)=\mode'(E,\cmode)$).
-The result context mode is depeneded on where $\Box$ locates.
-If it occurs within $(\eunchecked{\overline{x}}{E'})$ inside $E$ without
-a surrounding $\echeckedtext$ block, then the mode is
-$\umode$; if the exact opposite happens (within $(\echecked{\overline{x}}{E'})$ without surrounding $\euncheckedtext$ blocks),
-the mode is $\cmode$; the other cases ($\mode'(\alpha({E}),m)=\mode'(E,m)$) are recursively defined by the above base cases ($\alpha$ represents any syntactic categories in \Cref{fig:c-context} other than $\Box$, $\euncheckedtext$, and $\echeckedtext$).
-Evaluation contexts $E$ define a standard left-to-right evaluation order. (We explain the
-$\ret{x}{\mu}{e}$ syntax shortly.)
+The $\mode$ function  at the bottom of Fig.~\ref{fig:c-context}
+describes the context mode determination in each evaluation step based on the context $E$.
+For any program execution, the function starts the mode computation with $\cmode$ ($\mode(E)=\mode'(E,\cmode)$).
+The result context mode depends on where $\Box$ locates.
+If it occurs within $E$ in $(\eunchecked{\overline{x}}{E})$
+that has no surrounding $\echeckedtext$ block,
+the mode is $\umode$; otherwise, the mode is $\cmode$.
+$\mode'(\alpha({E}),m)=\mode'(E,m)$ represent other construct cases 
+that are not $\echeckedtext$ and $\euncheckedtext$; in such case, 
+the function recursively traverses the sub-context to find the context mode.
+
 % For a term $e$, $C$ is a context if any
 % only if it contains a $\Box$ hole term in one of the subterm position
 % in $e$. $\Box$ indicates the break point where we split $e$ into $C$
@@ -446,7 +453,7 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
     {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{c}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
     \inferrule[S-AssignArrC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,(\heap,\cmode)[n \mapsto \evalue{n_1}{\tau_a}],\evalue{n_1}{\tau})}
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heapup{\cmode}{n}{\evalue{n_1}{\tau_a}},\evalue{n_1}{\tau})}
 
         \inferrule[S-DefT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}
          \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau} }
@@ -454,7 +461,7 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 
     \inferrule[S-AssignArrT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h)
                \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_1}{\tau} }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\tmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,(\heap,\umode)[n \mapsto \evalue{n_1}{\tau_a}],\evalue{n_1}{\tau})}
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\tmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heapup{\umode}{n}{\evalue{n_1}{\tau_a}},\evalue{n_1}{\tau})}
 
     \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
 
@@ -462,19 +469,19 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
               {}
               {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
 
-    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\mu}{\mu'}) \longrightarrow (\varphi,\heap,\mu')}
+    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{\evalue{n'}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n'}{\tau'})}
 
         \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e})}
 
-    \inferrule[S-RetCon]{\varphi(x)=\mu\\ (\varphi[x\mapsto \mu'],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\mu'}{e}) \longrightarrow (\varphi'[x\mapsto \mu],\heap',\ret{x}{\varphi'(x)}{e'})}
+    \inferrule[S-RetCon]{ (\varphi[x\mapsto \evalue{n}{\tau}],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi'[x\mapsto \varphi(x)],\heap',\ret{x}{\varphi'(x)}{e'})}
 
-    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\mu}) \longrightarrow (\varphi,\heap,\mu)}
+    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
     \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
         {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
    (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
 
-    \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\mu}) \longrightarrow (\varphi,\heap,\mu)}
+    \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
     \inferrule[S-FunT]{ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\tmode,e)
                   \\ \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}}
@@ -545,8 +552,7 @@ nt_array_ptr<char> safe_strcat
 
 % LEO: This has an overfull line...?
 
-Fig.~\ref{fig:semantics} shows selected rules for the computation
-relation; we explain them with the help of the example in \Cref{fig:checkedc-example-1} and \Cref{fig:checkedc-example-2}.
+Fig.~\ref{fig:semantics} shows selected rules for the computation relation.
 
 \ignore{
  in
@@ -566,9 +572,9 @@ Fig.~\ref{fig:strcat-ex},
 The rules for pointer related operations---\textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-AssignArrC}, \textsc{S-AssignArrT},
 \textsc{S-DefNull}, and \textsc{S-Cast}.
-The first five are deference and assignment operations---illustrate how the semantics checks bounds.
+The first five define deference and assignment operations---illustrate how the semantics checks bounds.
 Rule \textsc{S-DefNull} transitions attempted null-pointer
-dereferences to $\enull$, whereas \textsc{S-DefC} dereferences a \cmode-mode
+dereferences to $\enull$, whereas \textsc{S-DefC} dereferences a $\cmode$-mode
 non-null (single) pointer.
 When $\enull$ is returned by the
 computation relation, the evaluation relation halts the entire
@@ -582,8 +588,8 @@ and strictly less than the upper bound.
 Any dynamic heap use of a tainted pointer requires a verification.
 Performing such a verification equates to performing a type check for a pointer constant in \Cref{fig:const-type}.
 We explain this shortly in \Cref{sec:type-system}.
-For now, the verification step, e.g. $\umode;\emptyset;\heap ; \emptyset \vdash\evalue{n_a}{\tau}$ in \textsc{S-DefC},
-means we verify that the value $n_a$ has type $\tau$ in the $\umode$ region heap.
+For now, the verification step, e.g. $\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$ in \textsc{S-DefC},
+means we verify that the value $n_a$ is well-defined in $\heap(m,n_a)$ and has type $\tau$, if $\tau$ is a pointer.
 
 Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
 by \textsc{S-Cast}. In a type-correct program, such casts are
@@ -603,32 +609,32 @@ and null-terminated bound widening pointer operations, is given in \Cref{app:mai
 
 \myparagraph{Unchecked and Checked Blocks}
 %
-Semantically, $\euncheckedtext$ and $\echeckedtext$ blocks 
-(\textsc{S-Unchecked} and \textsc{S-Checked}) act as a classical C block structures.
-The interesting part is their type rules in \Cref{sec:type-system}.
+Semantically, $\euncheckedtext$ and $\echeckedtext$ blocks act as classical C blocks
+as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
 
 \myparagraph{Binding and Function Calls}
 %
 The semantics handles variable scopes using the special $\erettext$
-form. \textsc{S-Let} evaluates to a configuration whose stack
-is $\varphi$ extended with a binding for $x$, and whose expression is
-$\ret{x}{\evalue{n}{\tau}}{e})$ which keeps $\varphi$ unchanged, but
-remember $x$ with the new value $\evalue{n}{\tau}$ in the scope $e$.
-Every time when Evaluation proceeds on $e$ (Rule \textsc{S-RetCon}),
-we install the current stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$,
-after one-step evaluation is completed, we restore the result $\varphi'(x)$ 
-in the result $\ret{x}{\varphi'(x)}{e'})$.
-This procedure continues until it becomes a literal
-$n\!:\!\tau$, in which case \textsc{S-RetEnd} remove the $\kw{ret}$ frame and evaluates to
-$n\!:\!\tau$. 
+form. \textsc{S-Let} evaluates to a configuration whose expression is
+$\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
+and remember $x$ and its the new value $\evalue{n}{\tau}$
+in $e$'s scope that is defined by the $\erettext$ operation.
+Every time when evaluation proceeds on $e$ (rule \textsc{S-RetCon}),
+we install the stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$ for the current scope;
+after one-step evaluation is completed, 
+we store $x$'s change in the result $\erettext$ operation $\ret{x}{\varphi'(x)}{e'})$,
+and restore $x$'s outer score value $\varphi(x)$ in $\varphi'$. 
+This procedure continues until $e'$ becomes a literal
+$n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
+the literal. 
 
 Function calls are handled by \textsc{S-FunC} and \textsc{S-FunT},
-for \cmode and \tmode mode function pointers, respectively. 
-A call to function $f$ causes $f$'s
-definition to be retrieved from $\Xi$,
+for $\cmode$ and $\tmode$ mode function pointers, respectively. 
+A call to a function pointer $n$ retrieves
+ the function definition in $n$'s location in the global function store $\Xi$,
 % LEO: This is the first occurence of \Xi. It is explained,
 % but reads a bit awkward as it's unclear this is its "introduction"
-which maps function names to
+which maps function pointers to
 function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\xi,e)$, where
 $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, 
@@ -642,7 +648,7 @@ The \systemname functions are dependent functions.
 Recall that array
 bounds in types may refer to in-scope variables; e.g., parameter
 \code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
-2-3 in Fig.~\ref{fig:strcat-ex}. 
+2-3 in \Cref{fig:strcat-ex}. 
 %All dependent bound variables appearing in function headers 
 %are bounded by a variable list in the function pointer type, which is checked in the type rule.
 Semantically,
@@ -652,9 +658,10 @@ $\overline{n}$, but annotated with the parameter types
 $\overline{\tau}$ (this will be safe for type-correct programs). The
 function body $e$ is wrapped in a static cast
 $(\tau[\overline{n} / \overline{x}])$ which is the function's return
-type but with any parameter variables $\overline{x}$ appearing in that
-type substituted with the call's actual arguments $\overline{n}$. To
-see why this is needed, suppose that \code{safe_strcat} in
+type but with any integer parameter variables $\overline{x}$ appearing in that
+type, as type bound variables,
+substituted with the call's actual arguments $\overline{n}$.
+To see why this is needed, suppose that \code{safe_strcat} in
 Fig.~\ref{fig:strcat-ex} is defined to return a
 \code{nt_array_ptr<int>:count(n)} typed term, and assume that we
 perform a \code{safe_strcat} function call as
@@ -669,6 +676,10 @@ Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
   signature. Using $\overline{\tau_a}$ when executing the body of
 the function has no impact on the soundness of \lang, but will violate
 Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
+Rule \textsc{S-FunT} defines the tainted version of function call semantics.
+In such case, the verification process 
+$\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}$
+makes sure that the function in the global store is well-defined and has the right type.
 
  %  For this rule and
 % \textsc{S-StrWiden}, this widening persists in the current stack
@@ -702,7 +713,7 @@ The typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
 which states that in a type environment $\Gamma$ (mapping variables to
 their types) and a predicate environment $\Theta$ (mapping integer-typed
 variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
-in mode $m$. Key rules for this judgment are given in
+in context mode $m$. Key rules for this judgment are given in
 Fig.~\ref{fig:type-system-1}.
 % \review{text says $u < c$ but this seems to contradict the paragraph right
 %   after, because if $m = u$ then $u <= c$ and it seems like T-DefArr *does*
@@ -743,7 +754,7 @@ the supplemental report~\cite{checkedc-tech-report}.
 
      \inferrule[T-CastPtr]
                {\Gamma;\Theta \vdash_m e : \tau' \\
-                 \tau' \sqsubseteq \tptr{\tau}{\xi}}
+                 \tau' \sqsubseteq_{\Theta} \tptr{\tau}{\xi}}
                {\Gamma;\Theta \vdash_m \ecast{\tptr{\tau}{\xi}}{e} : \tptr{\tau}{\xi}}
                 
    \inferrule[T-Let]
@@ -755,23 +766,24 @@ the supplemental report~\cite{checkedc-tech-report}.
 
    \inferrule[T-LetInt]
     { x\in \fv(\tau') \Rightarrow e_1 \in \text{Bound} \\\\
-        \Gamma;\Theta \vdash_m e_1 : \tau \\\\
-           \Gamma[x\mapsto \tau];\Theta[x\mapsto \teq{e_1}] \vdash_m e_2 : \tau'
+        \Gamma;\Theta \vdash_m e_1 : \tint \\\\
+           \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{e_1}] \vdash_m e_2 : \tau'
              }
     {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'[e_1 / x]}
 
 
-   \inferrule[T-Ret]
-    { \Gamma[x\mapsto \tau'];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
-    {\Gamma;\Theta \vdash_m \eret{x}{\evalue{n}{\tau'}}{e} : \tau}
+   \inferrule[T-RetInt]
+    { \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
+    {\Gamma;\Theta \vdash_m \eret{x}{\evalue{n}{\tint}}{e} : \tau}
 
     \inferrule[T-Checked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
+              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
+                     \\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
               {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
 
     \inferrule[T-Unchecked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\\
-                  \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
+              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
+                \\\\ \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
               {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
 
 \inferrule[T-Fun]
@@ -818,15 +830,14 @@ the supplemental report~\cite{checkedc-tech-report}.
 
 \myparagraph{Pointer Access}
 %
-Rules \textsc{T-DefArr} and \textsc{T-AssignArr} type-check array
+Rules \textsc{T-Def} and \textsc{T-AssignArr} check array
 dereference and assignment operations resp., returning the type of
-pointed-to objects; rules for pointers to single objects are
+pointed-to objects; rules for pointers for other object types are
 similar.
-The condition $m\le m'$ ensures that checked pointers and unchecked pointers 
-can only be deferenced in checked and unchecked regions, respectively;
-the type rule for
-The rules do not attempt to reason whether the access is in bounds;
-this check is deferred to the semantics.
+The condition $m\le m'$ ensures that checked and unchecked pointers 
+can only be deferenced in checked and unchecked regions, resp.;
+The type rules do not attempt to reason whether the access is in bounds;
+such check is deferred to the semantics.
 
 % Subtyping and casting operations are briefly introduced in
 % Sec.~\ref{sec:intros}~and~\ref{sec:overview}.  Subtyping is useful in
@@ -845,28 +856,29 @@ this check is deferred to the semantics.
 
 \myparagraph{Type Equality and Subtyping and Casting}
 %
-In \systemname, we define the type equality $\tau=_{\Theta}\tau'$
-is an equivalent relation over the bound equality ($=_{\Theta}$) of the bounds in (NT-)array types
-and alpha equivalence of two function types in \Cref{fig:checkc-subtype}.
-Two (NT-)array pointers $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
-$\bvar =_{\Theta} \bvar'$; two function types 
+In \lang, type equality $\tau=_{\Theta}\tau'$
+is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
+and the alpha equivalence of two function types in \Cref{fig:checkc-subtype}.
+Two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
+$\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
 $\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
-are equivalent, if we can find a same length variable set $\overline{z}$ that is substituted for  
-$\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, respectively,
+are equivalent, if we can find a same length, as $\overline{x}$ and $\overline{y}$, variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
 and the substitution results are equal.
 
  The \textsc{T-CastPtr} rule
 permits casting from an expression of type $\tau'$ to a checked pointer when
 $\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
-$\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype} built on the type equality
+$\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype} and it is built on the type equality
 ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$); the many
 rules ensure the relation is transitive. Most of the rules handle
 casting between array pointer types. The second rule 
 $0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
 \tarrayptr{b_l}{b_h}{\tau}{m}$ permits treating a singleton
 pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
-Two function pointers are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
-if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are oppositely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
+There is another casting rule in \Cref{app:main} states that
+ users are free to cast types in unchecked code regions, since unchecked regions can contain C code.
 
 Since bounds expressions may
 contain variables, determining assumptions like $b_l \leq b_l'$
@@ -877,7 +889,7 @@ equation predicates $P$, which have the form $P ::= \tgez \;|\; \teq{b}$.
 It maps variables to equations that are recorded along the type checking procedure.
 If $\Theta$ maps $x$ to $\tgez$, that means that $x \ge 0$;
 $\teq{b}$ means that $x$ is equivalent to the bound value $b$ in the current context, 
-such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-Ret}.
+such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-RetInt}.
 \iftr
   Appendix~\ref{app:le}.
 \else
@@ -889,7 +901,7 @@ such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-R
 {\small
 \[\hspace*{-1.2em}
 \begin{array}{l}
-\text{Bound Inequality and Equality:}\\
+\text{Bound Inequality and Equality:}\\[0.3em]
   \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
      n \le n' &\Rightarrow& n &\le_{\Theta} & n'\\
      n \le n' &\Rightarrow& x+n &\le_{\Theta} & x+n'\\
@@ -898,8 +910,8 @@ such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-R
      \Theta(x)=\teq{b}\wedge b'\le_{\Theta}b+n  &\Rightarrow& b' & \le_{\Theta} & x+n\\
      b \le_{\Theta} b' \wedge b' \le_{\Theta} b  &\Rightarrow& b & =_{\Theta} & b'
     \end{array}
-  \\[0.5em]
-\text{Type Equility:}\\
+  \\[0.7em]
+\text{Type Equility:}\\[0.3em]
   \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
      && \tint & =_{\Theta} & \tint\\
      \omega =_{\Theta} \omega' &\Rightarrow& \tptr{\omega}{\xi} & =_{\Theta} & \tptr{\omega'}{\xi}\\
@@ -911,12 +923,11 @@ such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-R
  &\Rightarrow& \tfun{\overline{x}}{\overline{\tau}}{\tau} & 
                          =_{\Theta} & \tfun{\overline{y}}{\overline{\tau'}}{\tau'}\\
     \end{array}
-  \\[0.5em]
-\text{Subtype:}\\
+  \\[0.7em]
+\text{Subtype:}\\[0.3em]
 
   \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
     \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
-    &&\tptr{\omega}{\tmode} &\sqsubseteq_{\Theta}& \tptr{\omega'}{\umode}\\[0.2em]
 
     0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
     b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
@@ -959,14 +970,14 @@ n'+n = add(n',n)
    \inferrule
        {}
        {\Theta;\heap;\sigma \vdash_m n : \tint}
-  
-   \inferrule
-       {}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\umode}}
-  
+
    \inferrule
        {}
        {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\xi}}
+
+   \inferrule
+       {(m = \cmode \Rightarrow \xi \neq \cmode) \\\\ (m=\umode \Rightarrow \xi = \umode)}
+       {\Theta;\heap;\sigma \vdash_{\cmode} n : \tptr{\omega}{\tmode}}
   
    \inferrule
        {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
@@ -1007,17 +1018,27 @@ n'+n = add(n',n)
 \end{DIFnomarkup}
 
 \myparagraph{Constant Validity}
+Rules \textsc{T-ConstU} and \textsc{T-ConstC}
+describes type assumptions for constants appearing in a program.
+$\cmode(\tau)$ judges a constant pointer 
+in an unchecked region cannot be of a checked type,
+which represents an assumption that programmers 
+cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+In rule \textsc{T-ConstC}, we requires a static 
+verification procedure for validating a constant pointer, 
+which is similar to the dynamic verification process in \Cref{sec:semantics}. 
+
 Given a constant $\evalue{n}{\tau}$, 
-the type judgment $\Theta;\heap;\sigma \vdash_m n : \tau$ checks in \Cref{fig:const-type}
+the verification process $\Theta;\heap;\sigma \vdash_m n : \tau$ checks (\Cref{fig:const-type})
 if the constant is valid, 
-where $\heap$ is the initial heap that the constant resides on and
+where $\heap(m)$ is the initial heap that the constant resides on and
 $\sigma$ is a set of constant assumed to be checked.
-A global function store $\Xi$ is also required in checking the validity of a function pointer.
+A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
 A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
 and the address stores a function with the right type.
-
 The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
 where every element in the pointer range ($[0,\size(\omega))$) should be well typed.
+
 A checked pointer checks validity in type step as rule \textsc{T-ConstC},
 while a tainted/unchecked pointer does not check for such during the type checking.
 Tainted pointers are verified through the validity check in dynamic execution as we mentioned above.
@@ -1027,24 +1048,24 @@ Tainted pointers are verified through the validity check in dynamic execution as
 %
 During the type checking,
 Both $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$
-check all free variables are within $\overline{x}$,
-and the types for $\overline{x}$ have no checked pointers.
-A $\echeckedtext$ and $\euncheckedtext$ block represents 
-the transition stage from a checked to an checked region, or vice versa.
+check all free variables in $e$ are within $\overline{x}$;
+the types for $\overline{x}$ and the final return type $\tau$ have no checked pointers.
+A $\echeckedtext$ or $\euncheckedtext$ block represents 
+the context switching from a checked to an checked region, or vice versa.
 We need to make sure no checked pointers are information exposed to unsafe code regions.
 
-\myparagraph{Dependent Function Pointers and Let Bindings}
+\myparagraph{Let Bindings and Dependent Function Pointers}
 %
-Rule \textsc{T-Let} and \textsc{T-LetInt} type a $\elettext$ expression, which also admits
+Rules \textsc{T-Let} and \textsc{T-LetInt} type a $\elettext$ expression, which also admits
 type dependency. In particular, the result of evaluating a $\elettext$
 may have a type that refers to one of its bound variables (e.g., if
 the result is a checked pointer with a variable-defined bound); if so,
-we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). Note
-that we restrict the expression $e_1$ to syntactically match the
+we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). 
+Note that we restrict the expression $e_1$ to syntactically match the
 structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
 
-Rule \textsc{T-Ret} types a $\erettext$ expression, which does not
-appear in source programs but is introduced by the semantics when
+Rule \textsc{T-RetInt} types a $\erettext$ expression when $x$ is of type $\tint$.
+$\erettext$ does not appear in source programs but is introduced by the semantics when
 evaluating a let binding (rule \textsc{S-Let} in
 Fig.~\ref{fig:semantics}); this rule is needed for the preservation
 proof.
@@ -1053,15 +1074,15 @@ proof.
 %$\bot$ (meaning that there is no $x$ originally) or some value
 %$\evalue{n}{\tau}$.
 
-Rule \textsc{T-Fun} is the standard dependent function call rule. It
-learns the function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$) of $e$ by a recursive type check,
-type-checks the actual arguments $\overline{e}$ which have
-types $\overline{\tau'}$, and then confirms that each of these types
-is a subtype of the declared type of $e$'s corresponding parameter ($\overline{\tau}$). 
-Because functions have dependent types bounded by $\overline{x}$, 
-we substitute each parameter $e_i$ for
-its corresponding parameter $x_i$ in both the parameter types and the
-return type. Consider the \code{safe_strcat} function in
+Rule \textsc{T-Fun} is the dependent function call rule. 
+Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
+from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
+we confirm that each of $\overline{\tau'}$ is
+a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$,
+which replaces possible integer bound variables $\overline{x}$ with bound expressions $\overline{e'}$.
+The final result type is the defined target type $\tau$ appearing in the function pointer type
+also with such replacement, written as $\tau[\overline{e'} / \overline{x}]$.
+Consider the \code{safe_strcat} function in
 Fig.~\ref{fig:strcat-ex}; its parameter type for \code{dst} 
 depends on \code{n}. The \textsc{T-Fun} rule will substitute 
 \code{n} with the argument at a call-site.
@@ -1158,7 +1179,7 @@ These proofs have been carried out in our Coq model.
 Type soundness relies on several \emph{well-formedness}:
 
 \begin{defi}[Type Environment Well-formedness]\label{type-wellformed}
-A type environment $\Gamma$ is well-formed iff every variable mentioned as type bounds in $\Gamma$ are bounded by $\tnat$ typed variables in $\Gamma$.
+A type environment $\Gamma$ is well-formed iff every variable mentioned as type bounds in $\Gamma$ are bounded by $\tint$ typed variables in $\Gamma$.
 \end{defi}
 
 \begin{defi}[Heap Well-formedness]
@@ -1197,32 +1218,33 @@ A heap $\heap'$ is consistent with $\heap$---written $\heap \triangleright \heap
 for every constant $n$, $\emptyset;\heap;\emptyset \vdash_{\cmode} n:\tau$ implies $\emptyset;\heap';\emptyset \vdash_{\cmode} n:\tau$.
 \end{defi}
 
-Moreover, as a program evaluates, its expression may contain literals
-$\evalue{n}{\tau}$ where $\tau$ is a pointer type, i.e., $n$ is an
-index in $\heap$ (perhaps because $n$ was chosen by
-$\mathtt{malloc}$). The normal type-checking judgment for $e$ is
-implicitly parameterized by $\heap$, and the rules for type-checking
-literals confirm that pointed-to heap cells are compatible with
-(subtypes of) the pointer's type annotation; in turn this check may
-precipitate checking the type consistency of the heap itself. We
-follow the same approach as \citet{ruef18checkedc-incr}, and show the
-rules in
-  Fig.~\ref{fig:const-type}; the judgment
-  $\Theta;\heap;\sigma \vdash_m n : \tau$ is used to confirm literal
-  well-typing, where $\sigma$ is a set of pointer literals already
-  checked in $\heap$ (to allow pointer cycles). See
-  \iftr
-  Appendix~\ref{sec:literal-pointer-typing}
-  \else
-  the supplemental report~\cite{checkedc-tech-report}
-  \fi
-   for further discussion.
 
-Progress states that a \systemname program can always make a move:
+%Moreover, as a program evaluates, its expression may contain literals
+%$\evalue{n}{\tau}$ where $\tau$ is a pointer type, i.e., $n$ is an
+%index in $\heap$ (perhaps because $n$ was chosen by
+%$\mathtt{malloc}$). The normal type-checking judgment for $e$ is
+%implicitly parameterized by $\heap$, and the rules for type-checking
+%literals confirm that pointed-to heap cells are compatible with
+%(subtypes of) the pointer's type annotation; in turn this check may
+%precipitate checking the type consistency of the heap itself. We
+%follow the same approach as \citet{ruef18checkedc-incr}, and show the
+%rules in
+%  Fig.~\ref{fig:const-type}; the judgment
+%  $\Theta;\heap;\sigma \vdash_m n : \tau$ is used to confirm literal
+%  well-typing, where $\sigma$ is a set of pointer literals already
+%  checked in $\heap$ (to allow pointer cycles). See
+%  \iftr
+%  Appendix~\ref{sec:literal-pointer-typing}
+%  \else
+%  the supplemental report~\cite{checkedc-tech-report}
+%  \fi
+%   for further discussion.
+
+Progress states that a \lang program can always make a move:
 
 \begin{thm}[Progress]\label{thm:progress}
 
-For any \systemname program $e$, heap $\heap$, stack
+For any \lang program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed, consistent
 ($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
@@ -1243,9 +1265,10 @@ one of the following holds:
 There are two forms of preservation regarding the checked and unchecked regions.
 Checked Preservation states that a reduction step preserves both the
 type and consistency of the program being reduced.
+Unchecked Preservation states that any evaluation happens at unchecked region does not affect the checked heap.
 
 \begin{thm}[Checked Preservation]
-For any \systemname program $e$, heap $\heap$, stack
+For any \lang program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed, consistent
 ($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
@@ -1253,15 +1276,15 @@ typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists
 $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \longrightarrow_{\cmode} (\varphi',\heap',e')$, then $\heap'$ is
 checked region consistent with $\heap$ ($\heap \triangleright \heap'$) and there exists
-$\Gamma'$, $\Theta'$ and $\tau'$ that are well formed, checked region consistent
-($\Gamma';\Theta'\vdash \varphi'$ and $\heap' \vdash \varphi'$) and
-well typed ($\Gamma';\Theta' \vdash_{\cmode} e: \tau'$), where
-$\tau'\sqsubseteq \tau$.
+$\Gamma'$ and $\tau'$ that are well formed, checked region consistent
+($\Gamma';\Theta\vdash \varphi'$ and $\heap' \vdash \varphi'$) and
+well typed ($\Gamma';\Theta \vdash_{\cmode} e: \tau'$), where
+$\tau'\sqsubseteq_{\Theta} \tau$.
 \end{thm}
 %{\em Proof:} By induction on the typing derivation.
 %\smallskip
 \begin{thm}[Unchecked Preservation]
-For any \systemname program $e$, heap $\heap$, stack
+For any \lang program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed and well
 typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
@@ -1270,20 +1293,21 @@ $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \end{thm}
 
 Using the above theorem, we first show the non-exposure theorem,
-where code in unchecked region cannot observe know a valid checked pointer address.
+where code in unchecked region cannot observe a valid checked pointer address.
 
 \begin{thm}[Non-Exposure]
-For any \systemname program $e$, heap $\heap$, stack
+For any \lang program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed and well
 typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
 $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \longrightarrow_{\umode} (\varphi',\heap',e')$ and $e=E[\alpha(x)]$ and $\mode(E)=\umode$,
-where $\alpha(x)$ is some expression (not $\echeckedtext$ nor $\euncheckedtext$) containing variable $x$, if $x$ is a checked pointer, it is a null one.
+where $\alpha(x)$ is some expression (not $\echeckedtext$ nor $\euncheckedtext$) containing variable $x$; 
+thus, it is not a checked pointer.
 \end{thm}
 
-Using these two theorems we can prove our main result, {\em non-crashing},
-which states that a well-typed program can never be \emph{stuck} (expression
+We now state our main result, {\em non-crashing},
+which suggests that a well-typed program can never be \emph{stuck} (expression
 $e$ is a non-value that cannot take a step\footnote{Note that
   $\ebounds$ and $\enull$ are \emph{not} stuck expressions---they represent a
   program terminated by a failed run-time check. A program that tries to access $\heap{n}$
@@ -1293,7 +1317,7 @@ $e$ is a non-value that cannot take a step\footnote{Note that
 % \review{- There appears to be a slight discrepancy between the blame theorem in Coq and the one in the paper: the paper mentions some e', which I believe should be r. Also, the Coq code has a further disjunct m=Unchecked in the conclusion.}
 % \liyi{It is a typo. We will add the thing back that we show that either user uses a unchecked mode to evaluate $e$ or $e$ lives in a context that is an unchecked region. This is a bit due to the space limitation. The semantic rules allow users to input the mode $m$ of evaluating an expression, I just forgot to include the $m$ in the result of the proof statement. }
 
-\begin{thm}[Non-Crashing]\label{thm:blame} For any \systemname
+\begin{thm}[Non-Crashing]\label{thm:blame} For any \lang
   program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are well-formed and consistent

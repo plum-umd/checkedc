@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  24 JUL 2022 23:15
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  31 JUL 2022 23:36
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1153,28 +1153,28 @@ runsystem(rm main.aex)...executed.
  (./main.aux)
 \openout1 = `main.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 370.
-LaTeX Font Info:    ... okay on input line 370.
-LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 370.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 371.
+LaTeX Font Info:    ... okay on input line 371.
+LaTeX Font Info:    Checking defaults for mTT/cmtt/m/n on input line 371.
 LaTeX Font Info:    Trying to load font information for mTT+cmtt on input line 
-370.
+371.
 
 (/usr/share/texlive/texmf-dist/tex/latex/mdwtools/mTTcmtt.fd
 File: mTTcmtt.fd 1996/05/25 1.1 Handing of the cmtt font
 )
-LaTeX Font Info:    ... okay on input line 370.
+LaTeX Font Info:    ... okay on input line 371.
 
 -- Lines per column: 58 (exact).
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
@@ -1215,7 +1215,7 @@ ABD: EveryShipout initializing macros
 Package todonotes Warning: The length marginparwidth is less than 2cm and will 
 most likely cause issues with the appearance of inserted todonotes. The issue c
 an be solved by adding a line like \setlength {\marginparwidth }{2cm} prior to 
-loading the todonotes package. on input line 370.
+loading the todonotes package. on input line 371.
 
 Package caption Info: Begin \AtBeginDocument code.
 Package caption Info: float package is loaded.
@@ -1223,7 +1223,7 @@ Package caption Info: listings package is loaded.
 Package caption Info: End \AtBeginDocument code.
 \c@lstlisting=\count385
 LaTeX Font Info:    Trying to load font information for OT1+phv on input line 4
-21.
+22.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1phv.fd
 File: ot1phv.fd 2001/06/04 scalable font definitions for OT1/phv.
 )
@@ -1358,8 +1358,15 @@ Overfull \hbox (6.23639pt too wide) detected at line 88
 
 LaTeX Font Info:    Calculating math sizes for size <8.03> on input line 115.
 
-Underfull \hbox (badness 6641) in paragraph at lines 143--147
-\OT1/ptm/m/n/10.03749 tax, se-man-tics, and type sys-tem. It also de-vel-ops
+Underfull \hbox (badness 5533) in paragraph at lines 143--147
+\OT1/ptm/m/sc/10.03749 CBox\OT1/ptm/m/n/10.03749 , named \OT1/ptm/m/sc/10.03749
+ CoreChkCBox\OT1/ptm/m/n/10.03749 , mak-ing pre-cise its
+ []
+
+
+Underfull \hbox (badness 2027) in paragraph at lines 143--147
+\OT1/ptm/m/n/10.03749 syn-tax, se-man-tics, and type sys-tem. It also de-vel-op
+s
  []
 
 
@@ -1369,120 +1376,125 @@ ptm/m/n/10.03749 is given by the
  []
 
 
-Overfull \hbox (10.78923pt too wide) detected at line 191
+Overfull \hbox (10.78923pt too wide) detected at line 193
 | []
  []
 
 
-Underfull \hbox (badness 3108) in paragraph at lines 197--211
+Underfull \hbox (badness 3108) in paragraph at lines 199--213
 \OT1/ptm/m/n/10.03749 resp.), let bind-ing ($[] []\OML/cmm/m/it/10 x [] e[] [][
 ] []$\OT1/ptm/m/n/10.03749 ), con-di-tion-als
  []
 
 [5]
-Overfull \hbox (15.41302pt too wide) in paragraph at lines 286--304
+Overfull \hbox (15.41302pt too wide) in paragraph at lines 289--306
 []$| []$ 
  []
 
 LaTeX Font Info:    Trying to load font information for OT1+pzc on input line 3
-07.
+09.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1pzc.fd
 File: ot1pzc.fd 2001/06/04 font definitions for OT1/pzc.
 )
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <9.03374> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 309.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <6.32358> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 309.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.51686> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 307.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 309.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <8.03> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 319.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.62097> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 319.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <4.015> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 317.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 319.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <10.03749> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 364.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <7.0262> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 364.
 
 LaTeX Font Info:    Font shape `OT1/pzc/m/it' in size <5.01874> not available
-(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 362.
-
-
-Underfull \hbox (badness 1527) in paragraph at lines 420--440
-\OT1/ptm/m/n/10.03749 eval-u-at-ing $\OML/cmm/m/it/10 e[]$ \OT1/ptm/m/n/10.0374
-9 based on the con-text $\OML/cmm/m/it/10 E$\OT1/ptm/m/n/10.03749 . For any pro
--
- []
-
-
-Underfull \hbox (badness 2318) in paragraph at lines 420--440
-\OT1/cmr/m/n/10 ([]([])\OMS/cmsy/m/n/10 f\OML/cmm/m/it/10 E[]\OMS/cmsy/m/n/10 g
-\OT1/cmr/m/n/10 )$ \OT1/ptm/m/n/10.03749 in-side $\OML/cmm/m/it/10 E$ \OT1/ptm/
-m/n/10.03749 with-out a sur-round-ing
- []
+(Font)              Font shape `OT1/pzc/mb/it' tried instead on input line 364.
 
 LaTeX Font Info:    Trying to load font information for TS1+pcr on input line 5
-21.
+28.
+
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1pcr.fd
 File: ts1pcr.fd 2001/06/04 font definitions for TS1/pcr.
 )
-Underfull \hbox (badness 3039) in paragraph at lines 564--580
+Underfull \hbox (badness 3039) in paragraph at lines 570--586
 []\OT1/ptm/b/n/10.03749 Checked and Tainted Pointer Op-er-a-tions\OT1/ptm/m/n/1
 0.03749 . The
  []
 
-
-Underfull \hbox (badness 4024) in paragraph at lines 564--580
-\OT1/ptm/m/sc/10.03749 Cast\OT1/ptm/m/n/10.03749 . The first five are def-er-en
-ce and as-sign-ment
- []
-
 [6]
-Underfull \hbox (badness 7116) in paragraph at lines 604--609
+Underfull \hbox (badness 7116) in paragraph at lines 610--614
 []\OT1/ptm/b/n/10.03749 Unchecked and Checked Blocks\OT1/ptm/m/n/10.03749 . Se-
 man-ti-cally,
  []
 
-[7]
-Underfull \hbox (badness 2119) in paragraph at lines 846--857
+
+Underfull \vbox (badness 4366) has occurred while \output is active []
+
+ [7]
+Underfull \hbox (badness 2119) in paragraph at lines 857--867
 []\OT1/ptm/b/n/10.03749 Type Equal-ity and Sub-typ-ing and Cast-ing\OT1/ptm/m/n
 /10.03749 . In
  []
 
 
-Overfull \hbox (21.43398pt too wide) detected at line 932
+Overfull \hbox (21.43398pt too wide) detected at line 943
 | []
  []
 
 
-Overfull \hbox (2.27937pt too wide) detected at line 947
+Overfull \hbox (2.27937pt too wide) detected at line 958
 []
  []
 
 
-Underfull \hbox (badness 2165) in paragraph at lines 1026--1035
+Underfull \hbox (badness 1874) in paragraph at lines 1031--1041
+[]\OT1/ptm/m/n/10.03749 Given a con-stant $\OML/cmm/m/it/10 n  \OT1/cmr/m/n/10 
+:  \OML/cmm/m/it/10 ^^\$\OT1/ptm/m/n/10.03749 , the ver-i-fi-ca-tion pro-cess
+ []
+
+
+Underfull \hbox (badness 2165) in paragraph at lines 1047--1056
 \OT1/ptm/m/n/10.03749 check-ing, Both $[]\OT1/cmr/m/n/10 ([])[]$ \OT1/ptm/m/n/1
 0.03749 and $[]\OT1/cmr/m/n/10 ([])\OMS/cmsy/m/n/10 f\OML/cmm/m/it/10 e\OMS/cms
 y/m/n/10 g$
  []
 
 [8]
-Underfull \vbox (badness 1968) has occurred while \output is active []
+Underfull \vbox (badness 3118) has occurred while \output is active []
 
- [9])
-(./compilation.tex [10]
-Underfull \vbox (badness 1264) has occurred while \output is active []
+ [9]
+Underfull \hbox (badness 10000) in paragraph at lines 1270--1283
+[]\OT1/ptm/b/it/10.03749 Theorem 2 (Checked Preser-va-tion). \OT1/ptm/m/n/10.03
+749 For any
+ []
 
- [11]
+
+Underfull \hbox (badness 10000) in paragraph at lines 1286--1293
+[]\OT1/ptm/b/it/10.03749 Theorem 3 (Unchecked Preser-va-tion). \OT1/ptm/m/n/10.
+03749 For any
+ []
+
+
+Underfull \hbox (badness 6047) in paragraph at lines 1286--1293
+\OT1/ptm/m/sc/10.03749 CoreChkCBox \OT1/ptm/m/n/10.03749 pro-gram $\OML/cmm/m/i
+t/10 e$\OT1/ptm/m/n/10.03749 , heap $\OT1/pzc/mb/it/10.03749 H$\OT1/ptm/m/n/10.
+03749 , stack $\OML/cmm/m/it/10 '$\OT1/ptm/m/n/10.03749 ,
+ []
+
+) (./compilation.tex [10]
 Underfull \hbox (badness 2460) in paragraph at lines 284--299
 []\OT1/ptm/b/n/10.03749 Checked and Unchecked Blocks\OT1/ptm/m/n/10.03749 . In 
 the im-ple-
@@ -1498,10 +1510,7 @@ Underfull \hbox (badness 1728) in paragraph at lines 284--299
 \OT1/ptm/m/n/10.03749 piled as con-text switch-ing func-tions pro-vided by the
  []
 
-
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [12]
+[11] [12]
 Underfull \hbox (badness 3281) in paragraph at lines 507--507
 []\OT1/ptm/m/n/10.03749 Figure 15: |Sim-u-la-tion be-tween \OT1/ptm/m/sc/10.037
 49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
@@ -1520,15 +1529,15 @@ e-[]memory-[]safety-[]issues/$,
  []
 
 
+Underfull \vbox (badness 10000) has occurred while \output is active []
+
+ [14]
 Underfull \hbox (badness 2318) in paragraph at lines 157--163
 \OT1/ptm/m/n/9.03374 Glam-dring: Au-to-matic ap-pli-ca-tion par-ti-tion-ing for
  in-tel
  []
 
 
-Underfull \vbox (badness 10000) has occurred while \output is active []
-
- [14]
 Underfull \hbox (badness 1546) in paragraph at lines 213--216
 []\OT1/ptm/m/n/9.03374 Mozilla.  Rust Pro-gram-ming Lan-guage.  $https : / / ww
 w .
@@ -1607,10 +1616,10 @@ runsystem(rm main.pyg)...executed.
 
  ) 
 Here is how much of TeX's memory you used:
- 31892 strings out of 481239
- 622545 string characters out of 5920377
+ 31893 strings out of 481239
+ 622551 string characters out of 5920377
  1241824 words of memory out of 5000000
- 46460 multiletter control sequences out of 15000+600000
+ 46461 multiletter control sequences out of 15000+600000
  602975 words of font info for 166 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  68i,24n,100p,1382b,1519s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -1647,7 +1656,7 @@ w/times/utmb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmbi8a
 .pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/shar
 e/texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/share/texlive/texm
 f-dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (23 pages, 472140 bytes).
+Output written on main.pdf (23 pages, 472811 bytes).
 PDF statistics:
  243 PDF objects out of 1000 (max. 8388607)
  167 compressed objects within 2 object streams
