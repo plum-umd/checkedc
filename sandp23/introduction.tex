@@ -57,7 +57,7 @@ Checked C-converted portions of the FreeBSD kernel.
 Furthermore, Checked C is backward compatible as the compiler  represents checked pointers as system-level memory words, i.e., without
 ``fattening'' metadata, ensuring backward compatibility. 
 The backward compatibility also enables incremental or partial conversion where Checked annotations can be provided to a few pointers.
-Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe core regions).
+Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe code regions).
 ~\fig{fig:memprotections} shows the summary of these existing approaches along with Checked C.
 We argue that~\emph{converting to Checked C provides a reasonable and practical approach to adding safety to existing system software written in C}.
 }
@@ -72,12 +72,12 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 %   (compared to ASAN etc.)
 % \end{itemize}
 
-The guarantee \checkedc provides focuses on checked core regions,
+The guarantee \checkedc provides focuses on checked code regions,
 where any stuck (i.e., ill-defined)
 state reached by a well-typed program amounts to a spatial safety
 violation; such a state can always be attributed to, i.e., 
 \emph{blamed on}, the execution of code that is not in a checked core
-region. But what are the guarantees of unchecked (unsafe) core regions?
+region. But what are the guarantees of unchecked (unsafe) code regions?
 Programmers might not expect to convert every code to \checkedc,
 but leave some functions in unsafe regions,
 in which case the unsafe region executions should not affect other parts.
@@ -86,9 +86,9 @@ combining \checkedc with program partitioning mechanism,
 making three main contributions.
 
 \myparagraph{Executions Cannot Crash}
-Our first contribution is a clear program partition between checked and unchecked core regions,
+Our first contribution is a clear program partition between checked and unchecked code regions,
 and ensures that a \systemname program execution \textit{cannot crash} due to spatial safety violations.
-We restrict the checked and unchecked pointers usage only in checked and unchecked core regions, respectively;
+We restrict the checked and unchecked pointers usage only in checked and unchecked code regions, respectively;
 and develop tainted pointers for the communication between the two regions.
 Heap is partitioned into two parts: a \textit{checked memory region} containing all checked pointers
  and an \textit{unchecked memory region} that is sandboxed.
@@ -117,11 +117,12 @@ To the best of our knowledge,
 
 \myparagraph{Supporting Checked Pointer Callbacks and No Checked Pointer Exposure}
 Our third contribution is an added up feature
-to support checked (function) pointer callbacks in unchecked core regions.
+to support checked (function) pointer callbacks in unchecked code regions.
 In implementing a multi-threaded system, users might want 
 to provide third party interface permitting third parties 
-to write implement some new program features, while keeping those programs in unchecked core regions.
+to write implement some new program features, while keeping those programs in unchecked code regions.
 Moreover, they do want to provide them a (function) pointer pointing to checked data fields.
+To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
 
 However, accessing a checked pointer in an unchecked region violates the program partition principle of \systemname.
 To overcome the discord, we develop two mechanisms in \systemname 

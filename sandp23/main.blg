@@ -11,43 +11,43 @@ Repeated entry---line 66 of file sources.bib
 I'm skipping whatever remains of this entry
 You've used 28 entries,
             2773 wiz_defined-function locations,
-            1164 strings with 18588 characters,
-and the built_in function-call counts, 16388 in all, are:
-= -- 1435
-> -- 1220
-< -- 12
-+ -- 408
-- -- 380
-* -- 1437
-:= -- 2556
-add.period$ -- 126
+            1164 strings with 18456 characters,
+and the built_in function-call counts, 16102 in all, are:
+= -- 1403
+> -- 1202
+< -- 11
++ -- 402
+- -- 374
+* -- 1418
+:= -- 2520
+add.period$ -- 123
 call.type$ -- 28
-change.case$ -- 210
+change.case$ -- 208
 chr.to.int$ -- 28
 cite$ -- 56
-duplicate$ -- 672
-empty$ -- 1148
-format.name$ -- 412
-if$ -- 3433
+duplicate$ -- 660
+empty$ -- 1132
+format.name$ -- 406
+if$ -- 3361
 int.to.chr$ -- 1
 int.to.str$ -- 1
 missing$ -- 26
-newline$ -- 183
+newline$ -- 181
 num.names$ -- 114
-pop$ -- 424
+pop$ -- 418
 preamble$ -- 1
-purify$ -- 182
+purify$ -- 180
 quote$ -- 0
-skip$ -- 530
+skip$ -- 517
 stack$ -- 0
-substring$ -- 393
-swap$ -- 107
-text.length$ -- 7
+substring$ -- 377
+swap$ -- 96
+text.length$ -- 6
 text.prefix$ -- 0
 top$ -- 0
 type$ -- 303
 warning$ -- 0
-while$ -- 112
+while$ -- 111
 width$ -- 0
-write$ -- 443
+write$ -- 438
 (There was 1 error message)

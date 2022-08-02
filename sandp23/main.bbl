@@ -117,6 +117,14 @@ Liyi Li, Yiyun Liu, Deena~L. Postol, Leonidas Lampropoulos, David~Van Horn, and
 \newblock In \emph{Proceedings of the Computer Security Foundations Symposium
   (CSF)}, August 2022.
 
+\bibitem[Machiry et~al.(2022)Machiry, Kastner, McCutchen, Eline, Headley, and
+  Hicks]{machiry2022c}
+Aravind Machiry, John Kastner, Matt McCutchen, Aaron Eline, Kyle Headley, and
+  Michael Hicks.
+\newblock C to checked c by 3c.
+\newblock \emph{Proceedings of the ACM on Programming Languages}, 6\penalty0
+  (OOPSLA1):\penalty0 1--29, 2022.
+
 \bibitem[Memarian et~al.(2016)Memarian, Matthiesen, Lingard, Nienhuis,
   Chisnall, Watson, and Sewell]{10.1145/2980983.2908081}
 Kayvan Memarian, Justus Matthiesen, James Lingard, Kyndylan Nienhuis, David
@@ -155,17 +163,6 @@ Santosh Nagarakatte, Jianzhou Zhao, Milo~M.K. Martin, and Steve Zdancewic.
 \newblock ISBN 9781605583921.
 \newblock \doi{10.1145/1542476.1542504}.
 \newblock URL \url{https://doi.org/10.1145/1542476.1542504}.
-
-\bibitem[Narayan et~al.(2020)Narayan, Disselkoen, Garfinkel, Froyd, Rahm,
-  Lerner, Shacham, and Stefan]{rlbox-paper}
-Shravan Narayan, Craig Disselkoen, Tal Garfinkel, Nathan Froyd, Eric Rahm,
-  Sorin Lerner, Hovav Shacham, and Deian Stefan.
-\newblock Retrofitting fine grain isolation in the firefox renderer.
-\newblock In \emph{29th USENIX Security Symposium (USENIX Security 20)}, pages
-  699--716. USENIX Association, August 2020.
-\newblock ISBN 978-1-939133-17-5.
-\newblock URL
-  \url{https://www.usenix.org/conference/usenixsecurity20/presentation/narayan}.
 
 \bibitem[{Necula} et~al.(2005){Necula}, Condit, Harren, McPeak, and
   Weimer]{Necula2005}
