@@ -1584,208 +1584,300 @@
         (eHs Bounds)
         eX-Bounds)))
 
-;(define --->^CEK
-;  (reduction-relation
-;   CoreChkC+ 
-;   (--> (eHs eΣ (i_0 + i_1) (eK ...))
-;        (eHs eΣ ,(+ (term i_0) (term i_1)) (eK ...))
-;        eE-Add)
-;
-;   (--> (eHs eΣ (i_0 <=? i_1) (eK ...))
-;        (eHs eΣ ,(if (<= (term i_0) (term i_1)) 1 0) (eK ...))
-;        eE-Leq)
-;
-;   (--> (eHs eΣ (i_0 - i_1) (eK ...))
-;        (eHs eΣ ,(- (term i_0) (term i_1)) (eK ...))
-;        eE-Subtract)
-;
-;   (--> (eHs eΣ (* n) (eK ...))
-;        (eHs eΣ n_0 (eK ...))
-;        (where n_0 (⊢eheap-lookup eH n))
-;        eE-Deref)
-;
-;   (--> (eH eΣ (* n = n_0) (eK ...))
-;        (eH_′ eΣ n_0 (eK ...))
-;        (where eH_′ (⊢eheap-update eH n n_0))
-;        eE-Assign)
-;
-;   (--> (eH ((x_0 i_0) ... (x _) (x_2 i_2) ...) (x = i_1) (eK ...))
-;        (eH ((x_0 i_0) ... (x i_1) (x_2 i_2) ...) i_1 (eK ...))
-;        eE-Set)
-;
-;   (--> (eH eΣ (malloc n_1) (eK ...))
-;        (eH_′ eΣ n_2 (eK ...))
-;        (side-condition (positive? (term n_1)))
-;        (where eH_′ ,(append (term eH) (build-list (term n_1) (const 0))))
-;        (where n_2 ,(add1 (length (term eH))))
-;        eE-Malloc)
-;
-;   (--> (eH eΣ (malloc i_1) (eK ...))
-;        (eH eΣ 0 (eK ...))
-;        (side-condition (not (positive? (term i_1))))
-;        eE-MallocZero)
-;
-;   (--> (eH ((x i) ...) (let x_0 = i_0 in ee) (eK ...))
-;        (eH ((x_0 i_0) (x i) ...) ee (pop eK ...))
-;        eE-Let)
-;
-;   (--> (eH (name eΣ (_ ... (x i) _ ...)) x (eK ...))
-;        (eH eΣ i (eK ...))
-;        eE-Var)
-;
-;   (--> (eH eΣ (if i ee _) (eK ...))
-;        (eH eΣ ee (eK ...))
-;        (side-condition (not (zero? (term i))))
-;        eE-IfT)
-;
-;   (--> (eH eΣ (if 0 _ ee) (eK ...))
-;        (eH eΣ ee (eK ...))
-;        eE-IfF)
-;
-;   (--> (eH eΣ (strlen i) (eK ...))
-;        (eH eΣ i_0 (eK ...))
-;        (where i_0 (⊢estrlen i eH))
-;        eE-Str)
-;
-;   (--> (eH eΣ (call i i_1 ..._1) (eK ...))
-;        (eH eΣ (⊢ebuild-call-stack ee (x i_1) ...) (eK ...))
-;        (where (defun x ..._1 ee) (⊢efun-lookup ,(*eF*) i))
-;        eE-Fun)
-;
-;   (--> (eH eΣ (enull) (eK ...))
-;        (eH () Null ())
-;        eX-Null)
-;
-;   (--> (eH eΣ (ebounds) (eK ...))
-;        (eH () Bounds ())
-;        eX-Bounds)
-;
-;   ;; eval
-;   (--> (eH eΣ (if eS ee_0 ee_1) (eK ...))
-;        (eH eΣ eS ((if [] ee_0 ee_1) eK ...))
-;        eE-If-Eval)
-;
-;   (--> (eH eΣ i ((if [] ee_0 ee_1) eK ...))
-;        (eH eΣ (if i ee_0 ee_1) (eK ...))
-;        eE-If-Cont)
-;
-;   (--> (eH eΣ i ((strlen []) eK ...))
-;        (eH eΣ (strlen i) (eK ...))
-;        eE-Strlen-Cont)
-;
-;   (--> (eH eΣ (strlen eS) (eK ...))
-;        (eH eΣ eS ((strlen []) eK ...))
-;        eE-Strlen-Eval)
-;
-;   (--> (eH eΣ i ((malloc []) eK ...))
-;        (eH eΣ (malloc i) (eK ...))
-;        eE-Malloc-Cont)
-;
-;   (--> (eH eΣ (malloc eS) (eK ...))
-;        (eH eΣ eS ((malloc []) eK ...))
-;        eE-Malloc-Eval)
-;
-;
-;   (--> (eH eΣ (let x = eS in ee) (eK ...))
-;        (eH eΣ eS ((let x = [] in ee) eK ...))
-;        eE-Let-Eval0)
-;
-;   (--> (eH eΣ i ((let x = [] in ee) eK ...))
-;        (eH eΣ (let x = i in ee) (eK ...))
-;        eE-Let-Cont0)
-;
-;
-;   (--> (eH ((x i) (x_0 i_0) ...) i_1 (pop eK ...))
-;        (eH ((x_0 i_0) ...) i_1 (eK ...))
-;        eE-Pop-Cont)
-;
-;   (--> (eH eΣ (call n_fun n_args ... eS ee_args ...) (eK ...))
-;        (eH eΣ eS ((call n_fun n_args ... [] ee_args ...) eK ...))
-;        eE-Fun-Eval)
-;
-;   (--> (eH eΣ n ((call n_fun n_args ... [] ee_args ...) eK ...))
-;        (eH eΣ (call n_fun n_args ... n ee_args ...) (eK ...))
-;        eE-Fun-Cont)
-;
-;   (--> (eH eΣ (eS <=? ee) (eK ...))
-;        (eH eΣ eS (([] <=? ee) eK ...))
-;        eE-Leq-Eval0)
-;
-;   (--> (eH eΣ i (([] <=? ee) eK ...))
-;        (eH eΣ (i <=? ee) (eK ...))
-;        eE-Leq-Cont0)
-;
-;   (--> (eH eΣ (i <=? eS) (eK ...))
-;        (eH eΣ eS ((i <=? []) eK ...))
-;        eE-Leq-Eval1)
-;
-;   (--> (eH eΣ i_0 ((i <=? []) eK ...))
-;        (eH eΣ (i <=? i_0) (eK ...))
-;        eE-Leq-Cont1)
-;
-;   (--> (eH eΣ (* eS = ee) (eK ...))
-;        (eH eΣ eS ((* [] = ee) eK ...))
-;        eE-Assign-Eval0)
-;
-;   (--> (eH eΣ i ((* [] = ee) eK ...))
-;        (eH eΣ (* i = ee) (eK ...))
-;        eE-Assign-Cont0)
-;
-;   (--> (eH eΣ (* i = eS) (eK ...))
-;        (eH eΣ eS ((* i = []) eK ...))
-;        eE-Assign-Eval1)
-;
-;   (--> (eH eΣ i_0 ((* i = []) eK ...))
-;        (eH eΣ (* i = i_0) (eK ...))
-;        eE-Assign-Cont1)
-;
-;   (--> (eH eΣ (* eS) (eK ...))
-;        (eH eΣ eS ((* []) eK ...))
-;        eE-Deref-Eval)
-;
-;   (--> (eH eΣ i ((* []) eK ...))
-;        (eH eΣ (* i) (eK ...))
-;        eE-Deref-Cont)
-;
-;   (--> (eH eΣ (x = eS) (eK ...))
-;        (eH eΣ eS ((x = []) eK ...))
-;        eE-Set-Eval)
-;
-;   (--> (eH eΣ i ((x = []) eK ...))
-;        (eH eΣ i (x = i) (eK ...))
-;        eE-Set-Cont)
-;
-;   (--> (eH eΣ (eS + ee) (eK ...))
-;        (eH eΣ eS (([] + ee) eK ...))
-;        eE-Add-Eval0)
-;
-;   (--> (eH eΣ i (([] + ee) eK ...))
-;        (eH eΣ (i + ee) (eK ...))
-;        eE-Add-Cont0)
-;
-;   (--> (eH eΣ (i + eS) (eK ...))
-;        (eH eΣ eS ((i + []) eK ...))
-;        eE-Add-Eval1)
-;
-;   (--> (eH eΣ i_0 ((i + []) eK ...))
-;        (eH eΣ (i + i_0) (eK ...))
-;        eE-Add-Cont1)
-;
-;   (--> (eH eΣ (eS - ee) (eK ...))
-;        (eH eΣ eS (([] - ee) eK ...))
-;        eE-Subtract-Eval0)
-;
-;   (--> (eH eΣ i (([] - ee) eK ...))
-;        (eH eΣ (i - ee) (eK ...))
-;        eE-Subtract-Cont0)
-;
-;   (--> (eH eΣ (i - eS) (eK ...))
-;        (eH eΣ eS ((i - []) eK ...))
-;        eE-Subtract-Eval1)
-;
-;   (--> (eH eΣ i_0 ((i - []) eK ...))
-;        (eH eΣ (i - i_0) (eK ...))
-;        eE-Subtract-Cont)))
+(define --->^CEK
+  (reduction-relation
+   CoreChkC+ 
+   (--> (eHs eΣ (i_0 + i_1) (eK ...))
+        (eHs eΣ ,(+ (term i_0) (term i_1)) (eK ...))
+        eE-Add)
+
+   (--> (eHs eΣ (i_0 <=? i_1) (eK ...))
+        (eHs eΣ ,(if (<= (term i_0) (term i_1)) 1 0) (eK ...))
+        eE-Leq)
+
+   (--> (eHs eΣ (i_0 - i_1) (eK ...))
+        (eHs eΣ ,(- (term i_0) (term i_1)) (eK ...))
+        eE-Subtract)
+
+   (--> (eHs eΣ (star-l n) (eK ...))
+        (eHs eΣ n_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs c))
+        (where n_0 (⊢eheap-lookup eH n))
+        eE-DerefLeft)
+
+   (--> (eHs eΣ (star-r n) (eK ...))
+        (eHs eΣ n_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs u))
+        (where n_0 (⊢eheap-lookup eH n))
+        eE-DerefRight)
+
+   (--> (eHs eΣ (star-l n = n_0) (eK ...))
+        (eHs_′ eΣ n_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs c))
+        (where eHs_′ (⊢eheap-update eHs c n n_0))
+        eE-AssignLeft)
+
+   (--> (eHs eΣ (star-r n = n_0) (eK ...))
+        (eHs_′ eΣ n_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs u))
+        (where eHs_′ (⊢eheap-update eHs u n n_0))
+        eE-AssignRight)
+
+   (--> (eHs ((x_0 i_0) ... (x _) (x_2 i_2) ...) (x = i_1) (eK ...))
+        (eHs ((x_0 i_0) ... (x i_1) (x_2 i_2) ...) i_1 (eK ...))
+        eE-Set)
+
+   (--> (eHs eΣ (malloc-l n_1) (eK ...))
+        (eHs_′ eΣ n_2 (eK ...))
+        (side-condition (positive? (term n_1)))
+        (where eH (⊢eheap-by-mode eHs c))
+        (where eH_′ ,(append (term eH) (build-list (term n_1) (const 0))))
+        (where eHs_′ (⊢update-eheap-by-mode eHs eH_′ c))
+        (where n_2 ,(add1 (length (term eH))))
+        eE-MallocLeft)
+
+   (--> (eHs eΣ (malloc-r n_1) (eK ...))
+        (eHs_′ eΣ n_2 (eK ...))
+        (side-condition (positive? (term n_1)))
+        (where eH (⊢eheap-by-mode eHs u))
+        (where eH_′ ,(append (term eH) (build-list (term n_1) (const 0))))
+        (where eHs_′ (⊢update-eheap-by-mode eHs eH_′ u))
+        (where n_2 ,(add1 (length (term eH))))
+        eE-MallocRight)
+
+   (--> (eHs eΣ (malloc-l i_1) (eK ...))
+        (eHs eΣ 0 (eK ...))
+        (side-condition (not (positive? (term i_1))))
+        eE-MallocLeftZero)
+
+   (--> (eHs eΣ (malloc-r i_1) (eK ...))
+        (eHs eΣ 0 (eK ...))
+        (side-condition (not (positive? (term i_1))))
+        eE-MallocRightZero)
+
+
+   (--> (eHs ((x i) ...) (let x_0 = i_0 in ee) (eK ...))
+        (eHs ((x_0 i_0) (x i) ...) ee (pop eK ...))
+        eE-Let)
+
+   (--> (eHs (name eΣ (_ ... (x i) _ ...)) x (eK ...))
+        (eHs eΣ i (eK ...))
+        eE-Var)
+
+   (--> (eHs eΣ (if i ee _) (eK ...))
+        (eHs eΣ ee (eK ...))
+        (side-condition (not (zero? (term i))))
+        eE-IfT)
+
+   (--> (eHs eΣ (if 0 _ ee) (eK ...))
+        (eHs eΣ ee (eK ...))
+        eE-IfF)
+
+   (--> (eHs eΣ (strlen-l i) (eK ...))
+        (eHs eΣ i_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs c))
+        (where i_0 (⊢estrlen i eH))
+        eE-StrLeft)
+
+   (--> (eHs eΣ (strlen-r i) (eK ...))
+        (eHs eΣ i_0 (eK ...))
+        (where eH (⊢eheap-by-mode eHs u))
+        (where i_0 (⊢estrlen i eH))
+        eE-StrRight)
+
+   (--> (eHs eΣ (call-l i i_1 ..._1) (eK ...))
+        (eHs eΣ (⊢ebuild-call-stack ee (x i_1) ...) (eK ...))
+        (where (defun x ..._1 ee) (⊢efun-lookup (⊢efheap-by-mode ,(*eFs*) c) i))
+        eE-FunLeft)
+
+   (--> (eHs eΣ (call-r i i_1 ..._1) (eK ...))
+        (eHs eΣ (⊢ebuild-call-stack ee (x i_1) ...) (eK ...))
+        (where (defun x ..._1 ee) (⊢efun-lookup (⊢efheap-by-mode ,(*eFs*) u) i))
+        eE-FunRight)
+
+   
+   (--> (eHs eΣ (enull) (eK ...))
+        (eHs () Null ())
+        eX-Null)
+
+   (--> (eHs eΣ (ebounds) (eK ...))
+        (eHs () Bounds ())
+        eX-Bounds)
+
+   ;; eval
+   (--> (eHs eΣ (if eS ee_0 ee_1) (eK ...))
+        (eHs eΣ eS ((if [] ee_0 ee_1) eK ...))
+        eE-If-Eval)
+
+   (--> (eHs eΣ i ((if [] ee_0 ee_1) eK ...))
+        (eHs eΣ (if i ee_0 ee_1) (eK ...))
+        eE-If-Cont)
+
+   (--> (eHs eΣ i ((strlen-l []) eK ...))
+        (eHs eΣ (strlen-r i) (eK ...))
+        eE-StrlenLeft-Cont)
+
+   (--> (eHs eΣ i ((strlen-r []) eK ...))
+        (eHs eΣ (strlen-r i) (eK ...))
+        eE-StrlenRight-Cont)
+
+   (--> (eHs eΣ (strlen-l eS) (eK ...))
+        (eHs eΣ eS ((strlen-l []) eK ...))
+        eE-StrlenLeft-Eval)
+
+   (--> (eHs eΣ (strlen-r eS) (eK ...))
+        (eHs eΣ eS ((strlen-r []) eK ...))
+        eE-StrlenRight-Eval)
+
+   (--> (eHs eΣ i ((malloc-l []) eK ...))
+        (eHs eΣ (malloc-l i) (eK ...))
+        eE-MallocLeft-Cont)
+
+   (--> (eHs eΣ i ((malloc-r []) eK ...))
+        (eHs eΣ (malloc-r i) (eK ...))
+        eE-MallocRight-Cont)
+
+   (--> (eHs eΣ (malloc-l eS) (eK ...))
+        (eHs eΣ eS ((malloc-l []) eK ...))
+        eE-MallocLeft-Eval)
+
+   (--> (eHs eΣ (malloc-r eS) (eK ...))
+        (eHs eΣ eS ((malloc-r []) eK ...))
+        eE-MallocRight-Eval)
+
+
+   (--> (eHs eΣ (let x = eS in ee) (eK ...))
+        (eHs eΣ eS ((let x = [] in ee) eK ...))
+        eE-Let-Eval0)
+
+   (--> (eHs eΣ i ((let x = [] in ee) eK ...))
+        (eHs eΣ (let x = i in ee) (eK ...))
+        eE-Let-Cont0)
+
+
+   (--> (eHs ((x i) (x_0 i_0) ...) i_1 (pop eK ...))
+        (eHs ((x_0 i_0) ...) i_1 (eK ...))
+        eE-Pop-Cont)
+
+   (--> (eHs eΣ (call-l n_fun n_args ... eS ee_args ...) (eK ...))
+        (eHs eΣ eS ((call-l n_fun n_args ... [] ee_args ...) eK ...))
+        eE-FunLeft-Eval)
+
+   (--> (eHs eΣ (call-r n_fun n_args ... eS ee_args ...) (eK ...))
+        (eHs eΣ eS ((call-r n_fun n_args ... [] ee_args ...) eK ...))
+        eE-FunRight-Eval)
+
+   (--> (eHs eΣ n ((call-l n_fun n_args ... [] ee_args ...) eK ...))
+        (eHs eΣ (call-l n_fun n_args ... n ee_args ...) (eK ...))
+        eE-FunLeft-Cont)
+
+   (--> (eHs eΣ n ((call-r n_fun n_args ... [] ee_args ...) eK ...))
+        (eHs eΣ (call-r n_fun n_args ... n ee_args ...) (eK ...))
+        eE-FunRight-Cont)
+
+   (--> (eHs eΣ (eS <=? ee) (eK ...))
+        (eHs eΣ eS (([] <=? ee) eK ...))
+        eE-Leq-Eval0)
+
+   (--> (eHs eΣ i (([] <=? ee) eK ...))
+        (eHs eΣ (i <=? ee) (eK ...))
+        eE-Leq-Cont0)
+
+   (--> (eHs eΣ (i <=? eS) (eK ...))
+        (eHs eΣ eS ((i <=? []) eK ...))
+        eE-Leq-Eval1)
+
+   (--> (eHs eΣ i_0 ((i <=? []) eK ...))
+        (eHs eΣ (i <=? i_0) (eK ...))
+        eE-Leq-Cont1)
+
+   (--> (eHs eΣ (star-l eS = ee) (eK ...))
+        (eHs eΣ eS ((star-l [] = ee) eK ...))
+        eE-AssignLeft-Eval0)
+
+   (--> (eHs eΣ (star-r eS = ee) (eK ...))
+        (eHs eΣ eS ((star-r [] = ee) eK ...))
+        eE-AssignRight-Eval0)
+
+   (--> (eHs eΣ i ((star-l [] = ee) eK ...))
+        (eHs eΣ (star-l i = ee) (eK ...))
+        eE-AssignLeft-Cont0)
+   
+   (--> (eHs eΣ i ((star-r [] = ee) eK ...))
+        (eHs eΣ (star-r i = ee) (eK ...))
+        eE-AssignRight-Cont0)
+
+   (--> (eHs eΣ (star-l i = eS) (eK ...))
+        (eHs eΣ eS ((star-l i = []) eK ...))
+        eE-AssignLeft-Eval1)
+
+   (--> (eHs eΣ (star-r i = eS) (eK ...))
+        (eHs eΣ eS ((star-r i = []) eK ...))
+        eE-AssignRight-Eval1)
+
+   (--> (eHs eΣ i_0 ((star-l i = []) eK ...))
+        (eHs eΣ (star-l i = i_0) (eK ...))
+        eE-AssignLeft-Cont1)
+
+   (--> (eHs eΣ i_0 ((star-r i = []) eK ...))
+        (eHs eΣ (star-r i = i_0) (eK ...))
+        eE-AssignRight-Cont1)
+   
+   (--> (eHs eΣ (star-l eS) (eK ...))
+        (eHs eΣ eS ((star-l []) eK ...))
+        eE-DerefLeft-Eval)
+
+   (--> (eHs eΣ (star-r eS) (eK ...))
+        (eHs eΣ eS ((star-r []) eK ...))
+        eE-DerefRight-Eval)
+   
+   (--> (eHs eΣ i ((star-l []) eK ...))
+        (eHs eΣ (star-l i) (eK ...))
+        eE-DerefLeft-Cont)
+
+   (--> (eHs eΣ i ((star-r []) eK ...))
+        (eHs eΣ (star-r i) (eK ...))
+        eE-DerefRight-Cont)
+   
+   (--> (eHs eΣ (x = eS) (eK ...))
+        (eHs eΣ eS ((x = []) eK ...))
+        eE-Set-Eval)
+
+   (--> (eHs eΣ i ((x = []) eK ...))
+        (eHs eΣ i (x = i) (eK ...))
+        eE-Set-Cont)
+
+   (--> (eHs eΣ (eS + ee) (eK ...))
+        (eHs eΣ eS (([] + ee) eK ...))
+        eE-Add-Eval0)
+
+   (--> (eHs eΣ i (([] + ee) eK ...))
+        (eHs eΣ (i + ee) (eK ...))
+        eE-Add-Cont0)
+
+   (--> (eHs eΣ (i + eS) (eK ...))
+        (eHs eΣ eS ((i + []) eK ...))
+        eE-Add-Eval1)
+
+   (--> (eHs eΣ i_0 ((i + []) eK ...))
+        (eHs eΣ (i + i_0) (eK ...))
+        eE-Add-Cont1)
+
+   (--> (eHs eΣ (eS - ee) (eK ...))
+        (eHs eΣ eS (([] - ee) eK ...))
+        eE-Subtract-Eval0)
+
+   (--> (eHs eΣ i (([] - ee) eK ...))
+        (eHs eΣ (i - ee) (eK ...))
+        eE-Subtract-Cont0)
+
+   (--> (eHs eΣ (i - eS) (eK ...))
+        (eHs eΣ eS ((i - []) eK ...))
+        eE-Subtract-Eval1)
+
+   (--> (eHs eΣ i_0 ((i - []) eK ...))
+        (eHs eΣ (i - i_0) (eK ...))
+        eE-Subtract-Cont)))
 
 
 
