@@ -1,15 +1,9 @@
-\begin{thebibliography}{46}
+\begin{thebibliography}{28}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
-
-\bibitem[Bittau et~al.(2008)Bittau, Marchenko, Handley, and
-  Karp]{bittau2008wedge}
-Andrea Bittau, Petr Marchenko, Mark Handley, and Brad Karp.
-\newblock Wedge: Splitting applications into reduced-privilege compartments.
-\newblock USENIX Association, 2008.
 
 \bibitem[Blazy and Leroy(2009)]{Blazy2009}
 Sandrine Blazy and Xavier Leroy.
@@ -28,17 +22,6 @@ BlueHat.
   2019.
 \newblock Accessed: 2020-02-11.
 
-\bibitem[Brumley and Song(2004)]{brumley2004privtrans}
-David Brumley and Dawn Song.
-\newblock Privtrans: Automatically partitioning programs for privilege
-  separation.
-\newblock In \emph{USENIX Security Symposium}, volume~57, 2004.
-
-\bibitem[c2rust()]{c2rust}
-c2rust.
-\newblock {C} to rust translation, refactoring, and cross-checking.
-\newblock \url{https://c2rust.com/}, 2018.
-
 \bibitem[Condit et~al.(2007)Condit, Harren, Anderson, Gay, and
   Necula]{Condit2007}
 Jeremy Condit, Matthew Harren, Zachary Anderson, David Gay, and George~C.
@@ -52,12 +35,6 @@ Junhan Duan, Yudi Yang, Jie Zhou, and John Criswell.
 \newblock Refactoring the {FreeBSD} kernel with {Checked C}.
 \newblock In \emph{Proceedings of the 2020 IEEE Cybersecurity Development
   Conference (SecDev)}, 2020.
-
-\bibitem[Duck and Yap(2016)]{duck2016heap}
-Gregory~J Duck and Roland~HC Yap.
-\newblock Heap bounds protection with low fat pointers.
-\newblock In \emph{Proceedings of the 25th International Conference on Compiler
-  Construction}, pages 132--142. ACM, 2016.
 
 \bibitem[Elliott et~al.(2018)Elliott, Ruef, Hicks, and Tarditi]{Elliott2018}
 Archibald~Samuel Elliott, Andrew Ruef, Michael Hicks, and David Tarditi.
@@ -75,13 +52,6 @@ Chucky Ellison and Grigore Rosu.
 \newblock ISBN 978-1-4503-1083-3.
 \newblock \doi{10.1145/2103656.2103719}.
 \newblock URL \url{http://doi.acm.org/10.1145/2103656.2103719}.
-
-\bibitem[Emre et~al.(2021)Emre, Dewey, Schroeder, and
-  Hardekopf]{emre2021c2rust}
-Mehmet Emre, Kyle Dewey, Ryan Schroeder, and Ben Hardekopf.
-\newblock Translating {C} to safer {Rust}.
-\newblock \emph{In Proceedings of the 2021 ACM on Programming Languges
-  (PACMPL)}, 5\penalty0 (OOPSLA), 2021.
 
 \bibitem[Felleisen et~al.(2009)Felleisen, Findler, and Flatt]{pltredex}
 Matthias Felleisen, Robert~Bruce Findler, and Matthew Flatt.
@@ -123,11 +93,6 @@ Jeehoon Kang, Chung-Kil Hur, William Mansky, Dmitri Garbuzov, Steve Zdancewic,
 \newblock \doi{10.1145/2813885.2738005}.
 \newblock URL \url{http://doi.acm.org/10.1145/2813885.2738005}.
 
-\bibitem[Larson(2018)]{c2rusttalk}
-Per Larson.
-\newblock Migrating legacy code to {Rust}.
-\newblock RustConf 2018 talk, August 2018.
-
 \bibitem[Leroy(2009)]{compcert}
 Xavier Leroy.
 \newblock Formal verification of a realistic compiler.
@@ -151,22 +116,6 @@ Liyi Li, Yiyun Liu, Deena~L. Postol, Leonidas Lampropoulos, David~Van Horn, and
 \newblock A formal model of {Checked C}.
 \newblock In \emph{Proceedings of the Computer Security Foundations Symposium
   (CSF)}, August 2022.
-
-\bibitem[Lind et~al.(2017)Lind, Priebe, Muthukumaran, O'Keeffe, Aublin,
-  Kelbert, Reiher, Goltzsche, Eyers, Kapitza, et~al.]{lind2017glamdring}
-Joshua Lind, Christian Priebe, Divya Muthukumaran, Dan O'Keeffe, Pierre-Louis
-  Aublin, Florian Kelbert, Tobias Reiher, David Goltzsche, David Eyers,
-  R{\"u}diger Kapitza, et~al.
-\newblock Glamdring: Automatic application partitioning for intel $\{$SGX$\}$.
-\newblock In \emph{2017 USENIX Annual Technical Conference (USENIX ATC 17)},
-  pages 285--298, 2017.
-
-\bibitem[Liu et~al.(2017)Liu, Tan, and Jaeger]{liu2017ptrsplit}
-Shen Liu, Gang Tan, and Trent Jaeger.
-\newblock Ptrsplit: Supporting general pointers in automatic program
-  partitioning.
-\newblock In \emph{Proceedings of the 2017 ACM SIGSAC Conference on Computer
-  and Communications Security}, pages 2359--2371, 2017.
 
 \bibitem[Machiry et~al.(2022)Machiry, Kastner, McCutchen, Eline, Headley, and
   Hicks]{machiry2022c}
@@ -197,53 +146,23 @@ Kayvan Memarian, Victor B.~F. Gomes, Brooks Davis, Stephen Kell, Alexander
 \newblock \doi{10.1145/3290380}.
 \newblock URL \url{http://doi.acm.org/10.1145/3290380}.
 
-\bibitem[Mergendahl et~al.(2022)Mergendahl, Burow, and
-  Okhravi]{mergendahlcross}
-Samuel Mergendahl, Nathan Burow, and Hamed Okhravi.
-\newblock Cross-language attacks.
-\newblock 2022.
-
 \bibitem[Merigoux et~al.(2021)Merigoux, Chataing, and
   Protzenko]{merigoux2021catala}
 Denis Merigoux, Nicolas Chataing, and Jonathan Protzenko.
 \newblock {Catala: A Programming Language for the Law}.
 \newblock \emph{arXiv preprint arXiv:2103.03198}, 2021.
 
-\bibitem[Mozilla(2021)]{rustlang}
-Mozilla.
-\newblock {Rust} {Programming Language}.
-\newblock \url{https://www.rust-lang.org/}, 2021.
-
-\bibitem[Nagarakatte et~al.(2009{\natexlab{a}})Nagarakatte, Zhao, Martin, and
-  Zdancewic]{nagarakatte2009softbound}
-Santosh Nagarakatte, Jianzhou Zhao, Milo~MK Martin, and Steve Zdancewic.
-\newblock Softbound: Highly compatible and complete spatial memory safety for
-  c.
-\newblock \emph{ACM Sigplan Notices}, 44\penalty0 (6):\penalty0 245--258,
-  2009{\natexlab{a}}.
-
-\bibitem[Nagarakatte et~al.(2009{\natexlab{b}})Nagarakatte, Zhao, Martin, and
+\bibitem[Nagarakatte et~al.(2009)Nagarakatte, Zhao, Martin, and
   Zdancewic]{softbound}
 Santosh Nagarakatte, Jianzhou Zhao, Milo~M.K. Martin, and Steve Zdancewic.
 \newblock {SoftBound: Highly Compatible and Complete Spatial Memory Safety for
   C}.
 \newblock In \emph{Proceedings of the 30th ACM SIGPLAN Conference on
   Programming Language Design and Implementation}, PLDI '09, page 245–258,
-  New York, NY, USA, 2009{\natexlab{b}}. Association for Computing Machinery.
+  New York, NY, USA, 2009. Association for Computing Machinery.
 \newblock ISBN 9781605583921.
 \newblock \doi{10.1145/1542476.1542504}.
 \newblock URL \url{https://doi.org/10.1145/1542476.1542504}.
-
-\bibitem[Narayan et~al.(2020)Narayan, Disselkoen, Garfinkel, Froyd, Rahm,
-  Lerner, Shacham, and Stefan]{rlbox-paper}
-Shravan Narayan, Craig Disselkoen, Tal Garfinkel, Nathan Froyd, Eric Rahm,
-  Sorin Lerner, Hovav Shacham, and Deian Stefan.
-\newblock Retrofitting fine grain isolation in the firefox renderer.
-\newblock In \emph{29th USENIX Security Symposium (USENIX Security 20)}, pages
-  699--716. USENIX Association, August 2020.
-\newblock ISBN 978-1-939133-17-5.
-\newblock URL
-  \url{https://www.usenix.org/conference/usenixsecurity20/presentation/narayan}.
 
 \bibitem[{Necula} et~al.(2005){Necula}, Condit, Harren, McPeak, and
   Weimer]{Necula2005}
@@ -253,43 +172,22 @@ George~C. {Necula}, Jeremy Condit, Matthew Harren, Scott McPeak, and Westley
 \newblock \emph{{ACM} Transactions on Programming Languages and Systems
   ({TOPLAS})}, 27\penalty0 (3), 2005.
 
-\bibitem[Necula et~al.(2005)Necula, Condit, Harren, McPeak, and
-  Weimer]{necula2005ccured}
-George~C Necula, Jeremy Condit, Matthew Harren, Scott McPeak, and Westley
-  Weimer.
-\newblock Ccured: type-safe retrofitting of legacy software.
-\newblock \emph{ACM Transactions on Programming Languages and Systems
-  (TOPLAS)}, 27\penalty0 (3):\penalty0 477--526, 2005.
-
-\bibitem[Ruef et~al.(2019{\natexlab{a}})Ruef, Lampropoulos, Sweet, Tarditi, and
+\bibitem[Ruef et~al.(2019)Ruef, Lampropoulos, Sweet, Tarditi, and
   Hicks]{ruef18checkedc-incr}
 Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
   Hicks.
 \newblock {Achieving Safety Incrementally with Checked C}.
 \newblock In Flemming Nielson and David Sands, editors, \emph{Principles of
-  Security and Trust}, pages 76--98, Cham, 2019{\natexlab{a}}. Springer
-  International Publishing.
+  Security and Trust}, pages 76--98, Cham, 2019. Springer International
+  Publishing.
 \newblock ISBN 978-3-030-17138-4.
 
-\bibitem[Ruef et~al.(2019{\natexlab{b}})Ruef, Lampropoulos, Sweet, Tarditi, and
-  Hicks]{ruef2019achieving}
-Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
-  Hicks.
-\newblock Achieving safety incrementally with checked c.
-\newblock In \emph{International Conference on Principles of Security and
-  Trust}, pages 76--98. Springer, Cham, 2019{\natexlab{b}}.
-
-\bibitem[Rul et~al.(2009)Rul, Vandierendonck, and De~Bosschere]{rul2009towards}
-Sean Rul, Hans Vandierendonck, and Koen De~Bosschere.
-\newblock Towards automatic program partitioning.
-\newblock In \emph{Proceedings of the 6th ACM conference on Computing
-  frontiers}, pages 89--98, 2009.
-
 \bibitem[Serebryany et~al.(2012)Serebryany, Bruening, Potapenko, and
-  Vyukov]{serebryany2012addresssanitizer}
-Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitriy Vyukov.
-\newblock Addresssanitizer: A fast address sanity checker.
-\newblock In \emph{{USENIX} Annual Technical Conference}, pages 309--318, 2012.
+  Vyukov]{Serebryany2012}
+Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitry Vyukov.
+\newblock {{AddressSanitizer}: A Fast Address Sanity Checker}.
+\newblock In \emph{Proceedings of the 2012 USENIX Conference on Annual
+  Technical Conference}, 2012.
 
 \bibitem[Shacham et~al.(2004)Shacham, Page, Pfaff, Goh, Modadugu, and
   Boneh]{shacham-aslr}
@@ -306,30 +204,19 @@ Dokyung Song, Julian Lettner, Prabhu Rajasekaran, Yeoul Na, Stijn Volckaert,
 \newblock In \emph{Proceedings of the 2019 IEEE Symposium on Security and
   Privacy (S\&P)}, 2019.
 
-\bibitem[Tan et~al.(2017)]{tan2017principles}
-Gang Tan et~al.
-\newblock Principles and implementation techniques of software-based fault
-  isolation.
-\newblock \emph{Foundations and Trends{\textregistered} in Privacy and
-  Security}, 1\penalty0 (3):\penalty0 137--198, 2017.
-
-\bibitem[Tarditi et~al.(2018)Tarditi, Elliott, Ruef, and
-  Hicks]{tarditi2018checked}
-David Tarditi, Archibald~Samuel Elliott, Andrew Ruef, and Michael Hicks.
-\newblock {Checked} {C}: Making {C} safe by extension.
-\newblock In \emph{IEEE Cybersecurity Development Conference 2018 (SecDev)},
-  September 2018.
-
 \bibitem[Trends(2021)]{cvetrend}
 CVE Trends.
 \newblock Cve trends.
 \newblock \url{https://www.cvedetails.com/vulnerabilities-by-types.php}, 2021.
 \newblock Accessed: 2020-10-11.
 
-\bibitem[Zeng and Crichton(2019)]{zeng2019identifying}
-Anna Zeng and Will Crichton.
-\newblock Identifying barriers to adoption for rust through online discourse.
-\newblock \emph{arXiv preprint arXiv:1901.01001}, 2019.
+\bibitem[Zeng et~al.(2013)Zeng, Tan, and
+  Erlingsson]{Zeng:2013:SRF:2534766.2534798}
+Bin Zeng, Gang Tan, and \'{U}lfar Erlingsson.
+\newblock {Strato: A Retargetable Framework for Low-level Inlined-reference
+  Monitors}.
+\newblock In \emph{Proceedings of the 22Nd USENIX Conference on Security},
+  2013.
 
 \bibitem[Zhao et~al.(2012)Zhao, Nagarakatte, Martin, and
   Zdancewic]{Zhao:2012:FLI:2103621.2103709}
@@ -350,12 +237,5 @@ Feng Zhou, Jeremy Condit, Zachary Anderson, Ilya Bagrak, Rob Ennals, Matthew
   techniques.
 \newblock In \emph{7th Symposium on Operating System Design and Implementation
   (OSDI'06)}, Seattle, Washington, 2006. USENIX Association.
-
-\bibitem[Zhou(2021)]{checkedc:temporal}
-Jie Zhou.
-\newblock The benefits and costs of using fat pointers for temporal memory
-  safety.
-\newblock Poster presentation at PLDI 2021 student research competition (silver
-  medalist), June 2021.
 
 \end{thebibliography}

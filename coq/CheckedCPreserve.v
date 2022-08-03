@@ -660,6 +660,283 @@ Proof.
   apply TyLitTainted; try easy.
 Admitted.
 
+Lemma preservation_fieldaddr : forall (D : structdef) F H n T (fs : fields),
+  @well_typed_lit_checked D F (fst H) empty_scope n (TPtr Checked (TStruct T)) ->
+  forall i fi ti,
+  n <> 0 ->
+  StructDef.MapsTo T fs D ->
+  Fields.MapsTo fi ti fs ->
+  nth_error (Fields.this fs) i = Some (fi, ti) ->
+  rheap_wf H ->
+  structdef_wf D ->
+  fields_wf D fs ->
+  word_type ti ->
+  @well_typed_lit_checked D F (fst H) empty_scope (n + (Z.of_nat i)) (TPtr Checked ti).
+Proof.
+  intros D F H n T fs HWT.
+  inversion HWT;
+  intros i fi ti Hn HS HF Hnth Hhwf HDwf Hfwf Hwt; eauto.
+  - exfalso ; eauto.
+  - easy.
+  - inv H1.
+  - inv H3. inv H9; try easy. inv H4.
+    apply StructDef.find_1 in HS. rewrite HS in H3. inv H3.
+    specialize (H8 (Z.of_nat i)).
+    rewrite map_length in H8.
+    assert (0 <= Z.of_nat i < 0 + Z.of_nat (length (Fields.elements (elt:=type) fs))).
+    split. lia.
+    rewrite Z.add_0_l.
+    assert (i < (length (Fields.elements (elt:=type) fs)))%nat.
+    apply nth_error_Some.
+    assert (Hyp: Fields.this fs = Fields.elements fs) by auto.
+    rewrite <- Hyp. rewrite Hnth. easy. lia.
+    destruct (H8  H0) as [N' [T' [HNth [HMap HWT']]]]; subst.
+    assert (Z.to_nat (Z.of_nat i - 0) = i) by lia.
+    rewrite H3 in HNth. 
+    assert (Hyp: Fields.this fs = Fields.elements fs) by auto.
+    rewrite <- Hyp in HNth.
+    apply map_nth_error with (f := snd) in Hnth. 
+    rewrite Hnth in HNth. simpl in *. inv HNth.
+    inv Hwt.
+      * eapply TyLitC_C with (w := TNat); simpl in *; try easy.
+        constructor. constructor.
+        intros k Hk; simpl in *.
+        assert (k = 0) by lia; subst.
+        exists N'. exists TNat.
+        repeat (split; eauto).
+        rewrite Z.add_0_r; eauto. constructor.
+
+Admitted.
+
+Lemma well_typed_preserved : forall D F H t, heap_wf H ->
+  @heap_consistent_checked D F (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, t) H) H.
+Proof.
+  intros D H t0 Hwf n t HT.
+  induction HT using well_typed_lit_ind'; pose proof (cardinal_not_in D H Hwf); eauto.
+  eapply TyLitC; eauto.
+  intros k HK.  
+  destruct (H1 k HK) as [n' [t' [HNth [HMap HWT]]]].
+  exists n'. exists t'.
+  repeat split; eauto.
+  + apply Heap.add_2; eauto.
+    destruct (Hwf (n+k)) as [ _ HIn ].
+    destruct HIn; try eexists; eauto.
+    omega.
+  + inv HWT; eauto.
+Qed.
+
+Lemma alloc_correct : forall w D F H ptr H',
+    allocate D H w = Some (ptr, H') ->
+    structdef_wf D ->
+    heap_wf H ->
+    ~ is_fun_type w ->
+    simple_type (TPtr Checked w) ->
+    @heap_consistent_checked D F H' H /\
+    @well_typed_lit_checked D F H' empty_scope ptr (TPtr Checked w) /\
+    heap_wf H'.
+Proof.
+  intros w D env H ptr H' Alloc HSd HWf Hfun.
+  unfold allocate in *.
+  unfold allocate_meta in *.
+  unfold bind in *; simpl in *.
+  destruct w; simpl in *; eauto; inv Alloc; simpl in *; eauto.
+  - split; [| split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by omega; subst; clear HK.
+      exists 0. exists TNat.
+      repeat split; eauto.
+      apply Heap.add_1; eauto. omega.
+    * apply heap_add_preserves_wf; auto.
+  - split; [ | split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by omega; subst; clear HK.
+      exists 0. exists (TPtr m w).
+      repeat split; eauto.
+      apply Heap.add_1; eauto. omega.
+    * apply heap_add_preserves_wf; auto.
+  - split.
+
+    *unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      destruct (StructDef.find s D) eqn:Find; simpl in *; try congruence.
+
+      remember (Fields.elements f) as l.
+
+      pose proof (fold_preserves_consistency (map snd l) D H ptr HWf).
+      
+      remember (fold_left
+            (fun (acc : Z * heap) (t : type) =>
+             let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+            (map snd l) (Z.of_nat(Heap.cardinal H), H)) as p.
+      
+      destruct p.
+      clear Heqp.      
+      inv H1.
+      eauto.
+    
+    * unfold allocate_meta_no_bounds, allocate_meta in H1.
+
+      simpl in *.
+      destruct (StructDef.find s D) eqn:Find; try congruence.
+
+      pose proof (fold_summary (map snd (Fields.elements f)) D H ptr HWf) as Hyp.
+
+      remember
+        (fold_left
+           (fun (acc : Z * heap) (t : type) =>
+            let (sizeAcc, heapAcc) := acc in
+            (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+           (map snd (Fields.elements (elt:=type) f))
+           (Z.of_nat(Heap.cardinal H), H)) as p.
+      destruct p as [z h].
+      clear Heqp.
+      inv H1.
+
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      split; auto.
+      constructor.
+      eapply TyLitC; simpl in *; eauto; [ rewrite Find | ]; eauto.
+
+      intros k HK.
+      apply StructDef.find_2 in Find.
+      remember Find as Fwf; clear HeqFwf.
+      apply HSd in Fwf.
+
+      assert (HOrd: 0 < Z.of_nat(Heap.cardinal H) + 1 + k <= Z.of_nat(Heap.cardinal H')) by omega.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      apply Hyp in HOrd.
+      destruct HOrd as [[n' t'] HM'].
+      (*This bit is very annoying, quite a bit of converting back and forth
+        between ints and nats. This could definately be more automated DP*)
+      exists n'. exists t'.
+      rewrite Z.sub_0_r in *.
+      destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
+      assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
+        destruct k.
+          +zify. simpl. assumption.
+          +simpl. zify. omega.
+          +exfalso. inv HK. apply H0. simpl. reflexivity. }
+      specialize (HF (Z.to_nat k) x HK' Hnth).
+      assert (K0 : k = Z.of_nat (Z.to_nat k)). {
+      destruct k.
+        +simpl. reflexivity.
+        +simpl. zify. reflexivity.
+        +inv HK. exfalso. apply H0. simpl. reflexivity. }
+      rewrite <- K0 in HF.
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      repeat (split; eauto).
+  - split.
+    * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      simpl in H1.
+
+      remember (Zreplicate (z0 - z) w) as l.
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+
+      remember (fold_left
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+         l
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      
+      destruct p as (n1, h). (*n0 already used???*)
+      clear Heqp.
+      destruct z; inv H1.
+      apply H0; eauto.
+    * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      simpl in *.
+
+      remember (Zreplicate (z0 - z) w) as l.
+
+      pose proof (fold_summary l D H ptr HWf) as Hyp.
+      remember
+        (fold_left
+          (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+          (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      destruct p.
+      clear Heqp.
+      inv H1.
+
+      destruct z; inv H2; eauto.
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      
+      split; auto.
+      constructor.
+      eapply TyLitC; simpl in *; eauto.
+      intros k HK.
+      simpl in *.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      rewrite Z.sub_0_r in *.
+
+      remember (Heap.cardinal H ) as c.
+      remember (Heap.cardinal H') as c'.
+      
+      assert (HOrd : 0 < Z.of_nat c + 1 + k <= Z.of_nat c')
+        by (zify; omega).
+      
+      destruct Hyp as [HIn Useless].
+      destruct (HIn HOrd) as [[n' t'] HM'].
+
+      destruct HK as [HP1 HP2].
+
+      destruct z0 as [ | p | ?]; simpl in *; [ omega | | omega].
+      rewrite replicate_length in *.
+
+      destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
+      { rewrite replicate_length ; zify; split; try omega. 
+        (*This should go through with omega but it doesn't*)
+        assert (Hk : Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. apply HP1. simpl. reflexivity. }
+        rewrite Hk. assumption.
+      }
+
+      rewrite Z.sub_0_r in *.
+      
+      rewrite Hnth.
+      remember Hnth as Hyp; clear HeqHyp.
+      apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+      exists n'; exists t.
+      split; [ reflexivity | ].
+
+      specialize (HF (Z.to_nat k) t).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat). {
+        split; zify; (try omega). destruct k; simpl; zify; omega.
+      }
+
+      specialize (HF HF1 Hyp).
+
+      assert (HId: Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. omega. }
+      rewrite HId in HF.
+      
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      split; auto.
+Qed.
+
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
@@ -2637,9 +2914,8 @@ Section Preservation.
     (* T-FieldAddr *)
     - inv Hreduces.
       destruct E; inversion H; simpl in *; subst.
-      inv H2. 
-      exists env. 
-      + clear H0. clear H10. inv H6.
+      exists env, (TPtr m' ti). 
+      + inv H2; try easy.
         * inv HTy.
           (* Gotta prove some equalities *)
           assert (fs = fs0).
@@ -2651,61 +2927,74 @@ Section Preservation.
           } 
           subst.
           assert (fields_wf D fs0) by eauto.
-  
-          (* assert (i = i0).
-          { edestruct H; eauto. destruct H0. eapply H0. apply HWf2. apply H9. } *)
-          subst.
           assert (ti = ti0).
           { apply Fields.find_1 in HWf2.
-            apply Fields.find_1 in H9.
-            rewrite HWf2 in H9.
-            inv H9.
-            reflexivity. }
-          subst.
-          rename fs0 into fs.
-          clear i.
-          rename i0 into i. 
-          rename ti0 into ti. 
-  
-          (* The fact that n^(ptr C struct T) is well-typed is all we need *)
-          split; eauto.
-          inv HHwf.
-          constructor. eapply preservation_fieldaddr; eauto. omega.
-        * inv HTy.
-          (* Gotta prove some equalities *)
+            apply Fields.find_1 in H12.
+            rewrite HWf2 in H12.
+            inv H12.
+            reflexivity. } subst.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply rheap_consistent_refl.
+        split; try easy.
+        split. apply env_consist_refl.
+        split. constructor. constructor.
+        apply H in H12. destruct H12 as [X1 [X2 X3]];try easy.
+        apply preservation_fieldaddr with (T := T) (fs := fs0) (fi := fi); try easy. lia.
+        exists (TPtr Checked ti0). split. apply type_eq_refl. constructor. constructor.
+        assert (is_checked (TPtr Checked (TStruct T))) by constructor. easy.
+      * inv HTy; try easy.
           assert (fs = fs0).
           { apply StructDef.find_1 in HWf1.
-            apply StructDef.find_1 in H7.
-            rewrite HWf1 in H7.
-            inv H7.
-            reflexivity. }
-          subst. 
+            match goal with
+            | [ H : StructDef.MapsTo _ _ _ |- _ ] =>
+              apply StructDef.find_1 in H; rewrite HWf1 in H; inv H
+            end; auto.
+          } 
+          subst.
           assert (fields_wf D fs0) by eauto.
           assert (ti = ti0).
-          { eauto using FieldFacts.MapsTo_fun. }
-          clear i.
-          rename fs0 into fs.
-          rename i0 into i.
-          subst; rename ti0 into ti.
-          (* Since it is an unchecked pointer, well-typedness is easy *)
-          idtac...
-      + clear H2. rename e0 into e1_redex. rename e'0 into e1_redex'.
-        edestruct IH; eauto.
-        inv HHwf; eauto.
+          { apply Fields.find_1 in HWf2.
+            apply Fields.find_1 in H12.
+            rewrite HWf2 in H12.
+            inv H12.
+            reflexivity. } subst.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply rheap_consistent_refl.
+        split; try easy.
+        split. apply env_consist_refl.
+        split. apply TyLitTainted; try easy.
+        apply H in H12. destruct H12 as [X1 [X2 X3]]; try easy.
+        exists (TPtr Tainted ti0). split. apply type_eq_refl. repeat constructor.
+      * inv HTy; try easy. inv HMode.
+        assert (Checked = Checked) by easy. apply H in H2. easy.
+      + edestruct IH; eauto.
+        inv HEwf; eauto.
+        apply step_implies_reduces_1 with (E := E) (m := Checked) in H2; try easy.
+        apply H2.
+        destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+        inv X8. inv H0. inv H3. inv H0; try easy.
+        inv H1. inv H4.
+        exists x, (TPtr m' ti).
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply TyFieldAddr with (T := T) (fs := fs) (i := i); eauto.
+        exists (TPtr m' ti). split. apply type_eq_refl. repeat constructor.
+    (* T-Malloc *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst.
+      inv H2.
   Abort.
 
 
-
-    (* T-Plus *)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst.
-      + clear H0. clear H7. rename e'0 into e'. inv H4.
-        * inversion HTy1.
-        * inv HTy1...
-      + clear H1. rename e into e1_redex. rename e'0 into e1_redex'. edestruct IH1; idtac...
-        inv HHwf; eauto.
-      + clear H1. rename e into e2_redex. rename e'0 into e2_redex'. edestruct IH2; idtac...
-        inv HHwf; eauto.
+(*
     (* T-Malloc *)
     - inv Hreduces.
       destruct E; inversion H2; simpl in *; subst.
@@ -3238,7 +3527,7 @@ Section Preservation.
         * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
           split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
   Qed.
-
+*)
 
 Section Noncrash. 
   Variable D : structdef.

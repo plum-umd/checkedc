@@ -1,8 +1,97 @@
 \section{Overview and Transcendence}\label{sec:overview}
 
-This section discusses the key merge features between Checked-C and RLBox and the problems we are trying to solve.
+This section describes \checkedc and new features \systemname provides.
 
 
+\subsection{\checkedc Overview}
+
+Development of Checked C was initiated by Microsoft Research in 2015 but starting in
+late 2021 was forked and is now actively managed by the Secure Software
+Development Project (SSDP). Details can be found in a prior
+overview~\cite{Elliott2018} or the formalism~\cite{li22checkedc}.
+
+\myparagraph{Checked Pointer Types}
+\checkedc introduces three varieties of \emph{checked pointer}:
+\begin{itemize}
+\item \code{ptr<}$T$\code{>} types a pointer that is either null or
+  points to a single object of type $T$.
+\item \code{array_ptr<}$T$\code{>} types a pointer that is either null
+  or points to an array of $T$ objects. The array width is defined
+  by a \emph{bounds} expression, discussed below.
+\item \code{nt_array_ptr<}$T$\code{>} is like
+  \code{array_ptr<}$T$\code{>} except that the bounds expression
+  defines the \emph{minimum} array width---additional objects may
+  be available past the upper bound, up to a null terminator.
+\end{itemize}
+A bounds expression used with the latter two pointer types has three
+forms:
+\begin{itemize}
+\item \code{count(}$e$\code{)} where $e$ defines the array's
+  length. Thus, if pointer $p$ has bounds \code{count(n)} then the
+  accessible memory is in the range $[p,p+$\code{n}$]$. Bounds
+  expression $e$ must be side-effect free and may only refer to
+  variables whose addresses are not taken, or adjacent \code{struct}
+  fields.
+\item \code{byte_count(}$e$\code{)} is like \code{count}, but
+  expresses arithmetic using bytes, no objects; i.e.,
+  \code{count(}$e$\code{)} used for \code{array_ptr<}$T$\code{>} is
+  equivalent to \code{byte_count(}$e\times\texttt{sizeof}(T)$\code{)}
+\item \code{bounds(}$e_l$,$e_h$\code{)} where $e_l$ and $e_h$ are
+  pointers that bound the accessible region $[e_l,e_h)$ (the
+  expressions are similarly restricted). Bounds
+  \code{count(}$e$\code{)} is shorthand for
+  \code{bounds(}$p, p + e$\code{)}. This most general form of bounds
+  expression is useful for supporting pointer arithmetic.
+\end{itemize}
+  Dropping the bounds expression on an \code{nt_array_ptr} is equivalent
+  to the bounds being \code{count(0)}.
+
+The \checkedc compiler will instrument loads and stores of checked
+pointers to confirm the pointer is non-null, and the access is within
+the specified bounds. For pointers $p$ of type
+\code{nt_array_ptr<}$T$\code{>}, such a check could spuriously fail if
+the index is past $p$'s specified upper bound, but before the null
+terminator. To address this problem, Checked C supports \emph{bounds
+  widening}.
+If $p$'s bounds expression is \code{bounds}$(e_l$,$e_h)$ a program may read from (but not
+write to) $e_h$; when the compiler notices that a non-null character
+is read at the upper bound, it will extend that bound to $e_h+1$.
+% \liyi{solved: II.B.: LaTeX issue, your inline monospaced code snippets generate a space on
+%   the following line (i.e. "a program may read from (but not write to)" is not
+%   aligned with the left boundary of the paragraph).}
+
+\myparagraph{Spatial Safety and Backward Compatibility}
+%
+\checkedc is backward compatible with legacy C in the sense that all
+legacy code will type-check and compile. However, only code that
+appears in \emph{checked code regions}, which we call \emph{checked code},
+is spatially safe. Checked regions can be designated at the level of
+files, functions, or individual code blocks, the first with a
+\code{#pragma} and the latter two using the \code{checked}
+keyword.\footnote{You can also designate \emph{unchecked} regions
+  within checked ones.}  Within checked regions, both
+legacy pointers and certain unsafe idioms (e.g., \emph{variadic} function
+calls) are disallowed. The code in Fig.~\ref{fig:checkedc-example}
+satisfies these conditions, and will type-check in a checked region.
+
+How should we think about code that contains both checked and legacy
+components? \citet{li22checkedc} proved, for a simple
+formalization of \checkedc, that \emph{checked code cannot be blamed}:
+Any spatial safety violation is caused by the execution of unchecked
+code. 
+
+\myparagraph{Converting C to \checkedc}
+%
+The safety guarantees of Checked C come with certain restrictions. For instance, as shown below, Checked C programs cannot use address-taken variables in a bounds expression as the bounds relations may not hold because of possible modifications through pointers.
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+...
+array_ptr<int> p : count (n) = NULL;
+|\textcolor{red}{\faTimes}|..,&n,.
+\end{minted}
+Consequently, converting existing C programs to Checked C might require refactoring, e.g., modifying the above program to not use~\inlinecode{&n} expression, which might require considerable effort~\cite{duanrefactoring} depending on the program's complexity. 
+Recently, Machiry et al. developed~\threec~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
+However, as described in \threec, complete automated conversion is infeasible and requires the developer to convert some code regions manually.
+Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
 
 \begin{figure}[t]
 {\small
@@ -159,30 +248,26 @@ int main(int n) {
 \label{fig:checkedc-example-3}
 \end{figure}
 
+\subsection{\systemname Transcendence}
+
+Here, we discuss three key new features in \systemname with examples.
 
 \myparagraph{Maintaining Non-crashing}
-Previously, the main guarantee of \checkedc \cite{li22checkedc} was the blame theorem,
-i.e., if there is a crash, the source is from some unchecked regions.
+Previously, the main guarantee of \checkedc \cite{li22checkedc} was the blame theorem.
+The sources of crashing in \checkedc are (1) unchecked regions crash themselves;
+  and (2) the misuse of checked pointers in unchecked regions.
 For example, at \Cref{fig:checkedc-example-3} line 31,
 we call a unchecked function \code{f} with a checked null-terminated array (NT-array) pointer argument.
 At line 8, depending on the NT-array size, \code{free(s[10])} might crash.
 Even if it does not crash, line 38 is doomed because of the \code{free} call.
 
-The philosophy is that unchecked regions are written in C and unstable,
-and programmers will eventually remove them by converting them to \checkedc code.
-The reality is that users might not want to convert everything.
-For some insignificant or handy history C code, such as library functions,
-they might want to keep it as long as no crashing.
-
-The sources of crashing in \checkedc are (1) unchecked regions crash themselves;
-  and (2) the misuse of checked pointers in unchecked regions.
-Enlightened by RLBox \cite{rlbox-paper},
-we sandbox the unchecked regions and then we utilize the \checkedc type system
-to disallow checked pointers to be used in an unchecked region. 
-To achieve the communication between checked and unchecked regions,
-we create tainted pointers that can be shared by different regions,
-whose data are stored in the sandboxed heap.
-Users are required to copy data to tainted pointers that are shared in unchecked regions.
+Enlightened by program partitioning mechanism,
+we sandbox the unchecked code regions and utilize the \checkedc type system
+to disallow checked pointers to be used in an unchecked code region. 
+To achieve the communication between checked and unchecked code regions,
+Tainted pointers can be shared by different regions,
+whose data are stored in the sandboxed unchecked heap.
+Users are required to copy checked data to tainted pointers before they are shared in unchecked regions.
 For example,  we copy the checked pointer data to the tainted pointer \code{tp}
 at \Cref{fig:checkedc-example-3} line 26,
 and input the tainted pointer to the unchecked function at line 34.
@@ -194,24 +279,17 @@ This is handled by inserting additional checks
 and creating exception handling before the use by the \systemname compiler.
 Thus, the checked pointer \code{p} is safely used at line 38.
 
-In short, banning checked pointer uses in unchecked regions and providing tainted shared pointers
-are the solution for crashing. 
-In \systemname, we proved the non-crashing theorem based on the \systemname type system,
-.i.e, any program execution is stopped in a predictable manner
-where either the execution terminates or is stopped at a place where an exception handler exists.
-In fact, our work is \textit{the first formalism of RLBox},
-and formally shows the security guarantee that RLBox provides 
-is actually the non-crashing theorem.
+In \systemname, we prove the non-crashing theorem;
+.i.e, any well-typed \systemname program program can never crash due to spatial safety violations.
 
 \myparagraph{Formalism Function Pointers}
-In C, manipulating function pointers is a major way of implementing high order functions.
-Previously, we assumed all function calls are through calling by name to a global map.
+In C, manipulating function pointers is a major way of 
+implementing high order functions as well as accessing data stored in classes.
+Previously, \checkedc assumed all function calls are called by name to a global map.
 In \systemname, we formalize function pointers and maintain the \systemname type soundness.
-To the best of our knowledge,
-this is the first work of formalizing C function pointers with security guarantee.
 
 \Cref{fig:checkedc-example-1} defines a string sorting algorithm
-depending on the input function pointer \code{cmp} defining the generic order for strings,
+depending on the input function pointer \code{cmp} that provides the generic order for strings,
 and \code{compare_1} is an example \code{cmp} function
 that adds the ASCII numbers of characters in the two strings and compare the results.
 In addition, function pointers enable the callback mechanism,
@@ -232,11 +310,11 @@ In general, if function pointer $x$ has type $* (tl \to t)$, and  $y$ has $* (tl
 in order to use $x$ as $y$, $tl'$ should be a subtype of $tl$ and $t$ subtypes to $t'$.
 
 \myparagraph{Not Exposing Checked Pointer Addresses}
-The design for the non-crashing property bans the checked pointer uses in unchecked regions.
+The non-crashing guarantee in \systemname bans the checked pointer manipulation in unchecked code regions.
 Thus, there is no reason to permit checked pointer variable assignments in unchecked regions;
 especially, this might expose a checked pointer address to untrusted parties.
 For example, the call to function $g$ at \Cref{fig:checkedc-example-3} line 41 lives in an unchecked region,
-and $g$ might use some mechanism, such as derandomizing ASLR \cite{shacham-aslr},
+and $g$ might use some mechanisms, such as derandomizing ASLR \cite{shacham-aslr},
 to achieve the checked pointer address.
 Thus, it enables a third party to access any checked heap and function data by simple pointer arithmetic.
 
@@ -247,20 +325,22 @@ the \systemname compiler compiles every checked function
 with an additional tainted shell function.
 Users are required to serve unchecked regions with the tainted shell pointer instead of the original checked function pointer.
 For example, \code{tainted_compare_1} and \code{tainted_stringsort} in \Cref{fig:checkedc-example-2} 
-are the tainted shells of the checked functions \code{compare_1} and \code{stringsort}.
+are the tainted shells of the checked functions \code{compare_1} and \code{stringsort}, respectively.
 In the tainted shells, the arguments are tainted versions of the corresponding arguments in the checked functions.
-Inside the shell body, create checked pointer copies of the tainted arguments, and call the checked functions.
-In addition, once a checked function returns,
-if the output is a checked pointer, we also its the data to a new tainted pointer and exit the shell.
+Inside the shell body, we create checked pointer copies of the tainted arguments, and call the checked functions.
+In addition, once the checked function returns,
+if the output is a checked pointer, we copy its the data to a new tainted pointer and return it.
 \Cref{fig:checkedc-example-3} line 42 is an example of serving the function call living in an unchecked region
 with a tainted shell pointer argument \code{tainted_compare_1}.
 Even if $g$ derndomizes its address (line 14), the shell address is in the sandbox and has no harm,
 and calling the shell never exposes any checked pointer information outside of the shell.
 
 Conceptually, the shell is run in a checked region.
-One can imagine that a tainted shell is a safe closure that contains a checked block.
-Once the closure is called, the system is turned to a checked region,
-so that the checked function call at \Cref{fig:checkedc-example-2} line 14 is safe, 
+Essentially, a tainted shell is a safe closure that contains a checked block.
+Once the closure is called, the system is turned to a checked region.
+For example, \Cref{fig:checkedc-example-2} line 25 surrounds the tainted shell body with a $\echeckedtext$ block indicating
+that we context-switch from the unchecked to checked code region;
+thus, the checked function call at \Cref{fig:checkedc-example-2} line 14 is safe, 
 even if it is called by $g$ in \Cref{fig:checkedc-example-3} , because it lives in the checked region.
 In the \systemname formalism, we formalize a \textit{checked} block on top of the existing unchecked regions,
 and the transition of a tainted shell call creates a checked block containing the shell body.

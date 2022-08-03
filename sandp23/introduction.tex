@@ -1,8 +1,32 @@
 \section{Introduction}
-Vulnerabilities due to memory corruption, especially spatial memory corruptions, are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe} despite a large body of work that tries
-to prevent them~\cite{song2019sanitizing}.
+
+Vulnerabilities due to memory corruption, especially spatial memory corruptions, 
+are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:2013:SRF:2534766.2534798} 
+despite a large body of work that tries to prevent them~\cite{song2019sanitizing}.
+Several industrial and research efforts---including CCured~\cite{Necula2005},
+Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012}---have
+explored means to compile C programs 
+to automatically enforce spatial safety. These
+approaches all impose performance overheads deemed too high for
+deployment use. 
+Recently, \citet{Elliott2018,li22checkedc} introduced and formalized \checkedc, an
+open-source extension to C with new types and
+annotations whose use can ensure a program’s spatial safety.
+Importantly, \checkedc supports development that is 
+incremental and compositional. Code regions (e.g.,
+functions or whole files) designated as \emph{checked} enforce
+spatial safety in a manner preserved by composition with
+other checked regions. But not all regions must be checked: Checked
+C's annotated \emph{checked pointers} are binary-compatible with legacy pointers, and
+may coexist in the same code, which permits a deliberate (and
+semi-automated) refactoring process. Parts of the FreeBSD kernel have
+been successfully ported to \checkedc~\cite{duanrefactoring}, and overall, performance
+overhead seems low enough for practical deployment.
+
+\ignore{
 Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
 Although high-performant safe system languages such as Rust~\cite{rustlang} and Go exist, these a too different to constitute a practical target~\cite{zeng2019identifying}, and rewriting in these languages requires considerable effort.
+
 Existing automated conversion tools~\cite{c2rust,c2rusttalk, emre2021c2rust} are able to take only small steps (i.e., to unsafe, non-idiomatic Rust) and still~\emph{require considerable work from developers}.
 There are other retrofitting techniques such as CCured~\cite{necula2005ccured},
 Softbound~\cite{nagarakatte2009softbound}, Low Fat
@@ -11,6 +35,8 @@ pointers~\cite{duck2016heap}, and Address Sanitizer
 automatically~\emph{without any developer effort}, by analyzing a C program and compiling it to include
 run-time safety checks. Unfortunately, the resulting~\emph{run-time overhead is too high
 for deployment (between 60\%-200\%)}, especially in low-powered IoT devices where the usage of C-based system software (e.g., FreeRTOS) is still rampant.
+
+\input{figures/existingmem}
 
 \noindent
 \textbf{Checked C.} Tarditi et al. developed~\emph{Checked C}, a safe dialect of C that prevents spatial memory issues (temporal safety is underway~\cite{checkedc:temporal}) with no overhead.
@@ -31,13 +57,99 @@ Checked C-converted portions of the FreeBSD kernel.
 Furthermore, Checked C is backward compatible as the compiler  represents checked pointers as system-level memory words, i.e., without
 ``fattening'' metadata, ensuring backward compatibility. 
 The backward compatibility also enables incremental or partial conversion where Checked annotations can be provided to a few pointers.
-Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
+Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe code regions).
 ~\fig{fig:memprotections} shows the summary of these existing approaches along with Checked C.
 We argue that~\emph{converting to Checked C provides a reasonable and practical approach to adding safety to existing system software written in C}.
+}
 
-\input{figures/existingmem}
+% One possible solution is Checked C
+% \begin{itemize}
+% \item Think of it as migratory/gradual typing, but for C.
+% \item Distinct pointer types, but which are backward binary- and source-compatible.
+% \item Checked regions, containing only checked pointers and restricted
+%   idioms, aim to ensure spatial safety
+% \item Implemented as an extension to Clang/LLVM. Good performance
+%   (compared to ASAN etc.)
+% \end{itemize}
+
+The guarantee \checkedc provides focuses on checked code regions,
+where any stuck (i.e., ill-defined)
+state reached by a well-typed program amounts to a spatial safety
+violation; such a state can always be attributed to, i.e., 
+\emph{blamed on}, the execution of code that is not in a checked core
+region. But what are the guarantees of unchecked (unsafe) code regions?
+Programmers might not expect to convert every code to \checkedc,
+but leave some functions in unsafe regions,
+in which case the unsafe region executions should not affect other parts.
+In this paper, we cover this gap by introducing \systemname,
+combining \checkedc with program partitioning mechanism, 
+making three main contributions.
+
+\myparagraph{Executions Cannot Crash}
+Our first contribution is a clear program partition between checked and unchecked code regions,
+and ensures that a \systemname program execution \textit{cannot crash} due to spatial safety violations.
+We restrict the checked and unchecked pointers usage only in checked and unchecked code regions, respectively;
+and develop tainted pointers for the communication between the two regions.
+Heap is partitioned into two parts: a \textit{checked memory region} containing all checked pointers
+ and an \textit{unchecked memory region} that is sandboxed.
+Tainted pointers live in the unchecked memory region and is verified every time when using.
 
 
+\myparagraph{Formaling the Type System, Semantics and Compiler}
+%
+Our second contribution is a core formalism named \lang, which extends
+\citet{li22checkedc} with the non-crashing guarantee and other new features below.
+We prove formally the \textit{non-crashing theorem}, i.e., 
+a well-typed \lang program can never crash due to spatial safety violations.
+We maintain the compiler formalism with the new features extended in \systemname.
+Especially, we maintain the bound-check insertions for array accesses 
+without ``fat'' pointer compilation scheme, while keeping the non-crashing guarantee.
+To certify the simulation relation between the \lang semantics and the compiler,
+we utilize the model-based randomized testing.
+This is done by a conversion tool that converts expressions from \lang into
+actual \checkedc code that can be compiled by the Clang \checkedc
+compiler. We build a random generator of programs largely based on the
+typing rules of \lang and make sure that, both statically and
+dynamically, \lang and Clang Checked C are consistent after
+conversion.  
+To the best of our knowledge, 
+\lang is the first language and compiler formalism with the program partitioning mechanism.
+
+\myparagraph{Supporting Checked Pointer Callbacks and No Checked Pointer Exposure}
+Our third contribution is an added up feature
+to support checked (function) pointer callbacks in unchecked code regions.
+In implementing a multi-threaded system, users might want 
+to provide third party interface permitting third parties 
+to write implement some new program features, while keeping those programs in unchecked code regions.
+Moreover, they do want to provide them a (function) pointer pointing to checked data fields.
+To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
+
+However, accessing a checked pointer in an unchecked region violates the program partition principle of \systemname.
+To overcome the discord, we develop two mechanisms in \systemname 
+and maintain a stronger \textit{non-exposure} guarantee on of the non-crashing guarantee; 
+i.e., no checked pointer addresses can be observed in an unchecked region.
+The first mechanism is nested checked and unchecked code regions.
+Users can context switch between checked and unchecked code regions 
+by nested using the keywords $\echeckedtext$ $\euncheckedtext$.
+The type system ensures that no checked pointers can be accessed across the context switching.
+The second one is that a call to a checked pointer in unchecked code regions 
+must be surrounded by a \textit{tainted shell}; 
+i.e., a tainted function pointer that points to a checked regions possibly holding checked pointers.
+In this case, no checked pointer address can be observed in the unchecked code regions.
+In \systemname, for every checked function, 
+we automatically compiler a tainted version by surrounding the function without a tainted shell.
+
+We begin with a review of \checkedc (Section~\ref{sec:overview}) and introduce new features in \systemname,
+present our main contributions
+(Sections~\ref{sec:formal}--\ref{sec:evaluation}), and conclude with a
+discussion of 
+related and future work (Sections~\ref{sec:related},
+\ref{sec:conclude}). All code and proof artifacts (both for Coq and
+Redex) can be found at \url{https://github.com/plum-umd/checkedc}. 
+
+
+
+\ignore{
 \noindent
 \textbf{Converting C to Checked C.} The safety guarantees of Checked C come with certain restrictions. For instance, as shown below, Checked C programs cannot use address-taken variables in a bounds expression as the bounds relations may not hold because of possible modifications through pointers.
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
@@ -173,7 +285,7 @@ Our compiler avoids these attacks by ensuring, either statically or through dyna
 \label{lst:humanadjust}
 \end{listing}
 }
-
+}
 
 
 
