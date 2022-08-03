@@ -660,6 +660,54 @@ Proof.
   apply TyLitTainted; try easy.
 Admitted.
 
+Lemma preservation_fieldaddr : forall (D : structdef) F H n T (fs : fields),
+  @well_typed_lit_checked D F (fst H) empty_scope n (TPtr Checked (TStruct T)) ->
+  forall i fi ti,
+  n <> 0 ->
+  StructDef.MapsTo T fs D ->
+  Fields.MapsTo fi ti fs ->
+  nth_error (Fields.this fs) i = Some (fi, ti) ->
+  rheap_wf H ->
+  structdef_wf D ->
+  fields_wf D fs ->
+  word_type ti ->
+  @well_typed_lit_checked D F (fst H) empty_scope (n + (Z.of_nat i)) (TPtr Checked ti).
+Proof.
+  intros D F H n T fs HWT.
+  inversion HWT;
+  intros i fi ti Hn HS HF Hnth Hhwf HDwf Hfwf Hwt; eauto.
+  - exfalso ; eauto.
+  - easy.
+  - inv H1.
+  - inv H3. inv H9; try easy. inv H4.
+    apply StructDef.find_1 in HS. rewrite HS in H3. inv H3.
+    specialize (H8 (Z.of_nat i)).
+    rewrite map_length in H8.
+    assert (0 <= Z.of_nat i < 0 + Z.of_nat (length (Fields.elements (elt:=type) fs))).
+    split. lia.
+    rewrite Z.add_0_l.
+    assert (i < (length (Fields.elements (elt:=type) fs)))%nat.
+    apply nth_error_Some.
+    assert (Hyp: Fields.this fs = Fields.elements fs) by auto.
+    rewrite <- Hyp. rewrite Hnth. easy. lia.
+    destruct (H8  H0) as [N' [T' [HNth [HMap HWT']]]]; subst.
+    assert (Z.to_nat (Z.of_nat i - 0) = i) by lia.
+    rewrite H3 in HNth. 
+    assert (Hyp: Fields.this fs = Fields.elements fs) by auto.
+    rewrite <- Hyp in HNth.
+    apply map_nth_error with (f := snd) in Hnth. 
+    rewrite Hnth in HNth. simpl in *. inv HNth.
+    inv Hwt.
+      * eapply TyLitC_C with (w := TNat); simpl in *; try easy.
+        constructor. constructor.
+        intros k Hk; simpl in *.
+        assert (k = 0) by lia; subst.
+        exists N'. exists TNat.
+        repeat (split; eauto).
+        rewrite Z.add_0_r; eauto. constructor.
+
+Admitted.
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
@@ -2637,9 +2685,8 @@ Section Preservation.
     (* T-FieldAddr *)
     - inv Hreduces.
       destruct E; inversion H; simpl in *; subst.
-      inv H2. 
-      exists env. 
-      + clear H0. clear H10. inv H6.
+      exists env, (TPtr m' ti). 
+      + inv H2; try easy.
         * inv HTy.
           (* Gotta prove some equalities *)
           assert (fs = fs0).
@@ -2651,61 +2698,74 @@ Section Preservation.
           } 
           subst.
           assert (fields_wf D fs0) by eauto.
-  
-          (* assert (i = i0).
-          { edestruct H; eauto. destruct H0. eapply H0. apply HWf2. apply H9. } *)
-          subst.
           assert (ti = ti0).
           { apply Fields.find_1 in HWf2.
-            apply Fields.find_1 in H9.
-            rewrite HWf2 in H9.
-            inv H9.
-            reflexivity. }
-          subst.
-          rename fs0 into fs.
-          clear i.
-          rename i0 into i. 
-          rename ti0 into ti. 
-  
-          (* The fact that n^(ptr C struct T) is well-typed is all we need *)
-          split; eauto.
-          inv HHwf.
-          constructor. eapply preservation_fieldaddr; eauto. omega.
-        * inv HTy.
-          (* Gotta prove some equalities *)
+            apply Fields.find_1 in H12.
+            rewrite HWf2 in H12.
+            inv H12.
+            reflexivity. } subst.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply rheap_consistent_refl.
+        split; try easy.
+        split. apply env_consist_refl.
+        split. constructor. constructor.
+        apply H in H12. destruct H12 as [X1 [X2 X3]];try easy.
+        apply preservation_fieldaddr with (T := T) (fs := fs0) (fi := fi); try easy. lia.
+        exists (TPtr Checked ti0). split. apply type_eq_refl. constructor. constructor.
+        assert (is_checked (TPtr Checked (TStruct T))) by constructor. easy.
+      * inv HTy; try easy.
           assert (fs = fs0).
           { apply StructDef.find_1 in HWf1.
-            apply StructDef.find_1 in H7.
-            rewrite HWf1 in H7.
-            inv H7.
-            reflexivity. }
-          subst. 
+            match goal with
+            | [ H : StructDef.MapsTo _ _ _ |- _ ] =>
+              apply StructDef.find_1 in H; rewrite HWf1 in H; inv H
+            end; auto.
+          } 
+          subst.
           assert (fields_wf D fs0) by eauto.
           assert (ti = ti0).
-          { eauto using FieldFacts.MapsTo_fun. }
-          clear i.
-          rename fs0 into fs.
-          rename i0 into i.
-          subst; rename ti0 into ti.
-          (* Since it is an unchecked pointer, well-typedness is easy *)
-          idtac...
-      + clear H2. rename e0 into e1_redex. rename e'0 into e1_redex'.
-        edestruct IH; eauto.
-        inv HHwf; eauto.
+          { apply Fields.find_1 in HWf2.
+            apply Fields.find_1 in H12.
+            rewrite HWf2 in H12.
+            inv H12.
+            reflexivity. } subst.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply rheap_consistent_refl.
+        split; try easy.
+        split. apply env_consist_refl.
+        split. apply TyLitTainted; try easy.
+        apply H in H12. destruct H12 as [X1 [X2 X3]]; try easy.
+        exists (TPtr Tainted ti0). split. apply type_eq_refl. repeat constructor.
+      * inv HTy; try easy. inv HMode.
+        assert (Checked = Checked) by easy. apply H in H2. easy.
+      + edestruct IH; eauto.
+        inv HEwf; eauto.
+        apply step_implies_reduces_1 with (E := E) (m := Checked) in H2; try easy.
+        apply H2.
+        destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+        inv X8. inv H0. inv H3. inv H0; try easy.
+        inv H1. inv H4.
+        exists x, (TPtr m' ti).
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split; try easy.
+        split. apply TyFieldAddr with (T := T) (fs := fs) (i := i); eauto.
+        exists (TPtr m' ti). split. apply type_eq_refl. repeat constructor.
+    (* T-Malloc *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst.
+      inv H2.
   Abort.
 
 
 
-    (* T-Plus *)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst.
-      + clear H0. clear H7. rename e'0 into e'. inv H4.
-        * inversion HTy1.
-        * inv HTy1...
-      + clear H1. rename e into e1_redex. rename e'0 into e1_redex'. edestruct IH1; idtac...
-        inv HHwf; eauto.
-      + clear H1. rename e into e2_redex. rename e'0 into e2_redex'. edestruct IH2; idtac...
-        inv HHwf; eauto.
     (* T-Malloc *)
     - inv Hreduces.
       destruct E; inversion H2; simpl in *; subst.

@@ -3674,9 +3674,8 @@ Proof with eauto 20 with Preservation.
     destruct E; inversion H1; simpl in *; subst.
     + clear H0. admit.
     + clear H1. rename e into e1_redex. rename e'0 into e1_redex'. edestruct IH1; idtac...
-      inv HHwf; eauto.
-    + clear H1. rename e into e2_redex. rename e'0 into e2_redex'. edestruct IH2; idtac...
-      inv HHwf; eauto.
+     admit. admit.
+    + admit.
   (* T-Malloc *)
   - inv Hreduces.
     destruct E; inversion H2; simpl in *; subst.

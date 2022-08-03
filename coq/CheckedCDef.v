@@ -2910,7 +2910,7 @@ Inductive step
     allocate D H1 w' = Some (n1, H1') ->
     step D F
       (s, (H1,H2)) (EMalloc Checked w)
-      (s, (H1,H2)) (RExpr (ELit n1 (TPtr Checked w')))
+      (s, (H1',H2)) (RExpr (ELit n1 (TPtr Checked w')))
 | SMallocUnChecked : forall s H1 H2 m w w' H2' n1,
     eval_type_bound s w w' -> malloc_bound w' -> m <> Checked ->
     allocate D H2 w' = Some (n1, H2') ->
