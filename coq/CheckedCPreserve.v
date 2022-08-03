@@ -708,6 +708,218 @@ Proof.
 
 Admitted.
 
+Lemma alloc_correct : forall w D F H ptr H',
+    allocate D H w = Some (ptr, H') ->
+    structdef_wf D ->
+    heap_wf H ->
+    ~ is_fun_type w ->
+    simple_type (TPtr Checked w) ->
+    @heap_consistent_checked D F H' H /\
+    @well_typed_lit_checked D F H' empty_scope ptr (TPtr Checked w) /\
+    heap_wf H'.
+Proof.
+  intros w D env H ptr H' Alloc HSd HWf.
+  unfold allocate in *.
+  unfold allocate_meta in *.
+  unfold bind in *; simpl in *.
+  destruct w; simpl in *; eauto; inv Alloc; simpl in *; eauto.
+  - split; [| split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by omega; subst; clear HK.
+      exists 0. exists TNat.
+      repeat split; eauto.
+      apply Heap.add_1; eauto. omega.
+    * apply heap_add_preserves_wf; auto.
+  - split; [ | split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by omega; subst; clear HK.
+      exists 0. exists (TPtr m w).
+      repeat split; eauto.
+      apply Heap.add_1; eauto. omega.
+    * apply heap_add_preserves_wf; auto.
+  - split.
+
+    *unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      destruct (StructDef.find s D) eqn:Find; simpl in *; try congruence.
+
+      remember (Fields.elements f) as l.
+
+      pose proof (fold_preserves_consistency (map snd l) D H ptr HWf).
+      
+      remember (fold_left
+            (fun (acc : Z * heap) (t : type) =>
+             let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+            (map snd l) (Z.of_nat(Heap.cardinal H), H)) as p.
+      
+      destruct p.
+      clear Heqp.      
+      inv H1.
+      eauto.
+    
+    * unfold allocate_meta_no_bounds, allocate_meta in H1.
+
+      simpl in *.
+      destruct (StructDef.find s D) eqn:Find; try congruence.
+
+      pose proof (fold_summary (map snd (Fields.elements f)) D H ptr HWf) as Hyp.
+
+      remember
+        (fold_left
+           (fun (acc : Z * heap) (t : type) =>
+            let (sizeAcc, heapAcc) := acc in
+            (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+           (map snd (Fields.elements (elt:=type) f))
+           (Z.of_nat(Heap.cardinal H), H)) as p.
+      destruct p as [z h].
+      clear Heqp.
+      inv H1.
+
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      split; auto.
+      constructor.
+      eapply TyLitC; simpl in *; eauto; [ rewrite Find | ]; eauto.
+
+      intros k HK.
+      apply StructDef.find_2 in Find.
+      remember Find as Fwf; clear HeqFwf.
+      apply HSd in Fwf.
+
+      assert (HOrd: 0 < Z.of_nat(Heap.cardinal H) + 1 + k <= Z.of_nat(Heap.cardinal H')) by omega.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      apply Hyp in HOrd.
+      destruct HOrd as [[n' t'] HM'].
+      (*This bit is very annoying, quite a bit of converting back and forth
+        between ints and nats. This could definately be more automated DP*)
+      exists n'. exists t'.
+      rewrite Z.sub_0_r in *.
+      destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
+      assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
+        destruct k.
+          +zify. simpl. assumption.
+          +simpl. zify. omega.
+          +exfalso. inv HK. apply H0. simpl. reflexivity. }
+      specialize (HF (Z.to_nat k) x HK' Hnth).
+      assert (K0 : k = Z.of_nat (Z.to_nat k)). {
+      destruct k.
+        +simpl. reflexivity.
+        +simpl. zify. reflexivity.
+        +inv HK. exfalso. apply H0. simpl. reflexivity. }
+      rewrite <- K0 in HF.
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      repeat (split; eauto).
+  - split.
+    * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      simpl in H1.
+
+      remember (Zreplicate (z0 - z) w) as l.
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+
+      remember (fold_left
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+         l
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      
+      destruct p as (n1, h). (*n0 already used???*)
+      clear Heqp.
+      destruct z; inv H1.
+      apply H0; eauto.
+    * unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      simpl in *.
+
+      remember (Zreplicate (z0 - z) w) as l.
+
+      pose proof (fold_summary l D H ptr HWf) as Hyp.
+      remember
+        (fold_left
+          (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+          (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      destruct p.
+      clear Heqp.
+      inv H1.
+
+      destruct z; inv H2; eauto.
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      
+      split; auto.
+      constructor.
+      eapply TyLitC; simpl in *; eauto.
+      intros k HK.
+      simpl in *.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      rewrite Z.sub_0_r in *.
+
+      remember (Heap.cardinal H ) as c.
+      remember (Heap.cardinal H') as c'.
+      
+      assert (HOrd : 0 < Z.of_nat c + 1 + k <= Z.of_nat c')
+        by (zify; omega).
+      
+      destruct Hyp as [HIn Useless].
+      destruct (HIn HOrd) as [[n' t'] HM'].
+
+      destruct HK as [HP1 HP2].
+
+      destruct z0 as [ | p | ?]; simpl in *; [ omega | | omega].
+      rewrite replicate_length in *.
+
+      destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
+      { rewrite replicate_length ; zify; split; try omega. 
+        (*This should go through with omega but it doesn't*)
+        assert (Hk : Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. apply HP1. simpl. reflexivity. }
+        rewrite Hk. assumption.
+      }
+
+      rewrite Z.sub_0_r in *.
+      
+      rewrite Hnth.
+      remember Hnth as Hyp; clear HeqHyp.
+      apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+      exists n'; exists t.
+      split; [ reflexivity | ].
+
+      specialize (HF (Z.to_nat k) t).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat). {
+        split; zify; (try omega). destruct k; simpl; zify; omega.
+      }
+
+      specialize (HF HF1 Hyp).
+
+      assert (HId: Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. omega. }
+      rewrite HId in HF.
+      
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      split; auto.
+Qed.
+
+
 (** Type Preservation Theorem. *)
 Section Preservation. 
   Variable D : structdef.
@@ -2765,7 +2977,7 @@ Section Preservation.
   Abort.
 
 
-
+(*
     (* T-Malloc *)
     - inv Hreduces.
       destruct E; inversion H2; simpl in *; subst.
@@ -3298,7 +3510,7 @@ Section Preservation.
         * destruct (IHHwt2 H12 eq_refl (in_hole e'0 E) H') as [HC HWT]; eauto.
           split; eauto. eapply TyIndexAssign; eauto... eapply SubTyRefl.
   Qed.
-
+*)
 
 Section Noncrash. 
   Variable D : structdef.

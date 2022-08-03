@@ -3511,6 +3511,7 @@ Section Typing.
 
   | TyMalloc : forall env Q m m' w,
       mode_leq m' m ->
+      ~ is_fun_type w ->
       well_type_bound_in env w ->
       well_typed env Q m (EMalloc m' w) (TPtr m' w)
 
