@@ -2423,6 +2423,67 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) H
 #[export] Hint Constructors well_typed_lit_checked : ty.
 *)
 
+
+Lemma well_typed_lit_c_ind' :
+  forall (D : structdef) (F: FEnv) (H : heap) (P : scope -> Z -> type -> Prop),
+    (forall (s : scope) (n : Z), P s n TNat) ->
+       (forall (s : scope) (n : Z) (w : type) (m : mode), m <> Checked -> P s n (TPtr m w)) ->
+       (forall (s : scope) (t : type), P s 0 t) ->
+       (forall (s: scope) (n:Z) (xl:list var) (t:type) (ts: list type)
+              (tvl:list (var * type)) (e:expression) (ta:type),
+                F Checked n = Some (tvl,ta,e) 
+               -> subtype D empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) 
+               -> P s n (TPtr Checked (TFun xl t ts))) ->
+       (forall (s : scope) (n : Z) (w : type) (t : type),
+            set_In (n, t) s -> subtype D empty_theta t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
+       (forall (s : scope) (n : Z) (w : type) (t: type) (b : Z) (ts : list type),
+        simple_type w ->  ~ is_fun_type w  ->
+        subtype D empty_theta (TPtr Checked w) (TPtr Checked t) ->
+        Some (b, ts) = allocate_meta D w ->
+        nt_array_prop H n (TPtr Checked t) ->
+        (forall k : Z,
+         b <= k < b + Z.of_nat (length ts) ->
+         exists (n' : Z) (t' : type),
+           Some t' = nth_error ts (Z.to_nat (k - b)) /\
+           Heap.MapsTo (n + k) (n', t') H /\
+           well_typed_lit_checked D F H (scope_set_add n (TPtr Checked w) s) n' t' /\
+           P (scope_set_add n (TPtr Checked w) s) n' t') ->
+           P s n (TPtr Checked t)) 
+       -> forall (s : scope) (n : Z) (w : type), well_typed_lit_checked D F H s n w -> P s n w.
+Proof.
+  intros D F H P.
+  intros HTyLitInt
+         HTyLitU
+         HTyLitZero
+         HTyLitFun
+         HTyLitRec
+         HTyLitC.
+  refine (fix F s n w Hwtl :=
+            match Hwtl with
+            | TyLitInt_C _ _ _ s' n' => HTyLitInt s' n'
+            | TyLitU_C _ _ _ s' n' w' m' Hc => HTyLitU s' n' w' m' Hc
+            | TyLitZero_C _ _ _ s' t' => HTyLitZero s' t'
+            | TyLitFun_C _ _ _ s' n' xl' t' ts' tvl' e' ta' HF HSub => HTyLitFun s' n' xl' t' ts' tvl' e' ta' HF HSub
+            | TyLitRec_C _ _ _ s' n' w' t' Hscope Hsub => HTyLitRec s' n' w' t' Hscope Hsub
+            | TyLitC_C _ _ _ s' n' w' t' b ts HSim Hf HSub Hnt Hts IH =>
+              HTyLitC s' n' w' t' b ts HSim Hf HSub Hnt Hts (fun k Hk =>
+                                         match IH k Hk with
+                                         | ex_intro _ n' Htmp =>
+                                           match Htmp with
+                                           | ex_intro _ t' Hn't' =>
+                                             match Hn't' with
+                                             | conj Ht' Hrest1 =>
+                                             match Hrest1 with
+                                               | conj Hheap Hwt =>
+                                                 ex_intro _ n' (ex_intro _ t'
+                     (conj Ht' (conj Hheap (conj Hwt (F (scope_set_add _ (TPtr Checked w') s') n' t' Hwt)))))
+                                               end
+                                             end
+                                           end
+                                       end)
+            end).
+Qed.
+
 (** Typing of literals on Tainted heaps *)
 Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
   : scope -> Z -> type -> Prop :=
@@ -2432,7 +2493,7 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
     well_typed_lit_tainted D F H s n (TPtr Unchecked w)
 | TyLitZero_T : forall s t,
     well_typed_lit_tainted D F H s 0 t
-| TyLitFun_T : forall s n t ts tvl ta e xl,
+| TyLitFun_T : forall s n xl t ts tvl e ta,
     F Tainted n = Some (tvl,ta,e) ->
      subtype D empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
     well_typed_lit_tainted D F H s n (TPtr Tainted (TFun xl t ts))
@@ -2453,6 +2514,66 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
             well_typed_lit_tainted D F H (scope_set_add n (TPtr Tainted w) sc) n' t') ->
     well_typed_lit_tainted D F H sc n (TPtr Tainted t).
 
+
+Lemma well_typed_lit_u_ind' :
+  forall (D : structdef) (F: FEnv) (H : heap) (P : scope -> Z -> type -> Prop),
+    (forall (s : scope) (n : Z), P s n TNat) ->
+       (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
+       (forall (s : scope) (t : type), P s 0 t) ->
+       (forall (s: scope) (n:Z) (xl:list var) (t:type) (ts: list type)
+              (tvl:list (var * type)) (e:expression) (ta:type),
+                F Tainted n = Some (tvl,ta,e) 
+               -> subtype D empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) 
+               -> P s n (TPtr Tainted (TFun xl t ts))) ->
+       (forall (s : scope) (n : Z) (w : type) (t : type),
+            set_In (n, t) s -> subtype D empty_theta t (TPtr Tainted w) -> P s n (TPtr Tainted w)) ->
+       (forall (s : scope) (n : Z) (w : type) (t: type) (b : Z) (ts : list type),
+        simple_type w ->  ~ is_fun_type w  ->
+        subtype D empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
+        Some (b, ts) = allocate_meta D w ->
+        nt_array_prop H n (TPtr Tainted t) ->
+        (forall k : Z,
+         b <= k < b + Z.of_nat (length ts) ->
+         exists (n' : Z) (t' : type),
+           Some t' = nth_error ts (Z.to_nat (k - b)) /\
+           Heap.MapsTo (n + k) (n', t') H /\
+           well_typed_lit_tainted D F H (scope_set_add n (TPtr Tainted w) s) n' t' /\
+           P (scope_set_add n (TPtr Tainted w) s) n' t') ->
+           P s n (TPtr Tainted t)) 
+       -> forall (s : scope) (n : Z) (w : type), well_typed_lit_tainted D F H s n w -> P s n w.
+Proof.
+  intros D F H P.
+  intros HTyLitInt
+         HTyLitU
+         HTyLitZero
+         HTyLitFun
+         HTyLitRec
+         HTyLitC.
+  refine (fix F s n w Hwtl :=
+            match Hwtl with
+            | TyLitInt_T _ _ _ s' n' => HTyLitInt s' n'
+            | TyLitU_T _ _ _ s' n' w' => HTyLitU s' n' w'
+            | TyLitZero_T _ _ _ s' t' => HTyLitZero s' t'
+            | TyLitFun_T _ _ _ s' n' xl' t' ts' tvl' e' ta' HF HSub => HTyLitFun s' n' xl' t' ts' tvl' e' ta' HF HSub
+            | TyLitRec_T _ _ _ s' n' w' t' Hscope Hsub => HTyLitRec s' n' w' t' Hscope Hsub
+            | TyLitC_T _ _ _ s' n' w' t' b ts HSim Hf HSub Hnt Hts IH =>
+              HTyLitC s' n' w' t' b ts HSim Hf HSub Hnt Hts (fun k Hk =>
+                                         match IH k Hk with
+                                         | ex_intro _ n' Htmp =>
+                                           match Htmp with
+                                           | ex_intro _ t' Hn't' =>
+                                             match Hn't' with
+                                             | conj Ht' Hrest1 =>
+                                             match Hrest1 with
+                                               | conj Hheap Hwt =>
+                                                 ex_intro _ n' (ex_intro _ t'
+                     (conj Ht' (conj Hheap (conj Hwt (F (scope_set_add _ (TPtr Tainted w') s') n' t' Hwt)))))
+                                               end
+                                             end
+                                           end
+                                       end)
+            end).
+Qed.
 (*
 #[export] Hint Constructors well_typed_lit_tainted : ty.
 *)
@@ -2471,60 +2592,6 @@ Definition well_typed_lit D F R Theta n t := forall H1 H2,
     TODO: write blog post about this *)
 (* FIXME : REDEFINE ind *)
 (*
-Lemma well_typed_lit_ind' :
-  forall (D : structdef) (F: FEnv) (Q:theta) (H : heap) (P : scope -> Z -> type -> Prop),
-    (forall (s : scope) (n : Z), P s n TNat) ->
-       (forall (s : scope) (n : Z) (w : type), P s n (TPtr Unchecked w)) ->
-       (forall (s : scope) (t : type), P s 0 t) ->
-       (forall (s: scope) (n:Z) (t:type) (ts: list type), F n <> None -> P s n (TFun (Num n) t ts)) ->
-       (forall (s : scope) (n : Z) (m:mode) (w : type) (t : type),
-            m <> Unchecked -> set_In (n, t) s -> subtype D Q t (TPtr m w) -> P s n (TPtr m w)) ->
-       (forall (s : scope) (n : Z) (m:mode) (w : type) (t: type) (ts : list type) (b : Z),
-        simple_type w ->  m <> Unchecked ->
-        subtype D Q (TPtr m w) (TPtr m t) ->
-        Some (b, ts) = allocate_meta D w ->
-        nt_array_prop H n (TPtr m t) ->
-        (forall k : Z,
-         b <= k < b + Z.of_nat (length ts) ->
-         exists (n' : Z) (t' : type),
-           Some t' = nth_error ts (Z.to_nat (k - b)) /\
-           Heap.MapsTo (n + k) (n', t') H /\
-           well_typed_lit D F Q H (scope_set_add n (TPtr m w) s) n' t' /\
-           P (scope_set_add n (TPtr m w) s) n' t') ->
-        P s n (TPtr m t)) -> forall (s : scope) (n : Z) (w : type), well_typed_lit D F Q H s n w -> P s n w.
-Proof.
-  intros D F Q H P.
-  intros HTyLitInt
-         HTyLitU
-         HTyLitZero
-         HTyLitFun
-         HTyLitRec
-         HTyLitC.
-  refine (fix F s n t Hwtl :=
-            match Hwtl with
-            | TyLitInt _ _ _ _ s' n' => HTyLitInt s' n'
-            | TyLitU _ _ _ _ s' n' w' => HTyLitU s' n' w'
-            | TyLitZero _ _ _ _ s' t' => HTyLitZero s' t'
-            | TyLitFun _ _ _ _ s' n' t' ts' HF => HTyLitFun s' n' t' ts' HF
-            | TyLitRec _ _ _ _ s' n' m' w' t' HMode Hscope Hsub => HTyLitRec s' n' m' w' t' HMode Hscope Hsub
-            | TyLitC _ _ _ _ s' n' m' w' t' b ts HSim HMode Hsub Hts Hnt IH =>
-              HTyLitC s' n' m' w' t' ts b HSim HMode Hsub Hts Hnt (fun k Hk =>
-                                         match IH k Hk with
-                                         | ex_intro _ n' Htmp =>
-                                           match Htmp with
-                                           | ex_intro _ t' Hn't' =>
-                                             match Hn't' with
-                                             | conj Ht' Hrest1 =>
-                                             match Hrest1 with
-                                               | conj Hheap Hwt =>
-                                                 ex_intro _ n' (ex_intro _ t'
-                     (conj Ht' (conj Hheap (conj Hwt (F (scope_set_add _ (TPtr m' w') s') n' t' Hwt)))))
-                                               end
-                                             end
-                                           end
-                                       end)
-            end).
-Qed.
  *)
 (*
 Definition add_value (H:heap) (n:Z) (t:type) :=

@@ -708,6 +708,23 @@ Proof.
 
 Admitted.
 
+Lemma well_typed_preserved : forall D F H t, heap_wf H ->
+  @heap_consistent_checked D F (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, t) H) H.
+Proof.
+  intros D H t0 Hwf n t HT.
+  induction HT using well_typed_lit_ind'; pose proof (cardinal_not_in D H Hwf); eauto.
+  eapply TyLitC; eauto.
+  intros k HK.  
+  destruct (H1 k HK) as [n' [t' [HNth [HMap HWT]]]].
+  exists n'. exists t'.
+  repeat split; eauto.
+  + apply Heap.add_2; eauto.
+    destruct (Hwf (n+k)) as [ _ HIn ].
+    destruct HIn; try eexists; eauto.
+    omega.
+  + inv HWT; eauto.
+Qed.
+
 Lemma alloc_correct : forall w D F H ptr H',
     allocate D H w = Some (ptr, H') ->
     structdef_wf D ->
@@ -718,7 +735,7 @@ Lemma alloc_correct : forall w D F H ptr H',
     @well_typed_lit_checked D F H' empty_scope ptr (TPtr Checked w) /\
     heap_wf H'.
 Proof.
-  intros w D env H ptr H' Alloc HSd HWf.
+  intros w D env H ptr H' Alloc HSd HWf Hfun.
   unfold allocate in *.
   unfold allocate_meta in *.
   unfold bind in *; simpl in *.
