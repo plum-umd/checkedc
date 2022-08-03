@@ -2292,8 +2292,8 @@ Section EvalArg.
   Inductive eval_vl: list Z -> list (var * type) -> list var -> expression -> type -> expression -> type -> Prop :=
   | eval_vl_empty: forall e t, eval_vl [] [] [] e t (ECast t e) t
   | eval_vl_many_1: forall e es x t tvl xl ea ta ea' ta',
-     t <> TNat -> eval_vl es tvl xl ea ta ea' ta' 
-           -> eval_vl (e::es) ((x,t)::tvl) xl ea ta (ELet x (ELit e t) ea') ta'
+      t <> TNat -> eval_vl es tvl xl ea ta ea' ta' 
+      -> eval_vl (e::es) ((x,t)::tvl) xl ea ta (ELet x (ELit e t) ea') ta'
   | eval_vl_many_2: forall e es x tvl xl ea ta ea' ta',
      eval_vl es (map (fun a => (fst a, subst_type (snd a) x (Num e))) tvl) xl ea (subst_type ta x (Num e)) ea' ta' ->
      eval_vl (e::es) ((x,TNat)::tvl) (x::xl) ea ta (ELet x (ELit e TNat) ea') ta'.
