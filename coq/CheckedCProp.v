@@ -913,5 +913,9 @@ End TypeProp.
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
 
-
-
+Lemma split_zero {A B:Type}: forall (l:list (A*B)), (List.split l).2 = [] -> l = [].
+Proof.
+  induction l;intros;simpl in *; try easy.
+  destruct a. 
+  destruct (split l) eqn:eq1. inv H.
+Qed.
