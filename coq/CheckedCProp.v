@@ -635,9 +635,10 @@ Ltac solve_step :=
 Section GeneralProp.
   Variable D : structdef.
   Variable F : FEnv.
+  Variable cm : mode.
 
   Lemma lit_are_nf : forall R s n t,
-      ~ exists R' s' m' r, reduce D F (s, R) (ELit n t) m' (s', R') r.
+      ~ exists R' s' m' r, reduce D F cm (s, R) (ELit n t) m' (s', R') r.
   Proof.
    intros. intros H. destruct H as [R' [s' [m' [r X1]]]].
    remember (ELit n t) as q. inv X1; simpl in *.
