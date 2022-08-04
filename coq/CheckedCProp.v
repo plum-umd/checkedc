@@ -557,6 +557,13 @@ Proof with (try eauto with ty; try easy).
   eapply subtype_core_simple; eauto.
 Admitted.
 
+Lemma subtype_simple_1: forall D t t', simple_type t' -> subtype D empty_theta t' t -> simple_type t.
+Proof with (try eauto with ty; try easy).
+  intros. remember empty_theta as Q.
+  induction H0; unfold simple_type in *; intros; simpl in *; subst...
+  eapply subtype_core_simple; eauto.
+Admitted.
+
 Lemma eq_subtype_simple: forall D t t', simple_type t -> eq_subtype D empty_theta t' t -> simple_type t'.
 Proof.
   intros. destruct H0. destruct H0. eapply subtype_simple in H1; eauto.
@@ -914,5 +921,361 @@ End TypeProp.
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
 
+Lemma cardinal_not_in :
+  forall H, heap_wf H -> ~ Heap.In (Z.of_nat(Heap.cardinal H) + 1) H.
+  intros H Hwf Contra.
+  destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [H1 H2].
+  specialize (H2 Contra).
+  lia.
 
+Module HeapFacts := WFacts_fun Heap.E Heap.
+Module HeapProp := WProperties_fun Heap.E Heap.
+Lemma cardinal_plus_one :
+  forall (H : heap) n v, ~ Heap.In n H ->
+                         (Z.of_nat(Heap.cardinal (Heap.add n v H)) = Z.of_nat(Heap.cardinal H) + 1).
+Proof.
+  intros H n v NotIn.
+  pose proof HeapProp.cardinal_2 as Fact.
+  specialize (Fact _ H (Heap.add n v H) n v NotIn).
+  assert (Hyp: HeapProp.Add n v H (Heap.add n v H)).
+  {
+    intros y.
+    auto.
+  } 
+  specialize (Fact Hyp).
+  lia.
+Qed.
+
+Lemma length_nth : forall {A} (l : list A) (k : nat),
+    0 <= Z.of_nat(k) < Z.of_nat(length l) -> exists n, nth_error l k = Some n.
+Proof.
+  intros A l; induction l; intros k Hyp; simpl in *.
+  - lia.
+  - destruct k; simpl.
+    + exists a; eauto.
+    + assert (H: 0 <= Z.of_nat(k) < Z.of_nat(S k)). {split.
+      *lia. 
+      *zify. lia. }
+     destruct H. assert (H2: Z.of_nat(k) < Z.of_nat (length l)). {zify. lia. }
+     assert (H3: 0 <= Z.of_nat(k) < Z.of_nat (length l)). {split; assumption. }
+     apply (IHl k H3).
+Qed.      
+
+Lemma nth_length : forall {A} (l : list A) (k : nat) n,
+    nth_error l k = Some n -> 0 <= Z.of_nat(k) < Z.of_nat(length l).
+Proof.
+  intros A l; induction l; intros k n Hyp; simpl in *.
+  - apply nth_error_In in Hyp; inv Hyp.
+  - destruct k; simpl in *.
+    +zify. lia.
+    + edestruct IHl; eauto. zify.
+      lia.
+Qed.
+
+Lemma Zlength_nth : forall {A} (l : list A) (z : Z),
+0 <= z < Z.of_nat(length l) -> exists n, nth_error l (Z.to_nat z) = Some n.
+Proof.
+intros. destruct z.
+  -apply (length_nth l (Z.to_nat 0) H).
+  -assert (H1: Z.of_nat (Z.to_nat (Z.pos p)) = (Z.pos p)).
+    {destruct (Z.pos p) eqn:P; inv P.
+      +simpl. rewrite positive_nat_Z. reflexivity. }
+   rewrite <- H1 in H. apply (length_nth l (Z.to_nat (Z.pos p)) H).
+  -exfalso. inv H. apply H0. simpl. reflexivity.
+Qed.
+
+Lemma replicate_length : forall (n : nat) (T : type),
+(length (replicate n T)) = n.
+Proof.
+  intros n T. induction n.
+    -simpl. reflexivity.
+    -simpl. rewrite IHn. reflexivity.
+Qed.
+
+Lemma eval_type_bound_tfun: forall s t t', eval_type_bound s t t' 
+    -> ~ is_fun_type t -> ~ is_fun_type t'.
+Proof.
+  intros. induction H; intros;simpl in *; try easy.
+Qed.
+
+Lemma type_eq_not_checked: forall Q t t', type_eq Q t t' 
+    -> ~ is_checked t' -> ~ is_checked t.
+Proof.
+  intros. induction H; intros;simpl in *; try easy.
+  intros R. inv R. assert (is_checked (TPtr Checked t2)). constructor. easy.
+Qed.
+
+Lemma subtype_core_not_check: forall D Q t t', subtype_core D Q t t' 
+    -> ~ is_checked t' -> ~ is_checked t.
+Proof.
+  intros. inv H; eauto.
+  intros R. inv R. 
+  assert (is_checked (TPtr Checked (TArray l h t0))). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked t0)). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked t0)). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked (TArray l' h' t0))). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked (TArray l' h' t0))). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked (TNTArray l' h' t0))). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked TNat)). constructor. easy.
+  intros R. inv R.
+  assert (is_checked (TPtr Checked (TArray l h TNat))). constructor. easy.
+Qed.
+
+Lemma subtype_not_check: forall D Q t t', subtype D Q t t' 
+    -> ~ is_checked t' -> ~ is_checked t.
+Proof.
+  intros. inv H; try easy. apply subtype_core_not_check in H1; try easy.
+  assert (is_checked (TPtr Checked (TFun xl t'0 tl'))).
+  constructor. easy.
+Qed.
+
+Lemma eq_subtype_not_checked: forall D Q t t', eq_subtype D Q t t' 
+    -> ~ is_checked t' -> ~ is_checked t.
+Proof.
+  intros. destruct H as [ta [X1 X2]].
+  apply subtype_not_check in X2; try easy.
+  apply type_eq_not_checked in X1; try easy.
+Qed.
+
+Lemma eq_subtype_not_checked_1: forall D Q t t', eq_subtype D Q t' t 
+    -> ~ is_checked t' -> ~ is_checked t.
+Proof.
+Admitted.
+
+Lemma eval_type_bound_not_checked: forall s t t', eval_type_bound s t t' 
+    -> ~ is_checked t -> ~ is_checked t'.
+Proof.
+  intros. induction H; intros;simpl in *; try easy.
+  intros R. inv R. assert (is_checked (TPtr Checked t)). constructor. easy.
+Qed.
+
+Lemma type_eq_well_bound: forall Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     nat_leq Q t t' -> freeBoundVars t = [] -> well_bound_in env t'.
+Proof.
+  intros. induction H0; try easy.
+  apply Theta.mapsto_in in H0. apply H in H0.
+  unfold well_bound_in. intros.
+  simpl in *. destruct H3. subst. easy. easy.
+  apply Theta.mapsto_in in H0. apply H in H0.
+  unfold well_bound_in in *. intros. simpl in *.
+  destruct H3;subst. easy. easy.
+  apply Theta.mapsto_in in H0. apply H in H0.
+  unfold well_bound_in in *. intros. simpl in *.
+  destruct H3;subst. easy. easy.
+Qed.
+
+Lemma type_eq_well_bound_1: forall Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     nat_leq Q t t' -> freeBoundVars t' = [] -> well_bound_in env t.
+Proof.
+  intros. induction H0; try easy.
+  apply Theta.mapsto_in in H0. apply H in H0.
+  unfold well_bound_in. intros.
+  simpl in *. destruct H3. subst. easy. easy.
+  apply Theta.mapsto_in in H0. apply H in H0.
+  unfold well_bound_in in *. intros. simpl in *.
+  destruct H3;subst. easy. easy.
+Qed.
+
+Lemma type_eq_well_type_bound: forall Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     type_eq Q t t' -> simple_type t -> well_type_bound_in env t'.
+Proof.
+  intros. induction H0; try easy.
+  unfold simple_type in *. simpl in H1.
+  apply IHtype_eq in H1.
+  unfold well_type_bound_in in *.
+  intros. apply H1. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1. apply app_eq_nil in H4. destruct H4.
+  apply IHtype_eq in H5. unfold well_type_bound_in in *.
+  intros ; simpl in *.
+  apply in_app_iff in H6. destruct H6.
+  inv H2. apply type_eq_well_bound with (env := env) in H7; try easy.
+  unfold well_bound_in in *. apply H7 in H6. easy.
+  apply in_app_iff in H6. destruct H6.
+  inv H3. apply type_eq_well_bound with (env := env) in H7; try easy.
+  unfold well_bound_in in *. apply H7 in H6. easy.
+  apply H5 in H6. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1. apply app_eq_nil in H4. destruct H4.
+  apply IHtype_eq in H5. unfold well_type_bound_in in *.
+  intros ; simpl in *.
+  apply in_app_iff in H6. destruct H6.
+  inv H2. apply type_eq_well_bound with (env := env) in H7; try easy.
+  unfold well_bound_in in *. apply H7 in H6. easy.
+  apply in_app_iff in H6. destruct H6.
+  inv H3. apply type_eq_well_bound with (env := env) in H7; try easy.
+  unfold well_bound_in in *. apply H7 in H6. easy.
+  apply H5 in H6. easy.
+  unfold simple_type in *.
+  unfold well_type_bound_in in *. intros. rewrite H1 in H0. simpl in *. easy.
+Qed.
+
+
+Lemma subtype_core_well_type_bound: forall D Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     subtype_core D Q t t' -> simple_type t -> well_type_bound_in env t'.
+Proof.
+  intros. inv H0; try easy.
+  unfold simple_type in *.
+  unfold well_type_bound_in in *. intros. rewrite H1 in H0. simpl in *. easy.
+  unfold well_type_bound_in in *. intros; simpl in *. 
+  apply in_app_iff in H0. destruct H0.
+  apply type_eq_well_bound with (env := env) in H3; try easy.
+  apply H3. easy.
+  apply in_app_iff in H0. destruct H0.
+  apply type_eq_well_bound_1 with (env := env) in H4; try easy.
+  apply H4. easy.
+  unfold simple_type in *. simpl in H1. rewrite H1 in H0. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1.
+  apply app_eq_nil in H1. destruct H1.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  rewrite H5 in H6. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1.
+  apply app_eq_nil in H1. destruct H1.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  rewrite H5 in H6. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1.
+  apply app_eq_nil in H1. destruct H1.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound with (env := env) in H2; try easy.
+  apply H2. easy.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound_1 with (env := env) in H3; try easy.
+  apply H3. easy.
+  rewrite H4 in H5. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1.
+  apply app_eq_nil in H1. destruct H1.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound with (env := env) in H2; try easy.
+  apply H2. easy.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound_1 with (env := env) in H3; try easy.
+  apply H3. easy.
+  rewrite H4 in H5. simpl in *. easy.
+  unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H1. destruct H1.
+  apply app_eq_nil in H1. destruct H1.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound with (env := env) in H2; try easy.
+  apply H2. easy.
+  apply in_app_iff in H5. destruct H5.
+  apply type_eq_well_bound_1 with (env := env) in H3; try easy.
+  apply H3. easy.
+  rewrite H4 in H5. simpl in *. easy.
+  unfold well_type_bound_in. intros.
+  simpl in *.
+  apply in_app_iff in H0. destruct H0.
+  apply type_eq_well_bound with (env := env) in H4; try easy.
+  apply H4. easy.
+  apply in_app_iff in H0. destruct H0.
+  apply type_eq_well_bound_1 with (env := env) in H5; try easy.
+  apply H5. easy. simpl in *. easy.
+Qed.
+
+
+Lemma subtype_well_type_bound: forall D Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     subtype D Q t t' -> simple_type t -> well_type_bound_in env t'.
+Proof.
+  intros. inv H0; simpl in *; try easy.
+  eapply subtype_core_well_type_bound; eauto.
+  assert (subtype D empty_theta (TPtr Checked (TFun xl t0 tl)) (TPtr Checked (TFun xl t'0 tl'))).
+  apply SubTypeFunChecked; try easy.
+  apply subtype_simple_1 in H0; try easy.
+  unfold simple_type in H0.
+  unfold well_type_bound_in in *. intros.
+  rewrite H0 in H6. simpl in *. easy.
+  assert (subtype D empty_theta (TPtr Tainted (TFun xl t0 tl)) (TPtr Tainted (TFun xl t'0 tl'))).
+  apply SubTypeFunTainted; try easy.
+  apply subtype_simple_1 in H0; try easy.
+  unfold simple_type in H0.
+  unfold well_type_bound_in in *. intros.
+  rewrite H0 in H6. simpl in *. easy.
+Qed.
+
+Lemma eq_subtype_well_type_bound: forall D Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     eq_subtype D Q t t' -> simple_type t -> well_type_bound_in env t'.
+Proof.
+  intros.
+  inv H0 as [ta [X1 X2]].
+  apply type_eq_well_type_bound with (env := env) in X1; try easy.
+Admitted.
+
+Lemma well_type_eval_leq: forall D Q env s w w',
+      eval_bound s w = Some w' -> well_bound_in env w -> stack_wf D Q env s ->
+    (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
+      -> nat_eq Q w' w.
+Proof.
+  intros. 
+  unfold eval_bound in *. destruct w. inv H.
+  split. constructor. easy. constructor. easy.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
+  inv H. split. apply Stack.find_2 in eq1.
+  unfold well_bound_in in *.
+  specialize (H0 v). simpl in *. assert (v = v \/ False). left. easy.
+  apply H0 in H. apply H1 in H. destruct H. destruct H. destruct H.
+  destruct H. destruct H. apply subtype_nat in H4. subst. inv H.
+  apply Stack.mapsto_always_same with (v1 := (x, TNat)) in eq1. inv eq1. 
+  eapply nat_leq_var_2; eauto. constructor. lia. easy.
+  apply Stack.find_2 in eq1.
+  unfold well_bound_in in *.
+  specialize (H0 v). simpl in *. assert (v = v \/ False). left. easy.
+  apply H0 in H. apply H1 in H. destruct H. destruct H. destruct H.
+  destruct H. destruct H. apply subtype_nat in H4. subst. inv H.
+  apply Stack.mapsto_always_same with (v1 := (x, TNat)) in eq1. inv eq1. 
+  eapply nat_leq_var_1; eauto. constructor. lia. easy. inv H.
+Qed.
+
+
+Lemma well_type_eval_type_eq: forall D Q env s w w',
+      eval_type_bound s w w' -> well_type_bound_in env w -> stack_wf D Q env s ->
+    (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
+      -> type_eq Q w' w.
+Proof.
+  intros. generalize dependent Q. generalize dependent env.
+  induction H; intros;simpl in *; eauto.
+  constructor.
+  constructor. eapply IHeval_type_bound; eauto.
+  constructor. unfold well_type_bound_in in *.
+  eapply IHeval_type_bound; eauto. intros. apply H2.
+  simpl. apply in_app_iff. right. apply in_app_iff. right. easy.
+  eapply well_type_eval_leq; try easy; eauto.
+  unfold well_type_bound_in in *. unfold well_bound_in in *. intros. apply H2.
+  simpl. apply in_app_iff. left. easy.
+  eapply well_type_eval_leq; try easy; eauto.
+  unfold well_type_bound_in in *. unfold well_bound_in in *. intros. apply H2.
+  simpl. apply in_app_iff. right. apply in_app_iff. left. easy.
+  constructor. unfold well_type_bound_in in *.
+  eapply IHeval_type_bound; eauto. intros. apply H2.
+  simpl. apply in_app_iff. right. apply in_app_iff. right. easy.
+  eapply well_type_eval_leq; try easy; eauto.
+  unfold well_type_bound_in in *. unfold well_bound_in in *. intros. apply H2.
+  simpl. apply in_app_iff. left. easy.
+  eapply well_type_eval_leq; try easy; eauto.
+  unfold well_type_bound_in in *. unfold well_bound_in in *. intros. apply H2.
+  simpl. apply in_app_iff. right. apply in_app_iff. left. easy.
+  constructor. constructor.
+Qed.
 

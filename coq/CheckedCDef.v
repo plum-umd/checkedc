@@ -3585,7 +3585,7 @@ Section Typing.
   | TyUnchecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
       well_typed env Q Unchecked e t' ->
-      type_eq Q t' t ->
+      eq_subtype D Q t' t ->
       Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (EUnchecked vl t e) t
