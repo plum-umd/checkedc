@@ -921,12 +921,16 @@ End TypeProp.
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
 
+Local Open Scope Z_scope.
+
 Lemma cardinal_not_in :
   forall H, heap_wf H -> ~ Heap.In (Z.of_nat(Heap.cardinal H) + 1) H.
+Proof.
   intros H Hwf Contra.
   destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [H1 H2].
   specialize (H2 Contra).
   lia.
+Qed.
 
 Module HeapFacts := WFacts_fun Heap.E Heap.
 Module HeapProp := WProperties_fun Heap.E Heap.
@@ -1279,3 +1283,4 @@ Proof.
   constructor. constructor.
 Qed.
 
+Local Close Scope Z_scope.

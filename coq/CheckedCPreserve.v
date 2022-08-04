@@ -709,9 +709,6 @@ Proof.
 Admitted.
 
 
-Qed.
-
-
 
 Lemma well_typed_preserved : forall D F H t, heap_wf H ->
   @heap_consistent_checked D F (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, t) H) H.
