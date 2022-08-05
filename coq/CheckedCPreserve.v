@@ -3567,7 +3567,92 @@ Section Preservation.
       exists (TPtr m t). split. apply type_eq_refl. repeat constructor.
     (* T-DynCast-Array *)
     - inv Hreduces.
-
+      destruct E; inversion H; simpl in *; subst. 
+      inv H2. inv HTy. 
+      unfold is_array_ptr in *. easy.
+      unfold is_array_ptr in *. easy.
+      inv HTy. inv H2. inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq D Q env s' t w t' w' ) in H18 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H6 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H16 as A3; try easy.
+      subst. exists env, (TPtr Checked (TArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. constructor; try easy. constructor.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      apply checked_subtype_well_type with (t := (TPtr Checked (TArray u v w'))); eauto.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      inv HEwf. inv H4. constructor. inv H3. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      constructor. inv H23. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      exists (TPtr Checked (TArray u v w')). split. apply type_eq_refl.
+      constructor.
+      apply simple_type_array_num in H6 as eq1.
+      destruct eq1 as [B1 B2]. destruct B1; subst. destruct B2; subst.
+      unfold eval_bound in H9,H15. inv H9. inv H15.
+      apply SubTySubsume; try easy. constructor; easy. constructor; easy.
+      exists (TPtr Checked (TArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTySubsume; try easy.
+      destruct x. unfold eval_bound in H8. inv H8. constructor;lia.
+      unfold eval_bound in H8. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H8.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H17. inv H17. constructor;lia.
+      unfold eval_bound in H17. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H17.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H6. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy.
+      assert (m = Tainted). destruct HMode. assert (Checked = Checked) by easy. apply H in H2. destruct m; try easy.
+      assert (is_checked (TPtr Checked (TArray u v t'))). constructor. easy. subst.
+      inv H10. inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      exists x, t.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply TyCast1 with (t' := ta); try easy.
+      destruct X6 as [A1 [A2 A3]]. 
+      unfold well_type_bound_in in *. intros.
+      apply Wb in H0. apply A2 in H0. easy.
+      intros R1. unfold is_nt_ptr in *. easy.
+      exists t. split. apply type_eq_refl. repeat constructor.
   Abort.
 
 

@@ -2813,41 +2813,48 @@ Inductive step
       (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t')))
       (s, R) (RExpr (ELit n (TPtr m (TArray (Num n) (Num (n+1)) t''))))
 
-| SCastArray : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+| SCastArray : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     l' <= l -> l < h -> h <= h' ->
     step D F
       (s, R) (EDynCast t (ELit n t'))
-      (s, R) (RExpr (ELit n (TPtr Checked (TArray (Num l) (Num h) w))))
-| SCastArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+      (s, R) (RExpr (ELit n (TPtr m (TArray (Num l) (Num h) w))))
+| SCastArrayLowOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     l < l' ->
     step D F (s, R) (EDynCast t (ELit n t'))  (s, R) RBounds
-| SCastArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+| SCastArrayLowOOB2 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+| SCastNTArray : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    l' <= l -> l < h -> h <= h' ->
+    step D F
+      (s, R) (EDynCast t (ELit n t'))
+      (s, R) (RExpr (ELit n (TPtr m (TNTArray (Num l) (Num h) w))))
+| SCastArrayHighOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     h' < h ->
            step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+| SCastNTArrayLowOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
     l < l' ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+| SCastNTArrayLowOOB2 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+| SCastNTArrayHighOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
     h' < h ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 | SDerefChecked : forall s H1 H2 n n1 t1 t t2 tv,
@@ -3258,6 +3265,8 @@ Inductive well_typed_args {D: structdef} {U:FEnv} {H : real_heap} {Q:theta} :
     well_typed_arg D U H Q env m e TNat ->
     well_typed_args env m es (map (fun a => subst_type a x b) vl) xl (subst_type ta x b) ta'
     -> well_typed_args env m (e::es) (TNat::vl) (x::xl) ta ta'.
+
+
 
 
 Lemma type_eq_is_nat : forall Q t, type_eq Q TNat t -> t = TNat.

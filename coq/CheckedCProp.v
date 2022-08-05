@@ -1278,6 +1278,8 @@ Proof.
   intros.
 Admitted.
 
+
+
 Lemma well_type_eval_leq: forall D Q env s w w',
       eval_bound s w = Some w' -> well_bound_in env w -> stack_wf D Q env s ->
     (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
@@ -1332,6 +1334,179 @@ Proof.
   unfold well_type_bound_in in *. unfold well_bound_in in *. intros. apply H2.
   simpl. apply in_app_iff. right. apply in_app_iff. left. easy.
   constructor. constructor.
+Qed.
+
+
+Lemma eval_bound_type_leq: forall D Q env s t t' w w',
+      eval_bound s t = Some (Num t') -> nat_leq Q t w 
+      -> eval_bound s w = Some (Num w') -> well_bound_in env t -> 
+      well_bound_in env w -> stack_wf D Q env s ->
+    (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
+      -> t' <= w'.
+Proof.
+  intros. unfold eval_bound in *.
+  destruct t. destruct w. inv H. inv H1. inv H0. easy.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1.
+  destruct p. inv H. inv H1.
+  unfold well_bound_in in H2.
+  specialize (H3 v). simpl in *.
+  assert (v = v \/ False) by lia.
+  apply H3 in H. apply H4 in H. destruct H as [va [ta [X1 X2]]].
+  apply eq_subtype_nat_1 in X1; subst.
+  apply Stack.find_2 in eq1.
+  apply Stack.mapsto_always_same with (v1 :=(va, TNat)) in eq1; try easy.
+  inv eq1. apply H5 in X2. inv H0.
+  apply Theta.mapsto_always_same with (v1:= GeZero) in X2; try easy.
+  apply Theta.mapsto_always_same with (v1:= (NumEq (Num n))) in X2; try easy.
+  inv H8. inv X2. lia.
+  apply Theta.mapsto_always_same with (v1:= (NumEq (Var y n))) in X2; try easy.
+  easy. destruct w.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
+  inv H. inv H1.
+  unfold well_bound_in in H2.
+  specialize (H2 v). simpl in *.
+  assert (v = v \/ False) by lia.
+  apply H2 in H. apply H4 in H. destruct H as [va [ta [X1 X2]]].
+  apply eq_subtype_nat_1 in X1; subst.
+  apply Stack.find_2 in eq1.
+  apply Stack.mapsto_always_same with (v1 :=(va, TNat)) in eq1; try easy.
+  inv eq1. apply H5 in X2. inv H0.
+  apply Theta.mapsto_always_same with (v1:= (NumEq (Num n))) in X2; try easy.
+  inv H8. inv X2. lia.
+  apply Theta.mapsto_always_same with (v1:= (NumEq (Var y n))) in X2; try easy.
+  easy.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1. destruct p.
+  destruct (Stack.find (elt:=Z * type) v0 s) eqn:eq2. destruct p.
+  inv H1. inv H.
+  unfold well_bound_in in *.
+  simpl in *.
+  assert (v = v \/ False) by lia.
+  assert (v0 = v0 \/ False) by lia.
+  apply H2 in H. apply H3 in H1.
+  apply H4 in H. apply H4 in H1.
+  destruct H as [va [ta [X1 X2]]].
+  destruct H1 as [vb [tb [Y1 Y2]]].
+  apply eq_subtype_nat_1 in X1; subst.
+  apply eq_subtype_nat_1 in Y1; subst.
+  apply Stack.find_2 in eq1. apply Stack.find_2 in eq2.
+  apply Stack.mapsto_always_same with (v1 := (z1, t)) in X2; try easy.
+  apply Stack.mapsto_always_same with (v1 := (z2, t0)) in Y2; try easy.
+  inv X2. inv Y2.
+  apply H5 in eq1. apply H5 in eq2.
+  inv H0. apply Theta.mapsto_always_same with (v1 := (NumEq (Num va)) ) in eq2.
+  inv eq2. lia. easy.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Num n))) in eq1; try easy.
+  inv eq1. inv H8.
+  apply Theta.mapsto_always_same with (v1 := GeZero) in eq2; try easy.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Num n))) in eq2; try easy.
+  inv eq2. inv H9. lia.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Var y n))) in eq2; try easy.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Num n))) in eq2; try easy.
+  inv eq2. inv H8.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Num n))) in eq1; try easy.
+  inv eq1. inv H9. lia.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Var y n))) in eq1; try easy.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Var y n))) in eq1; try easy.
+  apply Theta.mapsto_always_same with (v1 := (NumEq (Var y n))) in eq2; try easy.
+  easy. easy.
+Qed.
+
+Lemma eval_bound_type_eq: forall D Q env s t t' w w',
+      eval_bound s t = Some t' -> nat_eq Q t w -> eval_bound s w = Some w' ->
+      well_bound_in env t -> 
+      well_bound_in env w -> stack_wf D Q env s ->
+    (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
+      -> t' = w'.
+Proof.
+  intros.
+  inv H0.
+  assert (exists ta, eval_bound s t = Some (Num ta)).
+  unfold eval_bound in *. destruct t. inv H. exists z. easy.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1.
+  destruct p. inv H. exists (z0 + z). easy.
+  easy.
+  assert (exists wa, eval_bound s w = Some (Num wa)).
+  unfold eval_bound in *. destruct w. inv H. exists z. easy.
+  destruct (Stack.find (elt:=Z * type) v s) eqn:eq1.
+  destruct p. inv H. exists (z0 + z). easy.
+  easy. destruct H0. destruct H8.
+  rewrite H0 in H. rewrite H8 in H1. inv H. inv H1.
+  eapply eval_bound_type_leq in H6; eauto.
+  eapply eval_bound_type_leq in H7; eauto.
+  assert (x = x0). lia. subst. easy.
+Qed.
+
+Lemma eval_type_bound_type_eq: forall D Q env s t t' w w',
+      eval_type_bound s t t' -> type_eq Q t w -> eval_type_bound s w w' ->
+      well_type_bound_in env t -> 
+      well_type_bound_in env w -> stack_wf D Q env s ->
+    (forall x n, Stack.MapsTo x (n,TNat) s -> Theta.MapsTo x (NumEq (Num n)) Q)
+      -> t' = w'.
+Proof.
+  intros. generalize dependent s. generalize dependent t'.
+  generalize dependent w'.
+  induction H0; intros;simpl in *; eauto.
+  inv H. inv H1. easy.
+  inv H. inv H1.
+  setoid_rewrite IHtype_eq with (w' := t') (t' := t'0) (s := s); try easy.
+  inv H. inv H1. easy.
+  inv H4. inv H5.
+  unfold well_type_bound_in in H2,H3. simpl in H2,H3.
+  eapply (eval_bound_type_eq D Q env s b1 l' b1a l'0) in H11; eauto.
+  eapply (eval_bound_type_eq D Q env s b2 h' b2a h'0) in H13; eauto.
+  subst.
+  setoid_rewrite IHtype_eq with (w' := t') (t' := t'0) (s := s); try easy.
+  unfold well_type_bound_in. intros.
+  apply H2. apply in_app_iff. right. apply in_app_iff. right. easy.
+  unfold well_type_bound_in. intros.
+  apply H3. apply in_app_iff. right. apply in_app_iff. right. easy.
+  unfold well_bound_in. intros.
+  apply H2. apply in_app_iff. right. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H3. apply in_app_iff. right. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H2. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H3. apply in_app_iff. left. easy.
+  inv H4. inv H5.
+  unfold well_type_bound_in in H2,H3. simpl in H2,H3.
+  eapply (eval_bound_type_eq D Q env s b1 l' b1a l'0) in H11; eauto.
+  eapply (eval_bound_type_eq D Q env s b2 h' b2a h'0) in H13; eauto.
+  subst.
+  setoid_rewrite IHtype_eq with (w' := t') (t' := t'0) (s := s); try easy.
+  unfold well_type_bound_in. intros.
+  apply H2. apply in_app_iff. right. apply in_app_iff. right. easy.
+  unfold well_type_bound_in. intros.
+  apply H3. apply in_app_iff. right. apply in_app_iff. right. easy.
+  unfold well_bound_in. intros.
+  apply H2. apply in_app_iff. right. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H3. apply in_app_iff. right. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H2. apply in_app_iff. left. easy.
+  unfold well_bound_in. intros.
+  apply H3. apply in_app_iff. left. easy.
+  inv H. inv H1. easy.
+Qed.
+
+Lemma simple_type_array_num: forall u v m t, simple_type (TPtr m (TArray u v t)) 
+   -> (exists ua, u = Num ua) /\ (exists va, v = Num va).
+Proof.
+  intros. unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H. destruct H. apply app_eq_nil in H0.
+  destruct H0.
+   split. destruct u; simpl in *. exists z. easy. inv H.
+   destruct v. exists z. easy. inv H0.
+Qed.
+
+Lemma simple_type_nt_num: forall u v m t, simple_type (TPtr m (TNTArray u v t)) 
+   -> (exists ua, u = Num ua) /\ (exists va, v = Num va).
+Proof.
+  intros. unfold simple_type in *. simpl in *.
+  apply app_eq_nil in H. destruct H. apply app_eq_nil in H0.
+  destruct H0.
+   split. destruct u; simpl in *. exists z. easy. inv H.
+   destruct v. exists z. easy. inv H0.
 Qed.
 
 Local Close Scope Z_scope.
