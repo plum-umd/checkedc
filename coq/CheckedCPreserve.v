@@ -1302,10 +1302,8 @@ Section Preservation.
         env Q m e1 e2 HTy1 IH1 HTy2 IH2                            | (* Addition *)
         env Q m e m' T fs i fi ti HMode HTy IH HWf1 HWf2 HList     | (* Field Addr *)
         env Q m m' w HMode Wb                                    | (* Malloc *)
-
         env Q m vl t t' e Hl HTy IH Heq Htl Ht                     | (* Unchecked *)
         env Q m vl t t' e Hl HTy IH Heq Htl Ht                     | (* checked *)
-
         env Q t e t' Wb HMode HTy IH                               | (* Cast - nat *)
         env Q m t e t' Wb HTy IH HSub                              | (* Cast - subtype *)
         env Q m e x y u v t t' Wb HTy IH Teq HMode                 | (* DynCast - ptr array *)
@@ -3464,6 +3462,112 @@ Section Preservation.
       eapply eq_subtype_trans; eauto.
       eapply env_consist_is_tainteds; eauto. exists t.
       split. apply type_eq_refl. repeat constructor.
+
+    (* T-Cast-Unchecked *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst. easy.
+      inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Unchecked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      exists x, t.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply TyCast1 with (t' := ta); try easy.
+      destruct X6 as [A1 [A2 A3]]. 
+      unfold well_type_bound_in in *. intros.
+      apply Wb in H0. apply A2 in H0. easy.
+      intros R1. unfold is_nt_ptr in *. easy.
+      exists t. split. apply type_eq_refl. repeat constructor.
+
+    (* T-Cast-Checked *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst. 
+      inv H2. inv HTy.
+      exists env,t''.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split. easy.
+      split. apply env_consist_refl.
+      split. 
+      assert (type_eq Q t'' (TPtr m t)).
+      apply (well_type_eval_type_eq D Q env s'); try easy.
+      destruct HQt as [A1 [A2 A3]]. easy.
+      apply type_eq_sym in H.
+      assert (eq_subtype D Q (TPtr m t) t'').
+      exists t''. split. easy. repeat constructor.
+      apply eq_subtype_trans with (t1 := t') in H2; try easy.
+      constructor; try easy.
+      eapply eq_subtype_is_checked_1; eauto.
+      inv HEwf.
+      eapply eval_type_bound_simple in H1; eauto.
+      eapply checked_subtype_well_type; eauto.
+      inv HEwf.
+      eapply eval_type_bound_simple in H1; eauto.
+      eapply eval_type_bound_type_wf; eauto. inv HEwf; easy.
+      inv HEwf.
+      assert (simple_type t'').
+      eapply eval_type_bound_simple in H1; eauto.
+      eapply eq_subtype_empty; eauto.
+      destruct HQt. easy.
+      assert (type_eq Q t'' (TPtr m t)).
+      apply (well_type_eval_type_eq D Q env s'); try easy.
+      destruct HQt as [A1 [A2 A3]]. easy.
+      exists (TPtr m t). split. easy. repeat constructor.
+      inv HEwf.
+      exists env,t''.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split. easy.
+      split. apply env_consist_refl.
+      assert (type_eq Q t'' (TPtr m t)).
+      apply (well_type_eval_type_eq D Q env s'); try easy.
+      destruct HQt as [A1 [A2 A3]]. easy.
+      apply type_eq_sym in H.
+      assert (eq_subtype D Q (TPtr m t) t'').
+      exists t''. split. easy. repeat constructor.
+      apply eq_subtype_trans with (t1 := t') in H2; try easy.
+      constructor; try easy.
+      apply TyLitTainted; eauto.
+      eapply eq_subtype_not_checked_1; eauto.
+      eapply eval_type_bound_simple in H1; eauto.
+      assert (type_eq Q t'' (TPtr m t)).
+      apply (well_type_eval_type_eq D Q env s'); try easy.
+      destruct HQt as [A1 [A2 A3]]. easy.
+      exists (TPtr m t). split. easy. repeat constructor.
+      inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      exists x, (TPtr m t).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply TyCast2 with (t' := ta) ; try easy.
+      destruct X6 as [A1 [A2 A3]]. 
+      unfold well_type_bound_in in *. intros.
+      apply Wb in H0. apply A2 in H0. easy.
+      intros R1. unfold is_nt_ptr in *. easy.
+      eapply eq_subtype_trans; eauto.
+      exists (TPtr m t). split. apply type_eq_refl. repeat constructor.
+    (* T-DynCast-Array *)
+    - inv Hreduces.
+
   Abort.
 
 

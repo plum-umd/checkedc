@@ -1008,6 +1008,26 @@ Proof.
     -simpl. rewrite IHn. reflexivity.
 Qed.
 
+Lemma eval_type_bound_word_type: forall s t t', eval_type_bound s t t' 
+    -> word_type t -> word_type t'.
+Proof.
+  intros. 
+  induction H; intros;simpl in *; try easy.
+Qed.
+
+Lemma eval_type_bound_type_wf: forall D s m t t', eval_type_bound s t t' 
+    -> type_wf D m t -> type_wf D m t'.
+Proof.
+  intros. generalize dependent m.
+  induction H; intros;simpl in *; try easy.
+  inv H0. constructor. eauto.
+  apply WFTPtrUnChecked; eauto.
+  inv H2. constructor;eauto.
+  eapply eval_type_bound_word_type; eauto.
+  inv H2. constructor;eauto.
+  eapply eval_type_bound_word_type; eauto.
+Qed.
+
 Lemma eval_type_bound_tfun: forall s t t', eval_type_bound s t t' 
     -> ~ is_fun_type t -> ~ is_fun_type t'.
 Proof.
