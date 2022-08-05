@@ -250,6 +250,47 @@ Inductive type_wf (D : structdef) : mode -> type -> Prop :=
     (forall x, In x (freeTypeVars t ++ (fold_right (fun b a => freeTypeVars b ++ a) [] ts)) -> In x xl) -> 
     type_wf D m (TFun xl t ts).
 
+Lemma type_wf_tc : forall t D m m', m <> Checked -> m' <> Checked -> type_wf D m t -> type_wf D m' t.
+Proof.
+  induction t using type_ind'; intros;simpl in *. constructor.
+  inv H1. easy. apply WFTPtrUnChecked; try easy. eapply IHt; eauto.
+  inv H1. constructor. easy.
+  inv H1. constructor; try easy. eapply IHt;eauto.
+  inv H1. constructor; try easy. eapply IHt;eauto.
+  inv H2. constructor; try easy.
+  eapply IHt; eauto. clear H10. clear IHt. clear H6 H8.
+  induction l; simpl in *. constructor.
+  inv H. inv H9. destruct H3. constructor.
+  split. easy. eapply H4; eauto.
+  apply IHl. easy. easy.
+Qed.
+
+Lemma type_wf_uc_c : forall t D m, m <> Checked -> type_wf D m t -> type_wf D Checked t.
+Proof.
+  induction t using type_ind';intros;simpl in *; try easy.
+  constructor. inv H0. easy.
+  destruct m. constructor.
+  apply IHt with (m := m0); try easy.
+  apply WFTPtrChecked.
+  apply type_wf_tc with (m := m0); try easy.
+  apply WFTPtrChecked.
+  apply type_wf_tc with (m := m0); try easy.
+  inv H0. constructor; try easy.
+  inv H0. constructor; try easy.
+  apply IHt with (m := m); try easy.
+  inv H0. constructor; try easy.
+  apply IHt with (m := m); try easy.
+  inv H1. constructor; try easy.
+  eapply IHt; eauto.
+  clear IHt H5 H7 H9.
+  induction l; intros;simpl in *.
+  constructor.
+  inv H8. inv H. constructor.
+  split. easy. eapply H5; eauto.
+  destruct H3; try easy.
+  apply IHl; try easy.
+Qed.
+
 
 Module Env := Map.Make Nat_as_OT.
 Module EnvFacts := FMapFacts.Facts (Env).
@@ -3586,15 +3627,15 @@ Section Typing.
       list_sub (freeVars e) vl ->
       well_typed env Q Unchecked e t' ->
       eq_subtype D Q t' t ->
-      Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
+      Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (EUnchecked vl t e) t
 
   | Tychecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
       well_typed env Q Checked e t' ->
-      type_eq Q t' t ->
-      Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
+      eq_subtype D Q t' t ->
+      Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (Echecked vl t e) t
 

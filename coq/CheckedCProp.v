@@ -391,6 +391,18 @@ Proof with (try eauto with ty; try easy).
   apply IHtype_eq. easy.
 Qed.
 
+Lemma type_eq_type_wf_1: forall D Q m t t', type_wf D m t -> type_eq Q t' t -> type_wf D m t'.
+Proof with (try eauto with ty; try easy).
+  intros. generalize dependent m. induction H0; intros...
+  inv H. constructor. apply IHtype_eq; try easy.
+  apply WFTPtrUnChecked; try easy. apply IHtype_eq; try easy.
+  inv H2. constructor. apply type_eq_word with (Q := Q) (t := t2); try easy.
+  apply IHtype_eq. easy.
+  inv H2. constructor. apply type_eq_word with (Q := Q) (t := t2); try easy.
+  apply IHtype_eq. easy.
+Qed.
+
+
 Lemma subtype_core_type_wf: forall D m t t', type_wf D m t -> subtype_core D empty_theta t' t -> type_wf D m t'.
 Proof with (try eauto with ty; try easy).
   intros. generalize dependent m. induction H0; intros...
@@ -1052,11 +1064,23 @@ Lemma eq_subtype_not_checked_1: forall D Q t t', eq_subtype D Q t' t
 Proof.
 Admitted.
 
+Lemma eq_subtype_is_checked_1: forall D Q t t', eq_subtype D Q t' t 
+    -> is_checked t' -> is_checked t.
+Proof.
+Admitted.
+
 Lemma eval_type_bound_not_checked: forall s t t', eval_type_bound s t t' 
     -> ~ is_checked t -> ~ is_checked t'.
 Proof.
   intros. induction H; intros;simpl in *; try easy.
   intros R. inv R. assert (is_checked (TPtr Checked t)). constructor. easy.
+Qed.
+
+Lemma eval_type_bound_is_checked: forall s t t', eval_type_bound s t t' 
+    -> is_checked t -> is_checked t'.
+Proof.
+  intros. induction H; intros;simpl in *; try easy.
+  inv H0. constructor.
 Qed.
 
 Lemma type_eq_well_bound: forall Q env t t', 
@@ -1225,6 +1249,13 @@ Proof.
   intros.
   inv H0 as [ta [X1 X2]].
   apply type_eq_well_type_bound with (env := env) in X1; try easy.
+Admitted.
+
+Lemma eq_subtype_empty: forall D Q env t t', 
+    (forall x, Theta.In x Q <-> Env.MapsTo x TNat env) ->
+     eq_subtype D Q t t' -> simple_type t -> simple_type t' -> eq_subtype D empty_theta t t'.
+Proof.
+  intros.
 Admitted.
 
 Lemma well_type_eval_leq: forall D Q env s w w',
