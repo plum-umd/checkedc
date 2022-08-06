@@ -15,45 +15,45 @@ Repeated entry---line 66 of file sources.bib
 I'm skipping whatever remains of this entry
 Warning--empty booktitle in bittau2008wedge
 Warning--can't use both volume and number fields in brumley2004privtrans
-You've used 34 entries,
+You've used 35 entries,
             2773 wiz_defined-function locations,
-            1196 strings with 19721 characters,
-and the built_in function-call counts, 19702 in all, are:
-= -- 1714
-> -- 1443
-< -- 17
-+ -- 483
-- -- 449
-* -- 1707
-:= -- 3044
-add.period$ -- 141
-call.type$ -- 34
-change.case$ -- 249
-chr.to.int$ -- 34
-cite$ -- 70
-duplicate$ -- 825
-empty$ -- 1413
-format.name$ -- 490
-if$ -- 4138
+            1203 strings with 20073 characters,
+and the built_in function-call counts, 20617 in all, are:
+= -- 1798
+> -- 1518
+< -- 18
++ -- 508
+- -- 473
+* -- 1789
+:= -- 3181
+add.period$ -- 147
+call.type$ -- 35
+change.case$ -- 260
+chr.to.int$ -- 35
+cite$ -- 72
+duplicate$ -- 858
+empty$ -- 1467
+format.name$ -- 515
+if$ -- 4335
 int.to.chr$ -- 1
 int.to.str$ -- 1
-missing$ -- 32
-newline$ -- 211
-num.names$ -- 138
-pop$ -- 515
+missing$ -- 33
+newline$ -- 218
+num.names$ -- 142
+pop$ -- 537
 preamble$ -- 1
-purify$ -- 215
+purify$ -- 225
 quote$ -- 0
-skip$ -- 656
+skip$ -- 687
 stack$ -- 0
-substring$ -- 510
-swap$ -- 135
-text.length$ -- 10
+substring$ -- 544
+swap$ -- 147
+text.length$ -- 11
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 369
+type$ -- 380
 warning$ -- 2
-while$ -- 140
+while$ -- 146
 width$ -- 0
-write$ -- 515
+write$ -- 533
 (There were 2 error messages)
