@@ -3633,21 +3633,71 @@ Section Preservation.
       apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
       destruct HQt as [A1 [A2 A3]]; easy.
       assert (m = Tainted). destruct HMode. assert (Checked = Checked) by easy. apply H in H2. destruct m; try easy.
-      assert (is_checked (TPtr Checked (TArray u v t'))). constructor. easy. subst.
-      inv H10. inv HEwf. specialize (IH H7 Henvt s).
+      assert (is_checked (TPtr Checked (TArray u v t'))). constructor. easy. subst. clear H6.
+      inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq D Q env s' t w t' w' ) in H17 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H8 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H15 as A3; try easy.
+      subst. exists env, (TPtr Tainted (TArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. apply TyLitTainted; try easy.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H1. destruct H1. easy.
+      exists (TPtr Tainted (TArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTySubsume; try easy.
+      destruct x. unfold eval_bound in H6. inv H6. constructor;lia.
+      unfold eval_bound in H6. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H6.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H16. inv H16. constructor;lia.
+      unfold eval_bound in H16. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H16.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H8. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy. inv H9. inv H1.
+      inv HEwf. specialize (IH H7 Henvt s).
       edestruct IH; eauto.
       apply step_implies_reduces_1 
           with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
       apply H2.
       destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
-      exists x, t.
+      exists x0, (TPtr m (TArray x y t)).
       split; try easy.
       split; try easy.
       split; try easy.
       split; try easy.
       split; try easy.
       split; try easy.
-      split. apply TyCast1 with (t' := ta); try easy.
+      split. apply TyDynCast1 with (u := u) (v := v) (t' := t'); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply well_typed_heap_consist with (R := R); try easy.
+      eapply well_typed_env_consist; eauto.
       destruct X6 as [A1 [A2 A3]]. 
       unfold well_type_bound_in in *. intros.
       apply Wb in H0. apply A2 in H0. easy.
