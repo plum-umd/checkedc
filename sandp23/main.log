@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  6 AUG 2022 16:33
+This is pdfTeX, Version 3.14159265-2.6-1.40.20 (TeX Live 2019/Debian) (preloaded format=pdflatex 2020.5.29)  6 AUG 2022 18:49
 entering extended mode
  \write18 enabled.
  %&-line parsing enabled.
@@ -1506,12 +1506,7 @@ Underfull \hbox (badness 3281) in paragraph at lines 503--503
 49 CoreChkCBox \OT1/ptm/m/n/10.03749 and
  []
 
-) (./evaluation.tex) (./comparison.tex [13]
-Underfull \hbox (badness 3713) in paragraph at lines 85--92
-[]\OT1/ptm/m/n/10.03749 In this work, we pro-pose a type-directed code-
- []
-
-) (./conclusion.tex) (./main.bbl
+) (./evaluation.tex) (./comparison.tex [13]) (./conclusion.tex) (./main.bbl
 Underfull \hbox (badness 10000) in paragraph at lines 24--30
 \OT1/ptm/m/n/9.03374 se-cu-rity vul-ner-a-bil-ity.  $https : / / www . zdnet . 
 com / article /
@@ -1533,22 +1528,22 @@ Underfull \hbox (badness 2318) in paragraph at lines 134--140
 Underfull \vbox (badness 10000) has occurred while \output is active []
 
 
-Underfull \hbox (badness 4899) in paragraph at lines 197--202
+Underfull \hbox (badness 4899) in paragraph at lines 208--213
 \OT1/ptm/m/n/9.03374 Mc-Peak, and West-ley Weimer.  CCured: Type-Safe
  []
 
 
-Underfull \hbox (badness 10000) in paragraph at lines 221--225
+Underfull \hbox (badness 10000) in paragraph at lines 232--236
 []\OT1/ptm/m/n/9.03374 Konstantin Sere-bryany, Derek Bru-en-ing, Alexan-der
  []
 
 
-Underfull \hbox (badness 1953) in paragraph at lines 221--225
+Underfull \hbox (badness 1953) in paragraph at lines 232--236
 \OT1/ptm/m/n/9.03374 Potapenko, and Dmitry Vyukov.  Ad-dress-San-i-tizer: A
  []
 
 LaTeX Font Info:    Trying to load font information for TS1+ptm on input line 2
-46.
+57.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ptm.fd
 File: ts1ptm.fd 2001/06/04 font definitions for TS1/ptm.
 )) [15]
@@ -1605,10 +1600,10 @@ runsystem(rm main.pyg)...executed.
 
  ) 
 Here is how much of TeX's memory you used:
- 31780 strings out of 481239
- 619302 string characters out of 5920377
+ 31781 strings out of 481239
+ 619345 string characters out of 5920377
  1242824 words of memory out of 5000000
- 46364 multiletter control sequences out of 15000+600000
+ 46365 multiletter control sequences out of 15000+600000
  602962 words of font info for 164 fonts, out of 8000000 for 9000
  1141 hyphenation exceptions out of 8191
  68i,24n,100p,1382b,1519s stack positions out of 5000i,500n,10000p,200000b,80000s
@@ -1644,7 +1639,7 @@ nts/type1/urw/courier/ucrr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw
 pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/times/utmr8a.pfb></usr/share
 /texlive/texmf-dist/fonts/type1/urw/times/utmri8a.pfb></usr/share/texlive/texmf
 -dist/fonts/type1/urw/zapfchan/uzcmi8a.pfb>
-Output written on main.pdf (23 pages, 465646 bytes).
+Output written on main.pdf (23 pages, 464985 bytes).
 PDF statistics:
  240 PDF objects out of 1000 (max. 8388607)
  164 compressed objects within 2 object streams
