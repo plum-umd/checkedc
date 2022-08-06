@@ -265,7 +265,14 @@ Section Progress.
          ** apply subtype_fun in H11. destruct H11 as (? & ? & ? & H). inv H.
             destruct H8...
       (* TyLitTainted *)
-      ++ admit.
+      ++ destruct m';
+           [destruct H9; constructor; congruence | idtac | congruence].
+         clear Hmode'. clear H9.
+
+         pose proof (subtype_xl_refl _ _ _ _ _ _ _ H14) as (Exl & ESub).
+         pose proof (mk_eval_el env s R es ts xl t ta H3 Hswf Hargs
+                       ftvl fe ft) as H.
+         
     - 
 
 
