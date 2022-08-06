@@ -1,9 +1,15 @@
-\begin{thebibliography}{28}
+\begin{thebibliography}{34}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
   \providecommand{\doi}[1]{doi: #1}\else
   \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Bittau et~al.(2008)Bittau, Marchenko, Handley, and
+  Karp]{bittau2008wedge}
+Andrea Bittau, Petr Marchenko, Mark Handley, and Brad Karp.
+\newblock Wedge: Splitting applications into reduced-privilege compartments.
+\newblock USENIX Association, 2008.
 
 \bibitem[Blazy and Leroy(2009)]{Blazy2009}
 Sandrine Blazy and Xavier Leroy.
@@ -21,6 +27,12 @@ BlueHat.
   \url{https://www.zdnet.com/article/microsoft-70-percent-of-all-security-bugs-are-memory-safety-issues/},
   2019.
 \newblock Accessed: 2020-02-11.
+
+\bibitem[Brumley and Song(2004)]{brumley2004privtrans}
+David Brumley and Dawn Song.
+\newblock Privtrans: Automatically partitioning programs for privilege
+  separation.
+\newblock In \emph{USENIX Security Symposium}, volume~57, 2004.
 
 \bibitem[Condit et~al.(2007)Condit, Harren, Anderson, Gay, and
   Necula]{Condit2007}
@@ -117,6 +129,22 @@ Liyi Li, Yiyun Liu, Deena~L. Postol, Leonidas Lampropoulos, David~Van Horn, and
 \newblock In \emph{Proceedings of the Computer Security Foundations Symposium
   (CSF)}, August 2022.
 
+\bibitem[Lind et~al.(2017)Lind, Priebe, Muthukumaran, O'Keeffe, Aublin,
+  Kelbert, Reiher, Goltzsche, Eyers, Kapitza, et~al.]{lind2017glamdring}
+Joshua Lind, Christian Priebe, Divya Muthukumaran, Dan O'Keeffe, Pierre-Louis
+  Aublin, Florian Kelbert, Tobias Reiher, David Goltzsche, David Eyers,
+  R{\"u}diger Kapitza, et~al.
+\newblock Glamdring: Automatic application partitioning for intel $\{$SGX$\}$.
+\newblock In \emph{2017 USENIX Annual Technical Conference (USENIX ATC 17)},
+  pages 285--298, 2017.
+
+\bibitem[Liu et~al.(2017)Liu, Tan, and Jaeger]{liu2017ptrsplit}
+Shen Liu, Gang Tan, and Trent Jaeger.
+\newblock Ptrsplit: Supporting general pointers in automatic program
+  partitioning.
+\newblock In \emph{Proceedings of the 2017 ACM SIGSAC Conference on Computer
+  and Communications Security}, pages 2359--2371, 2017.
+
 \bibitem[Machiry et~al.(2022)Machiry, Kastner, McCutchen, Eline, Headley, and
   Hicks]{machiry2022c}
 Aravind Machiry, John Kastner, Matt McCutchen, Aaron Eline, Kyle Headley, and
@@ -182,6 +210,12 @@ Andrew Ruef, Leonidas Lampropoulos, Ian Sweet, David Tarditi, and Michael
   Publishing.
 \newblock ISBN 978-3-030-17138-4.
 
+\bibitem[Rul et~al.(2009)Rul, Vandierendonck, and De~Bosschere]{rul2009towards}
+Sean Rul, Hans Vandierendonck, and Koen De~Bosschere.
+\newblock Towards automatic program partitioning.
+\newblock In \emph{Proceedings of the 6th ACM conference on Computing
+  frontiers}, pages 89--98, 2009.
+
 \bibitem[Serebryany et~al.(2012)Serebryany, Bruening, Potapenko, and
   Vyukov]{Serebryany2012}
 Konstantin Serebryany, Derek Bruening, Alexander Potapenko, and Dmitry Vyukov.
@@ -203,6 +237,13 @@ Dokyung Song, Julian Lettner, Prabhu Rajasekaran, Yeoul Na, Stijn Volckaert,
 \newblock {SoK}: Sanitizing for security.
 \newblock In \emph{Proceedings of the 2019 IEEE Symposium on Security and
   Privacy (S\&P)}, 2019.
+
+\bibitem[Tan et~al.(2017)]{tan2017principles}
+Gang Tan et~al.
+\newblock Principles and implementation techniques of software-based fault
+  isolation.
+\newblock \emph{Foundations and Trends{\textregistered} in Privacy and
+  Security}, 1\penalty0 (3):\penalty0 137--198, 2017.
 
 \bibitem[Trends(2021)]{cvetrend}
 CVE Trends.
