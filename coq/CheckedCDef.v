@@ -250,6 +250,47 @@ Inductive type_wf (D : structdef) : mode -> type -> Prop :=
     (forall x, In x (freeTypeVars t ++ (fold_right (fun b a => freeTypeVars b ++ a) [] ts)) -> In x xl) -> 
     type_wf D m (TFun xl t ts).
 
+Lemma type_wf_tc : forall t D m m', m <> Checked -> m' <> Checked -> type_wf D m t -> type_wf D m' t.
+Proof.
+  induction t using type_ind'; intros;simpl in *. constructor.
+  inv H1. easy. apply WFTPtrUnChecked; try easy. eapply IHt; eauto.
+  inv H1. constructor. easy.
+  inv H1. constructor; try easy. eapply IHt;eauto.
+  inv H1. constructor; try easy. eapply IHt;eauto.
+  inv H2. constructor; try easy.
+  eapply IHt; eauto. clear H10. clear IHt. clear H6 H8.
+  induction l; simpl in *. constructor.
+  inv H. inv H9. destruct H3. constructor.
+  split. easy. eapply H4; eauto.
+  apply IHl. easy. easy.
+Qed.
+
+Lemma type_wf_uc_c : forall t D m, m <> Checked -> type_wf D m t -> type_wf D Checked t.
+Proof.
+  induction t using type_ind';intros;simpl in *; try easy.
+  constructor. inv H0. easy.
+  destruct m. constructor.
+  apply IHt with (m := m0); try easy.
+  apply WFTPtrChecked.
+  apply type_wf_tc with (m := m0); try easy.
+  apply WFTPtrChecked.
+  apply type_wf_tc with (m := m0); try easy.
+  inv H0. constructor; try easy.
+  inv H0. constructor; try easy.
+  apply IHt with (m := m); try easy.
+  inv H0. constructor; try easy.
+  apply IHt with (m := m); try easy.
+  inv H1. constructor; try easy.
+  eapply IHt; eauto.
+  clear IHt H5 H7 H9.
+  induction l; intros;simpl in *.
+  constructor.
+  inv H8. inv H. constructor.
+  split. easy. eapply H5; eauto.
+  destruct H3; try easy.
+  apply IHl; try easy.
+Qed.
+
 
 Module Env := Map.Make Nat_as_OT.
 Module EnvFacts := FMapFacts.Facts (Env).
@@ -925,7 +966,6 @@ Inductive subtypeRef (D : structdef) (U:union) (Q:theta) : type -> type -> Prop 
  *)
 
 Section Subtype. 
-  Variable D : structdef.
 
   Inductive subtype_core (Q:theta) : type -> type -> Prop :=
   | SubTyRefl : forall t, subtype_core Q t t
@@ -946,17 +986,7 @@ Section Subtype.
       subtype_core Q (TPtr m (TNTArray l h t)) (TPtr m (TArray l' h' t))
   | SubTyNtSubsume : forall l h l' h' t m,
       nat_leq Q l l' -> nat_leq Q h' h ->
-      subtype_core Q (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t))
-  | SubTyStructArrayField_1 : forall (T : struct) (fs : fields) m,
-      StructDef.MapsTo T fs D ->
-      Some (TNat) = (Fields.find 0%nat fs) ->
-      subtype_core Q (TPtr m (TStruct T)) (TPtr m (TNat))
-  | SubTyStructArrayField_2 : forall (T : struct) (fs : fields) m l h,
-      StructDef.MapsTo T fs D ->
-      Some (TNat) = (Fields.find 0%nat fs) ->
-      nat_leq Q (Num 0) l -> nat_leq Q h (Num 1) ->
-      subtype_core Q (TPtr m (TStruct T)) (TPtr m (TArray l h (TNat))).
-
+      subtype_core Q (TPtr m (TNTArray l h t)) (TPtr m (TNTArray l' h' t)).
   Hint Constructors subtype_core : ty.
 
   Lemma subtype_core_word_type : forall Q t1 t2,
@@ -1211,11 +1241,7 @@ Proof.
   1-2:apply nat_leq_q_empty; easy.
   constructor; try easy.
   1-2:apply nat_leq_q_empty; easy.
-  apply SubTyStructArrayField_1 with (fs := fs); try easy.
-  apply SubTyStructArrayField_2 with (fs := fs); try easy.
-  1-2:apply nat_leq_q_empty; easy.
 Qed.
-
 
 Lemma subtype_q_empty: forall Q t t', subtype empty_theta t t' -> subtype Q t t'.
 Proof.
@@ -1248,10 +1274,6 @@ Proof with (eauto with ty; try easy).
   apply SubTyNtSubsume; try easy.
   eapply nat_leq_q_eq; eauto. 
   eapply nat_leq_q_eq; eauto. 
-  eapply SubTyStructArrayField_1; try easy. apply H0. easy.
-  eapply SubTyStructArrayField_2; try easy. apply H0. easy.
-  eapply nat_leq_q_eq; eauto. 
-  eapply nat_leq_q_eq; eauto. 
 Qed.
 
 Lemma subtype_core_q_conv: forall Q t t' x v, 0 <= v ->
@@ -1276,10 +1298,6 @@ Proof with (eauto with ty; try easy).
   eapply nat_leq_q_conv; eauto. 
   eapply nat_leq_q_conv; eauto. 
   apply SubTyNtSubsume; try easy.
-  eapply nat_leq_q_conv; eauto. 
-  eapply nat_leq_q_conv; eauto. 
-  eapply SubTyStructArrayField_1; try easy. apply H0. easy.
-  eapply SubTyStructArrayField_2; try easy. apply H0. easy.
   eapply nat_leq_q_conv; eauto. 
   eapply nat_leq_q_conv; eauto. 
 Qed.
@@ -1331,9 +1349,6 @@ Proof.
   apply nat_leq_q_add; try easy.
   apply nat_leq_q_add; try easy.
   apply SubTyNtSubsume; try easy.
-  apply nat_leq_q_add; try easy.
-  apply nat_leq_q_add; try easy.
-  eapply SubTyStructArrayField_2; try easy. apply H0. easy.
   apply nat_leq_q_add; try easy.
   apply nat_leq_q_add; try easy.
 Qed.
@@ -2216,9 +2231,9 @@ Proof.
   rewrite IHt; try easy.
 Qed.
 
-Lemma subtype_core_q_subst: forall D Q t t' x v, 
-              subtype_core D (Theta.add x (NumEq (Num v)) Q) t t' ->
-              subtype_core D Q (subst_type t x (Num v)) (subst_type t' x (Num v)).
+Lemma subtype_core_q_subst: forall Q t t' x v, 
+              subtype_core (Theta.add x (NumEq (Num v)) Q) t t' ->
+              subtype_core Q (subst_type t x (Num v)) (subst_type t' x (Num v)).
 Proof.
 Admitted.
 
@@ -2401,15 +2416,15 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) H
     well_typed_lit_checked D F H s 0 t
 | TyLitFun_C : forall s n xl t ts tvl e ta,
      F Checked n = Some (tvl,ta,e) ->
-     @subtype D empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) ->
+     @subtype empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) ->
     well_typed_lit_checked D F H s n (TPtr Checked (TFun xl t ts))
 | TyLitRec_C : forall s n w t,
     set_In (n, t) s ->
-    @subtype D empty_theta t (TPtr Checked w) ->
+    @subtype empty_theta t (TPtr Checked w) ->
     well_typed_lit_checked D F H s n (TPtr Checked w)
 | TyLitC_C : forall sc n w t b ts,
     simple_type w -> ~ is_fun_type w ->
-    @subtype D empty_theta (TPtr Checked w) (TPtr Checked t) ->
+    @subtype empty_theta (TPtr Checked w) (TPtr Checked t) ->
     Some (b, ts) = allocate_meta D w ->
     nt_array_prop H n (TPtr Checked t) ->
     (forall k,
@@ -2433,13 +2448,13 @@ Lemma well_typed_lit_c_ind' :
        (forall (s: scope) (n:Z) (xl:list var) (t:type) (ts: list type)
               (tvl:list (var * type)) (e:expression) (ta:type),
                 F Checked n = Some (tvl,ta,e) 
-               -> subtype D empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) 
+               -> subtype empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) 
                -> P s n (TPtr Checked (TFun xl t ts))) ->
        (forall (s : scope) (n : Z) (w : type) (t : type),
-            set_In (n, t) s -> subtype D empty_theta t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
+            set_In (n, t) s -> subtype empty_theta t (TPtr Checked w) -> P s n (TPtr Checked w)) ->
        (forall (s : scope) (n : Z) (w : type) (t: type) (b : Z) (ts : list type),
         simple_type w ->  ~ is_fun_type w  ->
-        subtype D empty_theta (TPtr Checked w) (TPtr Checked t) ->
+        subtype empty_theta (TPtr Checked w) (TPtr Checked t) ->
         Some (b, ts) = allocate_meta D w ->
         nt_array_prop H n (TPtr Checked t) ->
         (forall k : Z,
@@ -2496,15 +2511,15 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
     well_typed_lit_tainted D F H s 0 t
 | TyLitFun_T : forall s n xl t ts tvl e ta,
     F Tainted n = Some (tvl,ta,e) ->
-     subtype D empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
+     subtype empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
     well_typed_lit_tainted D F H s n (TPtr Tainted (TFun xl t ts))
 | TyLitRec_T : forall s n w t,
     set_In (n, t) s ->
-    subtype D empty_theta t (TPtr Tainted w) ->
+    subtype empty_theta t (TPtr Tainted w) ->
     well_typed_lit_tainted D F H s n (TPtr Tainted w)
 | TyLitC_T : forall sc n w t b ts,
     simple_type w -> ~ is_fun_type w ->
-    subtype D empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
+    subtype empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
     Some (b, ts) = allocate_meta D w ->
     nt_array_prop H n (TPtr Tainted t) ->
     (forall k,
@@ -2524,13 +2539,13 @@ Lemma well_typed_lit_u_ind' :
        (forall (s: scope) (n:Z) (xl:list var) (t:type) (ts: list type)
               (tvl:list (var * type)) (e:expression) (ta:type),
                 F Tainted n = Some (tvl,ta,e) 
-               -> subtype D empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) 
+               -> subtype empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) 
                -> P s n (TPtr Tainted (TFun xl t ts))) ->
        (forall (s : scope) (n : Z) (w : type) (t : type),
-            set_In (n, t) s -> subtype D empty_theta t (TPtr Tainted w) -> P s n (TPtr Tainted w)) ->
+            set_In (n, t) s -> subtype empty_theta t (TPtr Tainted w) -> P s n (TPtr Tainted w)) ->
        (forall (s : scope) (n : Z) (w : type) (t: type) (b : Z) (ts : list type),
         simple_type w ->  ~ is_fun_type w  ->
-        subtype D empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
+        subtype empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
         Some (b, ts) = allocate_meta D w ->
         nt_array_prop H n (TPtr Tainted t) ->
         (forall k : Z,
@@ -2773,43 +2788,74 @@ Inductive step
       (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t')))
       (s, R) (RExpr (ELit n (TPtr m (TArray (Num n) (Num (n+1)) t''))))
 
-| SCastArray : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+| SCastArray : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     l' <= l -> l < h -> h <= h' ->
     step D F
       (s, R) (EDynCast t (ELit n t'))
-      (s, R) (RExpr (ELit n (TPtr Checked (TArray (Num l) (Num h) w))))
-| SCastArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
-    l < l' ->
-    step D F (s, R) (EDynCast t (ELit n t'))  (s, R) RBounds
-| SCastArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
-    h <= l ->
-    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TArray (Num l') (Num h') w')) ->
+      (s, R) (RExpr (ELit n (TPtr m (TArray (Num l) (Num h) w))))
+| SCastArrayHighOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     h' < h ->
            step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayLowOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+| SCastArrayLowOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     l < l' ->
-    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayLowOOB2 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+    step D F (s, R) (EDynCast t (ELit n t'))  (s, R) RBounds
+| SCastArrayLowOOB2 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TArray (Num l') (Num h') w')) ->
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
-| SCastNTArrayHighOOB1 : forall s R t n t' l h w l' h' w',
-    eval_type_bound s t (TPtr Checked (TNTArray (Num l) (Num h) w)) ->
-    eval_type_bound s t' (TPtr Checked (TNTArray (Num l') (Num h') w')) ->
+| SCastNTArray : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    l' <= l -> l < h -> h <= h' ->
+    step D F
+      (s, R) (EDynCast t (ELit n t'))
+      (s, R) (RExpr (ELit n (TPtr m (TNTArray (Num l) (Num h) w))))
+| SCastNTArrayHighOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
     h' < h ->
+           step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+| SCastNTArrayLowOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    l < l' ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+| SCastNTArrayLowOOB2 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TNTArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    h <= l ->
+    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+
+| SCastNTTArray : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    l' <= l -> l < h -> h <= h' ->
+    step D F
+      (s, R) (EDynCast t (ELit n t'))
+      (s, R) (RExpr (ELit n (TPtr m (TArray (Num l) (Num h) w))))
+| SCastNTTArrayHighOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    h' < h ->
+           step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+| SCastNTTArrayLowOOB1 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    l < l' ->
+    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+| SCastNTTArrayLowOOB2 : forall m s R t n t' l h w l' h' w',
+    eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
+    eval_type_bound s t' (TPtr m (TNTArray (Num l') (Num h') w')) ->
+    h <= l ->
+    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
+
 | SDerefChecked : forall s H1 H2 n n1 t1 t t2 tv,
     eval_type_bound s (TPtr Checked t) t2 ->
     Heap.MapsTo n (n1, t1) H1 ->
@@ -3141,13 +3187,13 @@ Definition allQ  (l:list var) (Q:theta):=
 Definition well_bound_vars_type (l:list var) (t:type) :=
    forall x, In x (freeTypeVars t) -> In x l.
 
-Definition eq_subtype (D: structdef) (Q:theta) (t1 t3:type) := (exists t2, type_eq Q t1 t2 /\ subtype D Q t2 t3).
+Definition eq_subtype (Q:theta) (t1 t3:type) := (exists t2, type_eq Q t1 t2 /\ subtype Q t2 t3).
 
-Axiom eq_subtype_trans: forall D Q t1 t2 t3, 
- eq_subtype D Q t1 t2 -> eq_subtype D Q t2 t3 -> eq_subtype D Q t1 t3.
+Axiom eq_subtype_trans: forall Q t1 t2 t3, 
+ eq_subtype Q t1 t2 -> eq_subtype Q t2 t3 -> eq_subtype Q t1 t3.
 
-Lemma eq_subtype_q_eq: forall D Q Q' t t', Theta.Equal Q Q' -> 
-   eq_subtype D Q t t' -> eq_subtype D Q' t t'.
+Lemma eq_subtype_q_eq: forall Q Q' t t', Theta.Equal Q Q' -> 
+   eq_subtype Q t t' -> eq_subtype Q' t t'.
 Proof.
   intros. unfold eq_subtype in *.
   destruct H0. destruct H0.
@@ -3155,9 +3201,9 @@ Proof.
   eapply subtype_q_eq;eauto.
 Qed.
 
-Lemma eq_subtype_q_conv: forall D Q t t' x v, 0 <= v -> 
-   eq_subtype D (Theta.add x GeZero Q) t t' 
-        -> eq_subtype D (Theta.add x (NumEq (Num v)) Q) t t'.
+Lemma eq_subtype_q_conv: forall Q t t' x v, 0 <= v -> 
+   eq_subtype (Theta.add x GeZero Q) t t' 
+        -> eq_subtype (Theta.add x (NumEq (Num v)) Q) t t'.
 Proof.
   intros. unfold eq_subtype in *.
   destruct H0. destruct H0.
@@ -3166,9 +3212,9 @@ Proof.
 Qed.
 
 
-Lemma eq_subtype_subst_1: forall D Q t t' x b, ~ Theta.In x Q ->
-          eq_subtype D (Theta.add x (NumEq b) Q) t t' ->
-          eq_subtype D Q (subst_type t x b) (subst_type t' x b).
+Lemma eq_subtype_subst_1: forall Q t t' x b, ~ Theta.In x Q ->
+          eq_subtype (Theta.add x (NumEq b) Q) t t' ->
+          eq_subtype Q (subst_type t x b) (subst_type t' x b).
 Proof.
 Admitted.
 
@@ -3179,8 +3225,8 @@ Proof.
   inv H. inv H0. rewrite IHtype_eq; try easy.
 Admitted.
 
-Lemma eq_subtype_simple_same : forall D Q t t', simple_type t -> simple_type t' ->
-          eq_subtype D Q t t' -> subtype D Q t t'.
+Lemma eq_subtype_simple_same : forall Q t t', simple_type t -> simple_type t' ->
+          eq_subtype Q t t' -> subtype Q t t'.
 Proof.
   intros. destruct H1. destruct H1. apply type_eq_simple_same in H1; subst. easy. easy.
 Admitted.
@@ -3192,16 +3238,16 @@ Inductive well_typed_arg (D: structdef) (F:FEnv) (R : real_heap) (Q: theta)
 | ArgLitChecked : forall n t t',
     simple_type t' ->
     well_typed_lit_checked D F (fst R) empty_scope n t' ->
-    eq_subtype D Q t' t ->
+    eq_subtype Q t' t ->
     well_typed_arg D F R Q env Checked (ELit n t') t
 | ArgLitUnchecked : forall m n t t',
     ~ is_checked t' ->
     simple_type t' ->
-    eq_subtype D Q t' t ->
+    eq_subtype Q t' t ->
     well_typed_arg D F R Q env m (ELit n t') t
 | ArgVar : forall m x t t',
     Env.MapsTo x t' env ->
-    eq_subtype D Q t' t ->
+    eq_subtype Q t' t ->
     well_typed_arg D F R Q env m (EVar x) t.
 Inductive well_typed_args {D: structdef} {U:FEnv} {H : real_heap} {Q:theta} :
   env -> mode -> list expression -> list (type) -> list var -> type -> type -> Prop :=
@@ -3220,23 +3266,25 @@ Inductive well_typed_args {D: structdef} {U:FEnv} {H : real_heap} {Q:theta} :
     -> well_typed_args env m (e::es) (TNat::vl) (x::xl) ta ta'.
 
 
+
+
 Lemma type_eq_is_nat : forall Q t, type_eq Q TNat t -> t = TNat.
 Proof.
   intros. inv H. easy.
 Qed.
 
 
-Lemma eq_subtype_nat : forall D Q t, eq_subtype D Q TNat t -> t = TNat.
+Lemma eq_subtype_nat : forall Q t, eq_subtype Q TNat t -> t = TNat.
 Proof.
    intros. inv H. destruct H0. inv H. inv H0. inv H. easy.
 Qed.
 
-Lemma eq_subtype_nat_1 : forall D Q t, eq_subtype D Q t TNat -> t = TNat.
+Lemma eq_subtype_nat_1 : forall Q t, eq_subtype Q t TNat -> t = TNat.
 Proof.
    intros. inv H. destruct H0. inv H0. inv H1. inv H. easy.
 Qed.
 
-Lemma eq_subtype_ptr : forall D Q t m' ta, eq_subtype D Q t (TPtr m' ta) -> (exists tb, t = TPtr m' tb).
+Lemma eq_subtype_ptr : forall Q t m' ta, eq_subtype Q t (TPtr m' ta) -> (exists tb, t = TPtr m' tb).
 Proof with (eauto with ty; try easy).
    intros. inv H. destruct H0. inv H0. inv H1; inv H... inv H. inv H2.
    exists (TFun xl t0 tl). easy.
@@ -3244,22 +3292,22 @@ Proof with (eauto with ty; try easy).
 Qed.
 
 
-Lemma eq_subtype_nt_ptr : forall D Q t t', is_nt_ptr t' -> eq_subtype D Q t t' -> is_nt_ptr t.
+Lemma eq_subtype_nt_ptr : forall Q t t', is_nt_ptr t' -> eq_subtype Q t t' -> is_nt_ptr t.
 Proof with (eauto with ty; try easy).
    intros. unfold is_nt_ptr in *. destruct t'... destruct t'... 
    inv H0. destruct H1. inv H1. inv H2; inv H0... inv H3. easy. inv H3. easy.
 Qed.
 
-Lemma subtype_nt_ptr_1 : forall D Q t t', is_nt_ptr t' -> subtype D Q t t' -> subtype_core D Q t t'.
+Lemma subtype_nt_ptr_1 : forall Q t t', is_nt_ptr t' -> subtype Q t t' -> subtype_core Q t t'.
 Proof with (eauto with ty; try easy).
    intros. unfold is_nt_ptr in *. destruct t'... destruct t'... 
    inv H0. easy.
 Qed.
 
-Lemma eq_subtype_fun : forall D Q m xl t ts ta,
-      eq_subtype D Q ta (TPtr m (TFun xl t ts)) ->
+Lemma eq_subtype_fun : forall Q m xl t ts ta,
+      eq_subtype Q ta (TPtr m (TFun xl t ts)) ->
        (exists tb tlb, ta = TPtr m (TFun xl tb tlb)
-            /\ @subtype D empty_theta tb t /\ Forall2 (@subtype D empty_theta) ts tlb).
+            /\ @subtype empty_theta tb t /\ Forall2 (@subtype empty_theta) ts tlb).
 Proof.
   intros. inv H. destruct H0.
   apply subtype_fun in H0 as X1. destruct X1 as [yl [tb [tlb X1]]];subst.
@@ -3273,7 +3321,7 @@ Lemma checked_subtype_well_type : forall D F H env t t' n,
 simple_type t -> 
 simple_type t' -> type_wf D Checked t' ->
 @well_typed_lit_checked D F H env n t ->
-eq_subtype D empty_theta t t' ->
+eq_subtype empty_theta t t' ->
 @well_typed_lit_checked D F H env n t'.
 Proof.
   intros. induction H3. 
@@ -3282,7 +3330,7 @@ Proof.
   - constructor.
 Admitted.
 
-Lemma eq_subtype_mode_same :forall D Q m t m' t', eq_subtype D Q (TPtr m t) (TPtr m' t') -> m = m'.
+Lemma eq_subtype_mode_same :forall Q m t m' t', eq_subtype Q (TPtr m t) (TPtr m' t') -> m = m'.
 Proof.
   intros. inv H. inv H0. inv H. inv H1.
   inv H; try easy. easy. easy.
@@ -3490,7 +3538,7 @@ Section Typing.
       well_typed env Q m (ELit n t) t
   | TyVar : forall env Q m x t t',
       Env.MapsTo x t env ->
-      subtype_core D Q t t' ->
+      subtype_core Q t t' ->
       well_typed env Q m (EVar x) t'
 
   | TyCall : forall env Q m m' es x xl ts t ta,
@@ -3586,16 +3634,16 @@ Section Typing.
   | TyUnchecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
       well_typed env Q Unchecked e t' ->
-      type_eq Q t' t ->
-      Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
+      eq_subtype Q t' t ->
+      Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (EUnchecked vl t e) t
 
   | Tychecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
       well_typed env Q Checked e t' ->
-      type_eq Q t' t ->
-      Forall (fun x => Env.MapsTo x t env -> is_tainted t) vl ->
+      eq_subtype Q t' t ->
+      Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (Echecked vl t e) t
 
@@ -3608,7 +3656,7 @@ Section Typing.
   | TyCast2 : forall env Q m t e t',
       well_type_bound_in env t ->
       well_typed env Q Checked e t' ->
-      eq_subtype D Q t' (TPtr m t) ->
+      eq_subtype Q t' (TPtr m t) ->
       well_typed env Q Checked (ECast (TPtr m t) e) (TPtr m t)
 
   | TyDynCast1 : forall env Q m e x y u v t t',
@@ -3630,6 +3678,15 @@ Section Typing.
       well_typed env Q Checked e (TPtr m (TNTArray u v t')) ->
       mode_leq m Checked ->
       well_typed env Q Checked (EDynCast (TPtr m (TNTArray x y t)) e) (TPtr m (TNTArray x y t))
+
+  | TyDynCast4 : forall env Q m e x y u v t t',
+      well_type_bound_in env (TPtr m (TArray x y t)) ->
+      type_eq Q t t' ->
+      well_typed env Q Checked e (TPtr m (TNTArray u v t')) ->
+      mode_leq m Checked ->
+      well_typed env Q Checked (EDynCast (TPtr m (TArray x y t)) e) (TPtr m (TArray x y t))
+
+
   | TyDeref : forall env Q m e m' t l h t' t'',
       well_typed env Q m e t ->
       ((word_type t'' /\ t'' = t')
@@ -3652,7 +3709,7 @@ Section Typing.
       well_typed env Q m (EDeref (EPlus e1 e2)) t
 
   | TyAssign1 : forall env Q m e1 e2 m' t t1,
-      subtype D Q t1 t -> word_type t ->
+      subtype Q t1 t -> word_type t ->
       well_typed env Q m e1 (TPtr m' t) ->
       well_typed env Q m e2 t1 ->
       mode_leq m' m ->
@@ -3665,14 +3722,14 @@ Section Typing.
       well_typed env Q m (EAssign e1 e2) TNat
 *)
   | TyAssign2 : forall env Q m e1 e2 m' l h t t',
-      word_type t -> type_wf D m' t -> subtype D Q t' t ->
+      word_type t -> type_wf D m' t -> subtype Q t' t ->
       well_typed env Q m e1 (TPtr m' (TArray l h t)) ->
       well_typed env Q m e2 t' ->
       mode_leq m' m ->
       well_typed env Q m (EAssign e1 e2) t
   | TyAssign3 : forall env Q m e1 e2 m' l h t t',
       word_type t -> type_wf D m' t ->
-      subtype D Q t' t  ->
+      subtype Q t' t  ->
       well_typed env Q m e1 (TPtr m' (TNTArray l h t)) ->
       well_typed env Q m e2 t' ->
       mode_leq m' m ->
@@ -3680,7 +3737,7 @@ Section Typing.
 
   | TyIndexAssign1 : forall env Q m e1 e2 e3 m' l h t t',
       word_type t' -> type_wf D m' t' ->
-      subtype D Q t' t ->
+      subtype Q t' t ->
       well_typed env Q m e1 (TPtr m' (TArray l h t)) ->
       well_typed env Q m e2 (TNat) ->
       well_typed env Q m e3 t' ->
@@ -3688,7 +3745,7 @@ Section Typing.
       well_typed env Q m (EAssign (EPlus e1 e2) e3) t
   | TyIndexAssign2 : forall env Q m e1 e2 e3 m' l h t t',
       word_type t' -> type_wf D m' t' ->
-      subtype D Q t' t ->
+      subtype Q t' t ->
       well_typed env Q m e1 (TPtr m' (TNTArray l h t)) ->
       well_typed env Q m e2 (TNat) ->
       well_typed env Q m e3 t' ->
@@ -3697,7 +3754,7 @@ Section Typing.
 
   | TyIfDef : forall env Q m m' x t t1 e1 e2 t2,
       Env.MapsTo x t env ->
-      subtype D Q t (TPtr m' t1) ->
+      subtype Q t (TPtr m' t1) ->
       (exists l h t', (word_type t1 /\ t1 = t')
                       \/ (t1 = TArray l h t' /\ word_type t' /\ type_wf D m' t')
                       \/ (t1 = TNTArray l h t' /\ word_type t' /\ type_wf D m' t')) ->

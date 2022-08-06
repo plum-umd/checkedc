@@ -6,11 +6,11 @@ From CHKC Require Import
   CheckedCDef
   CheckedCProp.
 
-Lemma subtype_xl_refl : forall D xl t ts xl' t' ts',
-    subtype D empty_theta
-      (TPtr Checked (TFun xl t ts))
-      (TPtr Checked (TFun xl' t' ts')) ->
-    xl = xl' /\ Forall2 (subtype D empty_theta) ts' ts .
+Lemma subtype_xl_refl : forall m xl t ts xl' t' ts',
+    subtype empty_theta
+      (TPtr m (TFun xl t ts))
+      (TPtr m (TFun xl' t' ts')) ->
+    xl = xl' /\ Forall2 (subtype empty_theta) ts' ts .
 Proof.
   intros * Sub.
   split.
@@ -103,10 +103,10 @@ Section Progress.
       (forall e,
           In e es -> (exists (n : Z) (t : type), e = ELit n t) \/
                        (exists y : var, e = EVar y)) ->
-      stack_wf D Q env s ->
+      stack_wf Q env s ->
       @well_typed_args D F R Q env Checked es ts xl t ta -> 
       forall ftvl fe ft,
-        get_xl ftvl = xl /\ Forall2 (subtype D empty_theta) ts (split ftvl).2 ->
+        get_xl ftvl = xl /\ Forall2 (subtype empty_theta) ts (split ftvl).2 ->
         exists re rt, eval_el s es ftvl xl fe ft re rt.
   Proof with dauto.
     Hint Constructors eval_el : Progress.
@@ -166,6 +166,13 @@ Section Progress.
     cm = Unchecked /\ exists e' E, e = in_hole e' E /\ mode_of' E cm = Unchecked.
   Hint Unfold unchecked : Progress. 
 
+  Lemma wt_lit_tainted_middle_excluded : forall H2 x tptr xl t ts, 
+      tptr = (TPtr Tainted (TFun xl t ts)) -> 
+      well_typed_lit_tainted D F H2 empty_scope x tptr
+      \/ ~ well_typed_lit_tainted D F H2 empty_scope x tptr.
+  Admitted.
+  
+
   Lemma progress : forall R s env e t cm,
       cm <> Tainted ->
       rheap_wf R ->
@@ -174,7 +181,7 @@ Section Progress.
       stack_wt D Checked s ->
       env_wt D Checked env ->
       theta_wt Q env s ->
-      stack_wf D Q env s ->
+      stack_wf Q env s ->
       stack_rheap_consistent D F R s ->
       well_typed D F R env Q Checked e t ->
       value D e \/
@@ -214,7 +221,8 @@ Section Progress.
         ? |
         ? |
         ? |
-        ? 
+        ? |
+        ?
       ].
 
     Ltac solve_unchecked :=
@@ -267,27 +275,41 @@ Section Progress.
       (* TyLitTainted *)
       ++ destruct m';
            [destruct H9; constructor; congruence | idtac | congruence].
+         remember (TPtr Tainted (TFun xl t ts)) as tfun.
          clear Hmode'. clear H9.
-
-         pose proof (subtype_xl_refl _ _ _ _ _ _ _ H14) as (Exl & ESub).
-         pose proof (mk_eval_el env s R es ts xl t ta H3 Hswf Hargs
-                       ftvl fe ft) as H.
+         assert (n <> 0%Z) as Hnneq0.
+         { intros Contra. rewrite -> Contra in *.
+           rewrite -> (HNull Tainted) in *. congruence.
+         }
+         edestruct (wt_lit_tainted_middle_excluded R.2 n) as [Htt | Htt].
+         { apply Heqtfun. }
+         (* wt_tainted *)
+         ** inv Htt; try congruence.
+            --- rewrite H in Ef. inv Ef. inv H8.
+                pose proof (subtype_xl_refl _ _ _ _ _ _ _ H5) as (Exl & ESub).
+                pose proof (mk_eval_el env s R es ts xl t ta H3 Hswf Hargs
+                              ftvl fe ft) as H'.
+                destruct H' as (re & rt & H'). intuition.
+                eapply step_implies_reduces'.
+                pose proof (SCallTainted D F s R.1 R.2) as Step.
+                eapply Step in H; try eassumption.
+                2: rewrite Exl; eassumption.
+                replace ((R.1, R.2)) with R in * by (destruct R; reflexivity).
+                apply H.
+                econstructor; eassumption.
+            --- inv H.
+            --- inv H13. apply subtype_fun in H6.
+                destruct H6 as (? & ? & ? & Eptr); inv Eptr. destruct H5...
+         (* not wt_tainted *)
+         ** replace R with ((R.1, R.2)) by (destruct R; reflexivity).
+            eapply step_implies_reduces'. rewrite -> Heqtfun in *.
+            eapply SCallTaintedType; try eassumption.
+    -            
+            
          
-    - 
+  Admitted.
 
-
-
-      (*
-  | SCallChecked : forall (s : stack) (R : real_heap) (x : Z) (ta : type) (ts : list type) 
-                     (el : list expression) (t : type) (tvl : list (var * type)) (e ea : expression) 
-                     (ta' : type) (xl : list var),
-                   F Checked x = Some (tvl, t, e) ->
-                   eval_el s el tvl (get_xl tvl) e t ea ta' ->
-                   step D F (s, R) (ECall (ELit x (TPtr Checked (TFun xl ta ts))) el) (s, R) (RExpr ea)
-  | SCallNull : forall (m : mode) (s : stack) (R : real_heap) (x : Z) (ta : type) (ts : list type)
-                  (el : list expression) (xl : list var),
-                m <> Unchecked ->
-                F m x = None -> step D F (s, R) (ECall (ELit x (TPtr m (TFun xl ta ts))) el) (s, R) RNull
+(* 
   | SCallTainted : forall (s : stack) (H1 H2 : heap) (x : Z) (ta : type) (ts : list type) 
                      (el : list expression) (t : type) (tvl : list (var * type)) (e ea : expression) 
                      (ta' : type) (xl : list var),
@@ -302,11 +324,33 @@ Section Progress.
                        F Tainted x = Some (tvl, t, e) ->
                        ~ well_typed_lit_tainted D F R.2 empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
                        step D F (s, R) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el) (s, R) RBounds
-  | SCallUnchecked : forall (s : stack) (R : real_heap) (x : Z) (ta : type) (ts : list type)
-                       (el : list expression) (t : type) (tvl : list (var * type)) (e ea : expression)
-                       (ta' : type) (xl : list var),
-                     F Unchecked x = Some (tvl, t, e) ->
-                     eval_el s el tvl (get_xl tvl) e t ea ta' ->
-                     step D F (s, R) (ECall (ELit x (TPtr Unchecked (TFun xl ta ts))) el) (s, R) (RExpr ea)
-                     
-       *)
+
+ *)
+
+
+  (*
+
+   Inductive well_typed_lit_tainted (D : structdef) (F : FEnv) (H : heap) : scope -> Z -> type -> Prop :=
+NO    TyLitInt_T : forall (s : scope) (n : Z), well_typed_lit_tainted D F H s n TNat
+NO  | TyLitU_T : forall (s : scope) (n : Z) (w : type), well_typed_lit_tainted D F H s n (TPtr Unchecked w)
+  | TyLitZero_T : forall (s : scope) (t : type), well_typed_lit_tainted D F H s 0 t
+  | TyLitFun_T : forall (s : scope) (n : Z) (xl : list var) (t : type) (ts : list type) (tvl : list (var * type)) (e : expression) (ta : type),
+                 F Tainted n = Some (tvl, ta, e) ->
+                 subtype empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
+                 well_typed_lit_tainted D F H s n (TPtr Tainted (TFun xl t ts))
+  | TyLitRec_T : forall (s : ListSet.set (Z * type)) (n : Z) (w t : type),
+                 ListSet.set_In (n, t) s -> subtype empty_theta t (TPtr Tainted w) -> well_typed_lit_tainted D F H s n (TPtr Tainted w)
+  | TyLitC_T : forall (sc : scope) (n : Z) (w t : type) (b : Z) (ts : list type),
+               simple_type w ->
+               ~ is_fun_type w ->
+               subtype empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
+               Some (b, ts) = allocate_meta D w ->
+               nt_array_prop H n (TPtr Tainted t) ->
+               (forall k : Z,
+                (b <= k < b + Z.of_nat (length ts))%Z ->
+                exists (n' : Z) (t' : type),
+                  Some t' = nth_error ts (Z.to_nat (k - b)) /\
+                  Heap.MapsTo (n + k)%Z (n', t') H /\ well_typed_lit_tainted D F H (scope_set_add n (TPtr Tainted w) sc) n' t') ->
+               well_typed_lit_tainted D F H sc n (TPtr Tainted t)
+
+   *)
