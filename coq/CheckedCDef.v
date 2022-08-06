@@ -2781,11 +2781,29 @@ Inductive step
       (s, R) (ECast t (ELit n t'))
       (s, R) (RExpr (ELit n t''))
 
-| SCastNotArray : forall s R x y t n m t' t'',
-    ~ is_array_ptr (TPtr m t') -> eval_type_bound s t t'' ->
+| SCastNotArray : forall s R x y t l h w n m t',
+    eval_type_bound s (TPtr m (TArray x y t)) (TPtr m (TArray (Num l) (Num h) w)) ->
+    ~ is_array_ptr (TPtr m t') -> 
+    0 <= l -> l < h -> h <= 1 ->
     step D F
       (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t')))
-      (s, R) (RExpr (ELit n (TPtr m (TArray (Num n) (Num (n+1)) t''))))
+      (s, R) (RExpr (ELit n (TPtr m (TArray (Num l) (Num h) w))))
+
+| SCastNotArrayHighOOB1 : forall s R x y t l h w n m t',
+    eval_type_bound s (TPtr m (TArray x y t)) (TPtr m (TArray (Num l) (Num h) w)) ->
+    ~ is_array_ptr (TPtr m t') -> 
+    1 < h ->
+     step D F (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t'))) (s, R) RBounds
+| SCastNotArrayLowOOB1 : forall s R x y t l h w n m t',
+    eval_type_bound s (TPtr m (TArray x y t)) (TPtr m (TArray (Num l) (Num h) w)) ->
+    ~ is_array_ptr (TPtr m t') -> 
+    l < 0 ->
+    step D F (s, R) (EDynCast (TPtr m (TArray x y t)) (ELit n (TPtr m t'))) (s, R) RBounds
+| SCastNotArrayLowOOB2 : forall s R x y t l h w n m t',
+    eval_type_bound s (TPtr m (TArray x y t)) (TPtr m (TArray (Num l) (Num h) w)) ->
+    ~ is_array_ptr (TPtr m t') -> 
+    h <= l ->
+    step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 
 | SCastArray : forall m s R t n t' l h w l' h' w',
     eval_type_bound s t (TPtr m (TArray (Num l) (Num h) w)) ->
@@ -3665,12 +3683,12 @@ Section Typing.
       mode_leq m Checked ->
       well_typed env Q Checked (EDynCast (TPtr m (TArray x y t)) e) (TPtr m (TArray x y t))
   | TyDynCast2 : forall env Q m e x y t t',
-      ~ is_array_ptr (TPtr Checked t') ->
+      word_type t' ->
       type_eq Q t t' ->
       well_type_bound_in env (TPtr m (TArray x y t)) ->
-      well_typed env Q m e (TPtr Checked t') ->
+      well_typed env Q Checked e (TPtr m t') ->
       mode_leq m Checked ->
-      well_typed env Q Checked (EDynCast (TPtr m (TArray x y t)) e) (TPtr m (TArray (Num 0) (Num 1) t))
+      well_typed env Q Checked (EDynCast (TPtr m (TArray x y t)) e) (TPtr m (TArray x y t))
   | TyDynCast3 : forall env Q m e x y u v t t',
       well_type_bound_in env (TPtr m (TNTArray x y t)) ->
       type_eq Q t t' ->

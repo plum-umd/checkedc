@@ -4,50 +4,56 @@ The top-level auxiliary file: main.aux
 The style file: plainnat.bst
 Database file #1: IEEEabrv.bib
 Database file #2: paper.bib
+Repeated entry---line 1593 of file paper.bib
+ : @book{tan2017principles
+ :                        ,
+I'm skipping whatever remains of this entry
 Database file #3: sources.bib
 Repeated entry---line 66 of file sources.bib
  : @inproceedings{duanrefactoring
  :                               ,
 I'm skipping whatever remains of this entry
-You've used 28 entries,
+Warning--empty booktitle in bittau2008wedge
+Warning--can't use both volume and number fields in brumley2004privtrans
+You've used 34 entries,
             2773 wiz_defined-function locations,
-            1164 strings with 18456 characters,
-and the built_in function-call counts, 16102 in all, are:
-= -- 1403
-> -- 1202
-< -- 11
-+ -- 402
-- -- 374
-* -- 1418
-:= -- 2520
-add.period$ -- 123
-call.type$ -- 28
-change.case$ -- 208
-chr.to.int$ -- 28
-cite$ -- 56
-duplicate$ -- 660
-empty$ -- 1132
-format.name$ -- 406
-if$ -- 3361
+            1196 strings with 19721 characters,
+and the built_in function-call counts, 19702 in all, are:
+= -- 1714
+> -- 1443
+< -- 17
++ -- 483
+- -- 449
+* -- 1707
+:= -- 3044
+add.period$ -- 141
+call.type$ -- 34
+change.case$ -- 249
+chr.to.int$ -- 34
+cite$ -- 70
+duplicate$ -- 825
+empty$ -- 1413
+format.name$ -- 490
+if$ -- 4138
 int.to.chr$ -- 1
 int.to.str$ -- 1
-missing$ -- 26
-newline$ -- 181
-num.names$ -- 114
-pop$ -- 418
+missing$ -- 32
+newline$ -- 211
+num.names$ -- 138
+pop$ -- 515
 preamble$ -- 1
-purify$ -- 180
+purify$ -- 215
 quote$ -- 0
-skip$ -- 517
+skip$ -- 656
 stack$ -- 0
-substring$ -- 377
-swap$ -- 96
-text.length$ -- 6
+substring$ -- 510
+swap$ -- 135
+text.length$ -- 10
 text.prefix$ -- 0
 top$ -- 0
-type$ -- 303
-warning$ -- 0
-while$ -- 111
+type$ -- 369
+warning$ -- 2
+while$ -- 140
 width$ -- 0
-write$ -- 438
-(There was 1 error message)
+write$ -- 515
+(There were 2 error messages)

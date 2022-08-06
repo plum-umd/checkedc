@@ -157,10 +157,10 @@ Admitted.
 
 Lemma well_typed_eval_vs: forall D F Q R env S m es xl ts tvl t t' ta ta' e ea,
     (forall x n, Stack.MapsTo x (n,TNat) S -> Theta.MapsTo x (NumEq (Num n)) Q) ->
-    subtype D empty_theta t' t ->
-    Forall2 (subtype D empty_theta) ts ((split tvl).2) ->
+    subtype empty_theta t' t ->
+    Forall2 (subtype empty_theta) ts ((split tvl).2) ->
     @well_typed_args D F R Q env m es ts xl t ta -> eval_el S es tvl xl e t' ea ta'
-    -> eq_subtype D Q ta' ta.
+    -> eq_subtype Q ta' ta.
 Proof.
  intros.
   generalize dependent e.
@@ -208,14 +208,14 @@ Admitted.
 
 Lemma well_typed_args_sub : forall D F Q R R' env m es xl ts tlb t tb ta, 
        rheap_consistent D F R' R ->
-       subtype D empty_theta tb t ->
-       Forall2 (subtype D empty_theta) ts tlb ->
+       subtype empty_theta tb t ->
+       Forall2 (subtype empty_theta) ts tlb ->
        @well_typed_args D F R Q env m es ts xl t ta -> 
-       (exists ta', @well_typed_args D F R' Q env m es tlb xl tb ta' /\ subtype D Q ta' ta). 
+       (exists ta', @well_typed_args D F R' Q env m es tlb xl tb ta' /\ subtype Q ta' ta). 
 Proof.
 Admitted.
 
-Lemma well_typed_arg_consist: forall D Q F R env env' m e t, env_consistent D Q env env'
+Lemma well_typed_arg_consist: forall D Q F R env env' m e t, env_consistent Q env env'
       -> well_typed_arg D F R Q env m e t ->
          well_typed_arg D F R Q env' m e t.
 Proof.
@@ -231,13 +231,13 @@ Proof.
  destruct H4.
  apply X3 with (t' := x0) in H1; try easy.
  apply ArgVar with (t' := x0); try easy.
- assert (eq_subtype D Q x0 t').
+ assert (eq_subtype Q x0 t').
  unfold eq_subtype. exists x0. split. apply type_eq_refl. constructor. easy.
  apply eq_subtype_trans with (t2 := t'); try easy.
  apply X2 in H1; try easy. apply ArgVar with (t' := t'); try easy.
 Qed.
 
-Lemma well_typed_args_consist: forall D Q F R env env' m es ts xl t ta, env_consistent D Q env env'
+Lemma well_typed_args_consist: forall D Q F R env env' m es ts xl t ta, env_consistent Q env env'
       -> @well_typed_args D F R Q env m es ts xl t ta ->
         @well_typed_args D F R Q env' m es ts xl t ta.
 Proof.
@@ -347,6 +347,8 @@ Proof.
   eapply TyDynCast2; eauto.
   apply type_eq_q_eq with (Q := Q); try easy.
   eapply TyDynCast3; eauto.
+  apply type_eq_q_eq with (Q := Q); try easy.
+  eapply TyDynCast4; eauto.
   apply type_eq_q_eq with (Q := Q); try easy.
   eapply TyDeref; eauto.
   eapply TyIndex1; eauto.
@@ -555,6 +557,9 @@ Proof.
   eapply TyDynCast3; eauto.
   apply type_eq_q_eq with (Q' := (Theta.add x GeZero Q0)) in H1; try easy.
   apply type_eq_q_conv; try easy.
+  eapply TyDynCast4; eauto.
+  apply type_eq_q_eq with (Q' := (Theta.add x GeZero Q0)) in H1; try easy.
+  apply type_eq_q_conv; try easy.
   eapply TyDeref; eauto.
   eapply TyIndex1; eauto.
   eapply TyIndex2; eauto.
@@ -587,7 +592,7 @@ Proof.
 Admitted.
 
 Lemma well_typed_env_consist: forall D F R env env' Q m e t,
-   env_consistent D Q env env' ->
+   env_consistent Q env env' ->
    well_typed D F R env Q m e t -> well_typed D F R env' Q m e t.
 Proof.
   intros. generalize dependent env'.
@@ -607,7 +612,7 @@ Proof.
   apply X2 in H; try easy.
   apply TyVar with (t := t); try easy.
   eapply TyCall; try easy. apply H.
-  apply env_wf_consist with (D := D) (Q := Q) (env0 := env); try easy.
+  apply env_wf_consist with (Q := Q) (env0 := env); try easy.
   eauto. apply well_typed_args_consist with (env0 := env); try easy.
   unfold env_consistent in *.
   destruct H1 as [X1 [X2 X3]].
@@ -651,7 +656,7 @@ Admitted.
 
 
 Lemma well_typed_env_grow: forall D F R env env' Q m e t,
-   (forall x t t', Env.MapsTo x t env -> Env.MapsTo x t' env' -> eq_subtype D Q t' t) ->
+   (forall x t t', Env.MapsTo x t env -> Env.MapsTo x t' env' -> eq_subtype Q t' t) ->
    well_typed D F R env Q m e t -> well_typed D F R env' Q m e t.
 Proof.
   intros.
@@ -1236,7 +1241,7 @@ Proof.
 Admitted.
 
 
-Lemma env_consist_is_tainteds: forall D Q env env' vl, env_consistent D Q env env' 
+Lemma env_consist_is_tainteds: forall Q env env' vl, env_consistent Q env env' 
    -> Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl
    -> Forall (fun x => forall t, Env.MapsTo x t env' -> is_tainted t) vl.
 Proof.
@@ -1265,7 +1270,7 @@ Section Preservation.
       env_wt D Checked env ->
       theta_wt Q env s ->
       same_domain env s ->
-      stack_wf D Q env s ->
+      stack_wf Q env s ->
       stack_rheap_consistent D F R s ->
       fun_wf D F R ->
       well_typed D F R env Q cm e t ->
@@ -1274,13 +1279,13 @@ Section Preservation.
         (s', R') (RExpr e') ->
       exists env' t',
            same_domain env' s'
-        /\ stack_wf D Q env' s'
+        /\ stack_wf Q env' s'
         /\ theta_wt Q env' s'
         /\ rheap_consistent D F R' R
         /\ stack_rheap_consistent D F R' s'
-        /\ env_consistent D Q env env'
+        /\ env_consistent Q env env'
         /\ well_typed D F R' env' Q cm e' t'
-        /\ eq_subtype D Q t' t.
+        /\ eq_subtype Q t' t.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt HDom Hswf HsHwf Hwf Hwt.
@@ -1309,9 +1314,9 @@ Section Preservation.
         env Q m e x y u v t t' Wb HTy IH Teq HMode                 | (* DynCast - ptr array *)
         env Q m e x y t t' HNot Teq Wb HTy IH HMode                | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH HMode                 | (* DynCast - ptr nt-array *)
-
-
+        env Q m e x y u v t t' Wb Teq HTy IH HMode                 | (* DynCast - ptr nt-to-array *)
         env Q m e m' t l h t' t'' HTy IH HPtrType HMode            | (* Deref *)
+
         env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
         env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
 
@@ -1900,7 +1905,7 @@ Section Preservation.
      apply step_implies_reduces_1 with (cm:=Checked) (E := CHole) (m := Checked) in H11. simpl in *. apply H11. easy.
      destruct H0 as [ta [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H11 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D:=D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H0;subst. inv H0. split. easy. split. easy. easy.
           apply Stack.add_3 in H0. apply Hswt in H0. easy. lia.
@@ -2116,7 +2121,7 @@ Section Preservation.
          (E := CHole) (m := Checked) in H11. simpl in *. apply H11. easy.
      destruct H0 as [ta [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H11 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D:=D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H0;subst. inv H0. split. easy. split. easy. easy.
           apply Stack.add_3 in H0. apply Hswt in H0. easy. lia.
@@ -2351,7 +2356,7 @@ Section Preservation.
      apply step_implies_reduces_1 with (cm:=Checked) (E := CHole) (m := Checked) in H12. simpl in *. apply H12. easy.
      destruct H1 as [tx [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H12 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D:=D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H1;subst. inv H1. split. easy. split. easy. easy.
           apply Stack.add_3 in H1. apply Hswt in H1. easy. lia.
@@ -2574,7 +2579,7 @@ Section Preservation.
      simpl in *. apply H12. easy.
      destruct H1 as [tx [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H12 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D := D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H1;subst. inv H1. split. easy. split. easy. easy.
           apply Stack.add_3 in H1. apply Hswt in H1. easy. lia.
@@ -2801,7 +2806,7 @@ Section Preservation.
      apply step_implies_reduces_1 with (cm:=Checked) (E := CHole) (m := Checked) in H11. simpl in *. apply H11. easy.
      destruct H1 as [tx [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H11 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D := D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H1;subst. inv H1. split. easy. split. easy. easy.
           apply Stack.add_3 in H1. apply Hswt in H1. easy. lia.
@@ -3022,7 +3027,7 @@ Section Preservation.
      apply step_implies_reduces_1 with (cm := Checked) (E := CHole) (m := Checked) in H11. simpl in *. apply H11. easy.
      destruct H1 as [tx [Y1 [Y2 [Y3 [Y4 [Y5 [Y6 [Y7 Y8]]]]]]]].
      apply step_stack_consist in H11 as Y9. simpl in *.
-     apply stack_consist_wt with (m := Checked) in Y9 as Y10; try easy.
+     apply stack_consist_wt with (D := D) (m := Checked) in Y9 as Y10; try easy.
      2: { unfold stack_wt in *. intros. destruct (Nat.eq_dec x1 x);subst.
           apply Stack.mapsto_add1 in H1;subst. inv H1. split. easy. split. easy. easy.
           apply Stack.add_3 in H1. apply Hswt in H1. easy. lia.
@@ -3361,11 +3366,11 @@ Section Preservation.
       split. apply env_consist_refl.
       split. apply TyLitTainted.
       apply eval_type_bound_not_checked with (s := s') (t := t); try easy.
-      apply eq_subtype_not_checked_1 with (D := D) (Q := Q) (t' := t'); try easy.
+      apply eq_subtype_not_checked_1 with (Q := Q) (t' := t'); try easy.
       eapply eval_type_bound_simple; eauto.
       assert (type_eq Q t'' t).
-      apply well_type_eval_type_eq with (D := D) (s := s') (env := env); try easy.
-      apply (eq_subtype_well_type_bound D Q) with (t := t'); try easy.
+      apply well_type_eval_type_eq with (s := s') (env := env); try easy.
+      apply (eq_subtype_well_type_bound Q) with (t := t'); try easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       exists t. split. easy.
@@ -3402,16 +3407,16 @@ Section Preservation.
       split. 
       assert (is_checked t'').
       apply eval_type_bound_is_checked with (s := s') (t := t); try easy.
-      apply eq_subtype_is_checked_1 with (D := D) (Q := Q) (t' := t'); try easy.
+      apply eq_subtype_is_checked_1 with (Q := Q) (t' := t'); try easy.
       assert (simple_type t'').
       eapply eval_type_bound_simple; eauto.
       assert (type_eq Q t'' t).
-      apply well_type_eval_type_eq with (D := D) (s := s') (env := env); try easy.
-      apply (eq_subtype_well_type_bound D Q) with (t := t'); try easy.
+      apply well_type_eval_type_eq with (s := s') (env := env); try easy.
+      apply (eq_subtype_well_type_bound Q) with (t := t'); try easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       constructor; try easy.
-      assert (eq_subtype D Q t t''). exists t''. split; try easy.
+      assert (eq_subtype Q t t''). exists t''. split; try easy.
       apply type_eq_sym. easy.
       repeat constructor.
       apply eq_subtype_trans with (t1 := t') in H5; try easy.
@@ -3421,8 +3426,8 @@ Section Preservation.
       apply type_wf_uc_c with (m := Unchecked); try easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       assert (type_eq Q t'' t).
-      apply well_type_eval_type_eq with (D := D) (s := s') (env := env); try easy.
-      apply (eq_subtype_well_type_bound D Q) with (t := t'); try easy.
+      apply well_type_eval_type_eq with (s := s') (env := env); try easy.
+      apply (eq_subtype_well_type_bound Q) with (t := t'); try easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       exists t. split. easy. repeat constructor.
@@ -3436,11 +3441,11 @@ Section Preservation.
       split. apply env_consist_refl.
       split. apply TyLitTainted.
       apply eval_type_bound_not_checked with (s := s') (t := t); try easy.
-      apply eq_subtype_not_checked_1 with (D := D) (Q := Q) (t' := t'); try easy.
+      apply eq_subtype_not_checked_1 with (Q := Q) (t' := t'); try easy.
       eapply eval_type_bound_simple; eauto.
       assert (type_eq Q t'' t).
-      apply well_type_eval_type_eq with (D := D) (s := s') (env := env); try easy.
-      apply (eq_subtype_well_type_bound D Q) with (t := t'); try easy.
+      apply well_type_eval_type_eq with (s := s') (env := env); try easy.
+      apply (eq_subtype_well_type_bound Q) with (t := t'); try easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       destruct HQt as [X1 [X2 X3]]. easy.
       exists t. split. easy.
@@ -3499,10 +3504,10 @@ Section Preservation.
       split. apply env_consist_refl.
       split. 
       assert (type_eq Q t'' (TPtr m t)).
-      apply (well_type_eval_type_eq D Q env s'); try easy.
+      apply (well_type_eval_type_eq Q env s'); try easy.
       destruct HQt as [A1 [A2 A3]]. easy.
       apply type_eq_sym in H.
-      assert (eq_subtype D Q (TPtr m t) t'').
+      assert (eq_subtype Q (TPtr m t) t'').
       exists t''. split. easy. repeat constructor.
       apply eq_subtype_trans with (t1 := t') in H2; try easy.
       constructor; try easy.
@@ -3519,7 +3524,7 @@ Section Preservation.
       eapply eq_subtype_empty; eauto.
       destruct HQt. easy.
       assert (type_eq Q t'' (TPtr m t)).
-      apply (well_type_eval_type_eq D Q env s'); try easy.
+      apply (well_type_eval_type_eq Q env s'); try easy.
       destruct HQt as [A1 [A2 A3]]. easy.
       exists (TPtr m t). split. easy. repeat constructor.
       inv HEwf.
@@ -3531,10 +3536,10 @@ Section Preservation.
       split. easy.
       split. apply env_consist_refl.
       assert (type_eq Q t'' (TPtr m t)).
-      apply (well_type_eval_type_eq D Q env s'); try easy.
+      apply (well_type_eval_type_eq Q env s'); try easy.
       destruct HQt as [A1 [A2 A3]]. easy.
       apply type_eq_sym in H.
-      assert (eq_subtype D Q (TPtr m t) t'').
+      assert (eq_subtype Q (TPtr m t) t'').
       exists t''. split. easy. repeat constructor.
       apply eq_subtype_trans with (t1 := t') in H2; try easy.
       constructor; try easy.
@@ -3542,7 +3547,7 @@ Section Preservation.
       eapply eq_subtype_not_checked_1; eauto.
       eapply eval_type_bound_simple in H1; eauto.
       assert (type_eq Q t'' (TPtr m t)).
-      apply (well_type_eval_type_eq D Q env s'); try easy.
+      apply (well_type_eval_type_eq Q env s'); try easy.
       destruct HQt as [A1 [A2 A3]]. easy.
       exists (TPtr m t). split. easy. repeat constructor.
       inv HEwf. specialize (IH H7 Henvt s).
@@ -3572,7 +3577,7 @@ Section Preservation.
       unfold is_array_ptr in *. easy.
       unfold is_array_ptr in *. easy.
       inv HTy. inv H2. inv H10. inv H9. inv H1. inv H2.
-      apply (eval_type_bound_type_eq D Q env s' t w t' w' ) in H18 as A1; try easy; subst.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H18 as A1; try easy; subst.
       apply eval_type_bound_idempotent with (s := s') in H6 as A2.
       inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H16 as A3; try easy.
       subst. exists env, (TPtr Checked (TArray (Num l) (Num h) w')).
@@ -3635,7 +3640,7 @@ Section Preservation.
       assert (m = Tainted). destruct HMode. assert (Checked = Checked) by easy. apply H in H2. destruct m; try easy.
       assert (is_checked (TPtr Checked (TArray u v t'))). constructor. easy. subst. clear H6.
       inv H10. inv H9. inv H1. inv H2.
-      apply (eval_type_bound_type_eq D Q env s' t w t' w' ) in H17 as A1; try easy; subst.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H17 as A1; try easy; subst.
       apply eval_type_bound_idempotent with (s := s') in H8 as A2.
       inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H15 as A3; try easy.
       subst. exists env, (TPtr Tainted (TArray (Num l) (Num h) w')).
@@ -3680,13 +3685,16 @@ Section Preservation.
       apply in_app_iff. right. easy.
       apply simple_means_not_freeVars in H8. simpl in *. unfold well_type_bound_in. intros.
       apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
-      destruct HQt as [A1 [A2 A3]]; easy. inv H9. inv H1.
+      destruct HQt as [A1 [A2 A3]]; easy. 
+      inv H9. inv H1. inv HTy. inv H10. inv H1. inv H10. inv H1.
       inv HEwf. specialize (IH H7 Henvt s).
       edestruct IH; eauto.
       apply step_implies_reduces_1 
           with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
       apply H2.
       destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      apply eq_subtype_array_form in X8 as eq1.
+      destruct eq1 as [tb [A1 A2]].
       exists x0, (TPtr m (TArray x y t)).
       split; try easy.
       split; try easy.
@@ -3694,42 +3702,386 @@ Section Preservation.
       split; try easy.
       split; try easy.
       split; try easy.
-      split. apply TyDynCast1 with (u := u) (v := v) (t' := t'); try easy.
+      split.
+      destruct A2. destruct H0 as [A [A2 [A3 A4]]]; subst.
+      apply TyDynCast2 with (t' := tb); try easy.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
       eapply env_consist_well_bound; eauto.
-      apply well_typed_heap_consist with (R := R); try easy.
-      eapply well_typed_env_consist; eauto.
-      destruct X6 as [A1 [A2 A3]]. 
-      unfold well_type_bound_in in *. intros.
-      apply Wb in H0. apply A2 in H0. easy.
-      intros R1. unfold is_nt_ptr in *. easy.
-      exists t. split. apply type_eq_refl. repeat constructor.
+      destruct H0. destruct H0 as [ua [va [A2 [A3 A4]]]];subst.
+      apply TyDynCast1 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      destruct H0 as [ua [va [A2 [A3 A4]]]];subst.
+      apply TyDynCast4 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      exists (TPtr m (TArray x y t)). split. apply type_eq_refl. repeat constructor.
+    (* T-DynCast-NotArray *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst. 
+      inv H2. inv HTy. inv H6. inv H8. inv H1.
+      apply (eval_type_bound_type_eq Q env s' t w t' t' ) in H12 as A1; try easy; subst.
+      subst. exists env, (TPtr Checked (TArray (Num l) (Num h) t')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. constructor; try easy. constructor.
+      apply checked_subtype_well_type with (t := (TPtr Checked t')); eauto.
+      inv HEwf. inv H4; try easy. inv H3. constructor. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      exists (TPtr Checked t'). split. apply type_eq_refl.
+      constructor. apply SubTyBot; try easy.
+      constructor; try lia. constructor;try lia.
+      exists (TPtr Checked (TArray x y t)). split.
+      eapply well_type_eval_type_eq; eauto.
+      constructor. constructor; try easy.
+      destruct HQt as [X1 [X2 X3]];easy.
+      repeat constructor.
+      apply eval_type_bound_idempotent with (s := s') in H7. inv H7. easy.
+      unfold well_type_bound_in in *. intros. apply Wb. simpl.
+      apply in_app_iff. right. apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H7. simpl in *. 
+      unfold well_type_bound_in in *. intros. rewrite H7 in H. simpl in *. easy.
+      destruct HQt as [X1 [X2 X3]];easy.
+      assert (m = Tainted). destruct HMode. apply H in H5. destruct m; try easy.
+      assert (is_checked (TPtr Checked t')). constructor. easy. subst.
+      inv H8. inv H1.
+      apply (eval_type_bound_type_eq Q env s' t w t' t' ) in H12 as A1; try easy; subst.
+      subst. exists env, (TPtr Tainted (TArray (Num l) (Num h) t')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. apply TyLitTainted; try easy. 
+      exists (TPtr Tainted (TArray x y t)). split.
+      eapply well_type_eval_type_eq; eauto.
+      constructor. constructor; try easy.
+      destruct HQt as [X1 [X2 X3]];easy.
+      repeat constructor.
+      apply eval_type_bound_idempotent with (s := s') in H9. inv H9. easy.
+      unfold well_type_bound_in in *. intros. apply Wb. simpl.
+      apply in_app_iff. right. apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H9. simpl in *. 
+      unfold well_type_bound_in in *. intros. rewrite H9 in H. simpl in *. easy.
+      destruct HQt as [X1 [X2 X3]];easy.
+      inv HTy. inv H10. inv H1. easy.
+      inv H10. inv H1. easy. inv HTy. inv H10. inv H1. easy.
+      inv H10. inv H1. easy. inv HTy. inv H10. inv H1. easy.
+      inv H10. inv H1. easy.
+      inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      apply eq_subtype_ptr_form in X8 as eq1;try easy.
+      destruct eq1 as [tb [A1 A2]].
+      exists x0, (TPtr m (TArray x y t)).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split.
+      destruct A2. subst. 
+      apply TyDynCast2 with (t' := tb); try easy.
+      eapply type_eq_word; eauto. apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      eapply env_consist_well_bound; eauto.
+      destruct H0. destruct H0 as [ua [va [A2 [A3 A4]]]];subst.
+      apply TyDynCast1 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      destruct H0 as [ua [va [A2 [A3 A4]]]];subst.
+      apply TyDynCast4 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      exists (TPtr m (TArray x y t)). split. apply type_eq_refl. repeat constructor.
+    (* T-DynCast-NTArray *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst. 
+      inv H2. inv H9. inv H1. inv HTy. 
+      inv H2. inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H18 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H6 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H16 as A3; try easy.
+      subst. exists env, (TPtr Checked (TNTArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. constructor; try easy. constructor.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      apply checked_subtype_well_type with (t := (TPtr Checked (TNTArray u v w'))); eauto.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      inv HEwf. inv H4. constructor. inv H3. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      constructor. inv H23. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      exists (TPtr Checked (TNTArray u v w')). split. apply type_eq_refl.
+      constructor.
+      apply simple_type_nt_num in H6 as eq1.
+      destruct eq1 as [B1 B2]. destruct B1; subst. destruct B2; subst.
+      unfold eval_bound in H9,H15. inv H9. inv H15.
+      apply SubTyNtSubsume; try easy. constructor; easy. constructor; easy.
+      exists (TPtr Checked (TNTArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTyNtSubsume; try easy.
+      destruct x. unfold eval_bound in H8. inv H8. constructor;lia.
+      unfold eval_bound in H8. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H8.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H17. inv H17. constructor;lia.
+      unfold eval_bound in H17. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H17.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H6. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy.
+      assert (m = Tainted). destruct HMode. assert (Checked = Checked) by easy. apply H in H2. destruct m; try easy.
+      assert (is_checked (TPtr Checked (TNTArray u v t'))). constructor. easy. subst. clear H6.
+      inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H17 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H8 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H15 as A3; try easy.
+      subst. exists env, (TPtr Tainted (TNTArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. apply TyLitTainted; try easy.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H1. destruct H1. easy.
+      exists (TPtr Tainted (TNTArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTyNtSubsume; try easy.
+      destruct x. unfold eval_bound in H6. inv H6. constructor;lia.
+      unfold eval_bound in H6. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H6.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H16. inv H16. constructor;lia.
+      unfold eval_bound in H16. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H16.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H8. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy.
+      inv H9. inv H1. 
+      inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      apply eq_subtype_nt_form in X8 as eq1.
+      destruct eq1 as [tb [ua [va [A1 [A2 [A3 A4]]]]]]; subst.
+      exists x0, (TPtr m (TNTArray x y t)).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split.
+      apply TyDynCast3 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      exists (TPtr m (TNTArray x y t)). split. apply type_eq_refl. repeat constructor.
+    (* T-DynCast-NTArray-Array *)
+    - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst. 
+      inv H2. inv HTy. 
+      unfold is_array_ptr in *. easy.
+      unfold is_array_ptr in *. easy.
+      inv HTy. inv H10. inv H1. inv H10. inv H1.
+      inv HTy. inv H2. inv H10. inv H9. inv H1. inv H2.
+      inv H10. inv H9. inv H1. inv H2.
+      inv HTy. inv H2. inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H18 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H6 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H16 as A3; try easy.
+      subst. exists env, (TPtr Checked (TArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. constructor; try easy. constructor.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      apply checked_subtype_well_type with (t := (TPtr Checked (TNTArray u v w'))); eauto.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H1. destruct H1. easy.
+      inv HEwf. inv H4. constructor. inv H3. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      constructor. inv H23. constructor.
+      eapply eval_type_bound_word_type with (t := t); eauto.
+      eapply eval_type_bound_type_wf with (t := t); eauto.
+      exists (TPtr Checked (TNTArray u v w')). split. apply type_eq_refl.
+      constructor.
+      apply simple_type_nt_num in H6 as eq1.
+      destruct eq1 as [B1 B2]. destruct B1; subst. destruct B2; subst.
+      unfold eval_bound in H9,H15. inv H9. inv H15.
+      apply SubTyNtArray; try easy. constructor; easy. constructor; easy.
+      exists (TPtr Checked (TArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTySubsume; try easy.
+      destruct x. unfold eval_bound in H8. inv H8. constructor;lia.
+      unfold eval_bound in H8. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H8.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H17. inv H17. constructor;lia.
+      unfold eval_bound in H17. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H17.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H6. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H6. destruct H6. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy.
+      assert (m = Tainted). destruct HMode. assert (Checked = Checked) by easy. apply H in H2. destruct m; try easy.
+      assert (is_checked (TPtr Checked (TNTArray u v t'))). constructor. easy. subst. clear H6.
+      inv H10. inv H9. inv H1. inv H2.
+      apply (eval_type_bound_type_eq Q env s' t w t' w' ) in H17 as A1; try easy; subst.
+      apply eval_type_bound_idempotent with (s := s') in H8 as A2.
+      inv A2. inv H1. apply eval_type_bound_preserve with (t' := t') in H15 as A3; try easy.
+      subst. exists env, (TPtr Tainted (TArray (Num l) (Num h) w')).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy. split. apply env_consist_refl.
+      split. apply TyLitTainted; try easy.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H1. destruct H1. easy.
+      exists (TPtr Tainted (TArray (Num l) (Num h) t)). split.
+      constructor. constructor; try easy. apply type_eq_sym; try easy.
+      split. constructor; lia. constructor;lia.
+      split. constructor; lia. constructor;lia.
+      constructor.
+      apply SubTySubsume; try easy.
+      destruct x. unfold eval_bound in H6. inv H6. constructor;lia.
+      unfold eval_bound in H6. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H6.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (v0 = v0 \/ In v0 (freeBoundVars y ++ freeTypeVars t)). left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_2; eauto. constructor; lia. easy.
+      destruct y. unfold eval_bound in H16. inv H16. constructor;lia.
+      unfold eval_bound in H16. destruct (Stack.find (elt:=Z * type) v0 s') eqn:eq1.
+      destruct p. apply Stack.find_2 in eq1. inv H16.
+      destruct HQt as [A1 [A2 A3]].
+      unfold well_type_bound_in in Wb. simpl in *.
+      assert (In v0 (freeBoundVars x ++ v0 :: freeTypeVars t)).
+      apply in_app_iff. right. simpl. left. easy.
+      apply Wb in H. apply Hswf in H.
+      destruct H as [va [ta [B1 B2]]]. apply eq_subtype_nat_1 in B1; subst.
+      apply Stack.mapsto_always_same with (v1 := (z0, t0)) in B2; try easy. inv B2.
+      apply A3 in eq1. eapply nat_leq_var_1; eauto. constructor; lia. easy.
+      unfold well_type_bound_in in *.
+      intros. apply Wb. simpl.
+      apply in_app_iff. right.
+      apply in_app_iff. right. easy.
+      apply simple_means_not_freeVars in H8. simpl in *. unfold well_type_bound_in. intros.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. rewrite H3 in H. simpl in *. easy.
+      destruct HQt as [A1 [A2 A3]]; easy.
+      inv HEwf. specialize (IH H7 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 
+          with (cm := Checked) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      apply eq_subtype_nt_form in X8 as eq1.
+      destruct eq1 as [tb [ua [va [A1 [A2 [A3 A4]]]]]]; subst.
+      exists x0, (TPtr m (TArray x y t)).
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split.
+      apply TyDynCast4 with (t' := tb) (u := ua) (v := va); try easy.
+      eapply env_consist_well_bound; eauto.
+      apply type_eq_sym in A1. eapply type_eq_trans; eauto.
+      exists (TPtr m (TArray x y t)). split. apply type_eq_refl. repeat constructor.
+    (* T-Deref *)
+    - inv Hreduces.
   Abort.
 
 
 (*
-    (* T-Malloc *)
-    - inv Hreduces.
-      destruct E; inversion H2; simpl in *; subst.
-      clear H0. clear H8.
-      inv H5.
-      split; eapply alloc_correct; eauto.
-    (* T-Unchecked *)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst.
-      + clear H0. clear H7. inv H4. inv HTy...
-      + inversion H7; inversion H0.
-    (* T-Cast *)
-    - inv Hreduces.
-      destruct E; inversion H1; simpl in *; subst.
-      + clear H0. clear H7. inv H4. inv HTy.
-        inv HHwf.
-        inv H1.
-        * idtac...
-        * destruct m.
-          { specialize (HChkPtr eq_refl w). exfalso. apply HChkPtr. reflexivity. }
-          { idtac... }
-      + clear H1. rename e0 into e1_redex. rename e'0 into e1_redex'. edestruct IH; idtac...
-        inv HHwf; eauto.
+
     (* T-Deref *) 
     - destruct m'; try (specialize (HMode eq_refl); inversion HMode).
       clear HMode.

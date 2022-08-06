@@ -2,10 +2,12 @@
 \label{sec:related}
 
 Our work is most closely related to prior formalizations of C(-like)
-languages that aim to enforce memory safety, but it also touches on
+languages and program partitioning mechnism 
+that aim to enforce memory safety, but it also touches on
 C-language formalization in general.
 %, and work that uses random
 %testing to connect a formal development to a reference implementation.
+
 
 \myparagraph{Formalizing C and Low-level code}
 %
@@ -68,18 +70,32 @@ separation that led us to notice the
 limitation with Checked C's handling of bounds widening.
 
 The most closely related work is the
-formalization of \checkedc done by \citet{ruef18checkedc-incr}. They
+formalization of \checkedc done by \citet{ruef18checkedc-incr} and \citet{li22checkedc}. They
 present the type system and semantics of a core model of \checkedc,
-mechanized in Coq, and were the first to prove a blame theorem.  \lang's
-Coq-based development (Section~\ref{sec:formal}) substantially extends
-theirs to include conditionals, dynamically bounded array
-pointers with dependent types, null-terminated array pointers, 
-dependently typed functions, and subtyping. They postulate that pointer metadata can
-be erased in a real implementation, but do not show it. Our \CoreChkC
-compiler, formalized and
-validated in PLT Redex via randomized testing, demonstrates that such
-metadata \emph{can} be erased; we found that erasure was non-obvious once
-null-terminated pointers and bounds widening were considered.
+mechanized in Coq, and prove a blame theorem. 
+The difference between these works and \systemname is listed in \Cref{sec:intros} and \Cref{sec:overview}.
+
+\myparagraph{Program Partitioning Mechanism}
+%
+This mechanism is called program partitioning~\cite{rul2009towards}, and there has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area. Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning. E.g., Given sensitive data in a program, the goal is to partition functions into two parts or partitions based on whether a function can access the sensitive data.
+The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
+The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
+But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
+
+In this work, we propose a type-directed code-centric program partitioning approach.
+Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
+The tainted types long with Checked C allow annotating pointer along two dimensions, i.e., (i) taintedness: a pointer can be either tainted or not (untainted), and (ii) checkedness: it can be either checked or not.
+The checked types follow the standard Checked C typing rules. However, our type-system disallows all interactions between taint and untainted types.
+The developer starts by marking desired (unchecked or risky) functions and pointers used in these functions as tainted.
+Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
+\begin{itemize}
+\item~\ucregion (low privilege tainted region): This partition contains tainted types (i.e., functions and pointers) and can only access tainted pointers.
+\item~\cregion (high privilege untainted region): This partition contains the remaining (untainted) code and data and has complete access to~\cregion{}.
+The functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
+\end{itemize}
+Finally, during program execution, the~\ucregion partition will be executed in an existing sandboxed environment (e.g., WASM sandbox), and our compiler will add the necessary instrumentation to facilitate the communication between code in~\cregion{} and~\ucregion{}.
+
+
 
 % \item Lee \textsf{et al.} \cite{Lee:2017:TUB:3140587.3062343} proposed
 %   a math model for defining some undefinedness in LLVM. Mainly,  they

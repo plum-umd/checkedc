@@ -1510,5 +1510,75 @@ Proof.
   apply X2 in H2. easy. easy.
 Qed.
 
+Lemma eq_subtype_array_form: forall Q t m l h t',
+     eq_subtype Q t (TPtr m (TArray l h t')) -> 
+      (exists ta, type_eq Q ta t' /\
+             ((t = (TPtr m ta) /\ word_type ta /\ nat_leq Q (Num 0) l /\ nat_leq Q h (Num 1))
+              \/  (exists u v, (t = TPtr m (TArray u v ta) /\ nat_leq Q u l /\ nat_leq Q h v))
+              \/  (exists u v, (t = TPtr m (TNTArray u v ta) /\ nat_leq Q u l /\ nat_leq Q h v)))).
+Proof.
+  intros. destruct H as [ta [X1 X2]].
+  inv X2. inv H; try easy. inv X1. inv H1.
+  exists t0. split. easy.
+  right. left. exists b1,b2.
+  split. easy. split. destruct H5 as [X1 X2]. easy.
+  destruct H6 as [X1 X2]; easy.
+  inv X1. exists t1. split. easy.
+  left. split. easy. split.
+  eapply type_eq_word; eauto.
+  split. easy. easy.
+  inv X1. inv H1. exists t0.
+  split. easy. 
+  right. left. exists b1,b2. split. easy.
+  split. inv H7. eapply nat_leq_trans with (b := l0); try easy.
+  inv H8. eapply nat_leq_trans;eauto.
+  inv X1. inv H1.
+  exists t0. split. easy.
+  right. right. exists b1,b2. split. easy.
+  split. inv H7. eapply nat_leq_trans;eauto.
+  inv H8. eapply nat_leq_trans;eauto.
+Qed.
+
+Lemma eq_subtype_ptr_form: forall Q t m t',
+     word_type t' ->
+     eq_subtype Q t (TPtr m t') -> 
+      (exists ta, type_eq Q ta t' /\
+              ( t = (TPtr m ta)
+              \/ (exists u v, (t = TPtr m (TArray u v ta) /\ nat_leq Q u (Num 0) /\ nat_leq Q (Num 1) v))
+              \/  (exists u v, (t = TPtr m (TNTArray u v ta) /\ nat_leq Q u (Num 0) /\ nat_leq Q (Num 1) v)))).
+Proof.
+  intros. destruct H0 as [ta [X1 X2]].
+  inv X2. inv H0; simpl in *; try easy. inv X1.
+  exists t1. split. easy. left. easy.
+  inv X1. inv H2. exists t0. split. easy.
+  right. left. exists b1,b2.
+  split. easy. split. apply nat_leq_trans with (b := l). inv H9. easy. easy.
+  inv H10. eapply nat_leq_trans;eauto.
+  inv X1. inv H2. exists t0.
+  split. easy.
+  right. right. exists b1,b2.
+  split. easy.
+  inv H9. inv H10.
+  split; eapply nat_leq_trans;eauto. inv H. inv H.
+Qed.
+
+Lemma eq_subtype_nt_form: forall Q t m l h t',
+     eq_subtype Q t (TPtr m (TNTArray l h t')) -> 
+      (exists ta u v, type_eq Q ta t' /\
+             t = TPtr m (TNTArray u v ta) /\ nat_leq Q u l /\ nat_leq Q h v).
+Proof.
+  intros. destruct H as [ta [X1 X2]].
+  inv X2. inv H; try easy. inv X1. inv H1.
+  exists t0,b1,b2. split. easy.
+  split. easy. inv H5. inv H6.
+  split. eapply nat_leq_trans;eauto.
+  eapply nat_leq_trans;eauto. easy.
+  inv X1. inv H1.
+  exists t0,b1,b2. split. easy.
+  split. easy. inv H7. inv H8.
+  split. eapply nat_leq_trans;eauto.
+  eapply nat_leq_trans;eauto.
+Qed.
+
 
 Local Close Scope Z_scope.
