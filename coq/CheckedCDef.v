@@ -2276,8 +2276,9 @@ Definition get_fun_type (m:mode) (tvl: list (var*type)) (t:type) :=
 
 Lemma get_fun_type_fun: forall tvl t m,  get_fun_type m tvl t = TPtr m (TFun (get_xl tvl) t (snd (List.split tvl))).
 Proof.
-  unfold get_fun_type in *.
-  induction tvl;intros; simpl in *; try easy.
+  reflexivity.
+  (* unfold get_fun_type in *. *)
+  (* induction tvl;intros; simpl in *; try easy. *)
 Qed.
 
 Section EvalArg.

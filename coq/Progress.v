@@ -6,9 +6,24 @@ From CHKC Require Import
   CheckedCDef
   CheckedCProp.
 
+Lemma subtype_xl_refl : forall D xl t ts xl' t' ts',
+    subtype D empty_theta
+      (TPtr Checked (TFun xl t ts))
+      (TPtr Checked (TFun xl' t' ts')) ->
+    xl = xl' /\ Forall2 (subtype D empty_theta) ts' ts .
+Proof.
+  intros * Sub.
+  split.
+  - inv Sub; try reflexivity. inv H. reflexivity.
+  - inv Sub; auto.
+    inv H. induction ts'; constructor.
+    repeat constructor. assumption.
+Qed.
 
 Section Progress.
   Create HintDb Progress.
+
+  Hint Constructors eval_arg : Progress.
 
   Hint Rewrite compose_correct : Progress.  
   
@@ -28,13 +43,23 @@ Section Progress.
     (try kill_checked);
     autorewrite with Progress; eauto 10 with sem Progress.
   
-  Lemma step_implies_reduces : forall M e M' r,
-      step D F M e M' r -> 
-      reduces D F M e Checked.
-  Proof  with eauto with sem.
-    intros M e M' r. rewrite <- (hole_is_id e). destruct r...
+  Lemma step_implies_reduces : forall M e M' r cm m E,
+      step D F M e M' r ->
+      m = mode_of' E cm ->
+      reduces D F cm M (in_hole e E) m.
+  Proof with eauto with sem.
+    intros M e M' r cm m E Hstep Hmode; destruct r...
   Qed.
+
   Hint Resolve step_implies_reduces : Progress.
+  
+  Lemma step_implies_reduces' : forall M e M' r,
+      step D F M e M' r -> 
+      reduces D F Checked M e Checked.
+  Proof with eauto with sem.
+    intros M e M' r Hstep. rewrite <- (hole_is_id e). destruct r...
+  Qed.
+  Hint Resolve step_implies_reduces' : Progress.
 
 
   Lemma compose_mode_agree_inner : forall Eout Ein m,
@@ -58,59 +83,91 @@ Section Progress.
 
   Lemma reduces_in_reduces : forall M e e',
       (exists E, mode_of E = Checked  /\ e' = in_hole e E) ->
-      reduces D F M e Checked ->
-      reduces D F M e' Checked.
+      reduces D F Checked M e Checked ->
+      reduces D F Checked M e' Checked.
   Proof with dauto.
     intros M e e' (E & HChk & Hole) (M' & r & Red).
     exists M'. inv Red... 
   Qed.
 
-  Lemma mk_eval_el : forall env s R  es ts xl t ta,
-      is_checked (TPtr Checked (TFun xl t ts)) ->
+  Lemma get_xl_not_TNat : forall t v tvl,
+      t <> TNat ->
+      get_xl ((v, t) :: tvl) = get_xl tvl.
+  Proof with auto.
+    intros. destruct t; try congruence...
+  Qed.
+
+  Hint Rewrite get_xl_not_TNat : Progress.
+
+  Lemma mk_eval_el : forall env s R es ts xl t ta,
+      (forall e,
+          In e es -> (exists (n : Z) (t : type), e = ELit n t) \/
+                       (exists y : var, e = EVar y)) ->
+      stack_wf D Q env s ->
       @well_typed_args D F R Q env Checked es ts xl t ta -> 
       forall ftvl fe ft,
-        subtype D empty_theta
-          (TPtr Checked (TFun (get_xl ftvl) ft (split ftvl).2))
-          (TPtr Checked (TFun xl t ts)) -> 
-        exists re rt, eval_el s es ftvl (get_xl ftvl) fe ft re rt.
+        get_xl ftvl = xl /\ Forall2 (subtype D empty_theta) ts (split ftvl).2 ->
+        exists re rt, eval_el s es ftvl xl fe ft re rt.
   Proof with dauto.
     Hint Constructors eval_el : Progress.
-    intros env s R es. induction es; intros * Hchk Hwt * Hsub.
-    - inv Hwt. inv Hsub; rewrite (split_zero ftvl)...
-      inv H... inv H8...
-    - inv Hwt.
-      + inv Hsub. inv H.
-        * destruct ftvl; cbn in H6. 1: cbn in H6; congruence.
-          destruct p. destruct (split ftvl). inv H6. inv H4.
-          -- do 2 econstructor; auto.
-             econstructor... apply eval_lit.
-             assert (get_xl ((v, t0) :: ftvl) = get_xl ftvl).
-             { destruct t0; try congruence; auto. }
-             rewrite -> H3 in *.
-             specialize (IHes vl (get_xl ftvl) t ta).
-             mopo IHes. 1: constructor.
-             specialize (IHes H9 term+)
-
-                
-
-        cbn in H6
-
-
-    intros * Hchk Hwta. inv Hchk.
-    induction Hwta; intros.
-    - exists (ECast ft fe), ft. inv H; try congruence.
-      + inv H0. rewrite (split_zero ftvl)...
-      + inv H10. symmetry in H. apply (split_zero) in H...
-        rewrite H4. rewrite H...
-      + inv H10. rewrite H4. rewrite (split_zero ftvl)...
-    - induction ftvl. { inv H1. inv H2. inv H12. inv H12. }
-      destruct IHHwta as (re & rt & IH). 
-      
-        
+    intros env s R es. induction es; intros * Hev Hswf Hwt * (Hxl & Hts).
+    - inv Hwt. rewrite (split_zero ftvl); inv Hts...
+    - inv Hwt; destruct ftvl; try (inv Hts); try solve [cbn in *; congruence].
+      (* args_many_1 *)
+      + specialize (IHes vl (get_xl ftvl) t ta).
+        destruct p eqn:Ep. (* inv H.   *)destruct (split ftvl) eqn:Eftvl. inv H2.
+        mopo IHes by intuition.
+        assert (HnTNat1 : t1 <> TNat).
+        { inv H3; try easy. inv H; easy. }
+        specialize (IHes Hswf).
+        mopo IHes.
+        { cbn. assert (Exl : get_xl ((v, t1) :: ftvl) = get_xl ftvl).
+          destruct t1; try congruence; reflexivity.
+          rewrite Exl in H9. done. 
+        }
+        specialize (IHes ftvl fe ft).
+        mopo IHes.
+        { constructor... rewrite Eftvl... }
+        destruct IHes as (re & rt & IHes).
+        destruct (Hev a) as [(n' & t' & Eev) | (y & Eev)];
+          [intuition | rewrite Eev | rewrite Eev].
+        -- exists (ELet v (ELit n' t1) re), rt. constructor...
+        -- rewrite -> Eev in *. inv H4.
+           apply Hswf in H0. destruct H0 as (v'' & t'' & Hsub & Hmap).
+           repeat econstructor...
+      (* args_many_2 *)
+      + destruct p. inv H6. destruct (split ftvl). (* inv H. *)
+        apply subtype_nat_1 in H3. rewrite -> H3 in *. inv H2.
+        specialize (IHes vl (get_xl ftvl) t ta).
+        (* specialize (IHes *)
+        (*               (map (fun a : type => subst_type a v b) vl) *)
+        (*               (get_xl ftvl) *)
+        (*               (subst_type t v b) ta). *)
+        mopo IHes. { intros. apply Hev. intuition. }.
+        specialize (IHes Hswf).
+        mopo IHes. {admit.}
+        specialize (IHes ftvl fe t).
+        mopo IHes.
+        { split. reflexivity. admit.
+        }
+        destruct IHes as (re & rt & IHes).
+        inv H0.
+        destruct (Hev a) as [(n' & t' & Ha) | (y' & Ha)]; 
+          [intuition | rewrite -> Ha in * | rewrite -> Ha in * ]...
+        * eexists. exists rt.
+          eapply eval_el_many_2...
+          admit.
+        * inv H4. apply Hswf in H0. destruct H0 as (v'' & t'' & Hsub & Hmap).
+          eexists. exists rt. apply eval_el_many_2...
+          admit.
   Admitted.
+  
+  Definition unchecked (cm : mode) (e : expression) : Prop :=
+    cm = Unchecked /\ exists e' E, e = in_hole e' E /\ mode_of' E cm = Unchecked.
+  Hint Unfold unchecked : Progress. 
 
-
-  Lemma progress : forall R s env e t,
+  Lemma progress : forall R s env e t cm,
+      cm <> Tainted ->
       rheap_wf R ->
       fun_wf D F R ->
       expr_wf D Checked e ->
@@ -121,9 +178,10 @@ Section Progress.
       stack_rheap_consistent D F R s ->
       well_typed D F R env Q Checked e t ->
       value D e \/
-        reduces D F (s, R) e Checked.
+        reduces D F cm (s, R) e Checked \/
+        unchecked cm e.
   Proof with dauto.
-    intros R s env e t Hhwf Hfwf Hewf Hswt Henvwt Hthwf Hswf Hscon Hwt.
+    intros R s env e t cm Hcm Hhwf Hfwf Hewf Hswt Henvwt Hthwf Hswf Hscon Hwt.
     remember Checked as m. 
     induction Hwt as
       [ env Q n t HChkd HSplTy HTyLit | (* TyLitChecked *)
@@ -158,18 +216,27 @@ Section Progress.
         ? |
         ? 
       ].
+
+    Ltac solve_unchecked :=
+      right; split; do 2 econstructor; split; [symmetry; apply hole_is_id | done].
+    
     (* TyLit *)
     1-2: left; inv Hewf...
     (* TyVar *)
     - right. specialize (Hswf x t); intuition.
       destruct H as (v & t'' & Heq & Hsmap).
-      pose proof (SVar D F s R x v t'' Hsmap); rewrite Heqm...
+      pose proof (SVar D F s R x v t'' Hsmap); rewrite Heqm.
+      destruct cm; try congruence... solve_unchecked.
     (* TyCall *)
-    - inv Hewf. intuition.
+    - destruct cm; try congruence...
+      2: { right; solve_unchecked. }
+      inv Hewf. intuition.
+      (* [x] is unchecked; impossible *)
+      3: { inv H0. congruence. }
       (* [x] reduces *)
-      2: {  right. eapply reduces_in_reduces... exists (CCall CHole es)... }
+      2: {  right; left; eapply reduces_in_reduces... exists (CCall CHole es)... }
       (* [x] is a value, expand Call to Let expressions *)
-      right.
+      right; left.
       (* refine the mode *)
       assert (m' <> Unchecked) as Hmode'. { inv Hmode; intuition. }
       inv H. destruct (F m' n) eqn:Ef.
@@ -183,32 +250,27 @@ Section Progress.
       ++ inv H10.
          ** destruct m'; try congruence...
          ** rewrite (HNull m') in Ef; congruence.
+         (* TyLitFun_C *)
          ** rewrite H11 in Ef. inv Ef. unfold get_fun_type in *.
-            assert (exists ea ta, eval_el s es ftvl xl fe ft ea ta).
-            {
-              Hint Constructors eval_el : Progress.
-              induction Hargs; inv Hmode; destruct m; try congruence...
-              + exists (ECast ft fe), ft. inv H14.
-                ++ inv H7. inv H9. apply split_zero in H14; rewrite H14...
-                ++ inv H19. symmetry in H7.
-                   apply split_zero in H7; rewrite H7...
-              + intuition. mopo H12 by (constructor; easy). clear Hcut.
-                clear H10.
-                repeat econstructor.
-                pose proof (eval_el_many_1 s e es ).
-              +
-                   
-            }
-            pose proof (SCallChecked D F s R n ).
-         ** admit.
-         ** admit.
-        (* TyLitTainted *)
+            pose proof (subtype_xl_refl _ _ _ _ _ _ _ H14) as (Exl & ESub).
+            rewrite -> Exl in *.
+            pose proof (mk_eval_el env s R es ts xl t ta H3 Hswf Hargs
+                          ftvl fe ft) as H.
+            destruct H as (re & rt & H). intuition.
+            eapply step_implies_reduces'.
+            eapply SCallChecked. eassumption. rewrite Exl; eassumption.
+         (* TyLitRec_C : Impossible in empty theta *)
+         ** inv H11. 
+         (* TyLitC_C : Impossible for fun ptrs *)
+         ** apply subtype_fun in H11. destruct H11 as (? & ? & ? & H). inv H.
+            destruct H8...
+      (* TyLitTainted *)
       ++ admit.
     - 
 
 
 
-        (*
+      (*
   | SCallChecked : forall (s : stack) (R : real_heap) (x : Z) (ta : type) (ts : list type) 
                      (el : list expression) (t : type) (tvl : list (var * type)) (e ea : expression) 
                      (ta' : type) (xl : list var),
@@ -240,4 +302,4 @@ Section Progress.
                      eval_el s el tvl (get_xl tvl) e t ea ta' ->
                      step D F (s, R) (ECall (ELit x (TPtr Unchecked (TFun xl ta ts))) el) (s, R) (RExpr ea)
                      
-         *)
+       *)
