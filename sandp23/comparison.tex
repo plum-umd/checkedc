@@ -2,8 +2,8 @@
 \label{sec:related}
 
 Our work is most closely related to prior formalizations of C(-like)
-languages and program partitioning mechnism 
-that aim to enforce memory safety, but it also touches on
+languages and program partitioning mechanism 
+that aim at enforcing memory safety, but it also touches on
 C-language formalization in general.
 %, and work that uses random
 %testing to connect a formal development to a reference implementation.
@@ -31,7 +31,7 @@ language's behavior.
 Several prior works formalize C-language transformations or C-language
 dialects aiming to ensure spatial safety. 
 %
-\citet{10.1145/2813885.2737979} extends the formalization
+\citet{10.1145/2813885.2737979} extended the formalization
 of \citet{ellison-rosu-2012-popl} to produce a semantics that detects
 violations of spatial safety (and other forms of undefinedness). It
 uses a CompCert-style memory model, but ``fattens'' logical pointer
@@ -57,7 +57,7 @@ ensure memory safety; its pointer types are similar to
 CCured. Cyclone's formalization~\cite{GrossmanMJHWC02} focuses on the
 use of \emph{regions} to ensure temporal safety; it does not formalize
 arrays or threats to spatial safety. Deputy~\cite{Feng2006,Condit2007}
-is another safe-C dialect that aims to avoid fat pointers; it was an
+is another safe-C dialect that aims to avoid fat pointers. It was an
 initial inspiration for Checked C's design~\cite{Elliott2018}, though
 it provides no specific modeling for null-terminated array
 pointers. Deputy's formalization~\cite{Condit2007} defines its
@@ -71,7 +71,7 @@ limitation with Checked C's handling of bounds widening.
 
 The most closely related work is the
 formalization of \checkedc done by \citet{ruef18checkedc-incr} and \citet{li22checkedc}. They
-present the type system and semantics of a core model of \checkedc,
+presented the type system and semantics of a core model of \checkedc,
 mechanized in Coq, and prove a blame theorem. 
 The difference between these works and \systemname is listed in \Cref{sec:intros} and \Cref{sec:overview}.
 

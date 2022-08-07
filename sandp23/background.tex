@@ -5,8 +5,8 @@ This section describes \checkedc and new features \systemname provides.
 
 \subsection{\checkedc Overview}
 
-Development of Checked C was initiated by Microsoft Research in 2015 but starting in
-late 2021 was forked and is now actively managed by the Secure Software
+\checkedc Development began in 2015 by Microsoft Research, but it was forked
+in late 2021 and is now actively managed by the Secure Software
 Development Project (SSDP). Details can be found in a prior
 overview~\cite{Elliott2018} or the formalism~\cite{li22checkedc}.
 
@@ -72,9 +72,9 @@ keyword.\footnote{You can also designate \emph{unchecked} regions
   within checked ones.}  Within checked regions, both
 legacy pointers and certain unsafe idioms (e.g., \emph{variadic} function
 calls) are disallowed. The code in Fig.~\ref{fig:checkedc-example}
-satisfies these conditions, and will type-check in a checked region.
+satisfies these conditions and will type-check in a checked region.
 
-How should we think about code that contains both checked and legacy
+How should we approach code that has both checked and legacy
 components? \citet{li22checkedc} proved, for a simple
 formalization of \checkedc, that \emph{checked code cannot be blamed}:
 Any spatial safety violation is caused by the execution of unchecked
@@ -91,7 +91,7 @@ array_ptr<int> p : count (n) = NULL;
 Consequently, converting existing C programs to Checked C might require refactoring, e.g., modifying the above program to not use~\inlinecode{&n} expression, which might require considerable effort~\cite{duanrefactoring} depending on the program's complexity. 
 Recently, Machiry et al. developed~\threec~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
 However, as described in \threec, complete automated conversion is infeasible and requires the developer to convert some code regions manually.
-Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
+Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked, or safe regions).
 
 \begin{figure}[t]
 {\small
@@ -257,7 +257,7 @@ Previously, the main guarantee of \checkedc \cite{li22checkedc} was the blame th
 The sources of crashing in \checkedc are (1) unchecked regions crash themselves;
   and (2) the misuse of checked pointers in unchecked regions.
 For example, at \Cref{fig:checkedc-example-3} line 31,
-we call a unchecked function \code{f} with a checked null-terminated array (NT-array) pointer argument.
+we called an unchecked function \code{f} with a checked null-terminated array (NT-array) pointer argument.
 At line 8, depending on the NT-array size, \code{free(s[10])} might crash.
 Even if it does not crash, line 38 is doomed because of the \code{free} call.
 
@@ -275,7 +275,7 @@ At line 8, even if statement might crash, since tainted pointers are stored
 in the sandboxed heap, it can be recovered.
 At line 37, the use of a tainted pointer in a checked region
 requires a verification on it.
-This is handled by inserting additional checks
+This is managed by inserting additional checks
 and creating exception handling before the use by the \systemname compiler.
 Thus, the checked pointer \code{p} is safely used at line 38.
 
@@ -295,7 +295,7 @@ that adds the ASCII numbers of characters in the two strings and compare the res
 In addition, function pointers enable the callback mechanism,
 i.e., a server sends a function pointer to a client in an unchecked region,
 and allows the client to access some server resources by calling back the pointer.
-This is a common usage between a web-browser and untrusted third party libraries.
+This is a common usage between a web-browser and untrusted third-party libraries.
 The function call in \Cref{fig:checkedc-example-3} line 34 is one such usage.
 
 We also utilize \systemname subtyping relation to permit function pointer static auto-casting.
@@ -318,8 +318,7 @@ and $g$ might use some mechanisms, such as derandomizing ASLR \cite{shacham-aslr
 to achieve the checked pointer address.
 Thus, it enables a third party to access any checked heap and function data by simple pointer arithmetic.
 
-To prevent the checked pointer address leak,
-we prevent any unchecked regions acknowledge checked pointer variables.
+we prevent any unchecked regions from acknowledging checked pointer variables to avoid the checked pointer address leak.
 In addition, to facilitate checked function callbacks, 
 the \systemname compiler compiles every checked function
 with an additional tainted shell function.
@@ -329,10 +328,10 @@ are the tainted shells of the checked functions \code{compare_1} and \code{strin
 In the tainted shells, the arguments are tainted versions of the corresponding arguments in the checked functions.
 Inside the shell body, we create checked pointer copies of the tainted arguments, and call the checked functions.
 In addition, once the checked function returns,
-if the output is a checked pointer, we copy its the data to a new tainted pointer and return it.
+if the output is a checked pointer, we copy its data to a new tainted pointer and return it.
 \Cref{fig:checkedc-example-3} line 42 is an example of serving the function call living in an unchecked region
 with a tainted shell pointer argument \code{tainted_compare_1}.
-Even if $g$ derndomizes its address (line 14), the shell address is in the sandbox and has no harm,
+Even if $g$ derandomizes its address (line 14), the shell address is in the sandbox and has no harm,
 and calling the shell never exposes any checked pointer information outside of the shell.
 
 Conceptually, the shell is run in a checked region.

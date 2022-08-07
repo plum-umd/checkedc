@@ -3,13 +3,12 @@
 Vulnerabilities due to memory corruption, especially spatial memory corruptions, 
 are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:2013:SRF:2534766.2534798} 
 despite a large body of work that tries to prevent them~\cite{song2019sanitizing}.
-Several industrial and research efforts---including CCured~\cite{Necula2005},
-Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012}---have
-explored means to compile C programs 
-to automatically enforce spatial safety. These
-approaches all impose performance overheads deemed too high for
-deployment use. 
-Recently, \citet{Elliott2018,li22checkedc} introduced and formalized \checkedc, an
+Several industrial and research efforts, including CCured~\cite{Necula2005},
+Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
+have investigated ways to compile C programs 
+to automatic spatial safety enforcement.
+These approaches all impose performance overheads deemed too high for deployment use. 
+Recently, \citet{Elliott2018} and \citet{li22checkedc} introduced and formalized \checkedc, an
 open-source extension to C with new types and
 annotations whose use can ensure a program’s spatial safety.
 Importantly, \checkedc supports development that is 
@@ -19,9 +18,10 @@ spatial safety in a manner preserved by composition with
 other checked regions. But not all regions must be checked: Checked
 C's annotated \emph{checked pointers} are binary-compatible with legacy pointers, and
 may coexist in the same code, which permits a deliberate (and
-semi-automated) refactoring process. Parts of the FreeBSD kernel have
-been successfully ported to \checkedc~\cite{duanrefactoring}, and overall, performance
-overhead seems low enough for practical deployment.
+semi-automated) refactoring process. 
+Parts of the FreeBSD kernel have
+been successfully migrated to \checkedc~\cite{duanrefactoring}, and the overall performance
+overhead is minimal enough for practical deployment.
 
 \ignore{
 Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
@@ -75,9 +75,10 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 The guarantee \checkedc provides focuses on checked code regions,
 where any stuck (i.e., ill-defined)
 state reached by a well-typed program amounts to a spatial safety
-violation; such a state can always be attributed to, i.e., 
-\emph{blamed on}, the execution of code that is not in a checked core
-region. But what are the guarantees of unchecked (unsafe) code regions?
+violation.
+Such a state can always be attributed to, i.e., 
+\emph{blamed on}, the execution of code that is not in a checked core region. 
+However, what are the guarantees that unchecked (unsafe) code regions can provide?
 Programmers might not expect to convert every code to \checkedc,
 but leave some functions in unsafe regions,
 in which case the unsafe region executions should not affect other parts.
@@ -86,16 +87,16 @@ combining \checkedc with program partitioning mechanism,
 making three main contributions.
 
 \myparagraph{Executions Cannot Crash}
-Our first contribution is a clear program partition between checked and unchecked code regions,
+Our first contribution is a clear program partition between checked and unchecked code regions
 and ensures that a \systemname program execution \textit{cannot crash} due to spatial safety violations.
 We restrict the checked and unchecked pointers usage only in checked and unchecked code regions, respectively;
 and develop tainted pointers for the communication between the two regions.
-Heap is partitioned into two parts: a \textit{checked memory region} containing all checked pointers
- and an \textit{unchecked memory region} that is sandboxed.
-Tainted pointers live in the unchecked memory region and is verified every time when using.
+Heap is partitioned into two parts: a \textit{checked heap} containing all checked pointers
+ and an \textit{unchecked heap} that is sandboxed.
+Tainted pointers exist in the unchecked heap region and must be verified each time being used.
 
 
-\myparagraph{Formaling the Type System, Semantics and Compiler}
+\myparagraph{Formalizing the Type System, Semantics and Compiler}
 %
 Our second contribution is a core formalism named \lang, which extends
 \citet{li22checkedc} with the non-crashing guarantee and other new features below.
@@ -108,36 +109,36 @@ To certify the simulation relation between the \lang semantics and the compiler,
 we utilize the model-based randomized testing.
 This is done by a conversion tool that converts expressions from \lang into
 actual \checkedc code that can be compiled by the Clang \checkedc
-compiler. We build a random generator of programs largely based on the
-typing rules of \lang and make sure that, both statically and
-dynamically, \lang and Clang Checked C are consistent after
-conversion.  
+compiler. We create a program random generator 
+based on the
+typing rules of \lang and ensure that \lang and Clang Checked C are consistent after conversion, both statically and
+dynamically.  
 To the best of our knowledge, 
-\lang is the first language and compiler formalism with the program partitioning mechanism.
+\lang is the first C(-like) language and compiler formalism with the program partitioning mechanism.
 
 \myparagraph{Supporting Checked Pointer Callbacks and No Checked Pointer Exposure}
-Our third contribution is an added up feature
+Our third contribution is an added-up feature
 to support checked (function) pointer callbacks in unchecked code regions.
-In implementing a multi-threaded system, users might want 
-to provide third party interface permitting third parties 
-to write implement some new program features, while keeping those programs in unchecked code regions.
+When designing a multi-threaded system, users might want 
+to provide a third party interface that allows third party developers to create new program features, while keeping these programs in unchecked code regions.
 Moreover, they do want to provide them a (function) pointer pointing to checked data fields.
-To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
 
 However, accessing a checked pointer in an unchecked region violates the program partition principle of \systemname.
-To overcome the discord, we develop two mechanisms in \systemname 
+To resolve the conflict, we develop two mechanisms in \systemname 
 and maintain a stronger \textit{non-exposure} guarantee on of the non-crashing guarantee; 
-i.e., no checked pointer addresses can be observed in an unchecked region.
-The first mechanism is nested checked and unchecked code regions.
+that is, no checked pointer addresses can be observed in an unchecked code region.
+The first mechanism allows nested checked and unchecked code regions.
 Users can context switch between checked and unchecked code regions 
 by nested using the keywords $\echeckedtext$ $\euncheckedtext$.
 The type system ensures that no checked pointers can be accessed across the context switching.
 The second one is that a call to a checked pointer in unchecked code regions 
 must be surrounded by a \textit{tainted shell}; 
-i.e., a tainted function pointer that points to a checked regions possibly holding checked pointers.
-In this case, no checked pointer address can be observed in the unchecked code regions.
+i.e., a tainted function pointer that points to a checked region possibly holding checked pointers.
+In this case, no checked pointer address will be observed in the unchecked code regions.
 In \systemname, for every checked function, 
-we automatically compiler a tainted version by surrounding the function without a tainted shell.
+we automatically compile a tainted version by surrounding the function without a tainted shell.
+To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
+
 
 We begin with a review of \checkedc (Section~\ref{sec:overview}) and introduce new features in \systemname,
 present our main contributions
