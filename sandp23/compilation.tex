@@ -84,10 +84,10 @@ i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ po
 Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
 In the compiled LLVM code, pointer access operations have different syntax when the modes are different.
 \Cref{fig:flagtable} lists the different compiled syntax for a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
-For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. if the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
+For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
 This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
-with no loss of expressiveness;
+with no loss of expressiveness
 as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
 For the compiler formalism, 
 we present a compilation algorithm that converts from
@@ -97,7 +97,7 @@ In \elang, the syntax for deference, assignment, malloc, function calls are: $\g
 $\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
 The algorithm sheds
   light on how compilation can be implemented in the real Checked C
-  compiler, while eschewing many important details (\elang has many 
+  compiler, while eschewing many vital details (\elang has many 
   differences with LLVM IR).
 
 
@@ -118,13 +118,13 @@ The algorithm sheds
   %differences with LLVM IR).
 
 Compilation is defined by extending \lang's
-typing judgment thusly:
+typing judgment as follows:
 \[\Gamma;\Theta;\rho \vdash_m e \gg \dot e:\tau\]
 There is now a \elang output $\dot e$ and an input $\rho$, which maps
 each (NT-)array pointer variable to its mode and
 each variable \code{p} to a pair of \emph{shadow
-  variables} that keep \code{p}'s up-to-date upper and lower bounds; 
-these may differ from the bounds in \code{p}'s type due to bounds
+  variables} that keep \code{p}'s up-to-date upper and lower bounds. 
+These may differ from the bounds in \code{p}'s type due to bounds
 widening.\footnote{Since lower bounds are never widened, the
   lower-bound shadow variable is unnecessary; we include it for uniformity.}
 % When $\Gamma$,$\Theta$ and $\rho$ are all empty, we write $e \gg \dot e$ rather than the
@@ -165,8 +165,7 @@ Each rule performs up to three tasks: (a) conversion of $e$ to
 A-normal form; (b) insertion of dynamic checks and bound widening expressions; 
 and (c) generate right pointer accessing expressions based on modes.
 %
-A-normal form conversion is straightforward: compound expressions are
-handled by storing results of subexpressions into temporary variables,
+A-normal form conversion is straightforward: compound expressions are managed by storing results of subexpressions into temporary variables,
 as in the following example.
 
 {\vspace*{-0.5em}
@@ -261,17 +260,12 @@ In every declaration (or the beginning of a function body) of a pointer,
 if the poniter is an (NT-)array one,
 we first allocates two \emph{shadow variables}
 to track the lower and upper bounds potentially changed for pointer arithmetic and NT-array bound widening.
-We also associated with every $\cmode$-mode pointer variable according to its type;
-we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
+Each $\cmode$-mode NT-array pointer variable is associated with its type information in a store.
+Additionally, we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
 In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9 and 10), 
 there is an inserted verification step similar to \Cref{fig:const-type},
-which checks a pointer is well defined in the heap (\code{not_null}) and the spatial safety.
+which checks if a pointer is well defined in the heap (\code{not_null}) and the spatial safety.
 Predicate \code{not_null} checks that every element in the pointer's range (\code{p_lo} and \code{p_hi}) is well defined in the heap.  
-In implementation, we actually optimize the verification away and substitute it
-with the bounds and null-pointer checks.
-Because tainted pointer is checked every time before it is used,
-so that we only need to check the top pointer is 
-well defined without recursively looking at the sub-terms in a nested pointer case.
 The modes in compiled deference (\code{*(mode(p) }$\wedge$\code{ m,p)})
  and assignment (\code{*(mode(q) }$\wedge$\code{ m,q)=1}) operations 
 are computed based on the meet 
@@ -288,7 +282,7 @@ to execute expression $e$ with the arguments $\overline{x}$.
 $\echecked{\overline{x}}{e}$ is compiled to 
 $\texttt{callback}(\overline{x},e)$, where we perform 
 a \texttt{callback} to a checked block code $e$ inside a sandbox.
-In \systemname, We adopt an aggressive execution scheme that
+In \systemname, we adopt an aggressive execution scheme that
 directly learns pointer addresses from compiled assembly to make the $\texttt{callback}$ happen.
 In the formalism, we rely on the type system to 
 guarantee the context switching without creating the extra function calls for simplicity.
@@ -307,7 +301,7 @@ guarantee the context switching without creating the extra function calls for si
 
 \myparagraph{Function Pointers and Calls}
 %
-Function pointers are dealt with similarly to normal pointers,
+Function pointers are managed similarly to normal pointers,
 but we insert checks to check if the pointer address is not null in 
 the function store instead of heap, and whether or not the type is correctly represented, 
 for both $\cmode$ and $\tmode$ mode pointers 
@@ -345,7 +339,7 @@ We formalize both the compilation procedure and the simulation
 theorem in the PLT Redex model we developed for \lang (see Sec.~\ref{sec:syntax}),
 and then attempt to falsify it via Redex's support for random
 testing. Redex allows us
-  to specify compilation as logical rules (essentially, an extension
+  to specify compilation as logical rules (an extension
   of typing), but then execute it algorithmically to
   automatically test whether simulation holds. This process revealed
   several bugs in compilation and the theorem statement.
@@ -453,10 +447,9 @@ $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
 % \varphi_1$, $\heap_1 \gg \dot \heap_1$.
 % \end{thm}
 
-Our random generator (discussed in the next section) never produces
-$\euncheckedtext$ expressions (whose behavior could be undefined), so we
-can only test a the simulation theorem 
-as it applies to checked code. This limitation makes it
+As our random generator never generates
+$\euncheckedtext$ expressions (whose behavior could be undefined), we can only test a the simulation theorem 
+as it relates to checked code. This limitation makes it
 unnecessary to state the other direction of the simulation theorem
 where $e_0$ is stuck, because Theorem~\ref{thm:progress} guarantees
 that $e_0$ will never enter a stuck state if it is well-typed in
