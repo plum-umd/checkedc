@@ -195,7 +195,7 @@ Section Progress.
         env Q m n t HNChkd HSplTy     | (* TyLitTainted *)
         env Q m x t t' HEmap Hsub     | (* TyVar *)
         env Q m m' es x xl ts t ta Hmode HForall Hptr IHptr Hargs | (* TyCall *)
-        ? |
+        env Q x m m' l h t Hmaps Hmode | (* TyStrlen *)
         ? |
         ? |
         ? |
@@ -304,53 +304,97 @@ Section Progress.
          ** replace R with ((R.1, R.2)) by (destruct R; reflexivity).
             eapply step_implies_reduces'. rewrite -> Heqtfun in *.
             eapply SCallTaintedType; try eassumption.
-    -            
-            
-         
+    (* TyStrlen *)
+    - destruct cm; [ | intuition | right; solve_unchecked ].
+      inv Hmode. right; left. specialize (H (eq_refl _)).
+      pose proof (Henvwt _ _ Hmaps) as (Hwt & Hty & Hbd).
+      pose proof (Hswf _ _ Hmaps) as (v & t' & Hsub & Hsmaps).
+      pose proof (Hswt _ _ _ Hsmaps) as (Hwd & Htwf & Hsimple).
+      pose proof (eq_subtype_nt_ptr Q t' (TPtr m' (TNTArray l h t))) as Hnt.
+      mopo Hnt by constructor.  specialize (Hnt Hsub).
+      destruct t'; try destruct Hnt. destruct t'; try destruct Hnt.
+      apply eq_subtype_mode_same in Hsub as Hmode; subst.
+      pose proof (simple_type_tnt _ _ _ Hsimple) as (nl' & nh' & ? & ?); subst.
+      (* Checked Pointer *)
+      + destruct (Z_le_dec nh' 0).
+        { (* h' <= 0 *)
+          eapply step_implies_reduces'. eapply StrlenHighOOB; eassumption.
+        }
+        destruct (Z_gt_dec nl' 0).
+        { (* l' > 0 *)
+          eapply step_implies_reduces'. eapply StrlenLowOOB; eassumption.
+        }
+        destruct (Z_le_dec v 0).
+        { (* v <= 0 *)
+          eapply step_implies_reduces'. eapply StrlenNull; eassumption.
+        }
+        specialize (Hscon R.1 R.2 x v (TPtr m' (TNTArray (Num nl') (Num nh') t'))).
+        mopo Hscon by (destruct R; reflexivity).
+        mopo Hscon by assumption.
+        inv Hscon; [ destruct m'; try congruence | lia | inv H5 | ].
+        (* TyLitU_C : tainted pointer *) 
+        * 
+        (* TyLitC_C *) 
+        * cbn in H9. destruct H9 as (n' & t'' & Hzleq & Hhmaps & Hnbd').
+          pose (change_strlen_stack s x Checked t nl' v n' nh') as s'.
+          assert (R = (R.1, R.2)) as ER by (destruct R; reflexivity).
+          rewrite ER.
+          eapply step_implies_reduces'.
+          pose proof (StrlenChecked D F s R.1 R.2 x v n' nl' nh').
+          
+          eapply (StrlenChecked D F s R.1 R.2 x v n' nl' nh'); try lia.
+          apply Hcut1. apply Hnbd'. assumption.
+    -
   Admitted.
-
-(* 
-  | SCallTainted : forall (s : stack) (H1 H2 : heap) (x : Z) (ta : type) (ts : list type) 
-                     (el : list expression) (t : type) (tvl : list (var * type)) (e ea : expression) 
-                     (ta' : type) (xl : list var),
-                   F Tainted x = Some (tvl, t, e) ->
-                   eval_el s el tvl (get_xl tvl) e t ea ta' ->
-                   well_typed_lit_tainted D F H2 empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
-                   step D F (s, (H1, H2)) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el) 
-                     (s, (H1, H2)) (RExpr ea)
-  | SCallTaintedType : forall (s : stack) (R : heap * heap) (x : Z) (ta : type) (ts : list type)
-                         (el : list expression) (t : type) (tvl : list (var * type)) 
-                         (e : expression) (xl : list var),
-                       F Tainted x = Some (tvl, t, e) ->
-                       ~ well_typed_lit_tainted D F R.2 empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
-                       step D F (s, R) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el) (s, R) RBounds
-
- *)
-
-
   (*
 
-   Inductive well_typed_lit_tainted (D : structdef) (F : FEnv) (H : heap) : scope -> Z -> type -> Prop :=
-NO    TyLitInt_T : forall (s : scope) (n : Z), well_typed_lit_tainted D F H s n TNat
-NO  | TyLitU_T : forall (s : scope) (n : Z) (w : type), well_typed_lit_tainted D F H s n (TPtr Unchecked w)
-  | TyLitZero_T : forall (s : scope) (t : type), well_typed_lit_tainted D F H s 0 t
-  | TyLitFun_T : forall (s : scope) (n : Z) (xl : list var) (t : type) (ts : list type) (tvl : list (var * type)) (e : expression) (ta : type),
-                 F Tainted n = Some (tvl, ta, e) ->
-                 subtype empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
-                 well_typed_lit_tainted D F H s n (TPtr Tainted (TFun xl t ts))
-  | TyLitRec_T : forall (s : ListSet.set (Z * type)) (n : Z) (w t : type),
-                 ListSet.set_In (n, t) s -> subtype empty_theta t (TPtr Tainted w) -> well_typed_lit_tainted D F H s n (TPtr Tainted w)
-  | TyLitC_T : forall (sc : scope) (n : Z) (w t : type) (b : Z) (ts : list type),
-               simple_type w ->
-               ~ is_fun_type w ->
-               subtype empty_theta (TPtr Tainted w) (TPtr Tainted t) ->
-               Some (b, ts) = allocate_meta D w ->
-               nt_array_prop H n (TPtr Tainted t) ->
-               (forall k : Z,
-                (b <= k < b + Z.of_nat (length ts))%Z ->
-                exists (n' : Z) (t' : type),
-                  Some t' = nth_error ts (Z.to_nat (k - b)) /\
-                  Heap.MapsTo (n + k)%Z (n', t') H /\ well_typed_lit_tainted D F H (scope_set_add n (TPtr Tainted w) sc) n' t') ->
-               well_typed_lit_tainted D F H sc n (TPtr Tainted t)
+    | StrlenChecked : forall (s : Stack.t (Z * type)) (H1 : Heap.t (Z * type)) 
+                      (H2 : heap) (x : Stack.key) (n n' l h : Z) (t t1 : type),
+                    (h > 0)%Z ->
+                    (l <= 0)%Z ->
+                    (0 <= n')%Z ->
+                    Stack.MapsTo x (n, TPtr Checked (TNTArray (Num l) (Num h) t)) s ->
+                    (forall i : Z,
+                     (n <= i < n + n')%Z -> exists n1 : Z, Heap.MapsTo i (n1, t1) H1 /\ n1 <> 0%Z) ->
+                    Heap.MapsTo (n + n')%Z (0%Z, t1) H1 ->
+                    step D F (s, (H1, H2)) (EStrlen x)
+                    (change_strlen_stack s x Checked t l n n' h, (H1, H2)) 
+                      (RExpr (ELit n' TNat))
+  | StrlenTainted : forall (s : Stack.t (Z * type)) (H1 : heap) (H2 : Heap.t (Z * type))
+                      (x : Stack.key) (n n' l h : Z) (t t1 : type),
+                    (h > 0)%Z ->
+                    (l <= 0)%Z ->
+                    (0 <= n')%Z ->
+                    Stack.MapsTo x (n, TPtr Tainted (TNTArray (Num l) (Num h) t)) s ->
+                    (forall i : Z,
+                     (n <= i < n + n')%Z ->
+                     exists n1 : Z,
+                       Heap.MapsTo i (n1, t1) H2 /\
+                       n1 <> 0%Z /\ well_typed_lit_tainted D F H2 empty_scope n1 t1) ->
+                    Heap.MapsTo (n + n')%Z (0%Z, t1) H2 ->
+                    step D F (s, (H1, H2)) (EStrlen x)
+                      (change_strlen_stack s x Tainted t l n n' h, (H1, H2)) 
+                      (RExpr (ELit n' TNat))
+  | StrlenHighOOB : forall (s : Stack.t (Z * type)) (R : real_heap) (x : Stack.key) (n : Z) 
+                      (t : type) (l : bound) (h : Z),
+                    (h <= 0)%Z ->
+                    Stack.MapsTo x (n, TPtr Checked (TNTArray l (Num h) t)) s ->
+                    step D F (s, R) (EStrlen x) (s, R) RBounds
+  | StrlenLowOOB : forall (s : Stack.t (Z * type)) (R : real_heap) (x : Stack.key) (n : Z) 
+                     (t : type) (l : Z) (h : bound),
+                   (l > 0)%Z ->
+                   Stack.MapsTo x (n, TPtr Checked (TNTArray (Num l) h t)) s ->
+                   step D F (s, R) (EStrlen x) (s, R) RBounds
+  | StrlenNull : forall (s : Stack.t (Z * type)) (R : real_heap) (x : Stack.key) (t : type) (n : Z) (l h : bound),
+                 (n <= 0)%Z ->
+                 Stack.MapsTo x (n, TPtr Checked (TNTArray l h t)) s -> step D F (s, R) (EStrlen x) (s, R) RNull
+  | StrlenUnChecked : forall (s : Stack.t (Z * type)) (H1 : heap) (H2 : Heap.t (Z * type))
+                        (x : Stack.key) (n n' : Z) (t t1 : type),
+                      (0 <= n')%Z ->
+                      Stack.MapsTo x (n, TPtr Unchecked t) s ->
+                      (forall i : Z,
+                       (n <= i < n + n')%Z -> exists n1 : Z, Heap.MapsTo i (n1, t1) H2 /\ n1 <> 0%Z) ->
+                      Heap.MapsTo (n + n')%Z (0%Z, t1) H2 ->
+                      step D F (s, (H1, H2)) (EStrlen x) (s, (H1, H2)) (RExpr (ELit n' TNat))
+*)
 
-   *)

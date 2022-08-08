@@ -2673,19 +2673,19 @@ Inductive step
       (s, (H1,H2)) (EStrlen x)
       (s, (H1,H2)) (RExpr (ELit n' TNat))
 
-| StrlenHighOOB : forall s R x n t l h,
+| StrlenHighOOB : forall s R m x n t l h,
     h <= 0 -> 
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray l (Num h) t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
     step D F
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenLowOOB : forall s R x n t l h,
+| StrlenLowOOB : forall s R m x n t l h,
     l > 0 -> 
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray (Num l) h t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) h t))) s) ->
     step D F
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenNull : forall s R x t n l h,
+| StrlenNull : forall s R m x t n l h,
     n <= 0 ->
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray l h t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray l h t))) s) ->
     step D F
       (s, R) (EStrlen x)
       (s, R) RNull
