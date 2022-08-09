@@ -155,6 +155,29 @@ Section StackProp.
 End StackProp. 
 
 
+Section EnvProp.
+  Variable D : structdef.
+  Variable m : mode.
+
+  Lemma env_wt_add_tnat : forall x env,
+      env_wt D m env -> 
+      env_wt D m (Env.add x TNat env).
+  Proof.
+    intros * Henv.
+    unfold env_wt in *.
+    intros x' t Hmap. destruct (Nat.eq_dec x x').
+    - rewrite -> e in *.  apply Env.mapsto_add1 in Hmap.
+      rewrite Hmap; intuition; try constructor; done. 
+    - apply Env.mapsto_add2 in Hmap. 2: intuition. 
+      destruct (Henv x' t); intuition.
+      unfold well_type_bound_in. intros * Hin. cbn in Hin.
+      apply H2 in Hin.
+      destruct (Nat.eq_dec x x0).
+      + apply Env.add_1; done.
+      + apply Env.add_2; done.
+  Qed. 
+End EnvProp.
+
 (* Env consistency *)
 Definition both_simple (t t' :type) := simple_type t -> simple_type t'.
 
@@ -1587,7 +1610,5 @@ Proof.
   split. eapply nat_leq_trans;eauto.
   eapply nat_leq_trans;eauto.
 Qed.
-
-
 Local Close Scope Z_scope.
 
