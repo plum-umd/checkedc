@@ -103,26 +103,28 @@ Existing mechanisms are not suitable as they are based on process isolation and 
 Furthermore, these techniques are hard to engineer to co-exist with~\checkedc.
 But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
 
- and there has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area. Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning. E.g., Given sensitive data in a program, the goal is to partition functions into two parts or partitions based on whether a function can access the sensitive data.
-The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
-The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
-But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
+In this work, we propose a type-directed code-centric program partitioning approach.
+Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
+The checked types follow the standard Checked C typing rules. However, our type-system disallows all interactions between taint and untainted types.
+ 
+The developer starts by marking desired (i.e., unchecked) functions and pointers used in these functions as tainted.
+Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
+\begin{itemize}
+\item~\ucregion or~\emph{tainted region} (low privilege tainted region): This partition contains tainted types (i.e., functions and pointers) and can only access tainted pointers.
+\item~\cregion or~\emph{safe region} (high privilege untainted or checked region): This partition contains the remaining (untainted) code and data and has complete access to~\cregion{}.
+The functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
+\end{itemize}
+Finally, during program execution, the~\ucregion partition will be executed in an existing sandboxed environment (e.g., WASM sandbox), and our compiler will add the necessary instrumentation to facilitate the communication between code in~\cregion{} and~\ucregion{}.
 
-The guarantee \checkedc provides focuses on checked code regions,
-where any stuck (i.e., ill-defined)
-state reached by a well-typed program amounts to a spatial safety
-violation.
-Such a state can always be attributed to, i.e., 
-\emph{blamed on}, the execution of code that is not in a checked core region. 
-However, what are the guarantees that unchecked (unsafe) code regions can provide?
-Programmers might not expect to convert every code to \checkedc,
-but leave some functions in unsafe regions,
-in which case the unsafe region executions should not affect other parts.
-In this paper, we cover this gap by introducing \systemname,
-combining \checkedc with program partitioning mechanism, 
-making three main contributions.
+The combination of tainted types and privileged partitions enables us to enforce isolation and provide memory safety without marshaling costs.
+As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
+We avoid marshaling by allocating all tainted pointers (i.e., tainted buffers) in~\ucregion and thus can be accessed in both partitions.
+Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
+Our compiler avoids these attacks by ensuring, either statically or through dynamic checks that tainted pointers can only point to~\ucregion address space.
 
-\myparagraph{Executions Cannot Crash}
+In summary, we make the following three main contributions.
+
+\myparagraph{Type-Directed Program Partitioning}
 Our first contribution is a clear program partition between checked and unchecked code regions
 and ensures that a \systemname program execution \textit{cannot crash} due to spatial safety violations.
 We restrict the checked and unchecked pointers usage only in checked and unchecked code regions, respectively;
