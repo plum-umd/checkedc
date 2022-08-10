@@ -141,7 +141,12 @@ Specifically, we use a conversion tool that converts expressions from~\lang into
 based on the typing rules of~\lang and ensure that~\lang and~\checkedc compiler are consistent after conversion, both statically and dynamically.  
 To the best of our knowledge,~\lang is the first C(-like) language and compiler formalism with the program partitioning mechanism.
 
-\myparagraph{Supporting Checked Pointer Callbacks and No Checked Pointer Exposure}
+\myparagraph{Supporting callbacks to~\cregion with no Checked Pointer Exposure}
+Although we disallow access to~\cregion from~\ucregion, there can be cases where such access is needed. Specifically, when~\cregion wants to provide access to certain shared checked data to~\ucregion.
+To enable this, we support callback functions in~\cregion that can be invoked from~\ucregion through function pointers.
+However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of \systemname.
+
+-- NEED TO FINISH THIS--
 Our third contribution is an added-up feature
 to support checked (function) pointer callbacks in unchecked code regions.
 When designing a multi-threaded system, users might want 
