@@ -250,6 +250,8 @@ Inductive type_wf (D : structdef) : mode -> type -> Prop :=
     (forall x, In x (freeTypeVars t ++ (fold_right (fun b a => freeTypeVars b ++ a) [] ts)) -> In x xl) -> 
     type_wf D m (TFun xl t ts).
 
+Hint Constructors type_wf : ty.
+
 Lemma type_wf_tc : forall t D m m', m <> Checked -> m' <> Checked -> type_wf D m t -> type_wf D m' t.
 Proof.
   induction t using type_ind'; intros;simpl in *. constructor.
@@ -340,9 +342,10 @@ End EnvWt.
 
 (* Definition of simple type meaning that has no bound variables. *)
 Definition simple_bound (b:bound) := freeBoundVars b = [].
+Hint Unfold simple_bound : ty.
 
 Definition simple_type (t:type) := freeTypeVars t = [].
-
+Hint Unfold simple_type : ty.
 
 Lemma simple_type_tnt: forall b1 b2 t, simple_type (TNTArray b1 b2 t)
      -> exists b1' b2', b1 = Num b1' /\ b2 = Num b2'.
@@ -1374,6 +1377,7 @@ End Subtype.
 
 (* Defining stack. *)
 Module Stack := Map.Make Nat_as_OT.
+Module StackFacts := FMapFacts.Facts (Stack).
 
 Definition stack := Stack.t (Z * type).
 
@@ -2291,8 +2295,9 @@ Definition get_fun_type (m:mode) (tvl: list (var*type)) (t:type) :=
 
 Lemma get_fun_type_fun: forall tvl t m,  get_fun_type m tvl t = TPtr m (TFun (get_xl tvl) t (snd (List.split tvl))).
 Proof.
-  unfold get_fun_type in *.
-  induction tvl;intros; simpl in *; try easy.
+  reflexivity.
+  (* unfold get_fun_type in *. *)
+  (* induction tvl;intros; simpl in *; try easy. *)
 Qed.
 
 Section EvalArg.
@@ -2307,8 +2312,8 @@ Section EvalArg.
   Inductive eval_vl: list Z -> list (var * type) -> list var -> expression -> type -> expression -> type -> Prop :=
   | eval_vl_empty: forall e t, eval_vl [] [] [] e t (ECast t e) t
   | eval_vl_many_1: forall e es x t tvl xl ea ta ea' ta',
-     t <> TNat -> eval_vl es tvl xl ea ta ea' ta' 
-           -> eval_vl (e::es) ((x,t)::tvl) xl ea ta (ELet x (ELit e t) ea') ta'
+      t <> TNat -> eval_vl es tvl xl ea ta ea' ta' 
+      -> eval_vl (e::es) ((x,t)::tvl) xl ea ta (ELet x (ELit e t) ea') ta'
   | eval_vl_many_2: forall e es x tvl xl ea ta ea' ta',
      eval_vl es (map (fun a => (fst a, subst_type (snd a) x (Num e))) tvl) xl ea (subst_type ta x (Num e)) ea' ta' ->
      eval_vl (e::es) ((x,TNat)::tvl) (x::xl) ea ta (ELet x (ELit e TNat) ea') ta'.
@@ -2662,6 +2667,13 @@ Inductive step
       (s, (H1,H2)) (EStrlen x)
       ((change_strlen_stack s x Tainted t l n n' h), (H1,H2))
       (RExpr (ELit n' TNat))
+| StrlenTaintedFailed : forall s H1 H2 x n l h t,
+    h > 0 -> l <= 0 -> n > 0 ->
+    (Stack.MapsTo x (n,(TPtr Tainted (TNTArray (Num l) (Num h) t))) s) ->
+    ~ (well_typed_lit_tainted D F H2 empty_scope n
+         (TPtr Tainted (TNTArray (Num l) (Num h) t))) ->
+    step D F (s, (H1,H2)) (EStrlen x) (s, (H1,H2)) RNull
+
 | StrlenUnChecked : forall s H1 H2 x n n' t t1,
     0 <= n' ->
     (Stack.MapsTo x (n,(TPtr Unchecked t)) s) ->
@@ -2672,19 +2684,19 @@ Inductive step
       (s, (H1,H2)) (EStrlen x)
       (s, (H1,H2)) (RExpr (ELit n' TNat))
 
-| StrlenHighOOB : forall s R x n t l h,
+| StrlenHighOOB : forall s R m x n t l h,
     h <= 0 -> 
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray l (Num h) t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
     step D F
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenLowOOB : forall s R x n t l h,
+| StrlenLowOOB : forall s R m x n t l h,
     l > 0 -> 
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray (Num l) h t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) h t))) s) ->
     step D F
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenNull : forall s R x t n l h,
+| StrlenNull : forall s R m x t n l h,
     n <= 0 ->
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray l h t))) s) ->
+    (Stack.MapsTo x (n,(TPtr m (TNTArray l h t))) s) ->
     step D F
       (s, R) (EStrlen x)
       (s, R) RNull
@@ -3228,6 +3240,19 @@ Proof.
   eapply subtype_q_conv;eauto.
 Qed.
 
+Lemma eq_subtype_q_add: forall Q t t' x v,
+    ~ Theta.In x Q ->
+    eq_subtype Q t t' ->
+    eq_subtype (Theta.add x v Q) t t'.
+Proof with auto.
+  unfold eq_subtype.
+  intros * Hin Hes.
+  destruct Hes as (t'' & Heq & Hsub).
+  unfold eq_subtype. exists t''. split.
+  apply type_eq_q_add...
+  apply subtype_q_add... 
+Qed.
+Hint Resolve eq_subtype_q_add : ty.
 
 Lemma eq_subtype_subst_1: forall Q t t' x b, ~ Theta.In x Q ->
           eq_subtype (Theta.add x (NumEq b) Q) t t' ->
