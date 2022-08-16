@@ -1285,7 +1285,8 @@ Section Preservation.
         /\ stack_rheap_consistent D F R' s'
         /\ env_consistent Q env env'
         /\ well_typed D F R' env' Q cm e' t'
-        /\ eq_subtype Q t' t.
+        /\ eq_subtype Q t' t
+        /\ type_wf D cm t'.
   Proof with (eauto with ty sem heap Preservation).
     intros s R env Q e t s' R' e'
       HRwf HRWt HEwf Hswt Henvt HQt HDom Hswf HsHwf Hwf Hwt.
@@ -1315,7 +1316,7 @@ Section Preservation.
         env Q m e x y t t' HNot Teq Wb HTy IH HMode                | (* DynCast - ptr array from ptr *)
         env Q m e x y u v t t' Wb Teq HTy IH HMode                 | (* DynCast - ptr nt-array *)
         env Q m e x y u v t t' Wb Teq HTy IH HMode                 | (* DynCast - ptr nt-to-array *)
-        env Q m e m' t l h t' t'' HTy IH HPtrType HMode            | (* Deref *)
+        env Q m e m' t l h t' HTy IH HPtrType HMode                | (* Deref *)
 
         env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for array pointers *)
         env Q m e1 m' l h e2 t WT Twf HTy1 IH1 HTy2 IH2 HMode                      | (* Index for ntarray pointers *)
@@ -1354,7 +1355,8 @@ Section Preservation.
       apply Stack.mapsto_always_same with (v1 := (v1, t1)) in H4; try easy.
       inv H4. apply eq_subtype_trans with (t2 := t); try easy. 
       unfold eq_subtype. exists t. split. apply type_eq_refl.
-      constructor. easy.
+      constructor. easy. simpl in *. subst.
+      inv HEwf. apply Hswt in H4. destruct H4 as [X1 [X2 X3]]. easy.
     (*T-Call*)
     - inv HMode.
       inv Hreduces. destruct E; try congruence; try solve [solve_step].
@@ -1385,7 +1387,7 @@ Section Preservation.
       destruct (Y2 env Q x0 tvl0 tb ta' 
         e0 vl e'0 Checked Checked H1 H5 X6) as [Y3 [Y4 [Y5 [Y6 [Y7 [Y8 Y9]]]]]].
       clear H1.
-      split; try easy.
+      split; try easy. split.
       eapply well_typed_eval_vs with (F := F) (R := R') (env := env) (S := s').
       destruct HQt as [eq1 [eq2 eq3]].
       intros. apply eq3. easy.
@@ -3318,6 +3320,7 @@ Section Preservation.
       specialize (HRwf H0 H2 H3).
       apply eval_type_bound_tfun with (s := s') (t' := w') in Wb as X2; try easy.
       assert (simple_type (TPtr Checked w')). unfold simple_type in *. simpl. easy.
+      destruct HRwf as [HRwf HRwf1].
       specialize (alloc_correct w' D F H0 n1 H1' H13 HDwf HRwf X2 H4 H12) as X3.
       destruct X3 as [X3 [X4 X5]].
       split; try easy.
@@ -4077,8 +4080,350 @@ Section Preservation.
       exists (TPtr m (TArray x y t)). split. apply type_eq_refl. repeat constructor.
     (* T-Deref *)
     - inv Hreduces.
+      destruct E; inversion H; simpl in *; subst.
+      destruct HPtrType.
+      inv H2; try easy.
+      inv HTy. destruct H; inv H2. inv H10.
+      inv HEwf. inv H6.
+      apply eval_type_bound_idempotent with (s := s') in H17 as X1.
+      inv X1. apply eval_type_bound_preserve with (t' := t') in H7; try easy; subst.
+      exists env,tv. 
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. 
+      specialize (or_checked tv) as X1.
+      destruct X1. constructor; try easy. inv H14; try easy.
+      inv H9; try easy.
+      assert ((H1,H3) = (H1,H3)) by easy. apply HRwf in H6. destruct H6.
+      apply Heap.mapsto_in in H11. apply H6 in H11. lia.
+      inv H14; try easy. destruct w; try easy.
+      inv H18. inv H6. constructor; try easy. inv H22.
+      inv H19. simpl in *.
+      specialize (H23 0).
+      assert (0 <= 0 < 1) by lia. apply H23 in H6.
+      rewrite Z.sub_0_r in H6. simpl in *.
+      rewrite Z.add_0_r in H6.
+      destruct H6 as [na [ta [X1 [X2 X3]]]]. inv X1.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      eapply checked_subtype_well_type; eauto. inv H16; easy.
+      inv H18; try easy. inv H6; try easy.
+      exists (TPtr m w). split. apply type_eq_refl. repeat constructor.
+      inv H18; try easy. inv H6; try easy.
+      inv H18. inv H6; try easy.
+      assert (simple_type (TPtr Checked (TArray b0 b1 tv))).
+      unfold simple_type in *; try easy.
+      apply simple_type_array_num in H6 as eq1. destruct eq1 as [A1 A2].
+      destruct A1 as [ba1 A1];subst.
+      destruct A2 as [ba2 A2];subst. inv H26. inv H27.
+      inv H19.
+      destruct (ba2 - ba1) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H23.
+      specialize (H23 0).
+      assert (ba1 <= 0 < ba1 + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H23 in H9.
+      destruct H9 as [na [ta [X1 [X2 X3]]]].
+      symmetry in X1. apply replicate_nth in X1; subst.
+      rewrite Z.add_0_r in X2.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      unfold scope_set_add in *. easy.
+      inv H18. inv H6; try easy.
+      assert (simple_type (TPtr Checked (TNTArray b0 b1 tv))).
+      unfold simple_type in *; try easy.
+      apply simple_type_nt_num in H6 as eq1. destruct eq1 as [A1 A2].
+      destruct A1 as [ba1 A1];subst.
+      destruct A2 as [ba2 A2];subst. inv H26. inv H27.
+      inv H19.
+      destruct (ba2 - ba1 + 1) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H23.
+      specialize (H23 0).
+      assert (ba1 <= 0 < ba1 + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H23 in H9.
+      destruct H9 as [na [ta [X1 [X2 X3]]]].
+      symmetry in X1. apply replicate_nth in X1; subst.
+      rewrite Z.add_0_r in X2.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      unfold scope_set_add in *. easy.
+      inv H18. inv H6; try easy. inv H22.
+      apply TyLitTainted; eauto. inv H14; try easy.
+      inv H14; try easy. exists tv. split. apply type_eq_refl. repeat constructor.
+      assert (is_checked (TPtr Checked t0)). constructor. easy.
+      destruct H; subst. inv H10. inv HTy. inv H10.
+      apply eval_type_bound_idempotent with (s := s') in H17 as X1.
+      inv X1. apply eval_type_bound_preserve with (t' := t') in H6; try easy; subst.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv HEwf. inv H6; try easy.
+      inv H9; try easy. inv H15; try easy. inv H9.
+      constructor; try easy. constructor. constructor.
+      apply TyLitTainted; try easy. inv H6. intros R. inv R. easy.
+      inv H15; try easy. exists tv. split. apply type_eq_refl. repeat constructor.
+      destruct H; subst. inv H10. inv HTy. inv H10. easy. 
+      apply eval_type_bound_idempotent with (s := s') in H15 as X1.
+      inv X1. apply eval_type_bound_preserve with (t' := t') in H6; try easy; subst.
+      inv H13;try easy. exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv HEwf. inv H6. inv H13; try easy.
+      inv H7. constructor; try easy. constructor. constructor.
+      apply TyLitTainted; try easy. inv H6. easy. intros R. inv R. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      destruct H. destruct H as [A1 [A2 A3]];subst.
+      inv H2; try easy. inv HTy; try easy.
+      inv H9. inv H5.
+      apply simple_type_array_num in H14 as eq1. destruct eq1 as [B1 B2].
+      destruct B1 as [ua B1];subst.
+      destruct B2 as [va B2];subst. unfold eval_bound in H6, H9. inv H6. inv H9.
+      assert (TPtr Checked (TArray (Num ua) (Num va) t'1)  = TPtr Checked (TArray (Num ua) (Num va) t'1)) by easy.
+      apply H11 in H. inv H13; try easy.
+      inv H15; try easy. apply Heap.mapsto_in in H10.
+      assert ((H1,H3) = (H1,H3)) by easy. apply HRwf in H2. destruct H2. apply H2 in H10. lia.
+      apply eval_type_bound_idempotent with (s := s') in H14 as X1.
+      inv X1. inv H13. apply eval_type_bound_preserve with (t' := t') in H16; try easy; subst.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv H6. inv H2; try easy.
+      inv H7. specialize (H18 0).
+      destruct (va - ua) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H18.
+      assert (ua <= 0 < ua + BinInt.Z.of_nat (Pos.to_nat p)) by lia.
+      apply H18 in H2.
+      destruct H2 as [na [ta [X1 [X2 X3]]]].
+      symmetry in X1. apply replicate_nth in X1; subst.
+      rewrite Z.add_0_r in X2.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      unfold scope_set_add in *.
+      specialize (or_checked ta) as A1. destruct A1.
+      constructor; try easy.
+      apply TyLitTainted; eauto.
+      inv H21. inv H22. assert (ua = 0) by lia;subst. assert (va = 1) by lia ; subst.
+      inv H17. constructor; try easy. constructor. constructor.
+      inv H7. simpl in *. apply H18 in H.
+      destruct H as [na [ta [X1 [X2 X3]]]].
+      simpl in *. inv X1. rewrite Z.add_0_r in X2.
+      specialize (or_checked (TPtr m w)) as A1. destruct A1.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      constructor; try easy. apply TyLitTainted; try easy.
+      assert (simple_type (TPtr Checked (TArray l h tv))).
+      unfold simple_type in *. easy.
+      apply simple_type_array_num in H2 as A1. clear H2.
+      destruct A1 as [B1 B2]. destruct B1 as [la B1]; subst.
+      destruct B2 as [ha B2]; subst. inv H16. inv H21. inv H7.
+      destruct (ha - la) as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H18.
+      assert (la <= 0 < la + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H18 in H2.
+      destruct H2 as [na [ta [X1 [X2 X3]]]].
+      symmetry in X1. apply replicate_nth in X1; subst.
+      rewrite Z.add_0_r in X2. unfold scope_set_add in *.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      specialize (or_checked ta) as A1. destruct A1.
+      constructor; try easy. apply TyLitTainted; eauto.
+      assert (simple_type (TPtr Checked (TNTArray l h tv))).
+      unfold simple_type in *. easy.
+      apply simple_type_nt_num in H2 as A1. clear H2.
+      destruct A1 as [B1 B2]. destruct B1 as [la B1]; subst.
+      destruct B2 as [ha B2]; subst. inv H16. inv H21. inv H7.
+      destruct (ha - la + 1)  as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H18.
+      assert (la <= 0 < la + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H18 in H2.
+      destruct H2 as [na [ta [X1 [X2 X3]]]].
+      symmetry in X1. apply replicate_nth in X1; subst.
+      rewrite Z.add_0_r in X2. unfold scope_set_add in *.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in X2; try easy. inv X2.
+      specialize (or_checked ta) as A1. destruct A1.
+      constructor; try easy. apply TyLitTainted; eauto.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      assert (is_checked (TPtr Checked (TArray l h t'))). constructor. easy.
+      inv H9. inv HTy; try easy. inv H5.
+      assert (simple_type t'). unfold simple_type in *.
+      simpl in *. apply app_eq_nil in H16. destruct H16.
+      apply app_eq_nil in H2. destruct H2. easy.
+      apply eval_type_bound_idempotent with (s := s') in H as X1.
+      apply eval_type_bound_preserve with (t' := t') in H15; try easy; subst.
+      inv H14; try easy. exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv HEwf. inv H5; try easy. inv H15; try easy.
+      inv H5; try easy. inv H15. constructor; try easy. constructor. constructor.
+      inv H19.
+      apply TyLitTainted; try easy. intros R. inv R. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      inv H9.
+      inv HTy; try easy. inv H9. easy. inv H5.
+      apply eval_type_bound_idempotent with (s := s') in H14 as X1.
+      inv X1. inv H2. apply eval_type_bound_preserve with (t' := t') in H13; try easy; subst.
+      inv H12; try easy.
+      inv HEwf. inv H4; try easy. inv H12; try easy. inv H4; try easy.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv H12. constructor;try easy. constructor. constructor.
+      inv H17; try easy.
+      apply TyLitTainted; eauto. intros R. inv R. easy.
+      unfold simple_type in *.
+      simpl in *. apply app_eq_nil in H14. destruct H14.
+      apply app_eq_nil in H2. destruct H2. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      destruct H as [X1 [X2 X3]];subst.
+      inv H2; try easy. inv HTy; try easy. inv H9. inv H5.
+      apply eval_type_bound_idempotent with (s := s') in H14 as X1.
+      inv X1. inv H2.
+      apply eval_type_bound_preserve with (t' := t') in H16; try easy; subst.
+      apply simple_type_nt_num in H14 as X1. destruct X1 as [A1 A2].
+      destruct A1 as [ua A1];subst. destruct A2 as [va A2];subst.
+      inv H13; try easy.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. 
+      specialize (or_checked tv) as A1.
+      destruct A1. inv X2. constructor; try easy.
+      constructor. inv H15; try easy.
+      apply Heap.mapsto_in in H10. 
+      assert ((H1, H3) = (H1, H3)) by easy. apply HRwf in H2. destruct H2.
+      apply H2 in H10. lia. unfold eval_bound in H6, H9. inv H6. inv H9.
+      assert (TPtr Checked (TNTArray (Num ua) (Num va) (TPtr m w))
+        = TPtr Checked (TNTArray (Num ua) (Num va) (TPtr m w))) by easy.
+      apply H12 in H2.
+      inv H7. inv H6; try easy. inv H13.
+      specialize (H22 0).
+      destruct (va - ua + 1)  as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H22.
+      assert (ua <= 0 < ua + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H22 in H6.
+      destruct H6 as [na [ta [A1 [A2 A3]]]].
+      symmetry in A1. apply replicate_nth in A1; subst.
+      rewrite Z.add_0_r in A2. unfold scope_set_add in *.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in A2; try easy. inv A2.
+      constructor; try easy.
+      assert (simple_type (TPtr Checked (TNTArray l h (TPtr m w)))).
+      unfold simple_type in *. easy.
+      apply simple_type_nt_num in H6. destruct H6 as [A1 A2]. destruct A1 as [ub A1];subst.
+      destruct A2 as [vb A2];subst.
+      inv H18. inv H24. inv H13.
+      specialize (H22 0).
+      destruct (vb - ub + 1)  as [| p | ?] eqn:Hp; zify; [lia | |lia].
+      rewrite replicate_length in H22.
+      assert (ub <= 0 < ub + Z.of_nat (Pos.to_nat p)) by lia.
+      apply H22 in H6.
+      destruct H6 as [na [ta [A1 [A2 A3]]]].
+      symmetry in A1. apply replicate_nth in A1; subst.
+      rewrite Z.add_0_r in A2. unfold scope_set_add in *.
+      apply Heap.mapsto_always_same with (v1 := (n1, t1)) in A2; try easy. inv A2.
+      constructor; try easy.
+      apply TyLitTainted; eauto.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      assert (is_checked (TPtr Checked (TNTArray l h t'))). constructor. easy.
+      inv HTy; try easy. inv H9. inv H5.
+      apply eval_type_bound_idempotent with (s := s') in H16 as X1.
+      inv X1. inv H2.
+      apply eval_type_bound_preserve with (t' := t') in H15; try easy; subst.
+      inv H14; try easy.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv X2. constructor; try easy. constructor. constructor.
+      inv HEwf; try easy. inv H4; try easy.
+      inv H14; try easy. inv H4; try easy.
+      apply TyLitTainted; try easy.
+      intros R. inv R. inv H19. easy.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H16. destruct H16. apply app_eq_nil in H2. destruct H2. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      inv HEwf. inv H4; try easy. inv H7; try easy. inv H9.
+      inv HTy; try easy. inv H7.
+      apply eval_type_bound_idempotent with (s := s') in H16 as X1.
+      inv X1. inv H2.
+      apply eval_type_bound_preserve with (t' := t') in H18; try easy; subst.
+      inv H12; try easy.
+      exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv X2. constructor; try easy. constructor. constructor.
+      apply TyLitTainted; try easy. intros R. inv R.
+      inv H15. easy. unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      apply eval_type_bound_idempotent with (s := s') in H8 as X1.
+      inv X1. inv H2. inv H7.
+      apply eval_type_bound_preserve with (t' := t') in H18; try easy; subst.
+      inv H12; try easy. exists env,tv.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split. apply rheap_consistent_refl.
+      split; try easy.
+      split. apply env_consist_refl.
+      split. inv X2. constructor; try easy. constructor. constructor.
+      apply TyLitTainted; try easy.
+      intros R. inv R. inv H4. inv H13. easy. easy.
+      unfold simple_type in *. simpl in *.
+      apply app_eq_nil in H8. destruct H8. apply app_eq_nil in H2. destruct H2. easy.
+      exists tv. split. apply type_eq_refl. repeat constructor.
+      inv HEwf. specialize (IH H3 Henvt s).
+      edestruct IH; eauto.
+      apply step_implies_reduces_1 with (cm := m) (m := Checked) (E := E) in H2; try easy.
+      apply H2.
+      destruct H0 as [ta [X1 [X2 [X3 [X4 [X5 [X6 [X7 X8]]]]]]]].
+      destruct HPtrType. destruct H0; subst.
+      apply eq_subtype_ptr_form in X8 as X9; try easy.
+      destruct X9 as [tb [A1 A2]].
+      exists x,tb.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split; try easy.
+      split.
+      destruct A2;subst.
+      apply TyDeref with (m' := m') (t := (TPtr m' tb)) (l := Num 0) (h := Num 0); try easy.
+      left. split. eapply type_eq_word; eauto. easy.
+      destruct H1. destruct H1 as [ua [va [B1 [B2 B3]]]];subst.
+      apply TyDeref with (m' := m') (t := (TPtr m' (TArray ua va tb))) (l := ua) (h := va); try easy.
+      right. left. split. easy. split. eapply type_eq_word; eauto. easy.
+      
   Abort.
-
+ 
 
 (*
 

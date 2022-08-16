@@ -2889,9 +2889,9 @@ Inductive step
     eval_type_bound s (TPtr Checked t) t2 ->
     Heap.MapsTo n (n1, t1) H1 ->
     (forall l h t',
-        t2 = TPtr Checked (TArray (Num l) (Num h) t') -> l <= n < h) ->
+        t2 = TPtr Checked (TArray (Num l) (Num h) t') -> l <= 0 < h) ->
     (forall l h t',
-        t2 = TPtr Checked (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
+        t2 = TPtr Checked (TNTArray (Num l) (Num h) t') -> l <= 0 < h) ->
     @get_root D t2 tv ->
     step D F
       (s, (H1,H2)) (EDeref (ELit n (TPtr Checked t)))
@@ -2901,9 +2901,9 @@ Inductive step
     Heap.MapsTo n (n1, t1) H2 ->
     well_typed_lit_tainted D F H2 empty_scope n1 t1 ->
     (forall l h t',
-        t2 = TPtr Tainted (TArray (Num l) (Num h) t') -> l <= n < h) ->
+        t2 = TPtr Tainted (TArray (Num l) (Num h) t') -> l <= 0 < h) ->
     (forall l h t',
-        t2 = TPtr Tainted (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
+        t2 = TPtr Tainted (TNTArray (Num l) (Num h) t') -> l <= 0 < h) ->
     @get_root D t2 tv ->
     step D F
       (s, (H1,H2)) (EDeref (ELit n (TPtr Tainted t)))
@@ -3729,11 +3729,11 @@ Section Typing.
       well_typed env Q Checked (EDynCast (TPtr m (TArray x y t)) e) (TPtr m (TArray x y t))
 
 
-  | TyDeref : forall env Q m e m' t l h t' t'',
+  | TyDeref : forall env Q m e m' t l h t',
       well_typed env Q m e t ->
-      ((word_type t'' /\ t'' = t')
-       \/ (t'' = TArray l h t' /\ word_type t' /\ type_wf D  m' t')
-       \/ (t'' = TNTArray l h t' /\ word_type t') /\ type_wf D  m' t') ->
+      ((word_type t' /\ t = TPtr m' t')
+       \/ (t = TPtr m' (TArray l h t') /\ word_type t' /\ type_wf D  m' t')
+       \/ (t = TPtr m' (TNTArray l h t') /\ word_type t' /\ type_wf D  m' t')) ->
       mode_leq m' m ->
       well_typed env Q m (EDeref e) t'
 

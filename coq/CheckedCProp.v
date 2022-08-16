@@ -99,7 +99,7 @@ Section RealHeapProp.
   Variable m : mode.
 
   Definition rheap_wf (R : real_heap) : Prop := forall Hchk Htnt,
-      R = (Hchk, Htnt) -> heap_wf Hchk.
+      R = (Hchk, Htnt) -> heap_wf Hchk /\ heap_wf Htnt.
 
 (*
   Definition is_checked (t:type) := match t with TNat => True | TPtr m w => (m = Checked) | _ => False end.
@@ -381,6 +381,13 @@ Lemma or_nt_ptr: forall t, is_nt_ptr t \/ ~ is_nt_ptr t.
 Proof.
   intros. destruct t; simpl in *; try (right;easy).
   destruct t; try (right;easy). left. easy.
+Qed.
+
+Lemma or_checked: forall t, is_checked t \/ ~ is_checked t.
+Proof.
+  intros. destruct t; simpl in *; try (right;easy). left. constructor.
+  destruct m. left. constructor. right.
+  intros R. inv R. right. intros R. inv R.
 Qed.
 
 Lemma type_eq_word: forall Q t t', word_type t -> type_eq Q t' t -> word_type t'.
@@ -1086,6 +1093,12 @@ Proof.
   intros. inv H; try easy. apply subtype_core_not_check in H1; try easy.
   assert (is_checked (TPtr Checked (TFun xl t'0 tl'))).
   constructor. easy.
+Qed.
+
+Lemma subtype_check: forall Q m t t', subtype Q (TPtr Checked t) (TPtr m t')
+    -> m = Checked.
+Proof.
+  intros. inv H; try easy. inv H0; eauto.
 Qed.
 
 Lemma eq_subtype_not_checked: forall Q t t', eq_subtype Q t t' 
