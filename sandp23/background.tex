@@ -293,6 +293,8 @@ At line 8, depending on the NT-array size, \code{free(s[10])} might crash.
   could be valid since \code{p} is not yet freed.
   % 
 }
+%
+\mz{I changed a lot in this paragraph. Please compare with the previous commit.}
 % 
 Enlightened by program partitioning mechanism, \mzr{we address the crashes
   caused by spatial safety violation by sandboxing} the unchecked code regions
@@ -507,7 +509,7 @@ function pointer.  For example, \code{tainted_compare_1} and
 \code{tainted_stringsort} in \Cref{fig:checkedc-example-2} are the tainted
 shells of the checked functions \code{compare_1} and \code{stringsort},
 respectively.  In the tainted shells, \mzr{the types of} \mzs{arguments}
-\mzr{parameters} are the tainted \mzr{counterparts} \mzs{\versions of the
+\mzr{parameters} are the tainted \mzr{counterparts} \mzs{versions of the
   corresponding arguments} in the \mzr{original} checked \mzs{functions}
 \mzr{ones}.  
 % 
@@ -517,28 +519,32 @@ Inside the shell body, \mzr{the compiler} \mzs{we} \mzu{creates checked pointer
   pointers are just memory address. It's copying data that really helps. } 
 % 
 In addition, once the checked function returns, if the output is a checked
-pointer, we copy its data to a new tainted pointer and return it.
-\Cref{fig:checkedc-example-3} line 42 is an example of serving the function call
-living in an unchecked region with a tainted shell pointer argument
-\code{tainted_compare_1}.  Even if $g$ derandomizes its address (line 14), the
-shell address is in the sandbox and has no harm, and calling the shell never
-exposes any checked pointer information outside of the shell.
+pointer, we copy its data to a new tainted pointer and return it \mzr{so that
+  the tainted caller only observes tainted pointer that points to data in
+  unchecked heap}.  \Cref{fig:checkedc-example-3} line 42 is an example of
+\mzr{passing a tainted shell pointer as an argument to the function issued from
+  an unchecked region} \mzs{serving the function call living in an unchecked
+  region with a tainted shell pointer argument \code{tainted_compare_1}}.  Even
+if $g$ derandomizes its address (line 14), the shell address \mzs{is} in the
+sandbox \mzs{and} has no harm \mzs{, and} \mzr{because} calling the shell never
+\mzr{leaks} \mzs{exposes} any checked pointer information outside of the shell.
 % 
 
 % 
 Conceptually, the shell is run in a checked region.  Essentially, a tainted
 shell is a safe closure that contains a checked block.  Once the closure is
-called, the system is turned to a checked region.  For example,
-\Cref{fig:checkedc-example-2} line 25 surrounds the tainted shell body with a
-$\echeckedtext$ block indicating that we context-switch from the unchecked to
-checked code region; thus, the checked function call at
+called, the system \mzr{switches into the checked mode} \mzs{is turned to a
+  checked region}.  For example, \Cref{fig:checkedc-example-2} line 25 surrounds
+the tainted shell body with a $\echeckedtext$ block indicating that we
+\mzu{context-switch} \mz{potential term abuse; ``switch'' would suffice} from
+the unchecked to checked code region; thus, the checked function call at
 \Cref{fig:checkedc-example-2} line 14 is safe, even if it is called by $g$ in
-\Cref{fig:checkedc-example-3} , because it lives in the checked region.  In the
-\systemname formalism, we formalize a \textit{checked} block on top of the
+\Cref{fig:checkedc-example-3}, because it lives in the checked region.  In the
+\systemname{} formalism, we formalize a \textit{checked} block on top of the
 existing unchecked regions, and the transition of a tainted shell call creates a
-checked block containing the shell body.  We also make sure that no arguments in
-these tainted shell contains any checked pointers, as well as no output is of a
-checked type.
+checked block containing the shell body.  We also make sure that no
+arguments\mzr{, as well as the output, }in \mzr{any} \mzs{these} tainted shell
+contains any checked pointers\mzs{, as well as no output is of a checked type}.
 %
 
 \mz{Shell vs. Wrapper? Shell reminds me of bash. }
