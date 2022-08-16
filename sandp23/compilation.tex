@@ -54,7 +54,7 @@ that track array bound information, which is used in premises
 of rules like \textsc{S-DefArray} and
   \textsc{S-AssignArr} to prevent spatial safety violations.
 The \checkedc compiler \cite{li22checkedc} inserted additional pointer checks 
-for verifying pointers being not null and the bounds are within their limits.
+for verifying pointers are not null and the bounds are within their limits. \lc{what does it mean by bounds within limits?}
 The latter is done by introducing additional shadow variables for storing (NT-)array pointer bound information.
 
 \begin{figure}[t!]
@@ -80,10 +80,10 @@ The latter is done by introducing additional shadow variables for storing (NT-)a
 \end{figure}
 
 In \systemname, context and pointer modes determine the particular heap/function store that a pointer points to,
-i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions.
+i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions. \lc{context mode doesn't determine where pointer points to but check if it is valid to point to that region?}
 Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
-In the compiled LLVM code, pointer access operations have different syntax when the modes are different.
-\Cref{fig:flagtable} lists the different compiled syntax for a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
+In the compiled LLVM code, pointer access operations have different syntaxes when the modes are different. \lc{should we explain why we use different syntax instead of compiling the corresponding heap to llvm}
+\Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
 For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
 This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
@@ -94,7 +94,7 @@ we present a compilation algorithm that converts from
 \lang to \elang, an untyped language without metadata
 annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
 In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
-$\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
+$\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$. \lc{strlen?}
 The algorithm sheds
   light on how compilation can be implemented in the real Checked C
   compiler, while eschewing many vital details (\elang has many 
@@ -126,7 +126,9 @@ each variable \code{p} to a pair of \emph{shadow
   variables} that keep \code{p}'s up-to-date upper and lower bounds. 
 These may differ from the bounds in \code{p}'s type due to bounds
 widening.\footnote{Since lower bounds are never widened, the
-  lower-bound shadow variable is unnecessary; we include it for uniformity.}
+  lower-bound shadow variable is unnecessary; we include it for uniformity.} 
+\lc{These two sentences are confusing. }
+
 % When $\Gamma$,$\Theta$ and $\rho$ are all empty, we write $e \gg \dot e$ rather than the
 % complete judgment, implicitly assuming that $e$ is a well-typed and closed
 % term.
@@ -155,7 +157,7 @@ $e$, for all $e$.
 \subsection{Approach}
 
 Due to space constraints, we explain the rules for compilation by
-example, using a C-like syntax; the complete rules are given in
+examples, using a C-like syntax; the complete rules are given in
 \iftr
 Appendix~\ref{appx:comp1}.
 \else
@@ -256,10 +258,10 @@ deref_array(5, p0, q0);
 
 \myparagraph{Pointer Accesses and Modes}
 %
-In every declaration (or the beginning of a function body) of a pointer,
-if the poniter is an (NT-)array one,
-we first allocates two \emph{shadow variables}
-to track the lower and upper bounds potentially changed for pointer arithmetic and NT-array bound widening.
+In every declaration \lc{(or the beginning of a function body) why?} of a pointer,
+if the poniter is an (NT-)array,
+we first allocate two \emph{shadow variables}
+to track the lower and upper bounds which are potentially changed for pointer arithmetic and NT-array bound widening.
 Each $\cmode$-mode NT-array pointer variable is associated with its type information in a store.
 Additionally, we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
 In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9 and 10), 
@@ -630,3 +632,4 @@ ones that have a non-empty heap.
 
 
 % }
+
