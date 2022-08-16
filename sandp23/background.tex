@@ -1,17 +1,16 @@
 \section{Overview and Transcendence}\label{sec:overview}
-
-This section describes \checkedc and new features \systemname provides.
-
+This section describes \checkedc{} and new features \systemname{} provides.
 
 \subsection{\checkedc Overview}
-
-\checkedc Development began in 2015 by Microsoft Research, but it was forked
+% 
+\checkedc{} development began in 2015 by Microsoft Research, but it was forked
 in late 2021 and is now actively managed by the Secure Software
 Development Project (SSDP). Details can be found in a prior
 overview~\cite{Elliott2018} or the formalism~\cite{li22checkedc}.
+%
 
 \myparagraph{Checked Pointer Types}
-\checkedc introduces three varieties of \emph{checked pointer}:
+\checkedc{} introduces three varieties of \emph{checked pointer}:
 \begin{itemize}
 \item \code{ptr<}$T$\code{>} types a pointer that is either null or
   points to a single object of type $T$.
@@ -56,42 +55,64 @@ terminator. To address this problem, Checked C supports \emph{bounds
 If $p$'s bounds expression is \code{bounds}$(e_l$,$e_h)$ a program may read from (but not
 write to) $e_h$; when the compiler notices that a non-null character
 is read at the upper bound, it will extend that bound to $e_h+1$.
-% \liyi{solved: II.B.: LaTeX issue, your inline monospaced code snippets generate a space on
+% pp\liyi{solved: II.B.: LaTeX issue, your inline monospaced code snippets generate a space on
 %   the following line (i.e. "a program may read from (but not write to)" is not
 %   aligned with the left boundary of the paragraph).}
 
 \myparagraph{Spatial Safety and Backward Compatibility}
 %
-\checkedc is backward compatible with legacy C in the sense that all
-legacy code will type-check and compile. However, only code that
-appears in \emph{checked code regions}, which we call \emph{checked code},
-is spatially safe. Checked regions can be designated at the level of
-files, functions, or individual code blocks, the first with a
-\code{#pragma} and the latter two using the \code{checked}
-keyword.\footnote{You can also designate \emph{unchecked} regions
-  within checked ones.}  Within checked regions, both
-legacy pointers and certain unsafe idioms (e.g., \emph{variadic} function
-calls) are disallowed. The code in Fig.~\ref{fig:checkedc-example}
-satisfies these conditions and will type-check in a checked region.
+\checkedc is backward compatible with legacy C in the sense that all legacy code
+will type-check and compile. However, only code that appears in \emph{checked
+  code regions}, which we call \emph{checked code}, is spatially safe. Checked
+regions can be designated at the level of files, functions, or individual code
+blocks, the first with a \code{#pragma} and the latter two using the
+\code{checked} keyword.\footnote{You can also designate \emph{unchecked} regions
+  within checked ones.}  Within checked regions, both legacy pointers and
+certain unsafe idioms (e.g., \emph{variadic} function calls) are disallowed. The
+code in Fig.~\ref{fig:checkedc-example} satisfies these conditions and will
+type-check in a checked region.
 
-How should we approach code that has both checked and legacy
-components? \citet{li22checkedc} proved, for a simple
-formalization of \checkedc, that \emph{checked code cannot be blamed}:
-Any spatial safety violation is caused by the execution of unchecked
-code. 
+How should we approach code that has both checked and legacy components?
+\citet{li22checkedc} proved, for a simple formalization of \checkedc, that
+\emph{checked code cannot be blamed}: Any spatial safety violation is caused by
+the execution of unchecked code.
+%
+\mz{You might want to add that spatial safety violation is still there with the
+  amalgamation of both checked and unchecked code which gave rise to the
+  motivation of \systemname.
+}
+% 
+% 
 
 \myparagraph{Converting C to \checkedc}
 %
-The safety guarantees of Checked C come with certain restrictions. For instance, as shown below, Checked C programs cannot use address-taken variables in a bounds expression as the bounds relations may not hold because of possible modifications through pointers.
+The safety guarantees of Checked C come with certain restrictions. For instance,
+as shown below, Checked C programs cannot use address-taken variables in a
+bounds expression as the bounds relations may not hold because of possible
+modifications through pointers.
+% 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 ...
 array_ptr<int> p : count (n) = NULL;
 |\textcolor{red}{\faTimes}|..,&n,.
 \end{minted}
-Consequently, converting existing C programs to Checked C might require refactoring, e.g., modifying the above program to not use~\inlinecode{&n} expression, which might require considerable effort~\cite{duanrefactoring} depending on the program's complexity. 
-Recently, Machiry et al. developed~\threec~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
-However, as described in \threec, complete automated conversion is infeasible and requires the developer to convert some code regions manually.
-Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked, or safe regions).
+% 
+Consequently, converting existing C programs to Checked C might require
+refactoring, e.g., eliminate~\inlinecode{&n} from the program above without
+changing its functionality.
+% 
+This might require considerable effort~\cite{duanrefactoring} depending on the
+program's complexity.
+% 
+Recently, Machiry et al. developed~\threec~\cite{machiry2022c} that tries to
+automatically convert a program to Checked C by adding appropriate pointer
+annotations.  However, as described in \threec, completely automated conversion
+is \emph{infeasible}, and it requires the developer to convert some code regions
+manually.  
+% 
+Although the backward compatibility of Checked C helps a partially annotated
+program to enjoy spatial memory safety on those regions using only Checked
+pointers (i.e., checked, or safe regions), \mz{then what?}.
 
 \begin{figure}[t]
 {\small
@@ -254,97 +275,280 @@ Here, we discuss three key new features in \systemname with examples.
 
 \myparagraph{Maintaining Non-crashing}
 Previously, the main guarantee of \checkedc \cite{li22checkedc} was the blame theorem.
-The sources of crashing in \checkedc are (1) unchecked regions crash themselves;
-  and (2) the misuse of checked pointers in unchecked regions.
-For example, at \Cref{fig:checkedc-example-3} line 31,
-we called an unchecked function \code{f} with a checked null-terminated array (NT-array) pointer argument.
+The sources of crashing in \checkedc{} are (1) \mzr{crashes in unchecked regions}
+and (2) the misuse of checked pointers in unchecked regions.
+% 
+For example, at \Cref{fig:checkedc-example-3} line 31, we passed a checked
+null-terminated array (NT-array) pointer into an unchecked function \code{f}.
+% 
 At line 8, depending on the NT-array size, \code{free(s[10])} might crash.
-Even if it does not crash, line 38 is doomed because of the \code{free} call.
-
-Enlightened by program partitioning mechanism,
-we sandbox the unchecked code regions and utilize the \checkedc type system
-to disallow checked pointers to be used in an unchecked code region. 
-To achieve the communication between checked and unchecked code regions,
-Tainted pointers can be shared by different regions,
-whose data are stored in the sandboxed unchecked heap.
-Users are required to copy checked data to tainted pointers before they are shared in unchecked regions.
-For example,  we copy the checked pointer data to the tainted pointer \code{tp}
+% 
+\mzu{Even if it does not crash, line 38 is doomed because of the \code{free} call.}
+% 
+\mz{                            %
+  % 
+  That's not true:
+  %
+  Line 38 assigns the address of a constant char array to \code{p[10]} which
+  could be valid since \code{p} is not yet freed.
+  % 
+}
+%
+\mz{I changed a lot in this paragraph. Please compare with the previous commit.}
+% 
+Enlightened by program partitioning mechanism, \mzr{we address the crashes
+  caused by spatial safety violation by sandboxing} the unchecked code regions
+and utilize the \checkedc{} type system to rule out checked pointers from any
+unchecked regions.
+%
+\mzr{ % 
+  % 
+  Besides, we incorporate a new form of pointer, \emph{tainted pointer}, into
+  our existing \checkedc{} system to allow the interaction between checked and
+  unchecked code regions.
+  %
+  A tainted pointer can be used in both checked and unchecked region; but it can
+  only point to \emph{unchecked} heap memory so that the integrity of checked
+  region would not be compromised by writes issued by unchecked code.
+  %
+  Hence to pass a piece of data from a checked region to an unchecked one using
+  a tainted pointer, instead of exposing the address directly, the user would
+  need to copy it from checked region to the unchecked heap and create a tainted
+  pointer to refer to the copy.
+% 
+}
+% 
+For example, we copy the checked pointer data to the tainted pointer \code{tp}
 at \Cref{fig:checkedc-example-3} line 26,
 and input the tainted pointer to the unchecked function at line 34.
 At line 8, even if statement might crash, since tainted pointers are stored
 in the sandboxed heap, it can be recovered.
-At line 37, the use of a tainted pointer in a checked region
-requires a verification on it.
-This is managed by inserting additional checks
-and creating exception handling before the use by the \systemname compiler.
+\mzu{
+  % 
+  At line 37, the use of a tainted pointer in a checked region
+  requires a verification on it.
+  % 
+  This is managed by inserting additional checks
+  and creating exception handling before the use by the \systemname compiler.
+  % 
+}
+\mz{
+  Might as well state separately that dynamic checkes are instructmented upon
+  dereferncing a tainted pointer in checked region.  
+}
+% 
 Thus, the checked pointer \code{p} is safely used at line 38.
+% 
 
-In \systemname, we prove the non-crashing theorem;
-.i.e, any well-typed \systemname program program can never crash due to spatial safety violations.
+% 
+\mz{The example itself is a bit confusing.
+  %
+  There are a few simplifications can be made here:
+  % 
+  (1) introduce a macro: \code{#define nt_ptr nt_array_ptr} to make the example
+  less verbose;
+  % 
+  (2) split untangle BAD and GOOD code into 2 fragments, listed side-by-side.
+  %
+  (3) use more descriptive function name instead of \code{f}, \code{g}
+}
+% 
 
-\myparagraph{Formalism Function Pointers}
-In C, manipulating function pointers is a major way of 
-implementing high order functions as well as accessing data stored in classes.
-Previously, \checkedc assumed all function calls are called by name to a global map.
-In \systemname, we formalize function pointers and maintain the \systemname type soundness.
+% 
+In \systemname{}, we prove the non-crashing theorem: any well-typed
+\systemname{} program program can \emph{never crash} due to spatial safety
+violations, \mzr{i.e., spatial safety violation can be caught at runtime.}
+% 
 
-\Cref{fig:checkedc-example-1} defines a string sorting algorithm
-depending on the input function pointer \code{cmp} that provides the generic order for strings,
-and \code{compare_1} is an example \code{cmp} function
-that adds the ASCII numbers of characters in the two strings and compare the results.
-In addition, function pointers enable the callback mechanism,
-i.e., a server sends a function pointer to a client in an unchecked region,
-and allows the client to access some server resources by calling back the pointer.
-This is a common usage between a web-browser and untrusted third-party libraries.
-The function call in \Cref{fig:checkedc-example-3} line 34 is one such usage.
+%
+\mz{``catching a SSV at runtime'' may sound more appealing and more of
+  an application?
+  %
+  Assume audience here are still general; they could prefer more application
+  over high-level ideas?
+}
+% 
 
-We also utilize \systemname subtyping relation to permit function pointer static auto-casting.
-Function pointer type information might contain array pointer bound information,
-for which it is inconvenient to coincide the defined types for a function implementation and the function pointer type. 
-For example, the \code{cmp} argument in \code{stringsort} (\Cref{fig:checkedc-example-1})
-has type \code{ptr<(int)(nt_array_ptr<char>, nt_array_ptr<char>)>},
-meaning that the function takes two NT-array pointers with arbitrary size and outputs an integer.
-The function \code{compare_1}'s pointer has type \code{ptr<(int)(nt_array_ptr<char> : count (0), nt_array_ptr<char> : count (0) )>}
-To use \code{compare_1} in \code{stringsort}, the type is auto-cast to the \code{cmp}'s type.
-In general, if function pointer $x$ has type $* (tl \to t)$, and  $y$ has $* (tl' \to t')$,
-in order to use $x$ as $y$, $tl'$ should be a subtype of $tl$ and $t$ subtypes to $t'$.
+% 
+\myparagraph{\mzs{Formalism}\mzr{Formalizing} Function Pointers}
+% 
+In C, manipulating function pointers is a major way of implementing high order
+functions as well as accessing data stored in structs.  In previous works,
+\checkedc{} assumed all function calls are called by name to a global map.
+\mz{Global map can be confusing.}
+% 
+In \systemname{}, we \mzr{extend the existing formalism with} \mzs{formalize}
+function pointers and prove that the type soundness \systemname{} is preserved.
+% 
 
+%
+\mz{I'm trying to make it simpler. Let's rename \code{compare_1} to
+  \code{cmp_sum}. I assume the minumun knowledge of C for readers so that they
+  know sum of string is by the ASCII encoding. }
+% 
+\Cref{fig:checkedc-example-1} defines a string sorting algorithm depending on
+the input function pointer \code{cmp} \mzr{as a string comparator}
+\mzs{that provides the generic order for strings}; and,
+\mzr{                           %
+  %
+  \code{cmp_sum} is an example of \code{cmp} function that compares strings by
+  the sum of all characters in each of them.
+  % 
+} %
+\mzs{                           %
+  % 
+  \code{compare_1} is an example \code{cmp} function that adds the
+  ASCII numbers of characters in the two strings and compare the results.
+  % 
+} %
+%
+
+% 
+In addition, function pointers enable the callback mechanism, i.e., a server
+sends a function pointer to a client in an unchecked region, and allows the
+client to access some server resources by calling back the pointer \mzr{on
+  demand}.  This is a common usage between a web-browser and untrusted
+third-party libraries.  The function call in \Cref{fig:checkedc-example-3} line
+34 is one such usage.
+% 
+\mz{It sounds good.
+  % 
+  But, we might as well avoid using server/client here.
+  % 
+  They could potentially divert our motivation from memory-oriented to a network
+  related one or even sync-vs-async discussion.
+  %
+}
+% 
+
+
+%
+\mzr{                           %
+  % 
+  Simply adding function pointer type into the existing is not enough.
+  % 
+  Continuing with the example in \Cref{fig:checkedc-example-1}, we can find out
+  that \code{cmp} argument in \code{stringsort} is not exactly the same with the
+  signature of \code{cmp_sum}: \code{cmp} has type
+  \code{ptr<(int)(nt_array_ptr<char>, nt_array_ptr<char>)>} which takes stwo
+  NT-array pointers with arbitrary size and outputs an integer, but
+  \code{cmp_sum} \uline{ (Wait, what's the exact difference?) We may need to
+    make it clear here}. 
+  %
+  To make function pointers usable, we also defines a subtyping relation in
+  \systemname{} that permits function pointer subsumption.
+  %
+  In this example, the of type \code{cmp_sum} is automatically casted to the
+  type \code{cmp}. 
+  % 
+  In general, if function pointer $x$
+  has type $* (tl \to t)$, and $y$ has $* (tl' \to t')$, in order to use $x$ as
+  $y$, $tl'$ should be a subtype of $tl$ and $t$ subtypes to $t'$.
+}
+% 
+
+% 
+\mzs{
+  % 
+  We also utilize \systemname{} subtyping relation to permit function pointer
+  static auto-casting.  Function pointer type information might contain array
+  pointer bound information, for which it is inconvenient to coincide the
+  defined types for a function implementation and the function pointer type.
+  For example, the \code{cmp} argument in \code{stringsort}}
+% 
+(\Cref{fig:checkedc-example-1})
+% 
+\mzs{
+  % 
+  has type
+  \code{ptr<(int)(nt_array_ptr<char>, nt_array_ptr<char>)>}, meaning that the
+  function takes two NT-array pointers with arbitrary size and outputs an
+  integer.  The function pointer to {\code{compare_1}} has type
+  \code{ptr<(int)(nt_array_ptr<char> : count (0), nt_array_ptr<char> : count (0)
+    )>.}
+  % 
+}
+% 
+\mzs{                           %
+  To use {\code{compare_1}} in \code{stringsort}, the
+  type is auto-cast to the \code{cmp}'s type.  In general, if function pointer $x$
+  has type $* (tl \to t)$, and $y$ has $* (tl' \to t')$, in order to use $x$ as
+  $y$, $tl'$ should be a subtype of $tl$ and $t$ subtypes to $t'$.
+  % 
+}
+  % 
+% 
+\mz{This could make the subtyping sound more natural.}
+% 
+
+% 
 \myparagraph{Not Exposing Checked Pointer Addresses}
-The non-crashing guarantee in \systemname bans the checked pointer manipulation in unchecked code regions.
-Thus, there is no reason to permit checked pointer variable assignments in unchecked regions;
-especially, this might expose a checked pointer address to untrusted parties.
-For example, the call to function $g$ at \Cref{fig:checkedc-example-3} line 41 lives in an unchecked region,
-and $g$ might use some mechanisms, such as derandomizing ASLR \cite{shacham-aslr},
-to achieve the checked pointer address.
-Thus, it enables a third party to access any checked heap and function data by simple pointer arithmetic.
+% 
+The non-crashing guarantee in \systemname{} bans the checked pointer
+manipulation in unchecked code regions. \mzu{Thus, there is no reason to permit
+checked pointer variable assignments in unchecked regions; especially, this
+might expose a checked pointer address to untrusted parties.}  For example, the
+call to function $g$ at \Cref{fig:checkedc-example-3} line 41 lives in an
+unchecked region, and $g$ might use some mechanisms, such as derandomizing ASLR
+\cite{shacham-aslr}, to achieve the checked pointer address.  Thus, it enables a
+third party to access any checked heap and function data by simple pointer
+arithmetic.
+% 
+\mz{
+  Is it rather a consequence of forbidding checked pointer manipulation?
+}
+% 
 
-we prevent any unchecked regions from acknowledging checked pointer variables to avoid the checked pointer address leak.
-In addition, to facilitate checked function callbacks, 
-the \systemname compiler compiles every checked function
-with an additional tainted shell function.
-Users are required to serve unchecked regions with the tainted shell pointer instead of the original checked function pointer.
-For example, \code{tainted_compare_1} and \code{tainted_stringsort} in \Cref{fig:checkedc-example-2} 
-are the tainted shells of the checked functions \code{compare_1} and \code{stringsort}, respectively.
-In the tainted shells, the arguments are tainted versions of the corresponding arguments in the checked functions.
-Inside the shell body, we create checked pointer copies of the tainted arguments, and call the checked functions.
-In addition, once the checked function returns,
-if the output is a checked pointer, we copy its data to a new tainted pointer and return it.
-\Cref{fig:checkedc-example-3} line 42 is an example of serving the function call living in an unchecked region
-with a tainted shell pointer argument \code{tainted_compare_1}.
-Even if $g$ derandomizes its address (line 14), the shell address is in the sandbox and has no harm,
-and calling the shell never exposes any checked pointer information outside of the shell.
+% 
+We prevent any unchecked regions from acknowledging checked pointer variables to
+avoid the checked pointer address leak.  In addition, to facilitate checked
+function callbacks, the \systemname{} compiler compiles every checked function
+with an additional tainted shell function.  Users are required to serve
+unchecked regions with the tainted shell pointer instead of the original checked
+function pointer.  For example, \code{tainted_compare_1} and
+\code{tainted_stringsort} in \Cref{fig:checkedc-example-2} are the tainted
+shells of the checked functions \code{compare_1} and \code{stringsort},
+respectively.  In the tainted shells, \mzr{the types of} \mzs{arguments}
+\mzr{parameters} are the tainted \mzr{counterparts} \mzs{versions of the
+  corresponding arguments} in the \mzr{original} checked \mzs{functions}
+\mzr{ones}.  
+% 
+Inside the shell body, \mzr{the compiler} \mzs{we} \mzu{creates checked pointer
+  copies of the tainted arguments, and call the checked functions}.  \mz{This
+  part is unclear. What do you call copy? Copying pointers doesn't make sense:
+  pointers are just memory address. It's copying data that really helps. } 
+% 
+In addition, once the checked function returns, if the output is a checked
+pointer, we copy its data to a new tainted pointer and return it \mzr{so that
+  the tainted caller only observes tainted pointer that points to data in
+  unchecked heap}.  \Cref{fig:checkedc-example-3} line 42 is an example of
+\mzr{passing a tainted shell pointer as an argument to the function issued from
+  an unchecked region} \mzs{serving the function call living in an unchecked
+  region with a tainted shell pointer argument \code{tainted_compare_1}}.  Even
+if $g$ derandomizes its address (line 14), the shell address \mzs{is} in the
+sandbox \mzs{and} has no harm \mzs{, and} \mzr{because} calling the shell never
+\mzr{leaks} \mzs{exposes} any checked pointer information outside of the shell.
+% 
 
-Conceptually, the shell is run in a checked region.
-Essentially, a tainted shell is a safe closure that contains a checked block.
-Once the closure is called, the system is turned to a checked region.
-For example, \Cref{fig:checkedc-example-2} line 25 surrounds the tainted shell body with a $\echeckedtext$ block indicating
-that we context-switch from the unchecked to checked code region;
-thus, the checked function call at \Cref{fig:checkedc-example-2} line 14 is safe, 
-even if it is called by $g$ in \Cref{fig:checkedc-example-3} , because it lives in the checked region.
-In the \systemname formalism, we formalize a \textit{checked} block on top of the existing unchecked regions,
-and the transition of a tainted shell call creates a checked block containing the shell body.
-We also make sure that no arguments in these tainted shell contains any checked pointers,
-as well as no output is of a checked type.
+% 
+Conceptually, the shell is run in a checked region.  Essentially, a tainted
+shell is a safe closure that contains a checked block.  Once the closure is
+called, the system \mzr{switches into the checked mode} \mzs{is turned to a
+  checked region}.  For example, \Cref{fig:checkedc-example-2} line 25 surrounds
+the tainted shell body with a $\echeckedtext$ block indicating that we
+\mzu{context-switch} \mz{potential term abuse; ``switch'' would suffice} from
+the unchecked to checked code region; thus, the checked function call at
+\Cref{fig:checkedc-example-2} line 14 is safe, even if it is called by $g$ in
+\Cref{fig:checkedc-example-3}, because it lives in the checked region.  In the
+\systemname{} formalism, we formalize a \textit{checked} block on top of the
+existing unchecked regions, and the transition of a tainted shell call creates a
+checked block containing the shell body.  We also make sure that no
+arguments\mzr{, as well as the output, }in \mzr{any} \mzs{these} tainted shell
+contains any checked pointers\mzs{, as well as no output is of a checked type}.
+%
+
+\mz{Shell vs. Wrapper? Shell reminds me of bash. }
+
 
 % \paragraph*{\textbf{NT-array Pointer Formalization}} NT-array pointers point to NT-arrays whose endings are determined by a null (\code{'\0'}). The length of a NT-array is usually not fixed. The two uses of NT-array pointers in \checkedc are branching and \code{strlen} operations. \code{if (*x) }$e_1$\code{ else }$e_2$ branches to $e_1$/$e_2$ depending one the \code{x}'s data, while \code{strlen(x)} computes the length of the NT-array pointed to by \code{x}.
 % \liyi{move to formal and later section.}
@@ -374,6 +578,3 @@ as well as no output is of a checked type.
 % Second, in formalizing the \checkedc language, we investigate the balance between program execution efficiency and user practicality. We re-investigate the \checkedc type system with subtyping relations to make it more efficient and user-friendly.
 % Second, we also develop random testing tools in Redex \cite{pltredex} to test the \checkedc compiler and make sure it is properly developed. We are able to find and reproduce many bugs/faults in the \checkedc compiler \liyi{numbers?}. The random testing tool is able to generate tens of thousands of programs to properly validate the \checkedc compiler. Third, we also spent a great amount of work in developing experiments to compare \checkedc and other existing C-like languages that guarantee the spatial safety and eliminating undefined behaviors. We found that \checkedc keeps the best balance between execution efficiency and user practicality.
 % }
-
-
-

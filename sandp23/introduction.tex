@@ -85,16 +85,39 @@ in which case the unsafe region executions should not affect other parts.
 In this paper, we cover this gap by introducing \systemname,
 combining \checkedc with program partitioning mechanism, 
 making three main contributions.
+%
 
 \myparagraph{Executions Cannot Crash}
-Our first contribution is a clear program partition between checked and unchecked code regions
-and ensures that a \systemname program execution \textit{cannot crash} due to spatial safety violations.
-We restrict the checked and unchecked pointers usage only in checked and unchecked code regions, respectively;
-and develop tainted pointers for the communication between the two regions.
-Heap is partitioned into two parts: a \textit{checked heap} containing all checked pointers
- and an \textit{unchecked heap} that is sandboxed.
-Tainted pointers exist in the unchecked heap region and must be verified each time being used.
-
+\mz{This paragraph sounds incoherent to me.}
+% 
+Our first contribution is a clear program partition between checked and
+unchecked code regions \mzs{and ensures} \mzr{so} that a \systemname program execution
+\textit{cannot crash} due to spatial safety violations.
+\mzr{
+  % 
+  In \systemname, heap is partitioned into two parts: a \textit{checked heap}
+  containing all checked pointers and an \textit{unchecked heap} that is
+  sandboxed.
+  % 
+  Then, we restricted pointer usages so that checked pointers can only refer to
+  checked heap region and unchecked ones can only be used in unchecked heap
+  region.
+  %
+  To communicate safely between those two isolated regions, we developed tainted
+  pointers that is always verified upon accessing data and program in unchecked
+  region.
+  % 
+}
+\mzs{ 
+  % 
+  We restrict the checked and unchecked pointers usage only in checked and
+  unchecked code regions, respectively; and develop tainted pointers for the
+  communication between the two regions.  Heap is partitioned into two parts: a
+  \textit{checked heap} containing all checked pointers and an \textit{unchecked
+    heap} that is sandboxed.  Tainted pointers exist in the unchecked heap
+  region and must be verified each time being used.
+  % 
+}
 
 \myparagraph{Formalizing the Type System, Semantics and Compiler}
 %
@@ -135,19 +158,21 @@ The second one is that a call to a checked pointer in unchecked code regions
 must be surrounded by a \textit{tainted shell}; 
 i.e., a tainted function pointer that points to a checked region possibly holding checked pointers.
 In this case, no checked pointer address will be observed in the unchecked code regions.
-In \systemname, for every checked function, 
-we automatically compile a tainted version by surrounding the function without a tainted shell.
+% 
+\mzu{In \systemname, for every checked function, 
+we automatically compile a tainted version by surrounding the function without a
+tainted shell.}
+\mz{What does this mean?}
+% 
 To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
 
 
-We begin with a review of \checkedc (Section~\ref{sec:overview}) and introduce new features in \systemname,
-present our main contributions
+We begin with a review of \checkedc{} \mzr{and introduction of} new features in
+\systemname (Section~\ref{sec:overview}), present our main contributions
 (Sections~\ref{sec:formal}--\ref{sec:evaluation}), and conclude with a
-discussion of 
-related and future work (Sections~\ref{sec:related},
-\ref{sec:conclude}). All code and proof artifacts (both for Coq and
-Redex) can be found at \url{https://github.com/plum-umd/checkedc}. 
-
+discussion of related and future work (Sections~\ref{sec:related},
+\ref{sec:conclude}). All code and proof artifacts (both for Coq and Redex) can
+be found at \url{https://github.com/plum-umd/checkedc}.
 
 
 \ignore{
