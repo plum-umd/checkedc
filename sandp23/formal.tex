@@ -1,5 +1,17 @@
 \section{Formalization}\label{sec:formal}
-\liyi{This section might say too much, we might cut more here, and put more items in the compilation and implementation. }
+\liyi{This section might say too much, we might cut more here, and put more
+  items in the compilation and implementation. }
+
+\mz{                            %
+  I am wondering if it's still a good idea to talk about syntax, semantics
+  and types separately?
+  %
+  The key of the work is about tainted pointer, functions and blocks instead of
+  the overview of the entire system.
+  %
+  Tearing those topics apart into 3 aspects can lead to incoherence.
+  %
+}
 
 % \begin{itemize}
 % \item Describe the types for checked-C as a graph. \dvh{I don't know what this means.}
@@ -171,10 +183,18 @@ Whether an array pointer is null terminated or not is determined by annotation
 $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
 otherwise (we elide $\cdot$ when writing types).
 \liyi{should have a better way. }
-\lang function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
+% 
+
+\mz{Let's zero in on the function pointer and the mode context formalism.
+We can say something like ``bounds and array ptrs have been studied in [...]''
+already.
+}
+
+% 
+\lang{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
 reflect its dependent function declarations,
 where $\overline{x}$ represents
-a list of \tint type variables in a dependent function header
+a list of \tint{} type variables in a dependent function header
 that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
 \liyi{need to fix, do not understand. }
 We have a well-formed requirement for a function type;
@@ -232,6 +252,16 @@ casts; e.g., the following %
 
 \noindent
 becomes $\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$. 
+
+\mz{
+  I would say that let's just focus on uncheckd and checked.
+  %
+  We can make an simple example that contains a function pointer with dependent
+  parameters; then, explain in great detail what that means.
+  % 
+  Instead of rephrasing the meaning of symbols, we might as well direct the reader
+  to the appendix/previous work for tech details on the last paper. 
+}
 
 \liyi{should we bring out the difference? since readers might not even know the previous paper.}
 Compared to the former \checkedc model \cite{li22checkedc},
@@ -453,6 +483,16 @@ that are not $\echeckedtext$ and $\euncheckedtext$; in such case,
 the function recursively traverses the sub-context to find the context mode.
 \liyi{may be too low-level detailed. describe it in a high level. }
 
+\mz{
+  I don't see the thesis of these first a few paragraphs. 
+  %
+  And, what's the motivation of mode? How on earth this setup solves the
+  problem?
+  %
+  If we're explaining reduction in context, shall we delay the introduction of
+  this context mode now?
+}
+
 % For a term $e$, $C$ is a context if any
 % only if it contains a $\Box$ hole term in one of the subterm position
 % in $e$. $\Box$ indicates the break point where we split $e$ into $C$
@@ -632,6 +672,9 @@ Semantically, $\euncheckedtext$ and $\echeckedtext$ blocks act as classical C bl
 as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
 
 \liyi{Yeah, the block semantics is easy, but is there anything to say? I mean this is the essentially item.}
+\mz{
+  Explain how context mode works here. 
+}
 
 \myparagraph{Binding and Function Calls}
 %
@@ -654,6 +697,13 @@ Function calls are handled by \textsc{S-FunC} and \textsc{S-FunT},
 for $\cmode$ and $\tmode$ mode function pointers, respectively. 
 A call to a function pointer $n$ retrieves
  the function definition in $n$'s location in the global function store $\Xi$,
+ % 
+
+ \mz{
+   The ``global function store'' is what's missing in the background section.  
+ }
+
+% 
 % LEO: This is the first occurence of \Xi. It is explained,
 % but reads a bit awkward as it's unclear this is its "introduction"
 which maps function pointers to
@@ -662,11 +712,18 @@ $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, 
 $\xi$ determines the mode of the function, and $e$ is the
 function body. 
+\mz{
+  ``Function data'' is ``function definition'' right?
+  %
+  This sentence is verbose and contains repetitous words? 
+}
+
+
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
 maps addresses (integer literals) to the function data described above.
 
-The \systemname functions are dependent functions.
+The \systemname{} functions are dependent functions.
 Recall that array
 bounds in types may refer to in-scope variables; e.g., parameter
 \code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
@@ -693,6 +750,7 @@ because we substitute bound variable \code{n} in the
 defined return type with \code{10} from the function call's
 argument list.
 \liyi{This has appeared in the previous paper. A better description or more items? }
+
 Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
   annotations $\overline{\tau_a}$ with
   $\overline{\tau}$ (after instantiation) from the function's
@@ -862,7 +920,9 @@ The condition $m\le m'$ ensures that checked and unchecked pointers
 can only be dereferenced in checked and unchecked regions, respectively;
 The type rules do not attempt to reason whether the access is in bounds;
 such check is deferred to the semantics.
-
+\mz{
+  What about tainted pointers?
+}
 % Subtyping and casting operations are briefly introduced in
 % Sec.~\ref{sec:intros}~and~\ref{sec:overview}.  Subtyping is useful in
 % static casting operations that allow users to view a pointer in one
@@ -883,6 +943,9 @@ such check is deferred to the semantics.
 In \lang, type equality $\tau=_{\Theta}\tau'$
 is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
 and the alpha equivalence of two function types in \Cref{fig:checkc-subtype}.
+\mz{
+  What's ``type construct equivalent relation''?
+}
 Two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
 $\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
 $\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
@@ -894,7 +957,7 @@ permits casting from an expression of type $\tau'$ to a checked pointer when
 $\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
 $\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype} and is built on the type equality
 ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). The many
-rules ensure the relation is transitive. Most of the rules manage
+rules ensure the relation is transitive. \mz{?} Most of the rules manage
 casting between array pointer types. The second rule 
 $0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
 \tarrayptr{b_l}{b_h}{\tau}{m}$ permits treating a singleton
@@ -904,6 +967,10 @@ if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argume
 There is another casting rule in \Cref{app:main} stating that
  users are free to cast types in unchecked code regions, since unchecked regions can contain C code.
 \liyi{why? }
+
+\mz{
+  What changes are maded to bound equality compared to CheckedC?
+}
 
 Since bounds expressions may
 contain variables, determining assumptions like $b_l \leq b_l'$
@@ -1050,6 +1117,7 @@ $\cmode(\tau)$ judges that a constant pointer
 in an unchecked region cannot be of a checked type,
 which represents an assumption that programmers 
 cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+\mz{Or simply a checked pointer is not permitted in an unchecked region? }
 In rule \textsc{T-ConstC}, we requires a static 
 verification procedure for validating a constant pointer, 
 which is similar to the dynamic verification process in \Cref{sec:semantics}. 
@@ -1065,14 +1133,30 @@ A valid function pointer should appear in the right store region ($\cmode$ or $\
 and the address stores a function with the right type.
 \liyi{how? }
 The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
-where every element in the pointer range ($[0,\size(\omega))$) should be well typed.
+where every element in the pointer range ($[0,\size(\omega))$) should be well
+typed.
+\mz{
+  Name those judgements, instead of using ``last rule''.
+  If \(\mathcal{H}(m, n + i)\) refers to the location on \(m\) mode heap,
+  I would prefer \(\mathcal{H}_m\).
+}
 \liyi{only well typed? Can we have a better way to say this? }
+\mz{Is there a typo in the type rule? Is that supposed to be \(n : \tau\) rather
+than \(n : \tau : \tau\)?}
+
 
 A checked pointer checks validity in type step as rule \textsc{T-ConstC},
 while a tainted/unchecked pointer does not check for such during the type checking.
 Tainted pointers are verified through the validity check in dynamic execution as we mentioned above.
 \liyi{This is saying that the validity checks and verification are the same, but the word ''verification'' could be misleading, so maybe change it? }
-
+\mz{Validation instead? 
+  %
+  If for this entire section you want to emphasize what constant pointers are
+  allowed in some specific regions, validation might be much appropriate.
+  % 
+  It might also be worth stated at the beginning that you have two kinds of
+  validation procedures: static one for checked, and instrumented dynamic checks
+  for unchecked region.  }
 
 \liyi{I think unchecked/checked blocks and function calls below can be merged, 
    because this section is small and might not describe the needed items. }
@@ -1088,6 +1172,9 @@ A $\echeckedtext$ or $\euncheckedtext$ block represents
 the context switching from a checked to an checked region, or vice versa.
 We need to make sure no checked pointers are information exposed to unsafe code regions.
 \liyi{example? }
+\mz{
+  Giving a counterexample is sometimes more convincing.
+}
 
 \myparagraph{Let Bindings and Dependent Function Pointers}
 %
@@ -1128,6 +1215,19 @@ depends on \code{n}. The \textsc{T-Fun} rule will substitute
 
 \subsection{Type Soundness, Non-exposure, Non-crashing}\label{sec:theorem}
 
+\mz{
+  Audience might be interested in how the save/load operation in tainted
+  pointers faciliates the interaction between checked and unchecked pointer.
+  %
+  However, I'm wondering if there's any point in the proof have something to do
+  with this idea.
+  %
+  If there is, it's worth talking about than listing well-formedness and
+  consistency.
+  %
+  Also, state the exception mechanism we are using in representing 
+  results in reduction. 
+}
 % Before we present our main theorems, we need to first
 % discuss the meaning what a pointer being well-typed in a given heap
 % snapshot $\heap$ means, which is captured by rules in
@@ -1369,6 +1469,11 @@ if $e$ is well-typed ($\varphi;\Theta\vdash_{\cmode} e :
 $\varphi_i$, $\heap_i$, $e_i$, and $m_i$ for $i\in [1,k]$, such that
 $(\varphi,\heap,e) \longrightarrow_{m_1} (\varphi_1,\heap_1,e_1)\longrightarrow_{m_2} ...\longrightarrow_{m_k} (\varphi_k,\heap_k,r)$, then $r$ can never be \emph{stuck}.
 \end{thm}
+\mz{
+  It's in the footnote. But, we should explain the definition of ``stuck'' in the
+  text. It's not crystal clear.
+}
+
 %{\em Proof:} By induction on the number of steps of the \checkedc
 %evaluation ($\longrightarrow_m^*$), using progress and preservation to
 %maintain the invariance of the assumptions.
