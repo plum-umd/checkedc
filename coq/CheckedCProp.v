@@ -99,7 +99,7 @@ Section RealHeapProp.
   Variable m : mode.
 
   Definition rheap_wf (R : real_heap) : Prop := forall Hchk Htnt,
-      R = (Hchk, Htnt) -> heap_wf Hchk.
+      R = (Hchk, Htnt) -> heap_wf Hchk /\ heap_wf Htnt.
 
 (*
   Definition is_checked (t:type) := match t with TNat => True | TPtr m w => (m = Checked) | _ => False end.
@@ -154,6 +154,29 @@ Section StackProp.
 
 End StackProp. 
 
+
+Section EnvProp.
+  Variable D : structdef.
+  Variable m : mode.
+
+  Lemma env_wt_add_tnat : forall x env,
+      env_wt D m env -> 
+      env_wt D m (Env.add x TNat env).
+  Proof.
+    intros * Henv.
+    unfold env_wt in *.
+    intros x' t Hmap. destruct (Nat.eq_dec x x').
+    - rewrite -> e in *.  apply Env.mapsto_add1 in Hmap.
+      rewrite Hmap; intuition; try constructor; done. 
+    - apply Env.mapsto_add2 in Hmap. 2: intuition. 
+      destruct (Henv x' t); intuition.
+      unfold well_type_bound_in. intros * Hin. cbn in Hin.
+      apply H2 in Hin.
+      destruct (Nat.eq_dec x x0).
+      + apply Env.add_1; done.
+      + apply Env.add_2; done.
+  Qed. 
+End EnvProp.
 
 (* Env consistency *)
 Definition both_simple (t t' :type) := simple_type t -> simple_type t'.
@@ -358,6 +381,13 @@ Lemma or_nt_ptr: forall t, is_nt_ptr t \/ ~ is_nt_ptr t.
 Proof.
   intros. destruct t; simpl in *; try (right;easy).
   destruct t; try (right;easy). left. easy.
+Qed.
+
+Lemma or_checked: forall t, is_checked t \/ ~ is_checked t.
+Proof.
+  intros. destruct t; simpl in *; try (right;easy). left. constructor.
+  destruct m. left. constructor. right.
+  intros R. inv R. right. intros R. inv R.
 Qed.
 
 Lemma type_eq_word: forall Q t t', word_type t -> type_eq Q t' t -> word_type t'.
@@ -923,6 +953,14 @@ End TypeProp.
 #[export] Hint Resolve eval_type_bound_idempotent : ty.
 #[export] Hint Resolve eval_type_bound_simple : ty.
 
+
+Lemma split_zero {A B:Type}: forall (l:list (A*B)), (List.split l).2 = [] -> l = [].
+Proof.
+  induction l;intros;simpl in *; try easy.
+  destruct a. 
+  destruct (split l) eqn:eq1. inv H.
+Qed.
+
 Local Open Scope Z_scope.
 
 Lemma cardinal_not_in :
@@ -1055,6 +1093,12 @@ Proof.
   intros. inv H; try easy. apply subtype_core_not_check in H1; try easy.
   assert (is_checked (TPtr Checked (TFun xl t'0 tl'))).
   constructor. easy.
+Qed.
+
+Lemma subtype_check: forall Q m t t', subtype Q (TPtr Checked t) (TPtr m t')
+    -> m = Checked.
+Proof.
+  intros. inv H; try easy. inv H0; eauto.
 Qed.
 
 Lemma eq_subtype_not_checked: forall Q t t', eq_subtype Q t t' 
@@ -1581,4 +1625,45 @@ Proof.
 Qed.
 
 
+Lemma eq_subtype_ptr_form: forall Q t m t',
+     word_type t' ->
+     eq_subtype Q t (TPtr m t') -> 
+      (exists ta, type_eq Q ta t' /\
+              ( t = (TPtr m ta)
+              \/ (exists u v, (t = TPtr m (TArray u v ta) /\ nat_leq Q u (Num 0) /\ nat_leq Q (Num 1) v))
+              \/  (exists u v, (t = TPtr m (TNTArray u v ta) /\ nat_leq Q u (Num 0) /\ nat_leq Q (Num 1) v)))).
+Proof.
+  intros. destruct H0 as [ta [X1 X2]].
+  inv X2. inv H0; simpl in *; try easy. inv X1.
+  exists t1. split. easy. left. easy.
+  inv X1. inv H2. exists t0. split. easy.
+  right. left. exists b1,b2.
+  split. easy. split. apply nat_leq_trans with (b := l). inv H9. easy. easy.
+  inv H10. eapply nat_leq_trans;eauto.
+  inv X1. inv H2. exists t0.
+  split. easy.
+  right. right. exists b1,b2.
+  split. easy.
+  inv H9. inv H10.
+  split; eapply nat_leq_trans;eauto. inv H. inv H.
+Qed.
+
+Lemma eq_subtype_nt_form: forall Q t m l h t',
+     eq_subtype Q t (TPtr m (TNTArray l h t')) -> 
+      (exists ta u v, type_eq Q ta t' /\
+             t = TPtr m (TNTArray u v ta) /\ nat_leq Q u l /\ nat_leq Q h v).
+Proof.
+  intros. destruct H as [ta [X1 X2]].
+  inv X2. inv H; try easy. inv X1. inv H1.
+  exists t0,b1,b2. split. easy.
+  split. easy. inv H5. inv H6.
+  split. eapply nat_leq_trans;eauto.
+  eapply nat_leq_trans;eauto. easy.
+  inv X1. inv H1.
+  exists t0,b1,b2. split. easy.
+  split. easy. inv H7. inv H8.
+  split. eapply nat_leq_trans;eauto.
+  eapply nat_leq_trans;eauto.
+Qed.
 Local Close Scope Z_scope.
+

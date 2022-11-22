@@ -129,7 +129,6 @@ We present a type-directed program partition technique to separate checked and u
 Our type system restricts checked and tainted (or unchecked) pointers usage only in~\cregion and~\ucregion, respectively.
 Our modular design enables us to use existing sandboxed techniques to enforce memory and execution isolation.
 
-
 \myparagraph{Formalizing the Type System, Semantics and Compiler}
 %
 We developed a core formalism named~\lang, which extends
@@ -165,19 +164,21 @@ The second one is that a call to a checked pointer in unchecked code regions
 must be surrounded by a \textit{tainted shell}; 
 i.e., a tainted function pointer that points to a checked region possibly holding checked pointers.
 In this case, no checked pointer address will be observed in the unchecked code regions.
-In \systemname, for every checked function, 
-we automatically compile a tainted version by surrounding the function without a tainted shell.
+% 
+\mzu{In \systemname, for every checked function, 
+we automatically compile a tainted version by surrounding the function without a
+tainted shell.}
+\mz{What does this mean?}
+% 
 To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
 
 
-We begin with a review of \checkedc (Section~\ref{sec:overview}) and introduce new features in \systemname,
-present our main contributions
+We begin with a review of \checkedc{} \mzr{and introduction of} new features in
+\systemname (Section~\ref{sec:overview}), present our main contributions
 (Sections~\ref{sec:formal}--\ref{sec:evaluation}), and conclude with a
-discussion of 
-related and future work (Sections~\ref{sec:related},
-\ref{sec:conclude}). All code and proof artifacts (both for Coq and
-Redex) can be found at \url{https://github.com/plum-umd/checkedc}. 
-
+discussion of related and future work (Sections~\ref{sec:related},
+\ref{sec:conclude}). All code and proof artifacts (both for Coq and Redex) can
+be found at \url{https://github.com/plum-umd/checkedc}.
 
 
 \ignore{

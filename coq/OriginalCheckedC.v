@@ -3677,41 +3677,25 @@ Proof with eauto 20 with Preservation.
      admit. admit.
     + admit.
   (* T-Malloc *)
-  - inv Hreduces.
-    destruct E; inversion H2; simpl in *; subst.
-    clear H0. clear H8.
-    inv H5.
-    split; eapply alloc_correct; eauto.
+  - admit.
   (* T-Unchecked *)
-  - inv Hreduces.
-    destruct E; inversion H1; simpl in *; subst.
-    + clear H0. clear H7. inv H4. inv HTy...
-    + inversion H7; inversion H0.
+  - admit.
   (* T-Cast *)
-  - inv Hreduces.
-    destruct E; inversion H1; simpl in *; subst.
-    + clear H0. clear H7. inv H4. inv HTy.
-      inv HHwf.
-      inv H1.
-      * idtac...
-      * destruct m.
-        { specialize (HChkPtr eq_refl w). exfalso. apply HChkPtr. reflexivity. }
-        { idtac... }
-    + clear H1. rename e0 into e1_redex. rename e'0 into e1_redex'. edestruct IH; idtac...
-      inv HHwf; eauto.
+  - admit.
   (* T-Deref *) 
   - destruct m'; try (specialize (HMode eq_refl); inversion HMode).
     clear HMode.
-    inv HHwf.
-    specialize (IH H1 eq_refl).
+    inv HEwf.
+    specialize (IH H1 HSwf).
     inv Hreduces.
     destruct E eqn:He; inversion H2; simpl in *; try congruence.
     + 
       subst.
       clear IH.
-      inv H5.
+      inv H6. exists env.
       split; eauto.
       destruct HPtrType as [[Hw Eq] | Hw]; subst.
+      * admit. * admit.
       *   inv HSubType.  
          ** { inv HTy.
             remember H7 as Backup; clear HeqBackup.
