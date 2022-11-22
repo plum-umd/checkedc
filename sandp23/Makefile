@@ -1,4 +1,4 @@
-TARGETS = main
+TARGETS = main extended
 
 
 LATEX   = pdflatex -shell-escape
