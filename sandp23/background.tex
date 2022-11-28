@@ -13,41 +13,89 @@ Development Project (SSDP). Details can be found in a prior
 overview~\cite{Elliott2018} or the formalism~\cite{li22checkedc}.
 %
 
+\noindent
 \myparagraph{Checked Pointer Types}
 \checkedc{} introduces three varieties of \emph{checked pointer}:
 \begin{itemize}
-\item \code{ptr<}$T$\code{>} types a pointer that is either null or
+\item \code{ptr<}$T$\code{>} ($\ptr$) types a pointer that is either null or
   points to a single object of type $T$.
-\item \code{array_ptr<}$T$\code{>} types a pointer that is either null
+\item \code{array_ptr<}$T$\code{>} ($\arr$) types a pointer that is either null
   or points to an array of $T$ objects. The array width is defined
   by a \emph{bounds} expression, discussed below.
-\item \code{nt_array_ptr<}$T$\code{>} is like
+\item \code{nt_array_ptr<}$T$\code{>} ($\ntarr$) is like
   \code{array_ptr<}$T$\code{>} except that the bounds expression
   defines the \emph{minimum} array width---additional objects may
   be available past the upper bound, up to a null terminator.
 \end{itemize}
-A bounds expression used with the latter two pointer types has three
-forms:
-\begin{itemize}
-\item \code{count(}$e$\code{)} where $e$ defines the array's
-  length. Thus, if pointer $p$ has bounds \code{count(n)} then the
-  accessible memory is in the range $[p,p+$\code{n}$]$. Bounds
-  expression $e$ must be side-effect free and may only refer to
-  variables whose addresses are not taken, or adjacent \code{struct}
-  fields.
-\item \code{byte_count(}$e$\code{)} is like \code{count}, but
-  expresses arithmetic using bytes, no objects; i.e.,
-  \code{count(}$e$\code{)} used for \code{array_ptr<}$T$\code{>} is
-  equivalent to \code{byte_count(}$e\times\texttt{sizeof}(T)$\code{)}
-\item \code{bounds(}$e_l$,$e_h$\code{)} where $e_l$ and $e_h$ are
-  pointers that bound the accessible region $[e_l,e_h)$ (the
-  expressions are similarly restricted). Bounds
-  \code{count(}$e$\code{)} is shorthand for
-  \code{bounds(}$p, p + e$\code{)}. This most general form of bounds
-  expression is useful for supporting pointer arithmetic.
-\end{itemize}
-  Dropping the bounds expression on an \code{nt_array_ptr} is equivalent
-  to the bounds being \code{count(0)}.
+Both $\arr$ and $\ntarr$ pointers have an associated bounds which defines the
+range of memory referenced by the pointer.
+The three different ways to declare bounds and the corresponding memory range is:
+\begin{footnotesize}
+\begin{tabular}{ll}
+\arrT{|$T$|} \inlinecode{p: count(|$n$|)}
+  &
+$[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
+%$[\inlinecode{p}, )$ \\
+\arrT{|$T$|} \inlinecode{p: byte_count(|$b$|)}
+
+  &
+    $[\code{p}, \code{p}+b)$ \\
+
+
+\arrT{|$T$|} \inlinecode{p: bounds(|$x, y$|)}
+
+  &
+    $[x, y)    $\\  
+\end{tabular}
+\end{footnotesize}
+The bounds can be declared for $\ntarr$ as well, but the memory range can extend further to the right,
+until a~\code{NULL} terminator is reached (\ie the~\code{NULL} is not within the bounds).
+
+\subsection{Ensuring Memory Safety}
+
+
+%A bounds expression used with the latter two pointer types has three
+%forms:
+%\begin{itemize}
+%\item \code{count(}$e$\code{)} where $e$ defines the array's
+%  length. Thus, if pointer $p$ has bounds \code{count(n)} then the
+%  accessible memory is in the range $[p,p+$\code{n}$]$. Bounds
+%  expression $e$ must be side-effect free and may only refer to
+%  variables whose addresses are not taken, or adjacent \code{struct}
+%  fields.
+%\item \code{byte_count(}$e$\code{)} is like \code{count}, but
+%  expresses arithmetic using bytes, no objects; i.e.,
+%  \code{count(}$e$\code{)} used for \code{array_ptr<}$T$\code{>} is
+%  equivalent to \code{byte_count(}$e\times\texttt{sizeof}(T)$\code{)}
+%\item \code{bounds(}$e_l$,$e_h$\code{)} where $e_l$ and $e_h$ are
+%  pointers that bound the accessible region $[e_l,e_h)$ (the
+%  expressions are similarly restricted). Bounds
+%  \code{count(}$e$\code{)} is shorthand for
+%  \code{bounds(}$p, p + e$\code{)}. This most general form of bounds
+%  expression is useful for supporting pointer arithmetic.
+%\end{itemize}
+%
+%\begin{footnotesize}
+%\begin{tabular}{ll}
+%\arrT{|$T$|} \inlinecode{p: count(|$n$|)}
+%  &
+%$[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
+%%$[\inlinecode{p}, )$ \\
+%\arrT{|$T$|} \inlinecode{p: byte_count(|$b$|)}
+%
+%  &
+%    $[\code{p}, \code{p}+b)$ \\
+%
+%
+%\arrT{|$T$|} \inlinecode{p: bounds(|$x, y$|)}
+%
+%  &
+%    $[x, y)    $\\  
+%\end{tabular}
+%\end{footnotesize}
+%
+%  Dropping the bounds expression on an \code{nt_array_ptr} is equivalent
+%  to the bounds being \code{count(0)}.
 
 The \checkedc compiler will instrument loads and stores of checked
 pointers to confirm the pointer is non-null, and the access is within
