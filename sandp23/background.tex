@@ -5,7 +5,7 @@
 \section{Overview and Transcendence}\label{sec:overview}
 This section describes \checkedc{} and new features \systemname{} provides.
 
-\subsection{\checkedc Overview}
+\subsection{\checkedc}
 % 
 \checkedc{} development began in 2015 by Microsoft Research, but it was forked
 in late 2021 and is now actively managed by the Secure Software
@@ -74,6 +74,43 @@ overhead when running Checked C-converted portions of the FreeBSD kernel.
 
 \noindent
 \myparagraph{Backward Compatibility}
+\checkedc is backward compatible with legacy C in the sense that all legacy code will type-check and compile.
+However, the compiler adds the aforementioned spatial safety checks to only checked pointers.
+The spatial safety guarantee is partial when the code is not fully ported.
+Specifically, only code that appears in \emph{checked
+  code regions}, which we call \emph{checked code}, is guaranteed to be spatially safe.
+Checked regions can be designated at the level of files, functions, or individual code blocks using the
+\code{checked} keyword.\footnote{You can also designate~\emph{unchecked} regions  within checked ones.}
+ Within checked regions, both legacy pointers and
+certain unsafe idioms (\eg \emph{variadic} function calls) are disallowed.
+
+\myparagraph{Converting C to \checkedc}
+%
+The safety guarantees of Checked C come with certain restrictions. For instance,
+as shown below, Checked C programs cannot use address-taken variables in a
+bounds expression as the bounds relations may not hold because of possible
+modifications through pointers.
+% 
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+...
+array_ptr<int> p : count (n) = NULL;
+|\textcolor{red}{\faTimes}|..,&n,.
+\end{minted}
+% 
+Consequently, converting existing C programs to Checked C might require
+refactoring,~\eg eliminate~\inlinecode{&n} from the program above without
+changing its functionality.
+% 
+This might require considerable effort~\cite{duanrefactoring} depending on the
+program's complexity.
+% 
+Recently, Machiry~\etal developed~\threec~\cite{machiry2022c} that tries to
+automatically convert a program to Checked C by adding appropriate pointer
+annotations.
+However, as described in \threec, completely automated conversion
+is \emph{infeasible}, and it requires the developer to convert some code regions
+manually.  
+
 
 \subsection{Ensuring Memory Safety}
 
