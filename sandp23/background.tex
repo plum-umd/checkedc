@@ -51,6 +51,30 @@ $[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
 The bounds can be declared for $\ntarr$ as well, but the memory range can extend further to the right,
 until a~\code{NULL} terminator is reached (\ie the~\code{NULL} is not within the bounds).
 
+\noindent
+\myparagraph{Ensuring Spatial Memory Safety}
+The \checkedc compiler will instrument loads and stores of checked
+pointers to confirm the pointer is non-null, and additionally for $\arr$ and $\ntarr$ pointers the access is within
+the specified bounds.
+For instance, in the code \inlinecode{if (n>0) a[n-1] =} $...$ the write
+is via address $\alpha = \inlinecode{a + sizeof(int)}\!\times\!\code{(n-1)}$. If the
+bounds of \code{a} are \code{count(u)}, the
+inserted check will confirm that prior to dereference
+$\inlinecode{a} \leq \alpha < \inlinecode{a + sizeof(int)} \!\times\!
+\inlinecode{u}$.
+Failed checks throw an exception.
+
+Oftentimes, inserted checks can be optimized away by LLVM.
+Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
+In such cases, the inserted check can be
+removed as the outer condition $\inlinecode{n<u}$ already ensures that the
+dereference is within bounds.
+Dual~\etal~\cite{duanrefactoring} found essentially no
+overhead when running Checked C-converted portions of the FreeBSD kernel.
+
+\noindent
+\myparagraph{Backward Compatibility}
+
 \subsection{Ensuring Memory Safety}
 
 
