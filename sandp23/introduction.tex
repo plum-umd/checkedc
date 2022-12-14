@@ -1,6 +1,6 @@
 \section{Introduction}\label{sec:intros}
 
-Vulnerabilities due to memory corruption, especially spatial memory corruptions, 
+Vulnerabilities due to memory corruption, especially spatial memory corruption, 
 are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:2013:SRF:2534766.2534798} 
 despite a large body of work that tries to prevent them~\cite{song2019sanitizing}.
 Several industrial and research efforts, including CCured~\cite{Necula2005},
@@ -8,20 +8,15 @@ Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
 have investigated ways to compile C programs 
 to automatic spatial safety enforcement.
 These approaches all impose performance overheads deemed too high for deployment use. 
-Recently, \citet{Elliott2018} and \citet{li22checkedc} introduced and formalized \checkedc, an
+Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
 open-source extension to C with new types and
 annotations whose use can ensure a program’s spatial safety.
-Importantly, \checkedc supports development that is 
-incremental and compositional. Code regions (e.g.,
-functions or whole files) designated as \emph{checked} enforce
-spatial safety in a manner preserved by composition with
-other checked regions. But not all regions must be checked: Checked
-C's annotated \emph{checked pointers} are binary-compatible with legacy pointers, and
-may coexist in the same code, which permits a deliberate (and
-semi-automated) refactoring process. 
-Parts of the FreeBSD kernel have
-been successfully migrated to \checkedc~\cite{duanrefactoring}, and the overall performance
-overhead is minimal enough for practical deployment.
+Specifically,~\checkedc extends C with checked pointer types, which are restricted by the compiler to spatially safe uses.
+The checked pointers are represented as system-level memory words,~\ie without ``fattening'' metadata, ensuring backward compatibility.
+This enables incremental conversion, where regions of code can be converted to~\checkedc and ensure spatial safety within those regions.
+However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the unconverted or unchecked code can violate guarantees provided in Checked regions.
+%
+We need to ensure that~\emph{code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 
 \ignore{
 Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
@@ -71,6 +66,7 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 % \item Implemented as an extension to Clang/LLVM. Good performance
 %   (compared to ASAN etc.)
 % \end{itemize}
+\iffalse
 \noindent
 \textbf{No safety against unchecked code.} The spatial safety guarantee~\checkedc provides applies to completely converted programs, i.e., programs that uses only checked types.
 Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
@@ -98,6 +94,7 @@ Here, the checked function~\inlinecode{func} expected a pointer to a buffer of f
 This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the Checked region, but of course, the blame or the root cause is in the unchecked region (\textcolor{red}{\faBug}).
 Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
+\fi
 This mechanism is called program partitioning~\cite{rul2009towards}.
 Existing mechanisms are not suitable as they are based on process isolation and have high overhead, and are data-centric~\emph{data-centric} (\sect{subsec:background:programpart}).
 Furthermore, these techniques are hard to engineer to co-exist with~\checkedc.
