@@ -124,9 +124,17 @@ Our compiler avoids these attacks by ensuring, either statically or through dyna
 
 In summary, we make the following three main contributions.
 
+\myparagraph{\systemname Type System, Formalism and Compiler}
+We present a type system that integrates tainted types with~\checkedc and ensures the~\emph{non-crashing property},~\ie 
+a well-typed~\systemname program can never crash due to spatial safety violations of tainted pointers.
+We extend~\checkedc compiler to support our type system.
+We formalize our system by extending~\checkedc formalism~\citet{li22checkedc} with the non-crashing guarantee and other new features below.
+We formally prove the~\emph{non-crashing theorem} and use model-based randomized testing (CITE) to certify the simulation relation between the~\systemname semantics and the compiler.
+To the best of our knowledge,~\systemname is the first C(-like) language and compiler formalism with the program partitioning mechanism.
+
 \myparagraph{Type-Directed Program Partitioning}
 We present a type-directed program partition technique to separate checked and unchecked code regions and ensure that the code in checked region~\textit{cannot crash} due to spatial safety violations.
-Our type system restricts checked pointers usage only in~\cregion and ensures that~\ucregion can only access tainted (or unchecked) pointers.
+Our type system restricts checked pointers usage only in~\cregion and ensures that~\ucregion can only access tainted pointers.
 Our modular design enables us to use existing sandboxed techniques to enforce memory and execution isolation.
 
 \myparagraph{Supporting callbacks to~\cregion with no Checked Pointer Exposure}
@@ -160,6 +168,7 @@ tainted shell.}
 \mz{What does this mean?}
 % 
 
+\iffalse
 \myparagraph{Formalizing the Type System, Semantics and Compiler}
 %
 We developed a core formalism named~\lang, which extends
@@ -171,6 +180,7 @@ Specifically, we use a conversion tool that converts expressions from~\lang into
 based on the typing rules of~\lang and ensure that~\lang and~\checkedc compiler are consistent after conversion, both statically and dynamically.  
 To the best of our knowledge,~\lang is the first C(-like) language and compiler formalism with the program partitioning mechanism.
 %To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
+\fi
 
 We evaluated~\systemname by partioning~\numprog{} large real-world programs to demonstrate its effectiveness.
 Our evaluation shows that~\systemname provides a flexible, low-overhead program partitioning mechanism and guarantees spatial memory safety.
