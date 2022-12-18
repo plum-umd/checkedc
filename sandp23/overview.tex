@@ -58,6 +58,8 @@ The function~\code{handle_request} reads data from the socket through~\code{read
 As we can see, there is an arbitrary memory write vulnerability (indicated by~\realbug) in~\code{process_req1} because of using~\code{i} as an index into the array~\code{msg} without any sanity check.
 The variable~\code{i} can take any integer value as it is parsed from~\code{msg}, whose contents are read from socket in~\code{read_msg} indicated by~\rootcause.
 
+\liyi{The example looks good. But we are focusing on converting C to \checkedc here? }
+
 \myparagraph{Goal} 
 The developer's goal is to partition the code in~\lst{lst:comb} so that spatial memory vulnerabilities do not affect the overall program.
 Ideally, the developer must convert the entire code to Checked C so that the entire program achieves spatial memory safety.
@@ -66,6 +68,8 @@ For instance,~\code{void*} pointers are not directly supported by Checked C.
 Consequently, the developer needs to convert functions using~\code{void*} pointers into generic versions -- this could be tedious.
 To handle this, the developer can do a best-effort conversion and annotate only a few pointers~\eg by using an automated conversion tool such as~\threec{} which annotates few pointers as shown in~\lst{lst:initialconv}.
 However, as explained in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecked code can also affect the safety of checked pointers.
+
+\liyi{Can we just assume that programmers know \checkedc and will use \checkedc, and then we added tainted type? }
 
 \myparagraph{Using tainted types}
 To handle this, the developer marks risky functions with unchecked pointers~\ie~\code{read_msg} and~\code{process_req1} as~\code{tainted} as shown in~\lst{lst:humantaint} indicated by~\useradded.

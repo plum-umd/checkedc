@@ -49,6 +49,8 @@ $[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
 The bounds can be declared for $\ntarr$ as well, but the memory range can extend further to the right,
 until a~\code{NULL} terminator is reached (\ie the~\code{NULL} is not within the bounds).
 
+\liyi{can we reuse the old text for the spatial safety? }
+
 \noindent
 \myparagraph{Ensuring Spatial Memory Safety}
 The \checkedc compiler will instrument loads and stores of checked
@@ -82,6 +84,8 @@ Checked regions can be designated at the level of files, functions, or individua
  Within checked regions, both legacy pointers and
 certain unsafe idioms (\eg \emph{variadic} function calls) are disallowed.
 
+\liyi{If we are not going to talk about converting C to \checkedc, can we just move this to future work? }
+
 \myparagraph{Converting C to \checkedc}
 %
 The safety guarantees of Checked C come with certain restrictions. For instance,
@@ -109,6 +113,7 @@ However, as described in \threec, completely automated conversion
 is \emph{infeasible}, and it requires the developer to convert some code regions
 manually.  
 
+\liyi{Does the program too small? Will reviewer complain about the program size? }
 \subsection{No Safety Against Unchecked Code}
 \label{subsec:nosafetyagsintuncheckedcode}
 The spatial safety guarantee~\checkedc provides applies to completely converted programs,~\ie programs that uses only checked types.
@@ -138,6 +143,7 @@ This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in 
 Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 
+\liyi{I do not think you need three sub-sections for these topics. They can be in the same place. }
 \subsection{Program Partitioning}
 \label{subsec:background:programpart}
 Program partitioning~\cite{rul2009towards} is a well-known technique to divide a program into multiple isolated parts or partitions.
