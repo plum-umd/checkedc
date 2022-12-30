@@ -1,4 +1,4 @@
-\section{\systemname Type System and Formalism}\label{sec:formal}
+\section{\systemname Formalism}\label{sec:formal}
 
 % \begin{itemize}
 % \item Describe the types for checked-C as a graph. \dvh{I don't know what this means.}
@@ -140,9 +140,8 @@
 % \liyi{The detailed explanation is in the appendix.}
 
 This section describes the formal model of \systemname, named
-\lang, making precise its syntax, semantics, and type system. It also
-develops \lang's meta-theory, including the type soundness, non-exposure, and non-crashing
-theorems.
+\lang, making precise its syntax, semantics, type system, and compilation. It also
+develops \lang's meta-theory, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
 
 \subsection{Syntax}\label{sec:syntax}
 
@@ -1002,6 +1001,184 @@ makes sure that the function in the global store is well-defined and has the rig
 
 % The last three rules in Fig.~\ref{fig:semantics} describe the semantic behaviors of an $\eiftext$ branching operation when the Boolean guard is a dereference of an NT-array pointer. The first one states that if the type upper bound of the pointer $x$ is $0$, and the pointer data value $n_a$ is not $0$, we can conclude that the upper bound is not the last position of the NT-array pointer, so we can then update $1$ in the upper bound while jump to the $\etrue$ branch. The second rule describes that we do not extend the upper bound if the upper-bound of the type of $x$ is not zero because we know that we are not in the NT-array's last position. The third rule describes the behavior of jumping to the $\efalse$ branch when the pointer content is $0$. In this case, we also do not need to increase the upper-bound of the type of $x$.}
 
+\subsection{Compilation}\label{sec:compilation}
+
+As we have shown in \Cref{fig:overview}, the \systemname compiler utilizes the sandbox mechanism \cite{rul2009towards} and the \checkedc compiler \cite{li22checkedc} to compile programs. Here, we introduce how \systemname compiles a program into these two components.
+
+\begin{figure}[t!]
+{\small
+\hspace*{-0.5em}
+\begin{tabular}{|c|c|c|c|}
+\hline
+& \cmode & \tmode & \umode \\
+\hline
+& \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} \\
+\hline
+\cmode & $\estar{x}$ / $\getstar{\cmode}{x}$ 
+ & $\texttt{sand\_get}(x)$ / $\getstar{\umode}{x}$ &  $\times$ \\
+\hline
+\umode & $\times$
+ & $\estar{x}$ / $\getstar{\umode}{x}$ &  $\estar{x}$ / $\getstar{\umode}{x}$ \\
+\hline
+\end{tabular}
+
+}
+\caption{Compiled Targets for Dereference}
+\label{fig:flagtable}
+\end{figure}
+
+In \systemname, context and pointer modes determine the particular heap/function store that a pointer points to,
+i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions.
+Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
+In the compiled LLVM code, pointer access operations have different syntaxes when the modes are different. 
+\Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
+For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
+
+This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
+with no loss of expressiveness
+as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
+For the compiler formalism, 
+we present a compilation algorithm that converts from
+\lang to \elang, an untyped language without metadata
+annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
+In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
+$\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
+The algorithm sheds
+  light on how compilation can be implemented in the real Checked C
+  compiler, while eschewing many vital details (\elang has many 
+  differences with LLVM IR).
+
+
+%This section shows how \systemname deals with 
+%annotations can be safely erased: using static information a compiler
+%can insert code to manage and check bounds metadata, with no loss of
+%expressiveness. We present a compilation algorithm that converts from
+%\lang to \elang, an untyped language without metadata
+%annotations. The syntax and semantics \elang
+  %closely mirrors that of \lang; it differs only in that literals lack
+  %type annotations and its operational rules perform no
+  %bounds and null checks, which are instead inserted during
+  %compilation. Our compilation algorithm is evidence that \lang's
+  %semantics, despite its apparent use of fat pointers, faithfully
+  %represents Checked C's intended behavior. The algorithm also sheds
+  %light on how compilation can be implemented in the real Checked C
+  %compiler, while eschewing many important details (\elang has many 
+  %differences with LLVM IR).
+
+Compilation is defined by extending \lang's
+typing judgment as follows:
+\[\Gamma;\Theta;\rho \vdash_m e \gg \dot e:\tau\]
+There is now a \elang output $\dot e$ and an input $\rho$, which maps
+each (NT-)array pointer variable to its mode and
+each variable \code{p} to a pair of \emph{shadow
+  variables} that keep \code{p}'s up-to-date upper and lower bounds. 
+These may differ from the bounds in \code{p}'s type due to bounds
+widening.\footnote{Since lower bounds are never widened, the
+  lower-bound shadow variable is unnecessary; we include it for uniformity.} 
+
+% When $\Gamma$,$\Theta$ and $\rho$ are all empty, we write $e \gg \dot e$ rather than the
+% complete judgment, implicitly assuming that $e$ is a well-typed and closed
+% term.
+
+We formalize rules for this judgment in PLT Redex~\cite{pltredex},
+following and extending our Coq development for \lang. To give
+confidence that compilation is correct, we use Redex's property-based
+random testing support to show that compiled-to $\dot e $ simulates
+$e$, for all $e$.
+
+\myparagraph{Checked and Unchecked Blocks}
+%
+In the \systemname implementation,
+$\euncheckedtext$ and $\echeckedtext$ blocks 
+are compiled as context switching functions provided by the sandbox mechanism.
+We compile $\eunchecked{\overline{x}}{e}$ to 
+$\texttt{sandbox\_call}(\overline{x},e)$, where we call the sandbox 
+to execute expression $e$ with the arguments $\overline{x}$.
+$\echecked{\overline{x}}{e}$ is compiled to 
+$\texttt{callback}(\overline{x},e)$, where we perform 
+a \texttt{callback} to a checked block code $e$ inside a sandbox.
+In \systemname, we adopt an aggressive execution scheme that
+directly learns pointer addresses from compiled assembly to make the $\texttt{callback}$ happen.
+In the formalism, we rely on the type system to 
+guarantee the context switching without creating the extra function calls for simplicity.
+
+%Fig.~\ref{fig:compilationexample} shows how an invocation of
+%\code{strlen} on a null-terminated string is compiled into C
+%code. Each dereference of a checked pointer requires a null check
+%(See \textsc{S-DefNull} in Fig.~\ref{fig:semantics}), which the
+%compiler makes explicit: Line~$3$ of the generated code has the null
+%check on pointer \code{p} due to the \code{strlen},
+%  and a similar check happens
+%  at line~$8$ due to the pointer arithmetic on \code{p}.
+%Dereferences also require bounds checks: line~$2$ checks \code{p} is
+%in bounds before computing \code{strlen(p)}, while line~$10$ does
+%likewise before computing \code{*(p+1)}.
+
+\myparagraph{Function Pointers and Calls}
+%
+Function pointers are managed similarly to normal pointers,
+but we insert checks to check if the pointer address is not null in 
+the function store instead of heap, and whether or not the type is correctly represented, 
+for both $\cmode$ and $\tmode$ mode pointers 
+\footnote{$\cmode$-mode pointers are checked once in the beginning and $\tmode$-mode pointers are checked every time when use}.
+For example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
+we place a check \code{verify_fun(cmp, not_null(c, p_lo, p_hi) && type_match)},
+and we place a similar check before \Cref{fig:checkedc-example-3} line 7 to check the tainted \code{cmp} when it is used. 
+The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
+is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
+
+\begin{figure}[t!]
+  \begin{small}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+int deref_array(n : int,
+     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$,
+     q : $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\tmode}$) {
+  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi,p_m */
+  /* $\color{purple!40!black}\rho$(q) = q_lo,q_hi,q_m */
+    * p;
+    * q = 1;
+}
+...
+/* p0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\cmode}$ */
+/* q0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\tmode}$ */
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\begin{frame}
+
+\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
+
+\end{frame}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+deref_array(int n, int* p, int * q) {
+  //m is the current context mode
+  let p_lo = 0; let p_hi = n; 
+  let q_lo = 0; let q_hi = n; 
+  /* runtime checks */
+  assert(p_lo <= 0 && 0 <= p_hi);
+  assert(p != 0);
+  *(mode(p) $\wedge$ m,p);
+  verify(q, not_null(m, q_lo, q_hi) 
+             && q_lo <= 0 && 0 <= q_hi);
+  *(mode(q) $\wedge$ m,q)=1;
+}
+...
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\end{small}
+    \caption{Compilation Example for Dependent Functions}
+\label{fig:compilationexample1}
+\end{figure}
+
+For compiling dependent function calls,
+\Cref{fig:compilationexample1} provides a hint.
+Notice that the bounds for the array pointer \code{p} are not passed as
+arguments. Instead, they are initialized according to \code{p}'s
+type---see line~4 of the original \lang program at the top of the figure.
+Line~$3$ of the generated code
+sets the lower bound  to \code{0} and the
+upper bound to \code{n}.
+
+
 \subsection{Meta Theories}\label{sec:theorem}
 
 % Before we present our main theorems, we need to first
@@ -1241,6 +1418,181 @@ if $e$ is well-typed ($\varphi;\Theta\vdash_{\cmode} e :
 $\varphi_i$, $\heap_i$, $e_i$, and $m_i$ for $i\in [1,k]$, such that
 $(\varphi,\heap,e) \longrightarrow_{m_1} (\varphi_1,\heap_1,e_1)\longrightarrow_{m_2} ...\longrightarrow_{m_k} (\varphi_k,\heap_k,r)$, then $r$ can never be \emph{stuck}.
 \end{thm}
+
+% \review{ 
+% My interpretation of section IV.C is that the authors have a pen-and-paper
+%   proof of Theorem 4, and that random testing using the Redex models has been
+%   used to gain confidence in such a proof. Is this correct?}
+% \liyi{Yes, this is correct.}
+% \mwh{No, not correct: We have no pen-and-paper proof, just the
+%   model. Clarify here}
+% showing that
+% extensive random testing fails to falsify the bisimilarity
+% property. \mwh{Better way to state the previous?}
+
+In the \systemname compiler, we also restore the compiler simulation theorem, such that executing a \systemname program is simulated by executing the compiled LLVM program, which is introduced in the \checkedc formalism \cite{li22checkedc} and \Cref{appx:comp1}. 
+
+We formalize both the compilation procedure and the simulation
+theorem in the PLT Redex model we developed for \lang (see Sec.~\ref{sec:syntax}),
+and then attempt to falsify it via Redex's support for random
+testing. Redex allows us
+  to specify compilation as logical rules (an extension
+  of typing), but then execute it algorithmically to
+  automatically test whether simulation holds. This process revealed
+  several bugs in compilation and the theorem statement.
+%
+  % us gain confidence that our original pen and paper proof of
+  % simulation remains true with the addition of variable bounds. }
+We ultimately plan to prove simulation in the Coq model.
+
+%Turning to the simulation theorem: We first introduce notation
+%used to specify the theorem.
+We use the notation $\gg$ to
+indicate the \emph{erasure} of stack and heap---the rhs is the same as
+the lhs but with type annotations removed:
+\begin{equation*}
+  \begin{split}
+    \heap  \gg & \dot \heap \\
+    \varphi \gg & \dot \varphi
+  \end{split}
+\end{equation*}
+In addition, when $\Gamma;\emptyset\vdash
+\varphi$ and $\varphi$ is well-formed, we write $(\varphi,\heap,e) \gg_m (\dot \varphi, \dot \heap,
+\dot e)$ to denote $\varphi \gg \dot \varphi$, $\heap \gg \dot \heap$
+and $\Gamma;\Theta;\emptyset \vdash_m e \gg \dot e : \tau$ for some $\tau$ respectively. $\Gamma$ is omitted from the notation since the well-formedness of $\varphi$ and its consistency with respect to $\Gamma$ imply that $e$ must be closed under $\varphi$, allowing us to recover $\Gamma$ from $\varphi$.
+Finally, we use $\xrightarrow{\cdot}^*$ to denote the transitive closure of the
+reduction relation of $\elang$. Unlike the $\lang$, the semantics of
+$\elang$ does not distinguish checked and unchecked regions.
+
+Fig.~\ref{fig:checkedc-simulation-ref} gives an overview of 
+the simulation theorem.\footnote{We ellide the  possibility of $\dot e_1$ evaluating to $\ebounds$ or $\enull$ in the diagram for readability.} The simulation theorem is specified in a way
+that is similar to the one by~\citet{merigoux2021catala}.
+
+An ordinary simulation property would
+replace the middle and bottom parts of the figure with the
+following: \[(\dot \varphi_0, \dot \heap_0, \dot e_0) 
+  \xrightarrow{\cdot}^* (\dot \varphi_1, \dot \heap_1, \dot e_1)\]
+Instead, we relate two erased configurations using the relation $\sim$,
+which only requires that the two configurations will eventually reduce
+to the same state.
+
+\ignore{
+ We formulate our simulation theorem differently
+because the standard simulation theorem imposes a very strong
+syntactic restriction to the compilation strategy. Very often, $(\dot
+\varphi_0, \dot \heap_0, \dot e_0)$ reduces to a term that is
+semantically equivalent to $(\dot \varphi_1, \dot \heap_1, \dot e_1)$,
+but we are unable to syntactically equate the two configurations due
+to the extra binders generated for dynamic checks and ANF
+transformation. In earlier versions of the Redex model, we attempted
+to change the compilation rules so the configurations could match
+syntactically. However, the approach scaled poorly as we added
+additional rules. 
+This slight relaxation on the equivalence relation
+between target configurations allows us to specify compilation more
+naturally without having to worry about syntactic constraints.
+}
+
+% The two theorems are translation preservation and simulation. We donate $\xrightarrow{c}$ as the transition semantics of CLight.
+\begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
+For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
+if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg_c (\dot \varphi_0,\dot \heap_0, \dot e_0)$,
+and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
+\rightarrow_c (\varphi_1, \heap_1, r_1)$, then the following facts hold:
+
+\begin{itemize}
+
+\item if there exists $e_1$ such that $r=e_1$ and $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+$(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+\varphi,\dot \heap,\dot e)$ and $(\dot
+\varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+\dot \heap,\dot e)$.
+
+\item if $r_1 = \ebounds$ or $\enull$, then we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+\dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+\varphi_1$, $\heap_1 \gg \dot \heap_1$.
+
+\end{itemize}
+\end{thm}
+
+
+% when $r_1 = e_1$ for
+% some $e_1$ and
+% $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then
+% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \varphi,\dot \heap,\dot e)$ and $(\dot
+% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
+
+% \begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
+% For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
+% if $\emptyset;\emptyset;\emptyset \vdash_\cmode e_0 \gg \dot e_0 :\tau_0$,
+% and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
+% \rightarrow_\cmode (\varphi_1, \heap_1, r_1)$, when $r_1 = e_1$ for
+% some $e_1$ and
+% $\emptyset;\emptyset;\emptyset \vdash_\cmode e_1 \gg \dot e_1 :\tau_1$ where $\tau_1 \sqsubseteq \tau_0$
+% , then
+% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \varphi,\dot \heap,\dot e)$ and $(\dot
+% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
+% \end{thm}
+
+As our random generator never generates
+$\euncheckedtext$ expressions (whose behavior could be undefined), we can only test a the simulation theorem 
+as it relates to checked code. This limitation makes it
+unnecessary to state the other direction of the simulation theorem
+where $e_0$ is stuck, because Theorem~\ref{thm:progress} guarantees
+that $e_0$ will never enter a stuck state if it is well-typed in
+checked mode.
+
+The current version of the Redex model has been tested against $23000$
+expressions with depth less than $11$. Each expression can
+reduce multiple steps, and we test simulation between every two
+adjacent steps to cover a wider range of programs, particularly the
+ones that have a non-empty heap.
+
+\begin{figure}[t]
+{\small
+\[
+\begin{array}{c}
+\begin{tikzpicture}[
+            > = stealth, % arrow head style
+            shorten > = 1pt, % don't touch arrow head to node
+            auto,
+            node distance = 3cm
+        ]
+
+\begin{scope}[every node/.style={draw}]
+    \node (A) at (0,1.5) {$\varphi_0,\heap_0, e_0$};
+    \node (B) at (4,1.5) {$\varphi_1, \heap_1 ,e_1$};
+    \node (C) at (0,0) {$\dot \varphi_0, \dot \heap_0 ,\dot e_0$};
+    \node (D) at (4,0) {$\dot \varphi_1, \dot \heap_1, \dot e_1$};
+    \node (E) at (2,-1.5) {$\dot \varphi,\dot \heap ,\dot e$};
+\end{scope}
+\begin{scope}[every edge/.style={draw=black}]
+
+    \path [->] (A) edge node {$\longrightarrow_\cmode$} (B);
+    \path [<->] (A) edge node {$\gg$} (C);
+    \path [<->] (B) edge node {$\gg$} (D);
+    \path [dashed,<->] (C) edge node {$\sim$} (D);
+    \path [dashed,->] (C) edge node {$\xrightarrow{\cdot}^*$} (E);
+    \path [dashed,->] (D) edge node[above] {$\xrightarrow{\cdot}^*$} (E);
+\end{scope}
+
+\end{tikzpicture}
+\end{array}
+\]
+}
+\caption{Simulation between \lang and \elang }
+\label{fig:checkedc-simulation-ref}
+\end{figure}
 
 %{\em Proof:} By induction on the number of steps of the \checkedc
 %evaluation ($\longrightarrow_m^*$), using progress and preservation to
