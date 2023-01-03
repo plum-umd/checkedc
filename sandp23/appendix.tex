@@ -521,620 +521,596 @@ $
 \end{figure}
 
 \subsection{The Compilation Rules}\label{appx:comp1}
-Fig.~\ref{fig:syntaxerased} and Fig.~\ref{fig:semanticserased} shows
-the syntax for $\elang$, the target language for compilation. We syntactically
-restrict the expressions to be in A-normal form to simplify the
-presentation of the compilation rules. In the Redex model, we
-occasionally break this constraint to speed up the performance of
-random testing by removing unnecessary let bindings.
-To allow explicit runtime
-checks, we include $\ebounds$ and $\enull$ as part of $\elang$
-expressions which, once evaluated, result in an corresponding error state. $\eassignstack{x}{\dot a}$ is a new syntactic form that
-modifies the stack variable $x$ with the result of $\dot a$. It is
-essential for bounds widening. $\leq$ and $-$ are introduced
-to operate on bounds and decide whether we need to halt with a bounds error
-or widen a null-terminated string.
 
-\begin{figure}[h]
+% \review{
+% The first reviewer said:
+% \begin{itemize}
+% \item I had a really hard time understanding precisely the "formalized" compilation
+%   from CoreChkC to CoreC. Specifically: is CoreC intended to model LLVM-IR, or
+%   is it a subset of C? Is CheckedC compiling to C or is it a new frontend like
+%   `clang`? See remark about undefined behavior (UB) below which got me even more
+%   confused. \mwh{CoreC is meant to model CoreChkC but with
+%   annotations, and checks removed; it is not meant to model C or LLVM-IR.}
+% \item Is the compilation scheme from CoreChkC to CoreC is faithful to the actual
+%   compilation scheme of the checkedc-clang compiler to ...? I feel like the
+%   paper is missing an actual description of what happens in the compiler to
+%   allow us to connect the dots and understand how the formalization illuminates
+%   the implementation. \mwh{We did not model compilation on the real
+%   implementation; our purpose was to show that annotations in CoreChkC
+%   do not necessitate fat pointers in an implementation; that said,
+%   our formalization does show how a real implementation can be
+%   carried out}
+% \item The paper doesn't seem upfront about what is *shown* (theorem in Coq) and what
+%   is *tested* (via PLT-Redex), and thus remains a
+%   conjecture. \mwh{Updated the intro and the individual sections}
+% \item  Missing discussion of why Coq vs. PLT-Redex, effort involved, any plans to
+%   formally prove compilation from CoreChkC to CoreC, any hopes of integrating
+%   that in the official implementation, etc. \mwh{Added note at the
+%   start of section 3.}
+% \end{itemize} }
+
+% \review{IV: ghost variables in other contexts (e.g. Why3, Dafny) are used for things
+%   that do not exist at run-time, but this doesn't seem to be the case here.}
+% \yiyun{Agreed: We changed the name to ``shadow variables'' to avoid confusion}
+% \review{Do your bug report and github links break anonymity?}
+
+
+% \review{From reviewer C:
+% \begin{itemize}
+% \item I'd like to have seen a bit more motivation for using PLT redex:
+%   what aspects made the use of this tool preferable to formulating the
+%   compilation in Coq and using Quickchick to do random testing of the
+%   simulation result.
+%   \mwh{Added some text to the end of III.A and IV.C}
+% \yiyun{Some reasons I can think of:\begin{itemize}
+%     \item Redex is highly optimized for specifying judgments that are algorithmic. By writing down a typing relation, we can immediately obtain a typechecker
+%     that is executable. Same applies for the small-step evaluation relation. Translating the relations into functions in Coq is definitely doable but time-consuming, especially since compilation is embedded as part of the typing rules. It is also hard to see whether the function we define really corresponds to the relation unless we formally prove it. This issue is particularly relevant at the early stage of the development when the compilation rules were buggy and the simulation property was violated often as we added new generator cases.
+%     In Redex, we don't have any formal guarantee either, but at least we can more easily see the correspondence because Redex is able to convert the relation into an executable version so we can specify the relation literally. This feature of Redex helped us speed up our development significantly when our compilation rules were constantly changing.
+% \end{itemize} }
+% \item there's a funny change of line spacing in column 2 of page 6, about 2/3 down.
+% \end{itemize}
+% }
+
+The main subtlety of compiling \checkedc to Clang/LLVM is to capture the annotations on pointer literals
+that track array bound information, which is used in premises
+of rules like \textsc{S-DefArray} and
+  \textsc{S-AssignArr} to prevent spatial safety violations.
+The \checkedc compiler \cite{li22checkedc} inserted additional pointer checks 
+for verifying pointers are not null and the bounds are within their limits. \lc{what does it mean by bounds within limits?}
+The latter is done by introducing additional shadow variables for storing (NT-)array pointer bound information.
+
+\begin{figure}[t!]
 {\small
-  \[\begin{array}{llcl}
-      \text{Atoms}       & \dot a & ::= & n \mid x \\
-      
-      \text{C-Expressions} & \dot c & ::= & \dot a \mid \estrlen{\dot a}  \mid \emalloc {\dot  a}  \mid \ecall{f} {\overline{\dot a}}  \\
-                         & & \mid &  \mid  \dot a \circ \dot a \mid \estar{\dot a} \\
-                         & & \mid & \eassign{\dot a}{\dot a} \mid \eassignstack{x}{\dot a}  \mid \eif{\dot a}{\dot e}{\dot e} \\
-                         & & \mid & \ebounds \mid \enull \\
-      \text{Expressions}  & \dot e & ::= & \dot c \mid \elet{x}{\dot c}{\dot e}\\
-      \text{Binops} & \circ & ::= & + \mid - \mid \leq  \\
-      \text{Closure} & \dot C & ::= & \hole \mid \elet{x}{\dot a}{\dot C} \\
-       & & \mid & \eif{\dot a}{\dot e}{\dot C} \mid \eif{\dot a}{\dot    C}{\dot e} \\
-      \text{Bounds Map} & \rho & \in & \texttt{Var} \rightharpoonup \texttt{Var} \times \texttt{Var}
-  \end{array}
-  \]
+\hspace*{-0.5em}
+\begin{tabular}{|c|c|c|c|}
+\hline
+& \cmode & \tmode & \umode \\
+\hline
+& \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} & \textsc{CBox} / \textsc{Core} \\
+\hline
+\cmode & $\estar{x}$ / $\getstar{\cmode}{x}$ 
+ & $\texttt{sand\_get}(x)$ / $\getstar{\umode}{x}$ &  $\times$ \\
+\hline
+\umode & $\times$
+ & $\estar{x}$ / $\getstar{\umode}{x}$ &  $\estar{x}$ / $\getstar{\umode}{x}$ \\
+\hline
+\end{tabular}
+
 }
-  \caption{\elang{} Syntax}
-  \label{fig:syntaxerased}
-{\small
-  \[\begin{array}{lll}
-    \dot \mu & ::= & n \mid \bot \\
-    \dot c & ::= & \ldots  \mid \eret{x}{\dot \mu}{\dot e} \\
-    \dot H & \in & \mathbb{Z} \rightharpoonup \mathbb{Z} \\
-    \dot r & ::= & \dot e \mid \enull \mid \ebounds \\
-    \dot E & ::= & \hole \mid  \elet{x}{\dot E}{\dot e}  \mid \eret{x}{i}{\dot E} \\
-             & \mid & \eif{\dot E}{\dot e}{\dot e} \mid \estrlen{\dot E} \\
-             & \mid & \emalloc{\dot E} \mid \ecall{f}{\overline{\dot
-                      E}} \mid \dot E \circ \dot a \mid n \circ \dot E \\
-             & \mid & \estar{\dot E} \mid \eassign{\dot E}{\dot a}
-                      \mid \eassign{n}{\dot E} \mid
-                      \eassignstack{x}{\dot E} \\
-      \overline{\dot E } & ::= & \dot E \mid n,\overline{\dot E} \mid
-                                 \overline{\dot E}, \dot a
-                      
-  \end{array} \]
-}
-  \caption{\elang Semantic Defs}
-  \label{fig:semanticserased}
+\caption{Compiled Targets for Dereference}
+\label{fig:flagtable}
 \end{figure}
 
+In \systemname, context and pointer modes determine the particular heap/function store that a pointer points to,
+i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions. \lc{context mode doesn't determine where pointer points to but check if it is valid to point to that region?}
+Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
+In the compiled LLVM code, pointer access operations have different syntaxes when the modes are different. \lc{should we explain why we use different syntax instead of compiling the corresponding heap to llvm}
+\Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
+For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
-$\elang$ does not include any annotations. We remove structs from
-$\elang$ because we can always statically convert expressions of the form
-$\eamper{n:\tau}{f}$ into $n + n_f$, where $n_f$ is the statically
-determined offset of $f$ within the struct. We ellide the semantics of
-$\elang$ because it is self-evident and mirrors the semantics
-$\lang$. The difference is that in $\elang$, only $\ebounds$ and
-$\enull$ can step into an error state. All failed dereferences and
-assignments would result in a stuck state and therefore we rely on the
-compiler to explicitly insert checks for checked pointers.
-
-
-Fig.~\ref{fig:compilation} and Fig.~\ref{fig:compilation2}
- shows the rules for the compilation judgment for expressions,
-\[\Gamma;\rho \vdash e \gg \dot C, \dot a\]
-The judgment is presented differently from the one in
-Sec.~\ref{sec:compilation}, which was simplified for presentation purposes. First,
-we remove $\Theta$ and $m$ because these
-parameters are only used for checking and have no
-impact on compilation. Second, the judgment includes two
-outputs, a closure $\dot C$ and an atom expression $\dot a$, instead of
-a single $\elang$ expression $\dot e$. $\dot C$ can be intuitively understood as a
-partially constructed program or context. Whereas $\dot E$ is used for
-evaluation, $\dot C$
-is used purely as a device for compilation. As an example,
-when compiling $(1 : \tint) \plus (2 : \tint)$, 
-we would first create a fresh variable $x$, and then produce two outputs:
-\[    \dot C = \elet{x}{1 \plus 2}{\hole}\]
-\[    \dot a = x\]
-To obtain the compiled expression $\dot e$, we plug $\dot a$ into
-$\dot C$ using the usual notation $\dot C[\dot a]$. We can also use $\dot C$ to represent runtime checks, which
-usually take the form $\elet{x}{\dot c}{\hole}$, where $\dot c$
-contains the check whose evaluation must not trigger $\ebounds$ or $\enull$ for the program to
-continue (see Fig.~\ref{fig:compilationhelpers} for the metafunctions that create
-those checks). 
-
-This unconventional output format enables us to separate the
-evaluation of the term and the computation that relies on the term's
-evaluated result. Since effects and reduction (except for variables) happen only
-within closures, we can precisely control the order in which effects
-and evaluation happen by composing the contexts in a specific order.
-Given two closures $\dot C_1$
-and $\dot C_2$, we write $\dot C_1[\dot C_2]$ to denote the meta
-operation of plugging $\dot C_2$ into $\dot C_1$. We also use
-$\dot C_{a;b;c}$ as a shorthand for $\dot C_a[\dot C_b[\dot C_c]]$. In
-the \textsc{C-Ind} rule,
-we first evaluate the expressions that correspond to $e_1$ and $e_2$
-through $\dot C_1$ and $\dot C_2$, and then perform a null check and
-an addition through $\dot C_n$ and $\dot C_3$. Finally, we dereference
-the result through $\dot C_4$ before returning the pair $\dot C_4,\dot
-x_4$, propagating the flexibility to the compilation rule that recursively
-calls \textsc{C-Ind}.
-
-Fig.~\ref{fig:compilationhelpers} shows the metafunctions that create
-closures representing dynamic checks. These functions first examine
-whether the pointer is a checked. If the pointer is unchecked, an empty closure $\hole$
-will be returned, because there is no need to perform a check. For bounds
-checking, there is a special case for NT-array pointers, where the
-bounds are retrived from the \textcolor{purple}{shadow} variables (found by
-looking up $\rho$) on the stack  rather than
-using the bounds specified in the type annotation. This is how we
-achieve the same precise runtime behavior as $\lang$ in our compiled expressions.
+This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
+with no loss of expressiveness
+as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
+For the compiler formalism, 
+we present a compilation algorithm that converts from
+\lang to \elang, an untyped language without metadata
+annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
+In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
+$\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$. \lc{strlen?}
+The algorithm sheds
+  light on how compilation can be implemented in the real Checked C
+  compiler, while eschewing many vital details (\elang has many 
+  differences with LLVM IR).
 
 
-Fig.~\ref{fig:compilationhelpers2} shows the metafunctions related to
-bounds widening. $\vdash_{extend}$ takes $\rho$,
-a checked NT-array pointer variable $x$, and its bounds $(b_l,b_h)$ as inputs, and returns an
-extended $\rho'$ that maps $x$ to two fresh variables $x_l$, $x_h$,
-together with a closure $\dot C$ that initializes $x_l$ and $x_h$ to
-$b_l$ and $b_h$ respectively. This function is used in the
-\textsc{C-Let} rule to extend $\rho$ before compiling the body of the
-$\elettext$ binding. The updated $\rho'$ can be used for generating
-precise bounds checks, and for inserting expressions that can potentially
-widen the upper bounds, as seen in the $\vdash_{widenstr}$
-metafunction used in the \textsc{C-Str} compilation rule.
+%This section shows how \systemname deals with 
+%annotations can be safely erased: using static information a compiler
+%can insert code to manage and check bounds metadata, with no loss of
+%expressiveness. We present a compilation algorithm that converts from
+%\lang to \elang, an untyped language without metadata
+%annotations. The syntax and semantics \elang
+  %closely mirrors that of \lang; it differs only in that literals lack
+  %type annotations and its operational rules perform no
+  %bounds and null checks, which are instead inserted during
+  %compilation. Our compilation algorithm is evidence that \lang's
+  %semantics, despite its apparent use of fat pointers, faithfully
+  %represents Checked C's intended behavior. The algorithm also sheds
+  %light on how compilation can be implemented in the real Checked C
+  %compiler, while eschewing many important details (\elang has many 
+  %differences with LLVM IR).
 
-\begin{figure*}[t]
+Compilation is defined by extending \lang's
+typing judgment as follows:
+\[\Gamma;\Theta;\rho \vdash_m e \gg \dot e:\tau\]
+There is now a \elang output $\dot e$ and an input $\rho$, which maps
+each (NT-)array pointer variable to its mode and
+each variable \code{p} to a pair of \emph{shadow
+  variables} that keep \code{p}'s up-to-date upper and lower bounds. 
+These may differ from the bounds in \code{p}'s type due to bounds
+widening.\footnote{Since lower bounds are never widened, the
+  lower-bound shadow variable is unnecessary; we include it for uniformity.} 
+\lc{These two sentences are confusing. }
+
+% When $\Gamma$,$\Theta$ and $\rho$ are all empty, we write $e \gg \dot e$ rather than the
+% complete judgment, implicitly assuming that $e$ is a well-typed and closed
+% term.
+
+We formalize rules for this judgment in PLT Redex~\cite{pltredex},
+following and extending our Coq development for \lang. To give
+confidence that compilation is correct, we use Redex's property-based
+random testing support to show that compiled-to $\dot e $ simulates
+$e$, for all $e$.
+
+% We developed a \checkedc compiler to compile a \checkedc program to a C program.
+% \mwh{We formalized compilation from CoreChkC to a version of CoreChkC
+%   but with the metadata removed, right? This is not a Checked C
+%   compiler. You go on to see stuff about CompCert, CLight,
+%   etc. This is confusing. We should be talking about how this relates
+%   to what was just presented. Pick definitive names for things. }
+% Given a \checkedc program $e$, we build a compilation process ($\gg$), such that $e \gg \dot e$, where $\dot e$ is the corresponding C program for $e$ in A-normal form (ANF). 
+% The compilation process ($\gg$) relies on the type checking step $\Gamma;\Theta\vdash_m e:\tau$. 
+% Especially, it relies on $\Gamma$ to provide the type information for variables in $e$. 
+% We utilize CompCert/CLight syntax and semantics \cite{Leroy:2009:FVC:1666192.1666216,Blazy2009} as our translation target language.
+%  Besides, we defined two data structures in the CompCert format for representing $\enull$ and $\ebounds$ states.
+% We write $\xrightarrow{c}$ for the semantics of CLight. \mwh{Of our
+%   target language, which I presume does not have all the features that
+%   CLight has. Should mention up front that we did all of this in PLT Redex.}
+
+Due to space constraints, we explain the rules for compilation by
+examples, using a C-like syntax; the complete rules are given in
+\iftr
+Appendix~\ref{appx:comp1}.
+\else
+the supplemental report~\cite{checkedc-tech-report}.
+\fi
+Each rule performs up to three tasks: (a) conversion of $e$ to
+A-normal form; (b) insertion of dynamic checks and bound widening expressions; 
+and (c) generate right pointer accessing expressions based on modes.
+%
+A-normal form conversion is straightforward: compound expressions are managed by storing results of subexpressions into temporary variables,
+as in the following example.
+
+{\vspace*{-0.5em}
 {\small
-  \begin{mathpar}
-    \inferrule[]
-    { x_l, x_h = \fresh \\
-      \rho' = \rho[x \mapsto (x_l, x_h)]\\
-    \dot C = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}}
-  {\cextend{\rho}{x}{\tntarrayptr{b_l}{b_h}{\tau}{c}}{\dot C, \rho'}\\}
+\begin{center}
+$
+\begin{array}{l}
+$\code{let y=(x+1)+(6+1)}$
+\;
+\begin{frame}
 
+\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
 
-  \inferrule[]
-  {x_l,x_h = \rho(x) \\
-    x_w = \fresh \\
-  \dot C = \elet{x_w}{\eif{x_h}{0}{\eassignstack{x_h}{1}}}{\hole}}
-{\ewidenderef{\rho}{x}{\tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c}}{\dot C}}
-
-
-\inferrule[]
-{e \notin dom(\rho)}
-{\ewidenstrlen{\rho}{e}{\dot a}{\tptr{\tntarrayb{\bvar}{\tau}}{m}}{\hole}}
-
-\inferrule[]
-{x_l,x_h = \rho(e) \\
-  x_a = \fresh \\
-  \dot C = \elet{x_a}{\eif{\dot a \leq x_h}{0}{\eassignstack{x_h}{\dot a}}}{\hole}}
-{\ewidenstrlen{\rho}{e}{\dot a}{\tptr{\tntarrayb{\bvar}{\tau}}{\cmode}}{\dot C}}
-
-
-
-  \end{mathpar}
-
+\end{frame}
+\;
+\begin{array}{l}
+$\code{let a=x+1;}$\\
+$\code{let b=6+1;}$\\
+$\code{let y=a+b}$\\
+\end{array}
+\end{array}
+$
+\end{center}
 }
- \caption{Metafunctions for Widening}
-\label{fig:compilationhelpers2}
-\end{figure*}
+}
+
+This simplifies the management of effects from subexpressions. The
+next two steps of compilation are more interesting.
+We state them based on different \lang operations.
+
+% \review{Fig 9: if this is actual C code, then your null-check at line 6 will be
+%   eliminated by the compiler. At line 3, you performed a pointer addition, which
+%   is only defined when `p` is non-null. So, either `p` is non-null, and the
+%   NULL-check can be eliminated; or, `p` is NULL, but line 3 was undefined
+%   behavior, meaning the compiler is allowed to do anything, notably eliminate
+%   the NULL-check. This is where I am super confused, and either:
+%   - CoreC is not really the C language, and has different semantics...? but is
+%     this well-defined in the context of LLVM?
+%   - there is a problem that was not caught by the PLT-Redex-based testing.
+% \yiyun{We have clarified at the start of IV that CoreC is an untyped
+%   variant of CoreChkC, and does not aim to represent C per se, or LLVM
+%   IR. We aimed to avoid confusion by rewriting the examples in a way that is more closely
+%     related to the syntax presented in Fig 3. Pointer arithmetic between 0 and a non-zero
+%     index is always valid because CoreC there is technically only
+%     integer arithmetic.}}
+
+\myparagraph{Pointer Accesses and Modes}
+%
+In every declaration \lc{(or the beginning of a function body) why?} of a pointer,
+if the poniter is an (NT-)array,
+we first allocate two \emph{shadow variables}
+to track the lower and upper bounds which are potentially changed for pointer arithmetic and NT-array bound widening.
+Each $\cmode$-mode NT-array pointer variable is associated with its type information in a store.
+Additionally, we place bounds and null-pointer checks, such as the line 6 and 7 in \Cref{fig:compilationexample1}.
+In addition, in the formalism, before every use of a tainted pointer (\Cref{fig:compilationexample1} line 9 and 10), 
+there is an inserted verification step similar to \Cref{fig:const-type},
+which checks if a pointer is well defined in the heap (\code{not_null}) and the spatial safety.
+Predicate \code{not_null} checks that every element in the pointer's range (\code{p_lo} and \code{p_hi}) is well defined in the heap.  
+The modes in compiled deference (\code{*(mode(p) }$\wedge$\code{ m,p)})
+ and assignment (\code{*(mode(q) }$\wedge$\code{ m,q)=1}) operations 
+are computed based on the meet 
+operation ($\wedge$) of the pointer mode (e.g. \code{mode(p)}) and the current context mode (\code{m}).
+
+\myparagraph{Checked and Unchecked Blocks}
+%
+In the \systemname implementation,
+$\euncheckedtext$ and $\echeckedtext$ blocks 
+are compiled as context switching functions provided by the sandbox mechanism.
+$\eunchecked{\overline{x}}{e}$ is compiled to 
+$\texttt{sandbox\_call}(\overline{x},e)$, where we call the sandbox 
+to execute expression $e$ with the arguments $\overline{x}$.
+$\echecked{\overline{x}}{e}$ is compiled to 
+$\texttt{callback}(\overline{x},e)$, where we perform 
+a \texttt{callback} to a checked block code $e$ inside a sandbox.
+In \systemname, we adopt an aggressive execution scheme that
+directly learns pointer addresses from compiled assembly to make the $\texttt{callback}$ happen.
+In the formalism, we rely on the type system to 
+guarantee the context switching without creating the extra function calls for simplicity.
+
+%Fig.~\ref{fig:compilationexample} shows how an invocation of
+%\code{strlen} on a null-terminated string is compiled into C
+%code. Each dereference of a checked pointer requires a null check
+%(See \textsc{S-DefNull} in Fig.~\ref{fig:semantics}), which the
+%compiler makes explicit: Line~$3$ of the generated code has the null
+%check on pointer \code{p} due to the \code{strlen},
+%  and a similar check happens
+%  at line~$8$ due to the pointer arithmetic on \code{p}.
+%Dereferences also require bounds checks: line~$2$ checks \code{p} is
+%in bounds before computing \code{strlen(p)}, while line~$10$ does
+%likewise before computing \code{*(p+1)}.
+
+\myparagraph{Function Pointers and Calls}
+%
+Function pointers are managed similarly to normal pointers,
+but we insert checks to check if the pointer address is not null in 
+the function store instead of heap, and whether or not the type is correctly represented, 
+for both $\cmode$ and $\tmode$ mode pointers 
+\footnote{$\cmode$-mode pointers are checked once in the beginning and $\tmode$-mode pointers are checked every time when use}.
+For example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
+we place a check \code{verify_fun(cmp, not_null(c, p_lo, p_hi) && type_match)},
+and we place a similar check before \Cref{fig:checkedc-example-3} line 7 to check the tainted \code{cmp} when it is used. 
+The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
+is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
+
+For compiling dependent function calls,
+\Cref{fig:compilationexample1} provides a hint.
+Notice that the bounds for the array pointer \code{p} are not passed as
+arguments. Instead, they are initialized according to \code{p}'s
+type---see line~4 of the original \lang program at the top of the figure.
+Line~$3$ of the generated code
+sets the lower bound  to \code{0} and the
+upper bound to \code{n}.
+
+\subsection{Metatheory}
+\label{sec:meta}
+
+% \review{ 
+% My interpretation of section IV.C is that the authors have a pen-and-paper
+%   proof of Theorem 4, and that random testing using the Redex models has been
+%   used to gain confidence in such a proof. Is this correct?}
+% \liyi{Yes, this is correct.}
+% \mwh{No, not correct: We have no pen-and-paper proof, just the
+%   model. Clarify here}
+% showing that
+% extensive random testing fails to falsify the bisimilarity
+% property. \mwh{Better way to state the previous?}
+
+We formalize both the compilation procedure and the simulation
+theorem in the PLT Redex model we developed for \lang (see Sec.~\ref{sec:syntax}),
+and then attempt to falsify it via Redex's support for random
+testing. Redex allows us
+  to specify compilation as logical rules (an extension
+  of typing), but then execute it algorithmically to
+  automatically test whether simulation holds. This process revealed
+  several bugs in compilation and the theorem statement.
+%
+  % us gain confidence that our original pen and paper proof of
+  % simulation remains true with the addition of variable bounds. }
+We ultimately plan to prove simulation in the Coq model.
+
+%Turning to the simulation theorem: We first introduce notation
+%used to specify the theorem.
+We use the notation $\gg$ to
+indicate the \emph{erasure} of stack and heap---the rhs is the same as
+the lhs but with type annotations removed:
+\begin{equation*}
+  \begin{split}
+    \heap  \gg & \dot \heap \\
+    \varphi \gg & \dot \varphi
+  \end{split}
+\end{equation*}
+In addition, when $\Gamma;\emptyset\vdash
+\varphi$ and $\varphi$ is well-formed, we write $(\varphi,\heap,e) \gg_m (\dot \varphi, \dot \heap,
+\dot e)$ to denote $\varphi \gg \dot \varphi$, $\heap \gg \dot \heap$
+and $\Gamma;\Theta;\emptyset \vdash_m e \gg \dot e : \tau$ for some $\tau$ respectively. $\Gamma$ is omitted from the notation since the well-formedness of $\varphi$ and its consistency with respect to $\Gamma$ imply that $e$ must be closed under $\varphi$, allowing us to recover $\Gamma$ from $\varphi$.
+Finally, we use $\xrightarrow{\cdot}^*$ to denote the transitive closure of the
+reduction relation of $\elang$. Unlike the $\lang$, the semantics of
+$\elang$ does not distinguish checked and unchecked regions.
+
+Fig.~\ref{fig:checkedc-simulation-ref} gives an overview of 
+the simulation theorem.\footnote{We ellide the  possibility of $\dot e_1$ evaluating to $\ebounds$ or $\enull$ in the diagram for readability.} The simulation theorem is specified in a way
+that is similar to the one by~\citet{merigoux2021catala}.
+
+An ordinary simulation property would
+replace the middle and bottom parts of the figure with the
+following: \[(\dot \varphi_0, \dot \heap_0, \dot e_0) 
+  \xrightarrow{\cdot}^* (\dot \varphi_1, \dot \heap_1, \dot e_1)\]
+Instead, we relate two erased configurations using the relation $\sim$,
+which only requires that the two configurations will eventually reduce
+to the same state.
+
+\ignore{
+ We formulate our simulation theorem differently
+because the standard simulation theorem imposes a very strong
+syntactic restriction to the compilation strategy. Very often, $(\dot
+\varphi_0, \dot \heap_0, \dot e_0)$ reduces to a term that is
+semantically equivalent to $(\dot \varphi_1, \dot \heap_1, \dot e_1)$,
+but we are unable to syntactically equate the two configurations due
+to the extra binders generated for dynamic checks and ANF
+transformation. In earlier versions of the Redex model, we attempted
+to change the compilation rules so the configurations could match
+syntactically. However, the approach scaled poorly as we added
+additional rules. 
+This slight relaxation on the equivalence relation
+between target configurations allows us to specify compilation more
+naturally without having to worry about syntactic constraints.
+}
+
+% The two theorems are translation preservation and simulation. We donate $\xrightarrow{c}$ as the transition semantics of CLight.
+\begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
+For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
+if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg_c (\dot \varphi_0,\dot \heap_0, \dot e_0)$,
+and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
+\rightarrow_c (\varphi_1, \heap_1, r_1)$, then the following facts hold:
+
+\begin{itemize}
+
+\item if there exists $e_1$ such that $r=e_1$ and $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+$(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+\varphi,\dot \heap,\dot e)$ and $(\dot
+\varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+\dot \heap,\dot e)$.
+
+\item if $r_1 = \ebounds$ or $\enull$, then we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+\dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+\varphi_1$, $\heap_1 \gg \dot \heap_1$.
+
+\end{itemize}
+\end{thm}
 
 
+% when $r_1 = e_1$ for
+% some $e_1$ and
+% $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then
+% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \varphi,\dot \heap,\dot e)$ and $(\dot
+% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
 
-\begin{figure*}[h]
+% \begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
+% For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
+% if $\emptyset;\emptyset;\emptyset \vdash_\cmode e_0 \gg \dot e_0 :\tau_0$,
+% and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
+% \rightarrow_\cmode (\varphi_1, \heap_1, r_1)$, when $r_1 = e_1$ for
+% some $e_1$ and
+% $\emptyset;\emptyset;\emptyset \vdash_\cmode e_1 \gg \dot e_1 :\tau_1$ where $\tau_1 \sqsubseteq \tau_0$
+% , then
+% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
+% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \varphi,\dot \heap,\dot e)$ and $(\dot
+% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
+% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
+% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
+% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
+% \end{thm}
+
+As our random generator never generates
+$\euncheckedtext$ expressions (whose behavior could be undefined), we can only test a the simulation theorem 
+as it relates to checked code. This limitation makes it
+unnecessary to state the other direction of the simulation theorem
+where $e_0$ is stuck, because Theorem~\ref{thm:progress} guarantees
+that $e_0$ will never enter a stuck state if it is well-typed in
+checked mode.
+
+The current version of the Redex model has been tested against $23000$
+expressions with depth less than $11$. Each expression can
+reduce multiple steps, and we test simulation between every two
+adjacent steps to cover a wider range of programs, particularly the
+ones that have a non-empty heap.
+
+\begin{figure}[t]
 {\small
-  \begin{mathpar}
-    \inferrule[]
-    {x = \fresh \\
-      \dot C = \elet{x}{\eif{\dot a}{0}{\enull}}{\hole}}
-    {\echecknull{\dot a}{c}{\dot C}}
+\[
+\begin{array}{c}
+\begin{tikzpicture}[
+            > = stealth, % arrow head style
+            shorten > = 1pt, % don't touch arrow head to node
+            auto,
+            node distance = 3cm
+        ]
 
-    \inferrule[]
-    {}
-    {\echecknull{\dot a}{u}{\hole}} \\
+\begin{scope}[every node/.style={draw}]
+    \node (A) at (0,1.5) {$\varphi_0,\heap_0, e_0$};
+    \node (B) at (4,1.5) {$\varphi_1, \heap_1 ,e_1$};
+    \node (C) at (0,0) {$\dot \varphi_0, \dot \heap_0 ,\dot e_0$};
+    \node (D) at (4,0) {$\dot \varphi_1, \dot \heap_1, \dot e_1$};
+    \node (E) at (2,-1.5) {$\dot \varphi,\dot \heap ,\dot e$};
+\end{scope}
+\begin{scope}[every edge/.style={draw=black}]
 
-    \inferrule[]
-    {}
-    {\echeckbounds{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{u}}{\dot a}{\hole}} 
+    \path [->] (A) edge node {$\longrightarrow_\cmode$} (B);
+    \path [<->] (A) edge node {$\gg$} (C);
+    \path [<->] (B) edge node {$\gg$} (D);
+    \path [dashed,<->] (C) edge node {$\sim$} (D);
+    \path [dashed,->] (C) edge node {$\xrightarrow{\cdot}^*$} (E);
+    \path [dashed,->] (D) edge node[above] {$\xrightarrow{\cdot}^*$} (E);
+\end{scope}
 
-    \inferrule[]
-    { x_l,x_h = \rho(e) \\
-      x_{cl},x_{ch} = \fresh\\
-      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
-      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
-    }
-    {\echeckbounds{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{c}}{\dot a}{\dot C_{cl;ch}}}
-
-    \inferrule[]
-    { e \notin dom(\rho) \\
-      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
-      \dot C_l = \elet{x_l}{b_l}{\hole}\\
-      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
-      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
-      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
-    }
-    {\echeckbounds{\rho}{e}{\tntarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
-
-    \inferrule[]
-    { e \notin dom(\rho) \\
-      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
-      \dot C_l = \elet{x_l}{b_l}{\hole}\\
-      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
-      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
-      \dot C_{ch} = \elet{x_{ch}}{\eif{x_h \leq \dot a}{\ebounds}{0}}{\hole}
-    }
-    {\echeckbounds{\rho}{e}{\tarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
-
-
-    \inferrule[]
-    {}
-    {\echeckboundsw{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{u}}{\dot a}{\hole}} 
-
-    \inferrule[]
-    { x_l,x_h = \rho(e) \\
-      x_{cl},x_{ch} = \fresh\\
-      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
-      \dot C_{ch} = \elet{x_{ch}}{\eif{\dot a \leq x_h}{0}{\ebounds}}{\hole}
-    }
-    {\echeckboundsw{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{c}}{\dot a}{\dot C_{cl;ch}}}
-
-
-    \inferrule[]
-    { e \notin dom(\rho) \\
-      x_{l}, x_{h}, x_{cl},x_{ch} = \fresh\\
-      \dot C_l = \elet{x_l}{b_l}{\hole}\\
-      \dot C_h = \elet{x_h}{b_h}{\hole}  \\    
-      \dot C_{cl} = \elet{x_{cl}}{\eif{x_l \leq \dot a}{0}{\ebounds}}{\hole}\\
-      \dot C_{ch} = \elet{x_{ch}}{\eif{x_h \leq \dot a}{\ebounds}{0}}{\hole}
-    }
-    {\echeckboundsw{\rho}{e}{\tallarrayptr{b_l}{b_h}{\tau}{c}}{\dot a}{\dot C_{l;h;cl;ch}}}
-
-\inferrule[]
-{e \notin dom(\rho) \\
-  x_l,x_l',x_h,x_h' = \fresh \\
-  \dot C_1 = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}\\
-  \dot C_2 = \elet{x_l'}{b_l'}{\elet{x_h'}{b_h'}{\hole}}\\
-  \dot C_3 = \eif{x_l' \leq x_l}{\hole}{\ebounds} \\
-  \dot C_4 = \eif{x_h \leq x_h'}{\hole}{\ebounds}
+\end{tikzpicture}
+\end{array}
+\]
 }
-{\echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{(b_l,b_h)}{\tau}}{m}}{\tptr{\tallarrayb{(b_l',b_h')}{\tau}}{m}}{\dot C_{1;2;3;4}}}
+\caption{Simulation between \lang and \elang }
+\label{fig:checkedc-simulation-ref}
+\end{figure}
 
-\inferrule[]
-{x_l',x_h' =\rho(e) \\
-  x_l,x_h = \fresh \\
-  \dot C_1 = \elet{x_l}{b_l}{\elet{x_h}{b_h}{\hole}}\\
-  \dot C_2 = \eif{x_l' \leq x_l}{\hole}{\ebounds} \\
-  \dot C_3 = \eif{x_h \leq x_h'}{\hole}{\ebounds}
-}
-{\echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{(b_l,b_h)}{\tau}}{m}}{\tptr{\tallarrayb{(b_l',b_h')}{\tau}}{m}}{\dot C_{1;2;3}}}
-  \end{mathpar}
-}
-\caption{Metafunctions for Dynamic Checks}
-\label{fig:compilationhelpers}
-\end{figure*}
+% \ignore
+% {The two theorems can be best understood by the diagram in Fig.~\ref{fig:checkedc-simulation-ref}.
+% % The diagram also indicates the simulation relation ($\sim$) among our formalization of the \checkedc Type System ($\vdash$), Semantics ($\longrightarrow$), Compilation ($\gg$), as well as the compiled C semantics ($\xrightarrow{c}$).
+% On the top of the relation, we have type soundness theorem (Sec.~\ref{sec:theorem}) stating that every type-checked \lang program $e_0$ can transition via \lang semantics into a type-checked program $e_1$ by taking a checked step.
+% The second line refers to that both $e_0$ and $e_1$ can be compiled to a C program $\dot e_0$ and $\dot e_1$, and such compilations always exist. The bottom two rewrites ($\xrightarrow{c}$) state that both $\dot e_0$ and $\dot e_1$ are transitioned finally to the same state $\dot e$. 
 
-% the closure $\dot
-% C_{1;2;n;3;b;4}$ encodes the idea that $e_1$ and $e_2$ are evaluated to values
-% before a null check (included in $\dot C_n$) is performed on
-% $\dot a_1$ , the result of evaluating $e_1$. $\dot C_3$ adds $\dot
-% a_1$ and $\dot a_2$ before a bounds check (included in $\dot C_b$) is performed on $\dot a_1$
-% with $\dot a_2$ as the index. Finally, we use $\dot C_4$ 
-% to store the result of the dereference in $x_4$ and return the pair
-% $\dot C_4,x_4$ as the result of the compilation. 
-% Further checks and
-% widening can be performed using $x_4$ and we don't have to worry about
-% the effects being triggered multiple times because the evaluation only
-% happens once in $\dot C_4$.
+%  The simulation states that given any well-typed \lang expression $e_0$, its compiled C program as $\dot e_0$, if $e_0$ can transition one step to $e_1$, and there must exist the compiled C program $\dot e_1$, such that both $\dot e_0$ and $\dot e_1$ transition to the same final state $\dot e$ in C. The simulation relation $\sim$ is built on top of the "triangle" structure in Fig.~\ref{fig:checkedc-simulation-ref} stating that every \lang expression and its one step transitioned expression might be compiled to two different C program, but the C semantics always evaluates them to the same place.
+% The translation preservation theorem is a support for the simulation theorem stating that for any well-typed \lang expression $e_0$,  its one step \checkedc transition expression $e_1$ must exist a compiled C program through the compilation process ($\gg$).
 
+% A corollary of the simulation theorem states that for any \lang expression $e_0$ and its one step \lang transition expression $e_1$, such that $e_0 \longrightarrow e_1$, if $e_0$ contains a fault due to a unchecked block (the blame theorem tells us that if there is a fault in a \lang code, it must come from a unchecked block), and its compiled code $\dot e_0$ is evaluated to a fault state, the compiled code $\dot e_1$ for $e_1$ is always evaluated to the same fault state in C.
+% This is an important property for a \lang compiler to preserve because any problematic program will be captured by running it long enough, so that enough random testing cases are able to capture all the bugs.
+% In our formalization implementation, the type soundness theorem is proved through Coq, while the simulation theorem is validated through intensive random test case generation. We generate tens of thousands cases and cover all possible corner cases of the compilation. 
+% }
+% \ignore{
+% \begin{figure*}[t]
+%   \begin{subfigure}[b]{1\textwidth}
+%     \begin{lstlisting}
+% int deref_array (size_t n, nt_array_ptr<int> p : bounds(p, p + n)) {
+%   return *p;
+% }
 
-% insert runtime checks and bounds widening
-% code in a straightforward way. Take the \textbf{C-Deref} rule as an example,
-% if we were to output $\dot e$ directly, we would have to rebind the
-% expression to a variable before we can perform the null check and
-% bounds check since $\dot e$ is not always a pure expression. Adding
-% $\elettext$ bindings in such an ad-hoc fashion for avoiding side
-% effects can clutter the compilation rules. Our approach of
-% outputting a context and an atom threads the ANF transformation into
-% each individual rule. Fig.~\ref{fig:compilationhelpers} shows helper
-% functions that take atom expressions and return a context that
-% contains the checks. The advantage of using explicit contexts becomes
-% evident when we start to compose them. For the simulation property to
-% hold, we want to ensure that the effects happen in the exact same
-% order.  In
-% the C-Deref rule, we first evaluate the expression that corresponds to
-% $e$ through $\dot C_1$, and then perform a bounds check followed by a
-% null check through $\dot C_b$ and $\dot C_n$. Finally, we dereference
-% the expression through $\dot C_2$, potentially widen the upper bound
-% by checking the dereferenced
-% result.
+% ...
+% /* nt_array_ptr<int> p0 : bounds(p0, p0 + 5) */
+% deref_array(5, p0);
+%     \end{lstlisting}
+%     \label{fig:chkcexamplederef}
+%     \caption{\texttt{deref\_array} in \checkedc}
+%   \end{subfigure}
 
+%   \begin{subfigure}[b]{1\textwidth}
+% \begin{lstlisting}
+% int deref_array(size_t n, int *p) {
+%   /* statically determine the definitions p_lo and p_hi */
+%   int *p_lo = p;
+%   int *p_hi = p + n;
+%   /* runtime checks */
+%   assert(p_lo <= p && p <= p_hi);
+%   assert(p != NULL);
+%   /* widening */
+%   int p_derefed = *p;
+%   if (p_derefed != '\0') {
+%     if (p_hi == p) {
+%       ++p_hi;
+%     }
+%   }
+%   return p_derefed;
+% }
+% ...
+% /* int *p0 */
+% /* rho(p0) = p_lo, p_hi */
+% deref_array(5, p0);
+% \end{lstlisting}
+% \caption{\texttt{deref\_array} in C}
+%     \label{fig:cexamplederef}
+%   \end{subfigure}
 
-% One big difference is that
-% our compilation strategy is not parameterized by the heap. Given a
-% literal annotated with a type, the compilation judgment simply
-% discards the type without validating whether the literal's type is
-% valid. This kind of relaxation not only makes the compilation rules
-% simpler (we no longer need to keep track of $\defscope$ and the mode),
-% but also allows us to formulate a stronger simulation theorem that
-% applies even after the program state is corrupted. More concretely,
-% the compilation judgment satisfies preservation regardless of whether
-% an unchecked step is being taken. On the other hand, if we were to
-% embed the compilation into the full-fledged typechecking rules, we
-% would not always be able to compile the expression after a step has
-% been taken.
+%   \begin{subfigure}[b]{\textwidth}
+%     \begin{lstlisting}
+% /* nt_array_ptr<int> p : bounds(e0, e1) */
+% /* rho(p) = p_lo, p_hi */
+% size_t x = strlen(p);
+% if(x >= 1) {
+%   *(p+1);
+% }
+%     \end{lstlisting}
+%     \caption{\texttt{strlen} in \checkedc}
+%     \label{fig:chkcexamplestrlen}
+%   \end{subfigure}
 
-% When our source
-% program is stuck because of the execution of unchecked code, we can
-% conclude that the compiled program will also get stuck with the
-% same erased heap state. It is possible to embed our compilation
-% strategy directly into the typing judgment, but our simulation would
-% be limited to states that are not yet corrupted to be untypable.
+%   \begin{subfigure}[b]{\textwidth}
+%     \begin{lstlisting}
+% /* nt_array_ptr<int> p : bounds(e0, e1) */
+% /* rho(p) = p_lo, p_hi */
+% /* runtime checks omitted */
+% ...
+% size_t x = strlen(p);
+% int *p_hi_new = p + x;
+% p_hi = max(p_hi, p_hi_new);
+% if (x >= 1) {
+%   /* null check for pointer arithmetic */
+%   assert(p != NULL);
+%   int *p_1 = p + 1;
+%   /* null check for dereference */
+%   assert(p_1 != NULL);
+%   /* bounds check for dereference */
+%   /* note how we are using p_hi rather than p + x */
+%   assert(p_lo <= p_1 && p_1 <= p_hi);
+%   ...
+% }
+%     \end{lstlisting}
+%     \caption{\texttt{strlen} in C}
+%     \label{fig:cexamplestrlen}
+%   \end{subfigure}
+% \caption{Compilation of null-terminated string dereference}
+% \label{fig:compilationexample}
+% \end{figure*}
+% }
 
-
-% Since the erased language does not have type annotations, we need
-% to explicitly represent bounds of null-terminated arrays as stack
-% variables to support bounds widening at runtime. Every time a checked
-% null-terminated array pointer is bound to a variable, we generate two
-% fresh new variables that are assigned the lower and upper bounds of
-% the array. The upper bound can be mutated into
-% a larger bound during execution. We use $\rho$ to keep track of the
-% bounds variables that belong to null-terminated array variables.
-
-
-% The compilation judgment does not produce expressions
-% directly. Instead, it outputs a tuple of a context $\dot C$ and an atom
-% expression $\dot a$ such that $\dot C[\dot a]$ corresponds to the
-% compiled target expression. In the case where the atom is a variable, $\dot
-% C$ will contain a let binding that defines the variable. This unconventional
-% output format enables us to insert runtime checks and bounds widening
-% code in a straightforward way. Take the C-Deref rule as an example,
-% if we were to output $\dot e$ directly, we would have to bind the
-% expression to a variable before we can perform the null check and
-% bounds check since $\dot e$ is not always a pure expression. Adding
-% $\kw{let}$ bindings in such an ad-hoc fashion for avoiding side
-% effects can clutter the compilation rules. Our approach of
-% outputting a context and an atom threads the ANF transformation into
-% each individual rule. Fig.~\ref{fig:compilationhelpers} shows helper
-% functions that take atom expressions and return a context that
-% contains the checks. The advantage of using explicit contexts becomes
-% evident when we start to compose them. For the simulation property to
-% hold, we want to ensure that the effects happen in the exact same
-% order. Since effects and reduction (except for variables?) happen only
-% within contexts, we can precisely control the order in which effects
-% and evaluation happen by composing the contexts in a specific order. In
-% the C-Deref rule, we first evaluate the expression that corresponds to
-% $e$ through $\dot C_1$, and then perform a bounds check followed by a
-% null check through $\dot C_b$ and $\dot C_n$. Finally, we dereference
-% the expression through $\dot C_2$, potentially widen the upper bound
-% by checking the dereferenced
-% result.
-
-\begin{figure*}[t]
-{\small
-  \begin{mathpar}
-
-    \inferrule[C-Const]
-      {}
-      {\Gamma;\rho\vdash \evalue{n}{\tau} \gg \hole, n : \tau}
-
-
-    \inferrule[C-Var]
-      {x : \tau \in \Gamma}
-      {\Gamma;\rho \vdash x \gg \hole, x : \tau}
-
-      
-    \inferrule[C-Cast]
-              {\Gamma;\rho \vdash e \gg  \dot C , \dot a : \tau'}
-              {\Gamma;\rho \vdash \ecast{\tau}{e} \gg \dot C, \dot a  : \tau}
-
-      \inferrule[C-DynCast]
-      {\Gamma;\rho \vdash e \gg \dot C_1, \dot a : \tptr{\tallarrayb{\bvar'}{\tau}}{m} \\
-      \echeckboundsdyn{\rho}{e}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\tptr{\tallarrayb{\bvar'}{\tau}}{m}}{\dot C_{b}}}
-      {\Gamma;\rho \vdash \edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{e}
-            \gg \dot C_{1;b}, \dot a : \tptr{\tallarrayb{\bvar}{\tau}}{m}}
+% \ignore{
+% Fig.~\ref{fig:compilationexample} gives an example of how we compile the
+% dereference of null-terminated strings by inserting explicit checks and
+% bounds widening code. For readability, we present the example in real
+% \checkedc and C syntax. At
+% line 3-4 of Fig.~\ref{fig:cexamplederef}, we see how the upper and lower
+% bounds are defined in terms of the arguments \code{p} and \code{n}
+% according to the bounds annotations obtained during typechecking. This
+% avoids the need to pass in bounds as extra arguments, thus maintaining
+% compatibility with C code. When we call \code{deref_array} on
+% \code{p0}, a string with size 5 (excluding the null character), there
+% is no need to pass the bounds \code{p_lo} and \code{p_hi} stored on
+% the stack. It is possible that \code{p_hi} has been widened
+% before we reach line 21. The programmer will have to perform a
+% \code{dynamic_bounds_cast} to recover the more precise bounds information. The if statement from line 10 to line 14
+% attempts to widen the bound when the dereferenced result is not
+% null. \todo[inline]{Show a full-fledged C program?} The widened upper bound will be available within the scope of
+% \code{deref_array}, in contrast to the T-IfNT rule, which only
+% remembers the widened bounds within the scope of the then branch of
+% the if statement. 
 
 
-      \inferrule[C-Str]
-      {\Gamma; \rho \vdash e \gg \dot C_1, \dot a_1 :  \tptr{\tntarrayb{\bvar}{\tau_a}}{m} \\
-        \echecknull{\dot a_1}{m}{\dot C_{n}} \\
-        \echeckbounds{\rho}{\dot a_1}{\tptr{\tntarrayb{\bvar}{\tau_a}}{m}}{0}{\dot C_{b}} \\
-        x_2 = \fresh \\
-          \dot C_2 = \elet{x_2}{\estrlen{\dot a_1}}{\hole} \\
-      \ewidenstrlen{\rho}{e}{\dot a_1}{\tptr{\tntarrayb{\bvar}{\tau_a}}{m}}{\dot C_{w}} } 
-                {\Gamma;\rho \vdash \estrlen{e} \gg \dot C_{1;n;b;2;w}, x_2 : \tint}
-
-
-      \inferrule[C-LetStr]
-      {\Gamma(y) = \tntarrayptr{b_l}{b_h}{\tau_a}{\cmode} \\ x \not\in \fv(\tau) \\
-        \Gamma; \rho \vdash \estrlen{y} \gg \dot C_1, \dot a_1 : \tint\\
-        \dot C_2 = \elet{x}{\dot a_1}{\hole} \\
-        \Gamma[x\mapsto \tint,y\mapsto [\tntarrayptr{b_l}{x}{\tau_a}{\cmode}]];\rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau}
-      %   x_3 = \fresh \\
-      %   \dot C_3 = \elet{x_3}{\dot a_2}{\hole}}
-                {\Gamma;\rho \vdash \elet{x}{\estrlen{y}}{e} \gg \dot C_{1;2;3},\dot a_3 : \tau}
-
-
-      \inferrule[C-If ]
-      {\Gamma; \rho \vdash e \gg \dot C_1, \dot a_1 : \tau \\
-        \Gamma; \rho \vdash e_1 \gg \dot C_2, \dot a_2 : \tau_2 \\
-        \Gamma; \rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau_3 \\
-        x_4 = \fresh \\
-        \dot C_4 = \elet{x_4}{\eif{\dot a_1}{\dot C_2[\dot a_2]}{\dot C_3[\dot a_3]}}{\hole}
-      }
-        {\Gamma; \rho \vdash \eif{e_1}{e_2}{e_3} \gg \dot C_{1;4}, x_4 : \tau_2 \sqcup \tau_3}
+% \todo[inline]{Widening can happen at every
+%   dereference at runtime. Is that ok?} Fig.~\ref{fig:cexamplestrlen}
+% shows how an invocation of \code{strlen} on null-termianted strings
+% is compiled into C code. We perform the same runtime checks that
+% happen during dereferencing. The widening code at line
+% 8 updates \code{p}'s upper bound only if the result of
+% \code{strlen} is larger than the value of the upper bound stored on
+% the stack. This is another scenario where the runtime can be more precise
+% than the statically determined bounds information.
 
 
 
-        \inferrule[C-IfNT]
-        {\Gamma; \rho \vdash x : \tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c} \\
-          b_h = 0 \Rightarrow \Gamma' = \Gamma[x \mapsto \tptr{\tntarrayb{(b_l,1)}{\tau}}{c}] \\
-          b_h \neq 0 \Rightarrow \Gamma' = \Gamma \\
-          \Gamma; \rho \vdash \estar{x} \gg \dot C_1, \dot a_1 : \tau_1\\
-          \Gamma'; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau_2\\
-          \Gamma;\rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau_3 \\
-        \ewidenderef{\rho}{x}{\tptr{\tntarrayb{(b_l,b_h)}{\tau}}{c}}{\dot C_{w}} \\
-        x_4 = \fresh \\
-        \dot C_4 = \elet{x_4}{\eif{\dot a_1}{\dot C_{2;w}[\dot a_2]}{\dot C_3[\dot a_3]}}{\hole}}
-        {\Gamma;\rho \vdash \eif{\estar{x}}{e_1}{e_2} \gg \dot C_{1;4}, x_4 : \tau_1 \sqcup \tau_2}
+% }
 
-   \inferrule[C-Let]
-    { (x\in \fv(\tau') \Rightarrow e_1 \in Bound) \\
-        \Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tau_1 \\ 
-        \cextend{\rho}{x}{\tau_1}{\dot C_2,\rho'}\\
-        \dot C_3 = \elet{x}{\dot a_1}{\hole}\\
-        \Gamma[x\mapsto \tau];\rho' \vdash e_4 \gg \dot C_4, \dot a_4  : \tau_4}
-    {\Gamma;\rho' \vdash \elet{x}{e_1}{e_4} \gg \dot C_{1;2;3;4},\dot a_4 : \tau_4[\tau_1 = \tint \Rightarrow x \mapsto e_1]}
-
-
-  \inferrule[C-Ret]
-    {\Gamma(x)\neq \bot \\
-      \Gamma;\rho \vdash e \gg \dot C_1, \dot a_1 : \tau \\
-      x_2 = \fresh \\
-      \mu \gg \dot \mu \\
-    \dot C_2 = \elet{x_2}{\eret{x}{\dot \mu}{\dot C_1[\dot a_1]}}{\hole}}
-  {\Gamma;\rho \vdash \eret{x}{\mu}{e} \gg \dot C_2, x_2 : \tau}
-
-
-    \inferrule[C-Fun]
-    {\Xi(f) = \tau\;(\overline{x}:\overline{\tau})\;e \\
-      % \dot \Xi(f) = (\overline{x})\; \dot C_f; \dot a_f \\
-      (\forall e_i\in\overline{e}\;\;\tau_i\in\overline{\tau}\;.\; \Gamma; \rho \vdash {e_i} \gg \dot C_i, \dot a_i  : \\ \tau_i' \wedge
-      \tau_i' \sqsubseteq 
-      \tau_i[\overline{e} / \overline{x}]%  \\
-      ) \\
-      x_f = \fresh \\
-      \dot C_f = \elet{x_f}{f(\overline{a})}{\hole}}
-    {\Gamma; \rho \vdash f(\overline{e}) \gg \overline{\dot C}[\dot C_f] , x_f  : \tau[\overline{e} / \overline{x}]}
-
-
-  \inferrule[C-Def]
-  {\Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tau}{m} \\
-    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-    x_2 = \fresh \\
-    \dot C_2 = \elet{x_2}{\estar{\dot a_1}}{\hole}
-   }
-   {\Gamma;\rho \vdash \estar{e_1} \gg \dot C_{1;n;2}, x_2 : \tau}
-
-   \inferrule[C-DefArr]
-   {\Gamma;\rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tallarrayptr{b_l}{b_h}{\tau}{m} \\
-    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-    \echeckbounds{\rho}{e_1}{\tallarrayptr{b_l}{b_h}{\tau}{m}}{0}{\dot C_{b}}\\
-    x_2 = \fresh \\
-    \dot C_2 = \elet{x_2}{\estar{\dot a_1}}{\hole}}
-   {\Gamma;\rho \vdash \estar{e_1} \gg \dot C_{1;n;b;2},x_2 : \tau} 
-
-
-    \inferrule[C-Mac]
-    {\dot C_{1}, \dot a_1 = \esizeof{\omega} \\
-      x_2 = \fresh \\
-    \dot C_2 = \elet{x_2}{\emalloc{\dot a_1}}{\hole}}
-     {\Gamma; \rho \vdash \emalloc{\omega} \gg \dot C_{1;2}, x_2 : \tptr{\omega}{\cmode}}
-
-  \end{mathpar}
-}
-\caption{Compilation}
-\label{fig:compilation}
-\end{figure*}
-
-
-\begin{figure*}[t]
-{\small
-  \begin{mathpar}
-    \inferrule[C-Add]
-              {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tint \\
-                \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint\\
-                x_3 = \fresh \\
-              \dot C_3 = \elet{x_3}{\dot a_1 \plus \dot a_2}{\hole}}
-              {\Gamma; \rho \vdash \dot C_3, x_3 : \tint }
-
-   \inferrule[C-Ind] 
-              {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m} \\
-                \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint \\
-                \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-                \echeckbounds{\rho}{e_1}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\dot a_2}{\dot C_{b}} \\
-                x_3, x_4 = \fresh\\
-                \dot C_3 = \elet{x_3}{\dot a_1 \plus \dot a_2}{\hole}\\
-                \dot C_4 = \elet{x_4}{\estar{x_3}}{\hole}
-                }
-                {\Gamma; \rho \vdash \estar{(\ebinop{e_1}{e_2})} \gg \dot C_{1;2;n;3;b;4} , x_4: \tau}
-
-
-
-
-  \inferrule[C-Assign]
-  {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tau}{m'} \\
-    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-    \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau' \\
-    \tau'\sqsubseteq \tau \\
-    x_3 = \fresh \\
-    \dot C_3 = \elet{x_3}{\eassign{\dot a_1}{\dot a_2}}{\hole} \\
-  }
-  {\Gamma; \rho \vdash \eassign{e_1}{e_2} \gg \dot C_{1;2;n;3}, x_3 : \tau}
-
-
-
-  \inferrule[C-AssignArr]
-  {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\
-    \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-    \echeckboundsw{\rho}{e_1}{\tallarrayptr{b_l}{b_h}{\tau}{m}}{0}{\dot C_{b}}\\
-    \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tau' \\
-    x_3 = \fresh \\
-    \dot C_3 = \elet{x_3}{\eassign{\dot a_1}{\dot a_2}}{\hole} \\
-    \tau'\sqsubseteq \tau}
-  {\Gamma; \rho \vdash \eassign{e_1}{e_2} \gg \dot C_{1;2;n;b;3},x_3 : \tau}
-
-
-
-
-    \inferrule[C-IndAssign]
-    {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m} \\
-      \Gamma; \rho \vdash e_2 \gg \dot C_2, \dot a_2 : \tint \\
-      \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-      \echeckboundsw{\rho}{e_1}{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\dot a_2}{\dot C_{b}} \\
-      \Gamma; \rho \vdash e_3 \gg \dot C_3, \dot a_3 : \tau' \\
-      x_4, x_5 = \fresh \\
-      \dot C_4 = \elet{x_4}{\dot a_1 \plus \dot a_2}{\hole}\\
-      \dot C_5 = \elet{x_5}{\eassign{x_4}{x_3}{\hole}}
-      \tau'\sqsubseteq \tau}
-    {\Gamma; \rho \vdash \eassign{(e_1 \plus e_2)}{e_3} \gg \dot C_{1;2;n;3;4;b;5} : \tau}
-
-
-    \inferrule [C-Struct]
-    {\Gamma; \rho \vdash e_1 \gg \dot C_1, \dot a_1  :  {\tptr{\tstruct{T}}{m}} \\
-      D(T) = \tau_0~f_0\ldots; \tau_j~f; ...  \\
-      \echecknull{\dot a_1}{m}{\dot C_{n}}\\
-      x_2 = \fresh\\
-    \dot C_2 = \elet{x_2}{\dot a_1 \plus \dot j}{\hole}}
-    {\Gamma; \rho \vdash \eamper{e_1}{f} \gg \dot C_2, x_2  : \tptr{\tau_f}{m}}
-
-    \inferrule[C-Unchecked]
-              {\Gamma;\rho \vdash e \gg \dot C, \dot a : \tau}
-              {\Gamma;\rho \vdash \eunchecked{e} \gg \dot C, \dot a : \tau}
-
-  \end{mathpar}
-    % \begin{prooftree}
-    %   \hypo{
-    %     \Gamma; \rho \vdash_u e \gg \dot C, a : \tau
-    %   }
-    %   \infer1[C-Unchecked]{\Gamma; \rho \vdash \eunchecked{e} \gg \dot C, a : \tau}
-    % \end{prooftree}\\\\
-
-    % \begin{prooftree}
-    %   \hypo{
-    %     \begin{matrix}
-    %         \Gamma; \rho \vdash e \gg \dot C_1, a_1 :  {\tptr[m]{\tstruct{T}}} \\
-    %         % \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
-    %         D(T) = \tau_0\ldots; \tau_j~f; ...\\
-    %         x_2 = \fresh \\
-    %         \dot C_2 = \elet{x_2}{a_1 + j}{\hole} \\
-    %         \echecknull{a_1}{m}{\dot C_{null}}
-    %     \end{matrix}
-    %   }
-    %   \infer1[C-Amper]{\Gamma; \rho \vdash \eamper{e}{f} \gg \dot C_{1;null;2}, x_2  : \tptr[m]{\tau_f}}
-    % \end{prooftree} \\ \\
-
-    % \begin{prooftree}
-    %   \hypo{
-    %     \begin{matrix}
-    %       \Gamma; \rho \vdash e_1 \gg \dot C_1, a_1 : \tptr[m']{\omega} \\
-    %       \Gamma; \rho \vdash e_2 \gg \dot C_2, a_2 : \tau \\
-    %       m' = u \Rightarrow m = u \\
-    %       \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}\\
-    %       \echecknull{a_1}{m}{\dot C_{n}} \\
-    %       % \echeckbounds{\rho}{a_1}{\tptr[m]{(\tntarray{le}{he}{\tau})}}{\dot C_{b}} \\
-    %       x_3 = \fresh\\
-    %       \dot C_3 = \elet{x_3}{\eassign{a_1}{a_2}}{\hole} \\
-    %     \end{matrix}
-    %   }
-    %   \infer1[C-Assign]{\Gamma; \rho \vdash \dot C_{1;b;n;2;3}, x_3 : \tau}
-    % \end{prooftree}\\\\
-
-
-    % \begin{prooftree}
-    %   \hypo{
-    %     \begin{matrix}
-    %       \Gamma; \rho \vdash e_1 : \tptr[m']{\omega} \\
-    %       \Gamma; \rho \vdash e_2 : \tint \\
-    %       \Gamma; \rho \vdash e_3 : \tau \\
-    %       m' = u \Rightarrow m = u \\
-    %       \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
-    %     \end{matrix}
-    %   }
-    %   \infer1[C-IndAssign]{\Gamma; \rho \vdash \eassign{(e_1 + e_2)}{e_3} : \tau}
-    % \end{prooftree}
-}
-\caption{Compilation (Continued)}
-\label{fig:compilation2}
-\end{figure*} 
 
 
 

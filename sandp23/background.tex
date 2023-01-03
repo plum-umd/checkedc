@@ -1,11 +1,9 @@
-\section{Background}
-\subsection{Program Partitioning}
-\label{subsec:background:programpart}
+\section{Background and Motivation}
+%\section{Overview and Transcendence}\label{sec:overview}
+%This section describes \checkedc{} and new features \systemname{} provides.
+This section presents a brief background of~\checkedc and motivation for~\systemname{}.
 
-\section{Overview and Transcendence}\label{sec:overview}
-This section describes \checkedc{} and new features \systemname{} provides.
-
-\subsection{\checkedc Overview}
+\subsection{\checkedc}
 % 
 \checkedc{} development began in 2015 by Microsoft Research, but it was forked
 in late 2021 and is now actively managed by the Secure Software
@@ -50,6 +48,113 @@ $[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
 \end{footnotesize}
 The bounds can be declared for $\ntarr$ as well, but the memory range can extend further to the right,
 until a~\code{NULL} terminator is reached (\ie the~\code{NULL} is not within the bounds).
+
+\liyi{can we reuse the old text for the spatial safety? }
+
+\noindent
+\myparagraph{Ensuring Spatial Memory Safety}
+The \checkedc compiler will instrument loads and stores of checked
+pointers to confirm the pointer is non-null, and additionally for $\arr$ and $\ntarr$ pointers the access is within
+the specified bounds.
+For instance, in the code \inlinecode{if (n>0) a[n-1] =} $...$ the write
+is via address $\alpha = \inlinecode{a + sizeof(int)}\!\times\!\code{(n-1)}$. If the
+bounds of \code{a} are \code{count(u)}, the
+inserted check will confirm that prior to dereference
+$\inlinecode{a} \leq \alpha < \inlinecode{a + sizeof(int)} \!\times\!
+\inlinecode{u}$.
+Failed checks throw an exception.
+
+Oftentimes, inserted checks can be optimized away by LLVM.
+Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
+In such cases, the inserted check can be
+removed as the outer condition $\inlinecode{n<u}$ already ensures that the
+dereference is within bounds.
+Dual~\etal~\cite{duanrefactoring} found essentially no
+overhead when running Checked C-converted portions of the FreeBSD kernel.
+
+\noindent
+\myparagraph{Backward Compatibility}
+\checkedc is backward compatible with legacy C in the sense that all legacy code will type-check and compile.
+However, the compiler adds the aforementioned spatial safety checks to only checked pointers.
+The spatial safety guarantee is partial when the code is not fully ported.
+Specifically, only code that appears in \emph{checked
+  code regions}, which we call \emph{checked code}, is guaranteed to be spatially safe.
+Checked regions can be designated at the level of files, functions, or individual code blocks using the
+\code{checked} keyword.\footnote{You can also designate~\emph{unchecked} regions  within checked ones.}
+ Within checked regions, both legacy pointers and
+certain unsafe idioms (\eg \emph{variadic} function calls) are disallowed.
+
+\liyi{If we are not going to talk about converting C to \checkedc, can we just move this to future work? }
+
+\myparagraph{Converting C to \checkedc}
+%
+The safety guarantees of Checked C come with certain restrictions. For instance,
+as shown below, Checked C programs cannot use address-taken variables in a
+bounds expression as the bounds relations may not hold because of possible
+modifications through pointers.
+% 
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+...
+array_ptr<int> p : count (n) = NULL;
+|\textcolor{red}{\faTimes}|..,&n,.
+\end{minted}
+% 
+Consequently, converting existing C programs to Checked C might require
+refactoring,~\eg eliminate~\inlinecode{&n} from the program above without
+changing its functionality.
+% 
+This might require considerable effort~\cite{duanrefactoring} depending on the
+program's complexity.
+% 
+Recently, Machiry~\etal developed~\threec~\cite{machiry2022c} that tries to
+automatically convert a program to Checked C by adding appropriate pointer
+annotations.
+However, as described in \threec, completely automated conversion
+is \emph{infeasible}, and it requires the developer to convert some code regions
+manually.  
+
+\liyi{Does the program too small? Will reviewer complain about the program size? }
+\subsection{No Safety Against Unchecked Code}
+\label{subsec:nosafetyagsintuncheckedcode}
+The spatial safety guarantee~\checkedc provides applies to completely converted programs,~\ie programs that uses only checked types.
+Although, the backward compatibility of~\checkedc helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (\ie checked or safe regions).
+The unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+Although the blameless proof exists~\cite{ruef2019achieving, li22checkedc} for~\checkedc, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
+Consider the following example:
+\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
+// Checked code
+int func(array_ptr<char> p : count(5)) {
+|\textcolor{red}{\faChainBroken}|..p[4]..
+}
+// unchecked code
+...
+str = "he";
+...
+func(|\textcolor{red}{\faBug}|assume_bounds_cast<char>(str, 5)); 
+...
+char ptr[16];
+...
+len <- derived from user input
+...
+|\textcolor{red}{\faBug}| memcpy(ptr, buff, len); // buffer overflow
+\end{minted}
+Here, the checked function~\inlinecode{func} expected a pointer to a buffer of five elements, but unchecked code violated it and invoked the function (Line 9) with a buffer of 2 elements.
+This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the Checked region, but of course, the blame or the root cause is in the unchecked region (\textcolor{red}{\faBug}).
+Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
+We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
+
+\liyi{I do not think you need three sub-sections for these topics. They can be in the same place. }
+\subsection{Program Partitioning}
+\label{subsec:background:programpart}
+Program partitioning~\cite{rul2009towards} is a well-known technique to divide a program into multiple isolated parts or partitions.
+There has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area.
+Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning.
+Specifically, given sensitive data in a program, the goal is to partition functions into two parts or partitions based on whether a function can access the sensitive data.
+The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
+The overhead of state-of-the-art approaches, such as Glamdring~\cite{lind2017glamdring} and  PtrSplit~
+\cite{liu2017ptrsplit}, is prohibitive and varies from 37\%-163\%.
+
+\iffalse
 
 \subsection{Ensuring Memory Safety}
 
@@ -602,6 +707,7 @@ contains any checked pointers\mzs{, as well as no output is of a checked type}.
 %
 
 \mz{Shell vs. Wrapper? Shell reminds me of bash. }
+\fi
 
 
 % \paragraph*{\textbf{NT-array Pointer Formalization}} NT-array pointers point to NT-arrays whose endings are determined by a null (\code{'\0'}). The length of a NT-array is usually not fixed. The two uses of NT-array pointers in \checkedc are branching and \code{strlen} operations. \code{if (*x) }$e_1$\code{ else }$e_2$ branches to $e_1$/$e_2$ depending one the \code{x}'s data, while \code{strlen(x)} computes the length of the NT-array pointed to by \code{x}.

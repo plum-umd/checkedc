@@ -1,6 +1,6 @@
 \section{Introduction}\label{sec:intros}
 
-Vulnerabilities due to memory corruption, especially spatial memory corruptions, 
+Vulnerabilities due to memory corruption, especially spatial memory corruption, 
 are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:2013:SRF:2534766.2534798} 
 despite a large body of work that tries to prevent them~\cite{song2019sanitizing}.
 Several industrial and research efforts, including CCured~\cite{Necula2005},
@@ -8,20 +8,17 @@ Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
 have investigated ways to compile C programs 
 to automatic spatial safety enforcement.
 These approaches all impose performance overheads deemed too high for deployment use. 
-Recently, \citet{Elliott2018} and \citet{li22checkedc} introduced and formalized \checkedc, an
+Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
 open-source extension to C with new types and
 annotations whose use can ensure a program’s spatial safety.
-Importantly, \checkedc supports development that is 
-incremental and compositional. Code regions (e.g.,
-functions or whole files) designated as \emph{checked} enforce
-spatial safety in a manner preserved by composition with
-other checked regions. But not all regions must be checked: Checked
-C's annotated \emph{checked pointers} are binary-compatible with legacy pointers, and
-may coexist in the same code, which permits a deliberate (and
-semi-automated) refactoring process. 
-Parts of the FreeBSD kernel have
-been successfully migrated to \checkedc~\cite{duanrefactoring}, and the overall performance
-overhead is minimal enough for practical deployment.
+Specifically,~\checkedc extends C with checked pointer types, which are restricted by the compiler to spatially safe uses.
+\liyi{why we need to mention C to \checkedc conversion? Is this paper about introducing CheckedCBox or about the conversion from C to CheckedCBox. I am actually against putting CheckedCBox conversion stuff in the paper, because it is kind of confusion. We have the compilation from CheckedCBox to LLVM and have the conversion from C to CheckedCBox. }
+The checked pointers are represented as system-level memory words,~\ie without ``fattening'' metadata, ensuring backward compatibility.
+This enables incremental conversion, where regions of code can be converted to~\checkedc and ensure spatial safety within those regions.
+However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the unconverted or unchecked code can violate guarantees provided in Checked regions.
+%
+We need to ensure that~\emph{code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
+\liyi{Can we strengthen the sentence a little by saying something fancy? }
 
 \ignore{
 Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
@@ -71,6 +68,7 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 % \item Implemented as an extension to Clang/LLVM. Good performance
 %   (compared to ASAN etc.)
 % \end{itemize}
+\iffalse
 \noindent
 \textbf{No safety against unchecked code.} The spatial safety guarantee~\checkedc provides applies to completely converted programs, i.e., programs that uses only checked types.
 Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
@@ -98,17 +96,21 @@ Here, the checked function~\inlinecode{func} expected a pointer to a buffer of f
 This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the Checked region, but of course, the blame or the root cause is in the unchecked region (\textcolor{red}{\faBug}).
 Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
+\fi
 This mechanism is called program partitioning~\cite{rul2009towards}.
 Existing mechanisms are not suitable as they are based on process isolation and have high overhead, and are data-centric~\emph{data-centric} (\sect{subsec:background:programpart}).
 Furthermore, these techniques are hard to engineer to co-exist with~\checkedc.
+\liyi{why? Can we not say this? It seems that the whole reason people should care our work is we did it in \checkedc, but \checkedc itself is the selling product here.... }
 But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
 
 In this work, we propose a type-directed code-centric program partitioning approach.
 Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
 The checked types follow the standard Checked C typing rules. However, our type-system disallows all interactions between taint and untainted types.
+\liyi{really? I think they can exchange data in the unchecked region, and then the sandbox guarantee the correctness? }
  
 The developer starts by marking desired (i.e., unchecked) functions and pointers used in these functions as tainted.
 Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
+\liyi{can we just name them unchecked and checked regions, and then referring to them as \ucregion and~\cregion? We need to make it clear that we are re-define c and uc regions. }
 \begin{itemize}
 \item~\ucregion or~\emph{tainted region} (low privilege tainted region): This partition contains tainted types (\ie functions and pointers) and can only access tainted pointers.
 \item~\cregion or~\emph{safe region} (high privilege untainted or checked region): This partition contains the remaining (untainted) code and data and has complete access to~\cregion{}.
@@ -124,9 +126,17 @@ Our compiler avoids these attacks by ensuring, either statically or through dyna
 
 In summary, we make the following three main contributions.
 
+\myparagraph{\systemname Type System, Formalism and Compiler}
+We present a type system that integrates tainted types with~\checkedc and ensures the~\emph{non-crashing property},~\ie 
+a well-typed~\systemname program can never crash due to spatial safety violations of tainted pointers.
+We extend~\checkedc compiler to support our type system.
+We formalize our system by extending~\checkedc formalism~\citet{li22checkedc} with the non-crashing guarantee and other new features below.
+We formally prove the~\emph{non-crashing theorem} and use model-based randomized testing (CITE) to certify the simulation relation between the~\systemname semantics and the compiler.
+To the best of our knowledge,~\systemname is the first C(-like) language and compiler formalism with the program partitioning mechanism.
+
 \myparagraph{Type-Directed Program Partitioning}
 We present a type-directed program partition technique to separate checked and unchecked code regions and ensure that the code in checked region~\textit{cannot crash} due to spatial safety violations.
-Our type system restricts checked pointers usage only in~\cregion and ensures that~\ucregion can only access tainted (or unchecked) pointers.
+Our type system restricts checked pointers usage only in~\cregion and ensures that~\ucregion can only access tainted pointers.
 Our modular design enables us to use existing sandboxed techniques to enforce memory and execution isolation.
 
 \myparagraph{Supporting callbacks to~\cregion with no Checked Pointer Exposure}
@@ -160,6 +170,7 @@ tainted shell.}
 \mz{What does this mean?}
 % 
 
+\iffalse
 \myparagraph{Formalizing the Type System, Semantics and Compiler}
 %
 We developed a core formalism named~\lang, which extends
@@ -171,11 +182,13 @@ Specifically, we use a conversion tool that converts expressions from~\lang into
 based on the typing rules of~\lang and ensure that~\lang and~\checkedc compiler are consistent after conversion, both statically and dynamically.  
 To the best of our knowledge,~\lang is the first C(-like) language and compiler formalism with the program partitioning mechanism.
 %To the best of our knowledge, \systemname is the first work of formalizing C function pointers with security guarantee.
+\fi
 
 We evaluated~\systemname by partioning~\numprog{} large real-world programs to demonstrate its effectiveness.
 Our evaluation shows that~\systemname provides a flexible, low-overhead program partitioning mechanism and guarantees spatial memory safety.
 
 \aravind{Fix the following text after all the sections of the papers are finalized.}
+\liyi{the following might be removed if space is needed, since it is usually not quite useful.}
 We begin with a review of \checkedc{} \mzr{and introduction of} new features in
 \systemname (Section~\ref{sec:overview}), present our main contributions
 (Sections~\ref{sec:formal}--\ref{sec:evaluation}), and conclude with a

@@ -1,18 +1,30 @@
-\documentclass[conference,compsoc]{IEEEtran}
+%\documentclass[conference,compsoc]{IEEEtran}
+%
+%\makeatletter
+%\def\endthebibliography{%
+%  \def\@noitemerr{\@latex@warning{Empty `thebibliography' environment}}%
+%  \endlist
+%}
+%\makeatother
+%
+%\IEEEpeerreviewmaketitle
 
-\makeatletter
-\def\endthebibliography{%
-  \def\@noitemerr{\@latex@warning{Empty `thebibliography' environment}}%
-  \endlist
-}
-\makeatother
+\documentclass[sigconf, anonymous]{acmart}
 
-\IEEEpeerreviewmaketitle
+\fancyhf{} % Remove fancy page headers 
+\fancyhead[C]{Anonymous submission \#9999 to ACM CCS 2023} % TODO: replace 9999 with your paper number
+\fancyfoot[C]{\thepage}
 
-\usepackage{filecontents}
-\usepackage[noadjust]{cite}
+\setcopyright{none} % No copyright notice required for submissions
+\acmConference[Anonymous Submission to ACM CCS 2023]{ACM Conference on Computer and Communications Security}{}{}
+\acmYear{2023}
+
+\settopmatter{printacmref=false, printccs=true, printfolios=true} % We want page numbers on submissions
+
+%\usepackage{filecontents}
+%\usepackage[noadjust]{cite}
 \usepackage{amsmath}
-\usepackage{amssymb}
+%\usepackage{amssymb}
 \usepackage{ebproof}
 \usepackage{todonotes}
 \usepackage{amsfonts}
@@ -47,8 +59,8 @@
 \usetikzlibrary{chains,fit,shapes,positioning,calc,arrows.meta,shapes.arrows}
 \usepackage{xspace}
 \usemintedstyle{emacs}
-\usepackage[numbers]{natbib}
-\bibliographystyle{plainnat}
+%\usepackage[numbers]{natbib}
+%\bibliographystyle{plainnat}
 %\bibliographystyle{IEEEtran}
 
 \newcommand{\inlinecode}[1]{%
@@ -480,9 +492,9 @@
 % \ignore{
 % https://github.com/microsoft/checkedc/tree/master/spec/bounds\_safety}
 % }
-
-\input{formal.tex}
-\input{compilation.tex}
+%\input{typesystem}
+\input{formal}
+%\input{compilation}
 \input{evaluation}
 % \input{discussion}
 \input{comparison}
@@ -524,6 +536,7 @@
 %%Text of appendix \ldots
 \begin{small}
 %\balance
+\bibliographystyle{ACM-Reference-Format}
 \bibliography{IEEEabrv,paper,sources}
 %%%%%%%%%%%%%%%%%%% Appendix %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \end{small}
