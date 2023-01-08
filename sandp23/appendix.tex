@@ -1111,6 +1111,234 @@ ones that have a non-empty heap.
 
 % }
 
+\subsection{Additional Type and Semantic Rules}\label{appx:add-type-sem}
+
+\begin{DIFnomarkup}
+\begin{figure}
+{\small
+\[\hspace*{-1.2em}
+\begin{array}{l}
+\textcolor{blue}{\text{Bound Inequality and Equality:}}\\[0.3em]
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+     n \le n' &\Rightarrow& n &\le_{\Theta} & n'\\
+     n \le n' &\Rightarrow& x+n &\le_{\Theta} & x+n'\\
+     n \le n' \wedge \Theta(x)=\tgez &\Rightarrow& n &\le_{\Theta} & x+n'\\
+     \Theta(x)=\teq{b} \wedge b+n\le_{\Theta}b'  &\Rightarrow& x+n & \le_{\Theta} & b'\\
+     \Theta(x)=\teq{b}\wedge b'\le_{\Theta}b+n  &\Rightarrow& b' & \le_{\Theta} & x+n\\
+     b \le_{\Theta} b' \wedge b' \le_{\Theta} b  &\Rightarrow& b & =_{\Theta} & b'
+    \end{array}
+  \\[1.5em]
+\textcolor{blue}{\text{Type Equility:}}\\
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+     && \tint & =_{\Theta} & \tint\\
+     \omega =_{\Theta} \omega' &\Rightarrow& \tptr{\omega}{\xi} & =_{\Theta} & \tptr{\omega'}{\xi}\\
+     \bvar =_{\Theta} \bvar' \wedge  \tau =_{\Theta} \tau'
+             &\Rightarrow& \tallarrayb{\bvar}{\tau} & =_{\Theta} & \tallarrayb{\bvar'}{\tau'}\\
+
+    \textit{cond}(\overline{x},\overline{\tau}\to\tau,\overline{y},\overline{\tau'}\to\tau')
+
+ &\Rightarrow& \tfun{\overline{x}}{\overline{\tau}}{\tau} & 
+                         =_{\Theta} & \tfun{\overline{y}}{\overline{\tau'}}{\tau'}\\
+    \end{array}
+  \\[0.7em]
+\textcolor{blue}{\text{Subtype:}}\\[0.3em]
+
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+    \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
+
+    0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
+    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
+    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
+    %% b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow&  \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq&  \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tallarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tallarrayptr{b_l'}{b_h'}{\tau}{m}
+\\[0.2em]
+\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}\wedge \tau\sqsubseteq_{\Theta}\tau' &\Rightarrow& \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} &\sqsubseteq_{\Theta}& \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}
+
+    \end{array}
+\end{array}
+  \]
+}
+{\footnotesize
+\[
+\begin{array}{l}
+n'+n = add(n',n)
+\qquad
+(x+n')+n = x+add(n',n)\\
+\textit{cond}(\overline{x},\tau,\overline{y},\tau')
+=\exists\overline{z}\;.\;\overline{x}\cupdot\overline{z}
+  \wedge \overline{y}\cupdot\overline{z}
+  \wedge \size(\overline{x})=\size(\overline{y})=\size(\overline{z})
+\\\qquad\qquad\qquad\qquad\qquad
+  \wedge \tau[\overline{z}/\overline{x}]= \tau'[\overline{z}/\overline{x}]
+\end{array}
+\]
+}
+  \caption{Type Equality and Subtyping}
+  \label{fig:checkc-subtype}
+\end{figure}
+\end{DIFnomarkup}
+
+Since bounds expressions may
+contain variables, determining assumptions like $b_l \leq b_l'$
+requires reasoning about the probable values of these variables'. The type
+system uses $\Theta$ to make such reasoning more precise.
+$\Theta$ is a map from variables $x$ to
+equation predicates $P$, which have the form $P ::= \tgez \;|\; \teq{b}$.
+It maps variables to equations that are recorded along the type checking procedure.
+If $\Theta$ maps $x$ to $\tgez$, that means that $x \ge 0$;
+$\teq{b}$ means that $x$ is equivalent to the bound value $b$ in the current context, 
+such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-RetInt}.
+\iftr
+  Appendix~\ref{app:le}.
+\else
+  the supplemental report~\cite{checkedc-tech-report}.
+\fi has an example rule for populating $\Theta$ with a $\tgez$ predicate.
+
+\begin{figure}[t]
+{\small
+{\captionsetup[lstlisting]{margin = 8 mm}
+  \begin{lstlisting}[xleftmargin=8 mm]
+nt_array_ptr<char> safe_strcat
+   (nt_array_ptr<char> dst : count(n),
+    nt_array_ptr<char> src : count(0), int n) {
+  int x = strlen(dst);
+  int y = strlen(src);
+  nt_array_ptr<char> c : count(n) =
+    dyn_bounds_cast
+           <nt_array_ptr<char>>(dst,count(n));
+    // sets c == dst with bound n (not x)
+  if (x+y < n) {
+    for (int i = 0; i < y; ++i)
+      *(c+x+i) = *(src+i);
+    *(c+x+y) = '\0';
+    return dst;
+  }
+  return null;
+}
+  \end{lstlisting}
+}
+}
+\caption{Implementation of safe \code{strcat}}
+\label{fig:strcat-ex}
+\end{figure}
+
+Recall that array
+bounds in types may refer to in-scope variables; e.g., parameter
+\code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
+2-3 in \Cref{fig:strcat-ex}. 
+All dependent bound variables appearing in function headers 
+are bounded by a variable list in the function pointer type, which is checked in the type rule.
+Semantically,
+the call is expanded into a \texttt{let} which binds
+parameter variables $\overline{x}$ to the actual arguments
+$\overline{n}$, but annotated with the parameter types
+$\overline{\tau}$ (this will be safe for type-correct programs). 
+The function body $e$ is wrapped in a static cast
+$(\tau[\overline{n} / \overline{x}])$ which is the function's return
+type but with any integer parameter variables $\overline{x}$ appearing in that
+type, as type bound variables,
+substituted with the call's actual arguments $\overline{n}$.
+To see why this is needed, suppose that \code{safe_strcat} in
+Fig.~\ref{fig:strcat-ex} is defined to return a
+\code{nt_array_ptr<int>:count(n)} typed term, and assume that we
+perform a \code{safe_strcat} function call as
+\code{x=safe_strcat(a,b,10)}. After the evaluation of \code{safe_strcat}, the
+function returns a value with type \code{nt_array_ptr<int>:count(10)}
+because we substitute bound variable \code{n} in the 
+defined return type with \code{10} from the function call's
+argument list.
+
+
+\begin{figure}[t!]
+  \begin{small}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+int deref_array(n : int,
+     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$,
+     q : $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\tmode}$) {
+  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi,p_m */
+  /* $\color{purple!40!black}\rho$(q) = q_lo,q_hi,q_m */
+    * p;
+    * q = 1;
+}
+...
+/* p0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\cmode}$ */
+/* q0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\tmode}$ */
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\begin{frame}
+
+\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
+
+\end{frame}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+deref_array(int n, int* p, int * q) {
+  //m is the current context mode
+  let p_lo = 0; let p_hi = n; 
+  let q_lo = 0; let q_hi = n; 
+  /* runtime checks */
+  assert(p_lo <= 0 && 0 <= p_hi);
+  assert(p != 0);
+  *(mode(p) $\wedge$ m,p);
+  verify(q, not_null(m, q_lo, q_hi) 
+             && q_lo <= 0 && 0 <= q_hi);
+  *(mode(q) $\wedge$ m,q)=1;
+}
+...
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\end{small}
+    \caption{Compilation Example for Dependent Functions}
+\label{fig:compilationexample1}
+\end{figure}
+
+For compiling dependent function calls,
+\Cref{fig:compilationexample1} provides a hint.
+Notice that the bounds for the array pointer \code{p} are not passed as
+arguments. Instead, they are initialized according to \code{p}'s
+type---see line~4 of the original \lang program at the top of the figure.
+Line~$3$ of the generated code
+sets the lower bound  to \code{0} and the
+upper bound to \code{n}.
 
 
 
+\begin{defi}[Type Environment Well-formedness]\label{type-wellformed}
+A type environment $\Gamma$ is well-formed if every variable mentioned as type bounds in $\Gamma$ are bounded by $\tint$ typed variables in $\Gamma$.
+\end{defi}
+
+\begin{defi}[Heap Well-formedness]
+For every $m$, A heap $\heap$ is well-formed if (i) $\heap(m,0)$ is undefined, and
+(ii) for all $\evalue{n}{\tau}$ in the range of $\heap(m)$, type $\tau$
+contains no free variables. 
+\end{defi}
+
+\begin{defi}[Stack Well-formedness]
+A stack snapshot $\varphi$ is well-formed if
+for all $\evalue{n}{\tau}$ in the range of $\varphi$, type $\tau$
+contains no free variables. 
+\end{defi}
+
+We also need to introduce a notion of
+\emph{consistency}, relating heap environments before and after a
+reduction step, and type environments, predicate sets, and stack
+snapshots together.
+
+
+\begin{defi}[Stack Consistency]
+A type environment $\Gamma$, variable predicate set $\Theta$, and
+stack snapshot $\varphi$ are consistent---written $\Gamma;\Theta\vdash
+\varphi$---if for every variable $x$, $\Theta(x)$ is defined implies
+$\Gamma(x) = \tau$ for some $\tau$ and 
+$\varphi(x) =\evalue{n}{\tau'}$ for some $n,\tau'$ where $\tau' \sqsubseteq_{\Theta} \tau$. 
+\end{defi}
+
+\begin{defi}[Checked Stack-Heap Consistency]
+A stack snapshot $\varphi$ is consistent with heap $\heap$---written $\heap \vdash \varphi$---if
+for every variable $x$, $\varphi(x)= \evalue{n}{\tau}$ with $\mode(\tau)=\cmode$ implies $\emptyset;\heap(\cmode);\emptyset \vdash_{\cmode} n:\tau$.
+\end{defi}
+
+\begin{defi}[Checked Heap-Heap Consistency]
+A heap $\heap'$ is consistent with $\heap$---written $\heap \triangleright \heap'$---if
+for every constant $n$, $\emptyset;\heap;\emptyset \vdash_{\cmode} n:\tau$ implies $\emptyset;\heap';\emptyset \vdash_{\cmode} n:\tau$.
+\end{defi}

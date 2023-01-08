@@ -108,7 +108,7 @@ However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used al
 %
 This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
 
-For our example in~\lst{lst:final}, we can make only the function~\code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
+For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
 
 The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
 It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
