@@ -5,17 +5,42 @@ are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:20
 despite a large body of work that tries to prevent them~\cite{song2019sanitizing}.
 Several industrial and research efforts, including CCured~\cite{Necula2005},
 Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
-have investigated ways to compile C programs 
-to automatic spatial safety enforcement.
+have investigated ways to
+\mzu{compile C programs 
+  to automatic spatial safety enforcement.}
+\mz{You cannot compile a program to enforcement.}
+% 
 These approaches all impose performance overheads deemed too high for deployment use. 
+% 
 \liyi{Should we say this? Is the paper about overhead reducing? }
 Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
-open-source extension to C with new types and
-annotations to ensure a program’s spatial safety.
-Specifically, \checkedc extends C with checked pointer types, which are restricted by the compiler to spatially safe uses.
-The checked pointers are represented as system-level memory words,~\ie without ``fattening'' metadata, ensuring backward compatibility.
-This enables incremental conversion, where regions of code can be converted to~\checkedc and ensure spatial safety within those regions.
-However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the unconverted or unchecked code can violate guarantees provided in Checked regions.
+open-source extension to C
+% 
+\mzs{ with new types and annotations to ensure a program’s spatial safety.
+  Specifically, \checkedc extends C with checked pointer types, which are
+  restricted by the compiler to spatially safe uses.}
+% 
+\mzr{ with additional annotations and types, checked pointer types in
+  particular, to ensure a program’s spatial safety.}
+% 
+\mz{Redundancy?}
+% 
+The checked pointers are represented as system-level memory words\mzs{,~\ie} without ``fattening'' metadata, ensuring backward compatibility.
+\mz{\ie{} sounds indirect and redundant to me.}
+% 
+\mzu{This enables incremental conversion, where regions of code can be converted to~\checkedc and ensure spatial safety within those regions.}
+\mz{This sentence is incoherent. I don't understand the connection between
+  incremental conversion and regions of code. 
+  % 
+  I guess your point is that since you don't introduce extra metadata, 
+  checked and unchecked region can coexist and interact seamlessly.
+  % 
+}
+% 
+However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the
+unconverted or unchecked code can violate guarantees provided in \mzu{Checked}
+\mz{either tt it or use lowercase?}
+regions.
 %
 We need to ensure that~\emph{code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 
