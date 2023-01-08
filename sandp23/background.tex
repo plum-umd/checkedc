@@ -12,17 +12,19 @@ Development Project (SSDP). Details can be found in a prior
 overview~\cite{Elliott2018} or the formalism~\cite{li22checkedc}.
 %
 
+\liyi{Do we need to spend more than half page introducing checked-c? OR just introduce it briefly like what we had in the formalism paper? }
+
 \noindent
 \myparagraph{Checked Pointer Types}
 \checkedc{} introduces three varieties of \emph{checked pointer}:
 \begin{itemize}
-\item \code{ptr<}$T$\code{>} ($\ptr$) types a pointer that is either null or
+\item \code{_Ptr<}$T$\code{>} ($\ptr$) types a pointer that is either null or
   points to a single object of type $T$.
-\item \code{array_ptr<}$T$\code{>} ($\arr$) types a pointer that is either null
+\item \code{_Array_ptr<}$T$\code{>} ($\arr$) types a pointer that is either null
   or points to an array of $T$ objects. The array width is defined
   by a \emph{bounds} expression, discussed below.
-\item \code{nt_array_ptr<}$T$\code{>} ($\ntarr$) is like
-  \code{array_ptr<}$T$\code{>} except that the bounds expression
+\item \code{_NT_Array_ptr<}$T$\code{>} ($\ntarr$) is like
+  \code{_Array_ptr<}$T$\code{>} except that the bounds expression
   defines the \emph{minimum} array width---additional objects may
   be available past the upper bound, up to a null terminator.
 \end{itemize}
@@ -58,13 +60,14 @@ The \checkedc compiler will instrument loads and stores of checked
 pointers to confirm the pointer is non-null, and additionally for $\arr$ and $\ntarr$ pointers the access is within
 the specified bounds.
 For instance, in the code \inlinecode{if (n>0) a[n-1] =} $...$ the write
-is via address $\alpha = \inlinecode{a + sizeof(int)}\!\times\!\code{(n-1)}$. If the
-bounds of \code{a} are \code{count(u)}, the
+is via address $\alpha = \inlinecode{a + sizeof(int)}\!\times\!\code{(n-1)}$. 
+If the bounds of \code{a} are \code{count(u)}, the
 inserted check will confirm that prior to dereference
 $\inlinecode{a} \leq \alpha < \inlinecode{a + sizeof(int)} \!\times\!
 \inlinecode{u}$.
 Failed checks throw an exception.
 
+\liyi{why we need the following? I suggest we can cut. }
 Oftentimes, inserted checks can be optimized away by LLVM.
 Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
 In such cases, the inserted check can be
@@ -96,7 +99,7 @@ modifications through pointers.
 % 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 ...
-array_ptr<int> p : count (n) = NULL;
+_Array_ptr<int> p : count (n) = NULL;
 |\textcolor{red}{\faTimes}|..,&n,.
 \end{minted}
 % 
@@ -144,7 +147,6 @@ This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in 
 Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 
-\liyi{I do not think you need three sub-sections for these topics. They can be in the same place. }
 \subsection{Program Partitioning}
 \label{subsec:background:programpart}
 Program partitioning~\cite{rul2009towards} is a well-known technique to divide a program into multiple isolated parts or partitions.
@@ -251,7 +253,7 @@ modifications through pointers.
 % 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 ...
-array_ptr<int> p : count (n) = NULL;
+_Array_ptr<int> p : count (n) = NULL;
 |\textcolor{red}{\faTimes}|..,&n,.
 \end{minted}
 % 
