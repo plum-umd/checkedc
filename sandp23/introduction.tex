@@ -8,56 +8,16 @@ Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
 have investigated ways to compile C programs 
 to automatic spatial safety enforcement.
 These approaches all impose performance overheads deemed too high for deployment use. 
+\liyi{Should we say this? Is the paper about overhead reducing? }
 Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
 open-source extension to C with new types and
-annotations whose use can ensure a program’s spatial safety.
-Specifically,~\checkedc extends C with checked pointer types, which are restricted by the compiler to spatially safe uses.
-\liyi{why we need to mention C to \checkedc conversion? Is this paper about introducing CheckedCBox or about the conversion from C to CheckedCBox. I am actually against putting CheckedCBox conversion stuff in the paper, because it is kind of confusion. We have the compilation from CheckedCBox to LLVM and have the conversion from C to CheckedCBox. }
+annotations to ensure a program’s spatial safety.
+Specifically, \checkedc extends C with checked pointer types, which are restricted by the compiler to spatially safe uses.
 The checked pointers are represented as system-level memory words,~\ie without ``fattening'' metadata, ensuring backward compatibility.
 This enables incremental conversion, where regions of code can be converted to~\checkedc and ensure spatial safety within those regions.
 However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the unconverted or unchecked code can violate guarantees provided in Checked regions.
 %
 We need to ensure that~\emph{code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
-\liyi{Can we strengthen the sentence a little by saying something fancy? }
-
-\ignore{
-Converting these existing programs into safe languages, such as Java, requires considerable effort and is not (yet) feasible for performance-critical environments such as Embedded Operating Systems.
-Although high-performant safe system languages such as Rust~\cite{rustlang} and Go exist, these a too different to constitute a practical target~\cite{zeng2019identifying}, and rewriting in these languages requires considerable effort.
-
-Existing automated conversion tools~\cite{c2rust,c2rusttalk, emre2021c2rust} are able to take only small steps (i.e., to unsafe, non-idiomatic Rust) and still~\emph{require considerable work from developers}.
-There are other retrofitting techniques such as CCured~\cite{necula2005ccured},
-Softbound~\cite{nagarakatte2009softbound}, Low Fat
-pointers~\cite{duck2016heap}, and Address Sanitizer
-(ASAN)~\cite{serebryany2012addresssanitizer} aim to enforce spatial safety
-automatically~\emph{without any developer effort}, by analyzing a C program and compiling it to include
-run-time safety checks. Unfortunately, the resulting~\emph{run-time overhead is too high
-for deployment (between 60\%-200\%)}, especially in low-powered IoT devices where the usage of C-based system software (e.g., FreeRTOS) is still rampant.
-
-\input{figures/existingmem}
-
-\noindent
-\textbf{Checked C.} Tarditi et al. developed~\emph{Checked C}, a safe dialect of C that prevents spatial memory issues (temporal safety is underway~\cite{checkedc:temporal}) with no overhead.
-Checked C extends C with \emph{checked pointer
-  types} which are restricted by the compiler to spatially safe uses (temporal safety is underway~\cite{checkedc:temporal}).
-Such pointers have one of three possible types, \ptrT{T}, \arrT{T},
-or~\ntarrT{T} (\ptr, \arr, and \ntarr{} for short), representing a
-pointer to a single element, array of elements, or null-terminated
-array of elements of type $T$, respectively. The latter two have an
-associated \emph{bounds annotation}; e.g., a declaration \arrT{int}
-\code{p} : \code{count(n)} says that \code{p} is a pointer to an \code{int} array whose size is \code{n}.
-The compiler uses these bounds annotations to add dynamic checks prior to checked pointer accesses, to prevent spatial safety violations.
-These run-time checks can often be proved redundant and removed by LLVM, yielding good performance.
-Specifically, Tarditi et al.~\cite{tarditi2018checked} reported average
-run-time overheads of 8.6\% on a small benchmark suite, and
-Duan et al.~\cite{duanrefactoring} found essentially~\emph{no overhead} when running
-Checked C-converted portions of the FreeBSD kernel.
-Furthermore, Checked C is backward compatible as the compiler  represents checked pointers as system-level memory words, i.e., without
-``fattening'' metadata, ensuring backward compatibility. 
-The backward compatibility also enables incremental or partial conversion where Checked annotations can be provided to a few pointers.
-Such partially annotated programs still enjoy the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe code regions).
-~\fig{fig:memprotections} shows the summary of these existing approaches along with Checked C.
-We argue that~\emph{converting to Checked C provides a reasonable and practical approach to adding safety to existing system software written in C}.
-}
 
 % One possible solution is Checked C
 % \begin{itemize}
@@ -70,7 +30,7 @@ We argue that~\emph{converting to Checked C provides a reasonable and practical 
 % \end{itemize}
 \iffalse
 \noindent
-\textbf{No safety against unchecked code.} The spatial safety guarantee~\checkedc provides applies to completely converted programs, i.e., programs that uses only checked types.
+\textbf{No safety against unchecked code.} The \checkedc spatial safety guarantee applies to completely converted programs, i.e., programs that uses only checked types.
 Although, the backward compatibility of Checked C helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
 But, the unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
 Although the blameless proof exists~\cite{ruef2019achieving} for~\checkedc, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
@@ -109,20 +69,21 @@ The checked types follow the standard Checked C typing rules.
 However, our type-system disallows any unsafe interactions between taint and untainted types.
  
 The developer starts by marking desired (\ie unchecked) functions and pointers used in these functions as tainted.
-Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
-\liyi{can we just name them unchecked and checked regions, and then referring to them as \ucregion and~\cregion? We need to make it clear that we are re-define c and uc regions. }
+Second,~\systemname partitions the given program into two partitions (\umode and~\cmode regions)  of different privileges:
+
 \begin{itemize}
-\item~\ucregion or~\emph{tainted region} (low privilege tainted region): This partition contains tainted types (\ie functions and pointers) and can only access tainted pointers.
-\item~\cregion or~\emph{safe region} (high privilege untainted or checked region): This partition contains the remaining (untainted) code and data and has complete access to~\cregion{}.
+\item~\umode \emph{region} or~\emph{tainted region} (low privilege tainted region): This partition contains tainted types (\ie functions and pointers) and can only access tainted pointers.
+\item~\cmode \emph{region} or~\emph{safe region} (high privilege untainted or checked region): This partition contains the remaining (untainted) code and data and has complete access to~\cmode region.
 The functions in~\cregion can invoke any function in~\ucregion and access all its data but not the other way around, except for call-back functions, which we will discuss later.
 \end{itemize}
 Finally, during program execution, the~\ucregion partition will be executed in an existing sandboxed environment (\eg WASM sandbox), and our compiler will add the necessary instrumentation to facilitate the communication between code in~\cregion{} and~\ucregion{}.
 
 The combination of tainted types and privileged partitions enables us to enforce isolation and provide memory safety without marshaling costs.
-As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
+As functions in the~\ucregion can only access tainted types (or unchecked types),~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
 We avoid marshaling by allocating all tainted pointers (\ie tainted buffers) in~\ucregion and thus can be accessed in both partitions.
 Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
-Our compiler avoids these attacks by ensuring, either statically or through dynamic checks that tainted pointers can only point to~\ucregion address space.
+Our compiler avoids these attacks by ensuring, through dynamic checks that tainted pointers validly point to \ucregion address space.
+Such checks are statically generated by our compiler.
 
 In summary, we make the following three main contributions.
 
@@ -147,7 +108,7 @@ To enable this, we support callback functions in~\cregion that can be invoked fr
 However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of~\systemname and leads to other attacks~\cite{hauser2019sleak}.
 
 We handle this by using indirection. Specifically, instead of directly accessing the~\cregion callbacks, the ~\ucregion accesses them using a protected trampoline function, which will direct the execution to the appropriate callback function.
-In addition, the trampoline function itself will be referenced using an opaque index rather than its virtual address, and we will utilize existing sandboxing techniques to implement this.
+In addition, the trampoline function itself will be referenced using an opaque index rather than its virtual address, and we will utilize existing sandboxing techniques to implement this. In our \systemname formalism, we formally verified that our formalism is \emph{non-exposure}, \ie, no \cregion pointer addresses will be leaked in \ucregion code.
 
 \ignore{
 
