@@ -18,11 +18,12 @@
 %   but redundant typing rules" from above?}
 % \liyi{Deena? Leo? }
 Our evaluation of \systemname consists of a series of tests that can be categorized into Micro-benchmarks and Program Benchmarks.
-MicroBenchmarking involves evaluating performance on fundamental operations involving tainted pointers, context switching between checked and sandboxed regions, and sandboxed execution of functions.
-We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
+Micro-benchmarking involves evaluating performance on operations containing tainted pointers, context switching between checked and sandboxed regions, and sandboxed function execution.
+We evaluate \systemname using six real-world programs 
+pertaining to diversified domains for evaluating real-world run-time and memory performance.
 
 \myparagraph{Benchmarking Methodology}
-We use C's~\code{<time.h>} library to evaluate the Runtime performance by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs). Our timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. We use Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, we record Peak Memory usage as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLib functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandboxed allocations which happen in the shadow memory. 
+We use C's~\code{<time.h>} library to evaluate the runtime performance by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs). Our timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. We use Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the runtime performance, we record Peak Memory usage as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLib functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandboxed allocations which happen in the shadow memory. 
 All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of RAM, running Ubuntu 20.04.3 LTS and the benchmarks for every test were sampled as the mean of ten consecutive iterations.
 
 \subsection{Micro-Benchmarks}
