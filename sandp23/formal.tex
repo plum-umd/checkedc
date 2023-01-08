@@ -54,35 +54,25 @@
 & \text{Integers:}~n::=\mathbb{Z} 
 \end{array}
 \\[0.5em]
-
 \begin{array}{llcllcl}
-
-\text{Context Mode:} & m & ::= & \cmode \mid \umode \\[0.5em]
-
-\text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\[0.5em]
-
+\text{Context Mode:} & m & ::= & \cmode \mid \umode \\
+\text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\
 \text{Bound:} & b & ::= & n \mid x \plus n \\
-              & \bvar & ::= & (b,b) \\[0.5em]
+              & \bvar & ::= & (b,b) \\
   
      \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{ \xi}
-\\[0.5em]
-
+\\
 \text{Type Flag:}&\kappa &::=& nt \mid \cdot
-\\[0.5em]
-
+\\
 \text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau} \mid \tfun{\overline{x}}{\overline{\tau}}{\tau}
-\\[0.5em]
-
+\\
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \edyncast{\tau}{e}  \\[0.2em]
-&&\mid& \estrlen{x} \mid\estar{e}\mid\eassign{e}{e}  \\[0.2em]
-&&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e}
-\\[0.2em]
-&&\mid&  \emalloc{\xi}{\omega} \mid \ecall{e}{\overline{e}}
-\\[0.2em]
+\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \edyncast{\tau}{e}  \\
+&&\mid& \estrlen{x} \mid \emalloc{\xi}{\omega} \mid\estar{e}\mid\eassign{e}{e}  \\
+&&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e} \mid \ecall{e}{\overline{e}}
+\\
 &&\mid&\eunchecked{\overline{x}}{e}
 \mid \echecked{\overline{x}}{e}
-
 \end{array}
     \end{array}
   \]
@@ -90,6 +80,7 @@
   \label{fig:checkc-syn}
 \end{figure}
 
+\ignore{
 \begin{figure}[t]
 {\small
   \begin{mathpar}
@@ -125,6 +116,7 @@
  \caption{Well-formedness for Types}
 \label{fig:wftypes}
 \end{figure}
+}
 
 %% \dvh{I don't understand the variable grammar.  What is $T$?  What is $\eta$?  I think $\cmode$ and $\umode$ should be in tt font.}
 %% \liyi{T and $\eta$ can be moved to the appendix, they are useful only for struct types.}
@@ -139,129 +131,216 @@
 %   Coq file?}
 % \liyi{The detailed explanation is in the appendix.}
 
-This section describes the formal model of \systemname, named
-\lang, making precise its syntax, semantics, type system, and compilation. It also
-develops \lang's meta-theory, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
+This section describes the formal core model of~\systemname,
+named~\lang.
+We precisely present its syntax, semantics, type
+system, and compilation.
+The formal model also enables us to develop~\lang’s meta-
+theories, including the type soundness, non-exposure, non-crashing,
+and the compiler simulation theorems, which we present in~\apdx{sec:theorem}.
+
+%This section describes the formal core model of \systemname, named
+%\lang, making precise its syntax, semantics, type system, and compilation. It also
+%develops \lang's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
 
 \subsection{Syntax}\label{sec:syntax}
-
-The syntax of \lang is given by the expression-based
-language presented in Fig.~\ref{fig:checkc-syn}.
-
-There are two type notions in \lang.  Types $\tau$ classify
-word-sized values including integers and pointers, while types
-$\omega$ classify multi-word values such as arrays, null-terminated
-arrays, functions, and single-word-size values. 
+The~\fig{fig:checkc-syn} shows a simplified syntax of~\lang.
+\subsubsection{Types ($\omega$)}
+At a high level, we classify types as word-size values, multi-word values, or functions.
+The word-size values can be either integers or pointers.
 Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
-($\xi$, the difference between context and pointer modes is introduced shortly below)
-that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
+($\xi$, the difference between context and pointer modes is introduced shortly below) that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
 and a type ($\omega$) denoting valid values that can be pointed to.
-Array types include both the type of
-elements ($\tau$) and a bound ($\bvar$) comprised of an upper and
-lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
-limited to integer literals $n$ and expressions $x + n$.
-Whether an array pointer is null terminated or not is determined by annotation
-$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
-otherwise (we elide $\cdot$ when writing types).
 
-\lang{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
-reflect its dependent function declarations,
-where $\overline{x}$ represents
-a list of \tint{} type variables in a dependent function header
-that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
-We have a well-formed requirement for a function type;
-that is, all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
-Here is the
-corresponding \systemname syntax for these types:
+Multi-word values represent arrays and null-terminated arrays, which include both the type of elements ($\tau$) and a bound ($\bvar$).
+The bounds can be either integer literals $n$, expressions $x + n$, or an explicit specification of lower and upper bound,~\ie $(b_l,b_h)$.
+We denote null-terminated arrays using $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$ otherwise (we elide $\cdot$ when writing types).
+The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
+An example representation of an array and null-terminated array in~\lang syntax is shown below:
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
-$\code{array_tptr<}$\tau$\code{> : count(}$n$\code{)}$
+$\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
 \\[0.2em]
-$\code{nt_array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+$\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
 \end{array}
-\\[0.2em]
-$\code{tptr<(int)(nt_array_tptr<}$\tau$\code{> : count(}$n$\code{),}$\\
-\qquad\qquad$\code{nt_array_tptr<}$\tau$\code{>)>: count(}$n$\code{))>}$
+\end{array}
+\]
+To simplify the representation, we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
+$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
+be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
+
+Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
+where $\overline{x}$ represents a list of \tint{} type variables that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
+An example of a function pointer type is shown below:
+\[\hspace*{-0.5em}
+\begin{array}{l}
+$\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{),}$\\
+\qquad\qquad$\code{_NT_Array_ptr<}$\tau$\code{>: count(}$n$\code{))>}$
 \\[0.2em]
 \Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
-As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
-$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the firs two examples above could
-be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
-$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
+Note that the well-formed requirement (\fig{fig:wffunctions} in Appendix) of a function type ensures that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+\aravind{The syntax of well-formed requirements for functions is incorrect. It looks like the forall qualifier is missing.}
 
-\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
- addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 
-dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}},
-the \texttt{strlen} operation ($\estrlen{x}$),
-pointer dereference and assignment ($\estar{e}$)
-and ($\eassign{e_1}{e_2}$), resp.),
-let binding ($\elet{x}{e_1}{e_2}$),
-conditionals ($\eif{e}{e_1}{e_2}$),
+%The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
+%There are two type notions in \lang.  Types $\tau$ classify
+%word-sized values including integers and pointers, while types
+%$\omega$ classify multi-word values such as arrays, null-terminated
+%arrays, functions, and single-word-size values. 
+%Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
+%($\xi$, the difference between context and pointer modes is introduced shortly below)
+%that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
+%and a type ($\omega$) denoting valid values that can be pointed to.
+%Array types include both the type of
+%elements ($\tau$) and a bound ($\bvar$) comprised of an upper and
+%lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
+%limited to integer literals $n$ and expressions $x + n$.
+%Whether an array pointer is null terminated or not is determined by annotation
+%$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
+%otherwise (we elide $\cdot$ when writing types).
+%
+%\lang{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
+%reflect its dependent function declarations,
+%where $\overline{x}$ represents
+%a list of \tint{} type variables in a dependent function header
+%that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
+%We have a well-formed requirement for a function type;
+%that is, all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+%Here is the
+%corresponding \systemname syntax for these types:
+%\[\hspace*{-0.5em}
+%\begin{array}{l}
+%\begin{array}{rcl}
+%$\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+%&\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
+%\\[0.2em]
+%$\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+%&\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
+%\end{array}
+%\\[0.2em]
+%$\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{),}$\\
+%\qquad\qquad$\code{_NT_Array_ptr<}$\tau$\code{>)>: count(}$n$\code{))>}$
+%\\[0.2em]
+%\Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
+%\end{array}
+%\]
+%As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
+%$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the firs two examples above could
+%be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+%$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
+\subsubsection{Expressions ($e$)}
+\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)($n\!:\!\tau$), pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.)
+along with expressions that require special handling, such as,
+ static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}}, the \texttt{strlen} operation ($\estrlen{x}$),
 memory allocation ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
-% \review{III.A.: the "dynamic cast" terminology may be briefly confused for C++'s
-%   RTTI-based dynamic cast feature}
-% \mwh{Added reference back to Section 2-B}
-
-Integer literals $n$ are annotated with a type $\tau$ which can be either
-$\tint$, or $\tptr{\omega}{\xi}$ in the case $n$ is being used as 
-a heap address (this is useful for the semantics);
-$\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer, as usual. 
-The $\texttt{strlen}$ expression operates on variables $x$
-rather than arbitrary expressions to simplify managing
-bounds information in the type system; the more general case can be
-encoded with a \code{let}. We use a less verbose syntax for dynamic bounds
-casts; e.g., the following %
-
-\code{dyn_bounds_cast<array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
+For instance, a dynamic bounds cast expression
 
 \noindent
-becomes $\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$. 
+{\footnotesize
+\code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
+}
+becomes 
+{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}
+. 
 
-Compared to the former \checkedc model \cite{li22checkedc},
-there are four differences.
-First, the \systemname type annotations have well-formed restrictions in \Cref{fig:wftypes}, 
-for maintaining non-exposure.
-Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, $\xi_2\le \xi_1$.
-It is worth noting that pointer modes are a three point partial order ($\le$),
-where $\tmode$ is the infimum, and
-$\xi\wedge m$ is a special meet operation that projects pointer modes onto context modes,
-such that $\tmode$ is projected as $\umode$.
-Second, $\emalloc{\xi}{\omega}$ includes a mode flag
-$\xi$ for allocating different pointers in different heaps.
+We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
+For instance, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer.
+The~\code{strlen} expression plays an important role in the type-checking of null-terminated arrays.
+For simplifying type checking, we assume~\code{strlen} to operate on variables $x$ rather than arbitrary expressions.
+The heap allocation expression $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions (\cregion or \ucregion).
 We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-Third, the first expression $e$ in a function call ($\ecall{e}{\overline{e}}$) represents a function pointer.
-Fourth, $\echeckedtext$ blocks are added to the system, 
-which permits the nested context-switching between $\echeckedtext$ (represented by context mode $\cmode$)
-and $\euncheckedtext$ (represented by context mode $\umode$) code regions.
-One example usage of the nested context-switching is the checked function callbacks inside 
-an unsafe region in \Cref{fig:checkedc-example-2} and \ref{fig:checkedc-example-3}.
-To guarantee the non-exposure safety,
- we extend the $\echeckedtext$ and $\euncheckedtext$ block syntax to be 
-$\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$:
-$\overline{x}$ restricts all free variables appearing in $e$, and they cannot be checked pointers.
+The $\echeckedtext$ and $\euncheckedtext$ expressions are used to represent the corresponding code regions.
+To guarantee the non-exposure property, we extend the base syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$.
+Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.
 
-\lang aims to be simple enough to work with, but powerful enough to
+\lang aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example, mutable local
 variables can be encoded as immutable locals that point to the heap;
 the use of \code{&} can be simulated with \code{malloc};
 and loops can be encoded as recursive function calls. \code{struct}s are
-not in Fig.~\ref{fig:checkc-syn} for space reasons, but they are
-actually in our model, and developed in
-\iftr
-Appendix~\ref{appx:struct}.
-\else
-the supplemental report~\cite{checkedc-tech-report}.
-\fi
-C-style \code{union}s have no safe typing
-in \checkedc, so we omit them.
+not included in~\fig{fig:checkc-syn} for space reasons, but they are
+supported as shown in~\apdx{appx:struct}.
+C-style \code{union}s have no safe typing in \checkedc, so we omit them.
 
+
+Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
+
+%\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
+% addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 
+%dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}},
+%the \texttt{strlen} operation ($\estrlen{x}$),
+%pointer dereference and assignment ($\estar{e}$)
+%and ($\eassign{e_1}{e_2}$), resp.),
+%let binding ($\elet{x}{e_1}{e_2}$),
+%conditionals ($\eif{e}{e_1}{e_2}$),
+%memory allocation ($\emalloc{\xi}{\omega}$), 
+%function calls ($\ecall{e}{\overline{e}}$),
+%unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
+%% \review{III.A.: the "dynamic cast" terminology may be briefly confused for C++'s
+%%   RTTI-based dynamic cast feature}
+%% \mwh{Added reference back to Section 2-B}
+%Integer literals $n$ are annotated with a type $\tau$ which can be either
+%$\tint$, or $\tptr{\omega}{\xi}$ in the case $n$ is being used as 
+%a heap address (this is useful for the semantics);
+%$\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer, as usual. 
+%The $\texttt{strlen}$ expression operates on variables $x$
+%rather than arbitrary expressions to simplify managing
+%bounds information in the type system; the more general case can be
+%encoded with a \code{let}. We use a less verbose syntax for dynamic bounds
+%casts; e.g., the following %
+%
+%\noindent
+%{\footnotesize
+%\code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
+%}
+%becomes 
+%{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}
+%. 
+%
+%Compared to the former \checkedc model \cite{li22checkedc},
+%there are four differences.
+%First, the \systemname type annotations have well-formed restrictions for maintaining non-exposure.
+%Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, $\xi_2\le \xi_1$.
+%It is worth noting that pointer modes are a three point partial order ($\le$),
+%where $\tmode$ is the infimum, and $\xi\wedge m$ is a special meet operation that projects pointer modes onto context modes,
+%such that $\tmode$ is projected as $\umode$.
+%Second, $\emalloc{\xi}{\omega}$ includes a mode flag
+%$\xi$ for allocating different pointers in different heaps.
+%We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
+%Third, the first expression $e$ in a function call ($\ecall{e}{\overline{e}}$) represents a function pointer.
+%Fourth, $\echeckedtext$ blocks are added to the system, 
+%which permits the nested context-switching between $\echeckedtext$ (represented by context mode $\cmode$)
+%and $\euncheckedtext$ (represented by context mode $\umode$) code regions.
+%One example usage of the nested context-switching is the checked function callbacks inside 
+%an unsafe region in \Cref{lst:humanadjust} and \Cref{lst:humantaint}.
+%To guarantee the non-exposure safety,
+% we extend the $\echeckedtext$ and $\euncheckedtext$ block syntax to be 
+%$\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$:
+%$\overline{x}$ restricts all free variables appearing in $e$, and they cannot be checked pointers.
+%
+%\lang aims to be simple enough to work with, but powerful enough to
+%encode realistic \systemname idioms. For example, mutable local
+%variables can be encoded as immutable locals that point to the heap;
+%the use of \code{&} can be simulated with \code{malloc};
+%and loops can be encoded as recursive function calls. \code{struct}s are
+%not in Fig.~\ref{fig:checkc-syn} for space reasons, but they are
+%actually in our model, and developed in
+%\iftr
+%Appendix~\ref{appx:struct}.
+%\else
+%the supplemental report~\cite{checkedc-tech-report}.
+%\fi
+%C-style \code{union}s have no safe typing
+%in \checkedc, so we omit them.
+
+\aravind{Why we have only function pointers in function call?}
 
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
 %   POINTERS: Array and NT-array types have two relative bounds, whose structures
@@ -313,21 +392,6 @@ $
 
   \end{mathpar}
 }
-{\footnotesize
-\[
-\begin{array}{l} 
-\mode(E)=\mode'(E,\cmode)
-\\[0.2em]
-\mode'(\Box,m)=m
-\\[0.2em]
-\mode'(\eunchecked{\overline{x}}{E},m)=\mode'(E,\umode)
-\\[0.2em]
-\mode'(\echecked{\overline{x}}{E},m)=\mode'(E,\cmode)
-\\[0.2em]
-\mode'(\alpha({E}),m)=\mode'(E,m)\;\;{[\emph{owise}]}
-\end{array}
-\]
-}
   \caption{\lang Semantics: Evaluation}
   \label{fig:c-context}
 \end{figure}
@@ -357,7 +421,7 @@ $
 % \mwh{Yes, it is modeled as 0, and the semantics checks for
 %   dereferences of 0. }
 
-Here, we discuss the \lang type system and operational semantics; 
+Here, we discuss the \lang type system (\Cref{fig:type-system-1}) and operational semantics (\Cref{fig:semantics}); 
 mainly focusing on the new changes on top of \checkedc in \cite{li22checkedc} with function pointers, modes, and function calls.
 The other type and semantic rules about (NT)-arrays are given in \cite{li22checkedc} and \Cref{sec:literal-pointer-typing}.
 
@@ -402,11 +466,10 @@ respectively. Such failures are a \emph{good} outcome; stuck states
 characterizing undefined behavior.
 %
 The context mode $m$ (in $\longrightarrow_{m}$) indicates whether the
-stepped redex within $e$ was in a checked ($\cmode$) or
-unchecked ($\umode$) region.
+stepped redex within $e$ was in a $\cmode$ or $\umode$ region.
 
 The rules for the main operational semantics
-judgment---\emph{evaluation}---are given at the middle of
+judgment \emph{evaluation} are given at the bottom of
 Fig.~\ref{fig:c-context}.
 The first rule takes an expression $e$, decomposes
 it into an \emph{evaluation context} $E$ and a sub-expression $e'$
@@ -414,7 +477,10 @@ it into an \emph{evaluation context} $E$ and a sub-expression $e'$
 $e$), and then evaluates $e'$ according to the \emph{computation}
   relation $(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$,
 whose rules are given in Fig.~\ref{fig:semantics}, discussed
-shortly. 
+shortly.
+The $\mode$ function  at the bottom of Fig.~\ref{fig:c-context}
+determines the context mode that the expression $e'$ locates based on the context $E$.
+In \Cref{lst:humantaint}, the function call expression \code{read_msg} has $\umode$ mode since it is inside a tainted function.
 The second rule describes the exception handling 
 for possible crashing behaviors in unchecked regions.
 A $\umode$ mode operation can non-deterministically crash
@@ -483,17 +549,6 @@ $\ret{x}{\mu}{e}$ syntax shortly.)
 \end{figure*}
 \end{DIFnomarkup}
 
-The $\mode$ function  at the bottom of Fig.~\ref{fig:c-context}
-describes the context mode determination in each evaluation step based on the context $E$.
-For any program execution, the function starts the mode computation with $\cmode$ ($\mode(E)=\mode'(E,\cmode)$).
-The result context mode depends on where $\Box$ locates.
-If it occurs within $E$ in $(\eunchecked{\overline{x}}{E})$
-that has no surrounding $\echeckedtext$ block,
-the mode is $\umode$; otherwise, the mode is $\cmode$.
-$\mode'(\alpha({E}),m)=\mode'(E,m)$ represent other construct cases 
-that are not $\echeckedtext$ and $\euncheckedtext$; in such case, 
-the function recursively traverses the sub-context to find the context mode.
-
 Fig.~\ref{fig:semantics} shows selected rules for the computation relation.
 The rules for pointer related operations---\textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-DefNull}, and \textsc{S-Cast}.
@@ -515,7 +570,6 @@ Performing such a verification equates to performing a literal type check for a 
 We explain this shortly below for \emph{constant validity checks}.
 For now, the verification step, e.g. $\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$ in \textsc{S-DefC},
 refers to that the value $n_a$ is well-defined in $\heap(m,n_a)$ and has type $\tau$, if $\tau$ is a pointer.
-
 Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
 by \textsc{S-Cast}. In a type-correct program, such casts are
 confirmed safe by the type system no matter
@@ -591,7 +645,7 @@ produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
 
 \inferrule[T-Fun]
     {\Gamma;\Theta \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \\
-        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\\\
+        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
          \overline{e'}=\{e'|(e',\tint)\in (\overline{e} : \overline{\tau'})\}\\\\
          \forall e'\;.\;e' \in \overline{e'} \Rightarrow e'\in \text{Bound}\\
              \overline{\tau'} \sqsubseteq_{\Theta}
@@ -628,114 +682,30 @@ $
 \end{figure*}
 \end{DIFnomarkup}
 
-
-\begin{DIFnomarkup}
-\begin{figure}
-{\small
-\[\hspace*{-1.2em}
-\begin{array}{l}
-\textcolor{blue}{\text{Bound Inequality and Equality:}}\\[0.3em]
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-     n \le n' &\Rightarrow& n &\le_{\Theta} & n'\\
-     n \le n' &\Rightarrow& x+n &\le_{\Theta} & x+n'\\
-     n \le n' \wedge \Theta(x)=\tgez &\Rightarrow& n &\le_{\Theta} & x+n'\\
-     \Theta(x)=\teq{b} \wedge b+n\le_{\Theta}b'  &\Rightarrow& x+n & \le_{\Theta} & b'\\
-     \Theta(x)=\teq{b}\wedge b'\le_{\Theta}b+n  &\Rightarrow& b' & \le_{\Theta} & x+n\\
-     b \le_{\Theta} b' \wedge b' \le_{\Theta} b  &\Rightarrow& b & =_{\Theta} & b'
-    \end{array}
-  \\[1.5em]
-\textcolor{blue}{\text{Type Equility:}}\\
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-     && \tint & =_{\Theta} & \tint\\
-     \omega =_{\Theta} \omega' &\Rightarrow& \tptr{\omega}{\xi} & =_{\Theta} & \tptr{\omega'}{\xi}\\
-     \bvar =_{\Theta} \bvar' \wedge  \tau =_{\Theta} \tau'
-             &\Rightarrow& \tallarrayb{\bvar}{\tau} & =_{\Theta} & \tallarrayb{\bvar'}{\tau'}\\
-
-    \textit{cond}(\overline{x},\overline{\tau}\to\tau,\overline{y},\overline{\tau'}\to\tau')
-
- &\Rightarrow& \tfun{\overline{x}}{\overline{\tau}}{\tau} & 
-                         =_{\Theta} & \tfun{\overline{y}}{\overline{\tau'}}{\tau'}\\
-    \end{array}
-  \\[0.7em]
-\textcolor{blue}{\text{Subtype:}}\\[0.3em]
-
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-    \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
-
-    0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
-    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
-    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
-    %% b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow&  \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq&  \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
-    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
-    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tallarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tallarrayptr{b_l'}{b_h'}{\tau}{m}
-\\[0.2em]
-\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}\wedge \tau\sqsubseteq_{\Theta}\tau' &\Rightarrow& \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} &\sqsubseteq_{\Theta}& \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}
-
-    \end{array}
-\end{array}
-  \]
-}
-{\footnotesize
-\[
-\begin{array}{l}
-n'+n = add(n',n)
-\qquad
-(x+n')+n = x+add(n',n)\\
-\textit{cond}(\overline{x},\tau,\overline{y},\tau')
-=\exists\overline{z}\;.\;\overline{x}\cupdot\overline{z}
-  \wedge \overline{y}\cupdot\overline{z}
-  \wedge \size(\overline{x})=\size(\overline{y})=\size(\overline{z})
-\\\qquad\qquad\qquad\qquad\qquad
-  \wedge \tau[\overline{z}/\overline{x}]= \tau'[\overline{z}/\overline{x}]
-\end{array}
-\]
-}
-  \caption{Type Equality and Subtyping}
-  \label{fig:checkc-subtype}
-\end{figure}
-\end{DIFnomarkup}
-
 \myparagraph{Type Equality and Subtyping and Casting}
 %
-In \lang, type equality $\tau=_{\Theta}\tau'$
+In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
+We provide some example descriptions here.
+Type equality $\tau=_{\Theta}\tau'$
 is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
-and the alpha equivalence of two function types in \Cref{fig:checkc-subtype};
+and the alpha equivalence of two function types;
 i.e., two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
 $\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
 $\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
 are equivalent, if we can find a same length (as $\overline{x}$ and $\overline{y}$) variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
 and the substitution results are equal.
 
- The \textsc{T-CastPtr} rule
+The \textsc{T-CastPtr} rule in \Cref{fig:type-system-1}
 permits casting from an expression of type $\tau'$ to a checked pointer when
 $\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
-$\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype} and is built on the type equality
-($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). The many
-rules ensure the relation is transitive. Most of the rules manage
-casting between array pointer types. The rule 
-($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
+$\sqsubseteq$ is built on the type equality ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). 
+The rule  ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
 \tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
 pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
 Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
 if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
 %There is another casting rule in \Cref{app:main} stating that
 % users are free to cast types in unchecked code regions, since unchecked regions can contain C code.
-
-Since bounds expressions may
-contain variables, determining assumptions like $b_l \leq b_l'$
-requires reasoning about the probable values of these variables'. The type
-system uses $\Theta$ to make such reasoning more precise.
-$\Theta$ is a map from variables $x$ to
-equation predicates $P$, which have the form $P ::= \tgez \;|\; \teq{b}$.
-It maps variables to equations that are recorded along the type checking procedure.
-If $\Theta$ maps $x$ to $\tgez$, that means that $x \ge 0$;
-$\teq{b}$ means that $x$ is equivalent to the bound value $b$ in the current context, 
-such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-RetInt}.
-\iftr
-  Appendix~\ref{app:le}.
-\else
-  the supplemental report~\cite{checkedc-tech-report}.
-\fi has an example rule for populating $\Theta$ with a $\tgez$ predicate.
 
 \begin{DIFnomarkup}
  \begin{figure}[t]
@@ -792,18 +762,17 @@ such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-R
 \end{DIFnomarkup}
 
 \myparagraph{Constant Validity}
-Rules \textsc{T-ConstU} and \textsc{T-ConstC}
-describes type assumptions for constants appearing in a program.
-$\cmode(\tau)$ judges that a constant pointer 
-in an unchecked region cannot be of a checked type,
-which represents the assumption that programmers 
+Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
+describe type assumptions for constants appearing in a program.
+$\neg \cmode(\tau)$ judges that a constant pointer 
+in an unchecked region cannot be of a checked type.
+The restriction ensures that programmers 
 cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
 In rule \textsc{T-ConstC}, we requires a static 
-verification procedure for validating a constant pointer, 
-which is similar to the dynamic verification process in \Cref{sec:semantics}. 
+verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
 
-The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$ checks (\Cref{fig:const-type})
-validate the constant $\evalue{n}{\tau}$, 
+The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
+validates the constant $\evalue{n}{\tau}$, 
 where $\heap(m)$ is the initial heap that the constant resides on and
 $\sigma$ is a set of constant assumed to be checked.
 A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
@@ -812,38 +781,9 @@ and the address stores a function with the right type.
 The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
 where every element in the pointer range ($[0,\size(\omega))$) should be well
 typed.
-
 A checked pointer checks validity in type step as rule \textsc{T-ConstC},
 while a tainted/unchecked pointer does not check for such during the type checking.
-Tainted pointers are validated through the validity check in dynamic execution as we mentioned above.
-
-\begin{figure}[t]
-{\small
-{\captionsetup[lstlisting]{margin = 8 mm}
-  \begin{lstlisting}[xleftmargin=8 mm]
-nt_array_ptr<char> safe_strcat
-   (nt_array_ptr<char> dst : count(n),
-    nt_array_ptr<char> src : count(0), int n) {
-  int x = strlen(dst);
-  int y = strlen(src);
-  nt_array_ptr<char> c : count(n) =
-    dyn_bounds_cast
-           <nt_array_ptr<char>>(dst,count(n));
-    // sets c == dst with bound n (not x)
-  if (x+y < n) {
-    for (int i = 0; i < y; ++i)
-      *(c+x+i) = *(src+i);
-    *(c+x+y) = '\0';
-    return dst;
-  }
-  return null;
-}
-  \end{lstlisting}
-}
-}
-\caption{Implementation of safe \code{strcat}}
-\label{fig:strcat-ex}
-\end{figure}
+Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
 
 % \review{Fig4: it was hard to tell which cases were stuck states, or could reduce
 %   owing to a rule that was not shown}
@@ -872,26 +812,26 @@ nt_array_ptr<char> safe_strcat
 During the type checking,
 Both $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$
 check all free variables in $e$ are within $\overline{x}$;
-the types for $\overline{x}$ and the final return type $\tau$ have no checked pointers.
+the types for $\overline{x}$ and the final return type $\tau$ of $e$ have no checked pointers.
+Otherwise, it violates the non-exposure safety.
+For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
+if any argument for \code{handle_request} is a checked pointer, 
+it means that we are exposing a checked pointer address to unsafe regions.
 A $\echeckedtext$ or $\euncheckedtext$ block represents 
 the context switching from a checked to an checked region, or vice versa.
 We need to make sure no checked pointers are information exposed to unsafe code regions.
 as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
 
-
-
-
 \myparagraph{Let Bindings and Dependent Function Pointers}
 %
-Rules \textsc{T-Let} and \textsc{T-LetInt} type a $\elettext$ expression, which also admits
+Rules \textsc{T-Let} and \textsc{T-LetInt} in in \Cref{fig:type-system-1} type a $\elettext$ expression, which also admits
 type dependency. 
-In particular, the result of evaluating a $\elettext$
+In particular, the result of evaluating a $\elettext$ expression
 may have a type that refers to one of its bound variables (e.g., if
 the result is a checked pointer with a variable-defined bound). 
 If so, we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). 
 Note that we restrict the expression $e_1$ to syntactically match the
 structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
-
 Rule \textsc{T-RetInt} types a $\erettext$ expression when $x$ is of type $\tint$.
 $\erettext$ does not appear in source programs but is introduced by the semantics when
 evaluating a let binding (rule \textsc{S-Let} in
@@ -902,7 +842,7 @@ Fig.~\ref{fig:semantics}).
 %$\bot$ (meaning that there is no $x$ originally) or some value
 %$\evalue{n}{\tau}$.
 
-Rule \textsc{T-Fun} is the dependent function call rule. 
+Rule \textsc{T-Fun} in \Cref{fig:type-system-1} is the dependent function call rule. 
 Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
 from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
 we confirm that each of $\overline{\tau'}$ is
@@ -910,11 +850,10 @@ a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline
 which replaces possible integer bound variables $\overline{x}$ with bound expressions $\overline{e'}$.
 The final result type is the defined target type $\tau$ appearing in the function pointer type
 also with such replacement, written as $\tau[\overline{e'} / \overline{x}]$.
-Consider the \code{safe_strcat} function in
-Fig.~\ref{fig:strcat-ex}; its parameter type for \code{dst} 
-depends on \code{n}. The \textsc{T-Fun} rule will substitute 
+Consider the \code{process_req2} function in
+Fig.~\ref{lst:final}; its parameter type for \code{msg} 
+depends on \code{m_1}. The \textsc{T-Fun} rule will substitute 
 \code{n} with the argument at a call-site.
-
 The semantics manages variable scopes using the special $\erettext$
 form. \textsc{S-Let} evaluates to a configuration whose expression is
 $\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
@@ -929,51 +868,21 @@ This procedure continues until $e'$ becomes a literal
 $n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
 the literal. 
 
-Function calls are handled by \textsc{S-FunC} and \textsc{S-FunT},
+\textsc{S-FunC} and \textsc{S-FunT} are
 for $\cmode$ and $\tmode$ mode function pointers, respectively. 
 A call to a function pointer $n$ retrieves
  the function definition in $n$'s location in the global function store $\Xi$,
-% 
-% LEO: This is the first occurence of \Xi. It is explained,
-% but reads a bit awkward as it's unclear this is its "introduction"
 which maps function pointers to
 function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\xi,e)$, where
 $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, 
 $\xi$ determines the mode of the function, and $e$ is the
 function body. 
-
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
 maps addresses (integer literals) to the function data described above.
 
-The \systemname{} functions are dependent functions.
-Recall that array
-bounds in types may refer to in-scope variables; e.g., parameter
-\code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
-2-3 in \Cref{fig:strcat-ex}. 
-%All dependent bound variables appearing in function headers 
-%are bounded by a variable list in the function pointer type, which is checked in the type rule.
-Semantically,
-the call is expanded into a \texttt{let} which binds
-parameter variables $\overline{x}$ to the actual arguments
-$\overline{n}$, but annotated with the parameter types
-$\overline{\tau}$ (this will be safe for type-correct programs). 
-The function body $e$ is wrapped in a static cast
-$(\tau[\overline{n} / \overline{x}])$ which is the function's return
-type but with any integer parameter variables $\overline{x}$ appearing in that
-type, as type bound variables,
-substituted with the call's actual arguments $\overline{n}$.
-To see why this is needed, suppose that \code{safe_strcat} in
-Fig.~\ref{fig:strcat-ex} is defined to return a
-\code{nt_array_ptr<int>:count(n)} typed term, and assume that we
-perform a \code{safe_strcat} function call as
-\code{x=safe_strcat(a,b,10)}. After the evaluation of \code{safe_strcat}, the
-function returns a value with type \code{nt_array_ptr<int>:count(10)}
-because we substitute bound variable \code{n} in the 
-defined return type with \code{10} from the function call's
-argument list.
-
+\systemname{} has dependent functions, whose semantic explaination is given in \Cref{appx:add-type-sem}.
 Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
   annotations $\overline{\tau_a}$ with
   $\overline{\tau}$ (after instantiation) from the function's
@@ -1034,7 +943,7 @@ In the compiled LLVM code, pointer access operations have different syntaxes whe
 \Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
 For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
-This section shows how \lang deals with pointer modes, mode switching and function pointer compilations, 
+We now show how \lang deals with pointer modes, mode switching and function pointer compilations, 
 with no loss of expressiveness
 as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
 For the compiler formalism, 
@@ -1121,871 +1030,8 @@ but we insert checks to check if the pointer address is not null in
 the function store instead of heap, and whether or not the type is correctly represented, 
 for both $\cmode$ and $\tmode$ mode pointers 
 \footnote{$\cmode$-mode pointers are checked once in the beginning and $\tmode$-mode pointers are checked every time when use}.
-For example, in compiling the \code{stringsort} function in \Cref{fig:checkedc-example-1},
-we place a check \code{verify_fun(cmp, not_null(c, p_lo, p_hi) && type_match)},
-and we place a similar check before \Cref{fig:checkedc-example-3} line 7 to check the tainted \code{cmp} when it is used. 
+For example, in compiling the \code{read_msg} function in \Cref{lst:humantaint},
+we place a check \code{verify_fun(read_msg, not_null(c, p_lo, p_hi) && type_match)},
 The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
 is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
-
-\begin{figure}[t!]
-  \begin{small}
-\begin{lstlisting}[mathescape,xleftmargin=4 mm]
-int deref_array(n : int,
-     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$,
-     q : $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\tmode}$) {
-  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi,p_m */
-  /* $\color{purple!40!black}\rho$(q) = q_lo,q_hi,q_m */
-    * p;
-    * q = 1;
-}
-...
-/* p0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\cmode}$ */
-/* q0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\tmode}$ */
-deref_array(5, p0, q0);
-    \end{lstlisting}
-\begin{frame}
-
-\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
-
-\end{frame}
-\begin{lstlisting}[mathescape,xleftmargin=4 mm]
-deref_array(int n, int* p, int * q) {
-  //m is the current context mode
-  let p_lo = 0; let p_hi = n; 
-  let q_lo = 0; let q_hi = n; 
-  /* runtime checks */
-  assert(p_lo <= 0 && 0 <= p_hi);
-  assert(p != 0);
-  *(mode(p) $\wedge$ m,p);
-  verify(q, not_null(m, q_lo, q_hi) 
-             && q_lo <= 0 && 0 <= q_hi);
-  *(mode(q) $\wedge$ m,q)=1;
-}
-...
-deref_array(5, p0, q0);
-    \end{lstlisting}
-\end{small}
-    \caption{Compilation Example for Dependent Functions}
-\label{fig:compilationexample1}
-\end{figure}
-
-For compiling dependent function calls,
-\Cref{fig:compilationexample1} provides a hint.
-Notice that the bounds for the array pointer \code{p} are not passed as
-arguments. Instead, they are initialized according to \code{p}'s
-type---see line~4 of the original \lang program at the top of the figure.
-Line~$3$ of the generated code
-sets the lower bound  to \code{0} and the
-upper bound to \code{n}.
-
-
-\subsection{Meta Theories}\label{sec:theorem}
-
-% Before we present our main theorems, we need to first
-% discuss the meaning what a pointer being well-typed in a given heap
-% snapshot $\heap$ means, which is captured by rules in
-% Fig.~\ref{fig:const-type}. The variable type rule ($\textsc{T-Var}$)
-% simply checks if a given variable has the defined type in $\Gamma$;
-% the constant rule ($\textsc{T-Const}$) is slightly more involved.
-% First, it ensures that the type annotation $\tau$ does not contain any
-% free variables. More importantly, it ensures that the pointer points
-% to a location that makes sense in a given heap.
-%  
-%  
-%  The $\size$ function in Fig.~\ref{fig:const-type}
-% refers to the \code{sizeof} function in C computing the number of
-% bytes for a type.
-%  
-%  
-%  Second, we
-% require that any constant ($\evalue{n}{\tau}$) should make sense in
-% $\heap$. We develop a recursive predicate $\sigma \vdash n : \tau$ to
-% verify if $n$ has $\tau$ in a heap snapshot $\heap$. $\sigma$ is a
-% constant set containing the constants that have been verified by the
-% relation. For every constant $\evalue{n}{\tau}$, it is either an
-% integer $\tint$, an unchecked pointer $\tptr{\omega}{\umode}$,
-% zero-valued number ($n=0$), checked in $\sigma$
-% ($\evalue{n}{\tptr{\omega}{\cmode}}\in \sigma$); or if it is not the
-% above case, then (i) $\heap(n)$ is defined, and (ii) for every heap
-% location $n+i$ in the range of the pointer (if $\omega$ is a word
-% type, range is $[0,1)$; if $\omega$ is an array type
-%   ($\tarray{0}{b_h}{\tau'}$), range is $[0,b_h)$, if $\tau$ is a
-%     NT-array type ($\tntarray{0}{b_h}{\tau'}$), range is $[0,b_h+1)$),
-%       if $\heap(n+i)=\evalue{n_a}{\tau_a}$, then
-%       $\evalue{n_a}{\tau_a}$ satisfies $\sigma \cup \{(n,\tau) \}
-%       \vdash n_a : \tau_a$.
-%  
-%  
-% \begin{figure}[t]
-% {\small
-% \text{Type Rules for Constants and Variables:}
-% \begin{mathpar}
-%   \inferrule[T-Var]
-%       {x : \tau \in \Gamma}
-%       {\Gamma;\Theta \vdash_m x : \tau}
-%  
-%   \inferrule[T-Const]
-%       {\fv(\tau) = \emptyset \\ \emptyset \vdash n : \tau}
-%       {\Gamma;\Theta\vdash_m \evalue{n}{\tau} : \tau}
-% \end{mathpar}
-%     
-% \text{Rules for Checking Constant Pointers In Heap:}
-% \begin{mathpar}
-%   \inferrule
-%       {}
-%       {\sigma \vdash n : \tint}
-%  
-%   \inferrule
-%       {}
-%       {\sigma \vdash n : \tptr{\omega}{\umode}}
-%  
-%   \inferrule
-%       {}
-%       {\sigma \vdash 0 : \tptr{\omega}{\cmode}}
-%  
-%   \inferrule
-%       {\evalue{n}{\tptr{\omega}{\cmode}}\in \sigma}
-%       {\sigma \vdash n : \tptr{\omega}{\cmode}}
-%  
-%   \inferrule
-%       {\forall i \in [0,\size(\omega)) .
-%            \sigma \cup \{(n:\tptr{\omega}{\cmode}) \}\vdash \heap(n+i)}
-%       {\sigma \vdash n : \tptr{\omega}{\cmode}}
-% \end{mathpar}
-% }
-% \caption{Type Rules for Checking Constants/Variables}
-% \label{fig:const-type}
-% \end{figure}
-
-% \review{
-%  Theorem 1 refers to a program $e$ being well-formed. Unless I've missed
-%   something, I didn't see such a definition in the paper.}
-% \mwh{This was stale text (dropped); $e$'s well formedness follows from the
-%   assumption of well typing; we have added more details about that.}
-
-In this subsection, we focus on our main meta-theoretic results about
-\lang: type soundness (progress and preservation),
-non-exposure, and non-crashing.
-These proofs have been conducted in our Coq model.
-Type soundness relies on several \emph{well-formedness}:
-
-\begin{defi}[Type Environment Well-formedness]\label{type-wellformed}
-A type environment $\Gamma$ is well-formed if every variable mentioned as type bounds in $\Gamma$ are bounded by $\tint$ typed variables in $\Gamma$.
-\end{defi}
-
-\begin{defi}[Heap Well-formedness]
-For every $m$, A heap $\heap$ is well-formed if (i) $\heap(m,0)$ is undefined, and
-(ii) for all $\evalue{n}{\tau}$ in the range of $\heap(m)$, type $\tau$
-contains no free variables. 
-\end{defi}
-
-\begin{defi}[Stack Well-formedness]
-A stack snapshot $\varphi$ is well-formed if
-for all $\evalue{n}{\tau}$ in the range of $\varphi$, type $\tau$
-contains no free variables. 
-\end{defi}
-
-We also need to introduce a notion of
-\emph{consistency}, relating heap environments before and after a
-reduction step, and type environments, predicate sets, and stack
-snapshots together.
-
-
-\begin{defi}[Stack Consistency]
-A type environment $\Gamma$, variable predicate set $\Theta$, and
-stack snapshot $\varphi$ are consistent---written $\Gamma;\Theta\vdash
-\varphi$---if for every variable $x$, $\Theta(x)$ is defined implies
-$\Gamma(x) = \tau$ for some $\tau$ and 
-$\varphi(x) =\evalue{n}{\tau'}$ for some $n,\tau'$ where $\tau' \sqsubseteq_{\Theta} \tau$. 
-\end{defi}
-
-\begin{defi}[Checked Stack-Heap Consistency]
-A stack snapshot $\varphi$ is consistent with heap $\heap$---written $\heap \vdash \varphi$---if
-for every variable $x$, $\varphi(x)= \evalue{n}{\tau}$ with $\mode(\tau)=\cmode$ implies $\emptyset;\heap(\cmode);\emptyset \vdash_{\cmode} n:\tau$.
-\end{defi}
-
-\begin{defi}[Checked Heap-Heap Consistency]
-A heap $\heap'$ is consistent with $\heap$---written $\heap \triangleright \heap'$---if
-for every constant $n$, $\emptyset;\heap;\emptyset \vdash_{\cmode} n:\tau$ implies $\emptyset;\heap';\emptyset \vdash_{\cmode} n:\tau$.
-\end{defi}
-
-
-%Moreover, as a program evaluates, its expression may contain literals
-%$\evalue{n}{\tau}$ where $\tau$ is a pointer type, i.e., $n$ is an
-%index in $\heap$ (perhaps because $n$ was chosen by
-%$\mathtt{malloc}$). The normal type-checking judgment for $e$ is
-%implicitly parameterized by $\heap$, and the rules for type-checking
-%literals confirm that pointed-to heap cells are compatible with
-%(subtypes of) the pointer's type annotation; in turn this check may
-%precipitate checking the type consistency of the heap itself. We
-%follow the same approach as \citet{ruef18checkedc-incr}, and show the
-%rules in
-%  Fig.~\ref{fig:const-type}; the judgment
-%  $\Theta;\heap;\sigma \vdash_m n : \tau$ is used to confirm literal
-%  well-typing, where $\sigma$ is a set of pointer literals already
-%  checked in $\heap$ (to allow pointer cycles). See
-%  \iftr
-%  Appendix~\ref{sec:literal-pointer-typing}
-%  \else
-%  the supplemental report~\cite{checkedc-tech-report}
-%  \fi
-%   for further discussion.
-
-Progress states that a \lang program can always make a move:
-
-\begin{thm}[Progress]\label{thm:progress}
-
-For any \lang program $e$, heap $\heap$, stack
-$\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
-that are all are well-formed, consistent
-($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
-typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$),
-one of the following holds:
-
-\begin{itemize}
-
-\item $e$ is a value ($\evalue{n}{\tau}$).
-
-\item there exists $\varphi'$ $\heap'$ $r$, such that $(\varphi,\heap,e) \longrightarrow_m (\varphi',\heap',r)$.
-
-\end{itemize}
-\end{thm}
-%{\em Proof:} By induction on the typing derivation.
-
-\noindent
-There are two forms of preservation regarding the checked and unchecked regions.
-Checked Preservation states that a reduction step preserves both the
-type and consistency of the program being reduced.
-Unchecked Preservation states that any evaluation happens at unchecked region does not affect the checked heap.
-
-\begin{thm}[Checked Preservation]
-For any \lang program $e$, heap $\heap$, stack
-$\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
-that are all are well-formed, consistent
-($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
-typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
-$\heap'$ and $e'$, such that $(\varphi,\heap,e)
-\longrightarrow_{\cmode} (\varphi',\heap',e')$, then $\heap'$ is
-checked region consistent with $\heap$ ($\heap \triangleright \heap'$) and there exists
-$\Gamma'$ and $\tau'$ that are well formed, checked region consistent
-($\Gamma';\Theta\vdash \varphi'$ and $\heap' \vdash \varphi'$) and
-well typed ($\Gamma';\Theta \vdash_{\cmode} e: \tau'$), where
-$\tau'\sqsubseteq_{\Theta} \tau$.
-\end{thm}
-%{\em Proof:} By induction on the typing derivation.
-%\smallskip
-\begin{thm}[Unchecked Preservation]
-For any \lang program $e$, heap $\heap$, stack
-$\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
-that are all are well-formed and well
-typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
-$\heap'$ and $e'$, such that $(\varphi,\heap,e)
-\longrightarrow_{\umode} (\varphi',\heap',e')$, then $\heap'(\cmode)=\heap(\cmode)$.
-\end{thm}
-
-Using the above theorem, we first show the non-exposure theorem,
-where code in unchecked region cannot observe a valid checked pointer address.
-
-\begin{thm}[Non-Exposure]
-For any \lang program $e$, heap $\heap$, stack
-$\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
-that are all are well-formed and well
-typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
-$\heap'$ and $e'$, such that $(\varphi,\heap,e)
-\longrightarrow_{\umode} (\varphi',\heap',e')$ and $e=E[\alpha(x)]$ and $\mode(E)=\umode$,
-where $\alpha(x)$ is some expression (not $\echeckedtext$ nor $\euncheckedtext$) containing variable $x$; 
-thus, it is not a checked pointer.
-\end{thm}
-
-We now state our main result, {\em non-crashing},
-which suggests that a well-typed program can never be \emph{stuck} (expression
-$e$ is a non-value that cannot take a step\footnote{Note that
-  $\ebounds$ and $\enull$ are \emph{not} stuck expressions---they represent a
-  program terminated by a failed run-time check. A program that tries to access $\heap{n}$
-  but $\heap$ is undefined at $n$ will be stuck, and violates spatial
-  safety.}).
-
-% \review{- There appears to be a slight discrepancy between the blame theorem in Coq and the one in the paper: the paper mentions some e', which I believe should be r. Also, the Coq code has a further disjunct m=Unchecked in the conclusion.}
-% \liyi{It is a typo. We will add the thing back that we show that either user uses a unchecked mode to evaluate $e$ or $e$ lives in a context that is an unchecked region. This is a bit due to the space limitation. The semantic rules allow users to input the mode $m$ of evaluating an expression, I just forgot to include the $m$ in the result of the proof statement. }
-
-\begin{thm}[Non-Crashing]\label{thm:blame} For any \lang
-  program $e$, heap $\heap$, stack
-$\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
-that are well-formed and consistent
-($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$),
-if $e$ is well-typed ($\varphi;\Theta\vdash_{\cmode} e :
-\tau$ for some $\tau$) and there exists
-$\varphi_i$, $\heap_i$, $e_i$, and $m_i$ for $i\in [1,k]$, such that
-$(\varphi,\heap,e) \longrightarrow_{m_1} (\varphi_1,\heap_1,e_1)\longrightarrow_{m_2} ...\longrightarrow_{m_k} (\varphi_k,\heap_k,r)$, then $r$ can never be \emph{stuck}.
-\end{thm}
-
-% \review{ 
-% My interpretation of section IV.C is that the authors have a pen-and-paper
-%   proof of Theorem 4, and that random testing using the Redex models has been
-%   used to gain confidence in such a proof. Is this correct?}
-% \liyi{Yes, this is correct.}
-% \mwh{No, not correct: We have no pen-and-paper proof, just the
-%   model. Clarify here}
-% showing that
-% extensive random testing fails to falsify the bisimilarity
-% property. \mwh{Better way to state the previous?}
-
-In the \systemname compiler, we also restore the compiler simulation theorem, such that executing a \systemname program is simulated by executing the compiled LLVM program, which is introduced in the \checkedc formalism \cite{li22checkedc} and \Cref{appx:comp1}. 
-
-We formalize both the compilation procedure and the simulation
-theorem in the PLT Redex model we developed for \lang (see Sec.~\ref{sec:syntax}),
-and then attempt to falsify it via Redex's support for random
-testing. Redex allows us
-  to specify compilation as logical rules (an extension
-  of typing), but then execute it algorithmically to
-  automatically test whether simulation holds. This process revealed
-  several bugs in compilation and the theorem statement.
-%
-  % us gain confidence that our original pen and paper proof of
-  % simulation remains true with the addition of variable bounds. }
-We ultimately plan to prove simulation in the Coq model.
-
-%Turning to the simulation theorem: We first introduce notation
-%used to specify the theorem.
-We use the notation $\gg$ to
-indicate the \emph{erasure} of stack and heap---the rhs is the same as
-the lhs but with type annotations removed:
-\begin{equation*}
-  \begin{split}
-    \heap  \gg & \dot \heap \\
-    \varphi \gg & \dot \varphi
-  \end{split}
-\end{equation*}
-In addition, when $\Gamma;\emptyset\vdash
-\varphi$ and $\varphi$ is well-formed, we write $(\varphi,\heap,e) \gg_m (\dot \varphi, \dot \heap,
-\dot e)$ to denote $\varphi \gg \dot \varphi$, $\heap \gg \dot \heap$
-and $\Gamma;\Theta;\emptyset \vdash_m e \gg \dot e : \tau$ for some $\tau$ respectively. $\Gamma$ is omitted from the notation since the well-formedness of $\varphi$ and its consistency with respect to $\Gamma$ imply that $e$ must be closed under $\varphi$, allowing us to recover $\Gamma$ from $\varphi$.
-Finally, we use $\xrightarrow{\cdot}^*$ to denote the transitive closure of the
-reduction relation of $\elang$. Unlike the $\lang$, the semantics of
-$\elang$ does not distinguish checked and unchecked regions.
-
-Fig.~\ref{fig:checkedc-simulation-ref} gives an overview of 
-the simulation theorem.\footnote{We ellide the  possibility of $\dot e_1$ evaluating to $\ebounds$ or $\enull$ in the diagram for readability.} The simulation theorem is specified in a way
-that is similar to the one by~\citet{merigoux2021catala}.
-
-An ordinary simulation property would
-replace the middle and bottom parts of the figure with the
-following: \[(\dot \varphi_0, \dot \heap_0, \dot e_0) 
-  \xrightarrow{\cdot}^* (\dot \varphi_1, \dot \heap_1, \dot e_1)\]
-Instead, we relate two erased configurations using the relation $\sim$,
-which only requires that the two configurations will eventually reduce
-to the same state.
-
-\ignore{
- We formulate our simulation theorem differently
-because the standard simulation theorem imposes a very strong
-syntactic restriction to the compilation strategy. Very often, $(\dot
-\varphi_0, \dot \heap_0, \dot e_0)$ reduces to a term that is
-semantically equivalent to $(\dot \varphi_1, \dot \heap_1, \dot e_1)$,
-but we are unable to syntactically equate the two configurations due
-to the extra binders generated for dynamic checks and ANF
-transformation. In earlier versions of the Redex model, we attempted
-to change the compilation rules so the configurations could match
-syntactically. However, the approach scaled poorly as we added
-additional rules. 
-This slight relaxation on the equivalence relation
-between target configurations allows us to specify compilation more
-naturally without having to worry about syntactic constraints.
-}
-
-% The two theorems are translation preservation and simulation. We donate $\xrightarrow{c}$ as the transition semantics of CLight.
-\begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
-For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
-if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg_c (\dot \varphi_0,\dot \heap_0, \dot e_0)$,
-and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
-\rightarrow_c (\varphi_1, \heap_1, r_1)$, then the following facts hold:
-
-\begin{itemize}
-
-\item if there exists $e_1$ such that $r=e_1$ and $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
-$(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-\varphi,\dot \heap,\dot e)$ and $(\dot
-\varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
-\dot \heap,\dot e)$.
-
-\item if $r_1 = \ebounds$ or $\enull$, then we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-\dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
-\varphi_1$, $\heap_1 \gg \dot \heap_1$.
-
-\end{itemize}
-\end{thm}
-
-
-% when $r_1 = e_1$ for
-% some $e_1$ and
-% $(\varphi_1, \heap_1, e_1) \gg (\dot \varphi_1, \dot \heap_1, \dot e_1)$, then
-% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
-% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-% \varphi,\dot \heap,\dot e)$ and $(\dot
-% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
-% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
-% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
-
-% \begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
-% For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
-% if $\emptyset;\emptyset;\emptyset \vdash_\cmode e_0 \gg \dot e_0 :\tau_0$,
-% and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
-% \rightarrow_\cmode (\varphi_1, \heap_1, r_1)$, when $r_1 = e_1$ for
-% some $e_1$ and
-% $\emptyset;\emptyset;\emptyset \vdash_\cmode e_1 \gg \dot e_1 :\tau_1$ where $\tau_1 \sqsubseteq \tau_0$
-% , then
-% there exists some $\dot \varphi$,$\dot \heap$, $\dot e$, such that
-% $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-% \varphi,\dot \heap,\dot e)$ and $(\dot
-% \varphi_1,\dot \heap_1,\dot e_1) \xrightarrow{\cdot}^* (\dot \varphi,
-% \dot \heap,\dot e)$. When $r_1 = \ebounds$ or $\enull$, we have $(\dot \varphi_0, \dot \heap_0,\dot e_0) \xrightarrow{\cdot}^* (\dot
-% \dot \varphi_1,\dot \heap_1, r_1)$ where $\varphi_1 \gg \dot
-% \varphi_1$, $\heap_1 \gg \dot \heap_1$.
-% \end{thm}
-
-As our random generator never generates
-$\euncheckedtext$ expressions (whose behavior could be undefined), we can only test a the simulation theorem 
-as it relates to checked code. This limitation makes it
-unnecessary to state the other direction of the simulation theorem
-where $e_0$ is stuck, because Theorem~\ref{thm:progress} guarantees
-that $e_0$ will never enter a stuck state if it is well-typed in
-checked mode.
-
-The current version of the Redex model has been tested against $23000$
-expressions with depth less than $11$. Each expression can
-reduce multiple steps, and we test simulation between every two
-adjacent steps to cover a wider range of programs, particularly the
-ones that have a non-empty heap.
-
-\begin{figure}[t]
-{\small
-\[
-\begin{array}{c}
-\begin{tikzpicture}[
-            > = stealth, % arrow head style
-            shorten > = 1pt, % don't touch arrow head to node
-            auto,
-            node distance = 3cm
-        ]
-
-\begin{scope}[every node/.style={draw}]
-    \node (A) at (0,1.5) {$\varphi_0,\heap_0, e_0$};
-    \node (B) at (4,1.5) {$\varphi_1, \heap_1 ,e_1$};
-    \node (C) at (0,0) {$\dot \varphi_0, \dot \heap_0 ,\dot e_0$};
-    \node (D) at (4,0) {$\dot \varphi_1, \dot \heap_1, \dot e_1$};
-    \node (E) at (2,-1.5) {$\dot \varphi,\dot \heap ,\dot e$};
-\end{scope}
-\begin{scope}[every edge/.style={draw=black}]
-
-    \path [->] (A) edge node {$\longrightarrow_\cmode$} (B);
-    \path [<->] (A) edge node {$\gg$} (C);
-    \path [<->] (B) edge node {$\gg$} (D);
-    \path [dashed,<->] (C) edge node {$\sim$} (D);
-    \path [dashed,->] (C) edge node {$\xrightarrow{\cdot}^*$} (E);
-    \path [dashed,->] (D) edge node[above] {$\xrightarrow{\cdot}^*$} (E);
-\end{scope}
-
-\end{tikzpicture}
-\end{array}
-\]
-}
-\caption{Simulation between \lang and \elang }
-\label{fig:checkedc-simulation-ref}
-\end{figure}
-
-%{\em Proof:} By induction on the number of steps of the \checkedc
-%evaluation ($\longrightarrow_m^*$), using progress and preservation to
-%maintain the invariance of the assumptions.
-
-% \review{
-%   add a paragraph that discusses what are the main changes from [21] in terms
-%   of the technical development (if there are any), e.g., are there any new
-%   challenges that needed to be solved while proving the blame theorem for this
-%   paper's semantics?
-% }
-%  Compared to \citet{ruef18checkedc-incr}, proofs for
-%  \lang were made challenging by the addition of dependently typed
-%  functions and dynamic arrays, and the need to handle bounds widening for NT
-%  array pointers. These features required changes in the runtime
-%%  semantics (adding a stack, and dynamically changing bounds) and in
- % compile-time knowledge of them (to soundly typing widened bounds).
-
-% \ignore{
-% \begin{figure}[t!]
-%   \begin{prooftree}
-%     \hypo{\evalue{n}{\tau} \in \defscope}
-%     \infer1[T-VConst]{\Gamma;\defscope \vdash_m \evalue{n}{\tau}  : \tau}
-%   \end{prooftree}
-%   \qquad
-
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma;\defscope \vdash_m e : \tau \\
-%         \Gamma;\defscope \vdash_m e_1 : \tau_1 
-%       \end{matrix}
-%     }
-%     \hypo{
-%       \begin{matrix}
-% \Gamma \vdash_m \tau_3 = \tau_1 \vee \tau_2 \\
-%             \Gamma;\defscope \vdash_m e_2 : \tau_2
-%           \end{matrix}
-%         }
-%     \infer2[T-If]{\Gamma;\defscope \vdash_m \eif{e}{e_1}{e_2} : \tau_3}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma;\defscope \vdash_m x : \tptr[c]{(\tntarray{l}{0}{\tau})}, l \leq 0 \\
-%         \Gamma, x : \tptr[c]{(\tntarray{l}{1}{\tau})};\defscope \vdash_m e_1 : \tau_1 \\
-%         \Gamma;\defscope \vdash_m e_2 : \tau_2 \\
-%         \Gamma \vdash_m \tau_3 = \tau_1 \vee \tau_2
-%       \end{matrix}
-%     }
-%     \infer1[T-IfNT]{\Gamma;\defscope \vdash_m \eif{\estar{x}}{e_1}{e_2} : \tau_3}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         F(f) = \tau_{j}\;(x_0:\tau_0, \ldots, x_{j-1}:\tau_{j-1})\;e  \\
-%         \Gamma; \defscope \vdash_m \tau_i[x_0,\ldots,x_{i-1} \mapsto e_0,\ldots,e_{i-1}] ~~~ 0 \leq i \leq j\\
-%         \Gamma; \defscope \vdash_m e_i : \tau_i' ~~~ 0 \leq i \leq j\\
-%         \Gamma; \defscope \vdash_m \subtype{\tau_i'}{\tau_i[x_0,\ldots,x_{i-1} \mapsto e_0,\ldots,e_{i-1}]}  ~~~ 0 \leq i < j
-%       \end{matrix}
-%     }
-%     \infer1[T-VCall]{\Gamma; \defscope \vdash_m f(\overline{e}) : \tau_j[x_0,\ldots,x_{j-1} \mapsto e_0,\ldots,e_{j-1}]}
-%   \end{prooftree} \\ \\
-% % \inferrule*[lab=T-PtrC]
-% % {
-% %   \tau = \tptr[c]{\omega} \\
-% %   \tau_0, ..., \tau_{j-1} = \mathrm{types}(D,\omega)\\\\
-% %   \wt[\Gamma][\defscope, n^\tau]{H(n+k)}{\tau_k} ~~~ 0 \leq k < j
-% % %  \Gamma,n^\tau \proves H(n+k) : \tau_k~~~0 \leq k < j
-% % }
-
-
-
-%   \begin{prooftree}
-%     \hypo{
-%           \Gamma; \defscope \vdash_m e_1 : \tau_1
-%       }
-%       \hypo{        \Gamma, x = e_1 : \tau_1; \defscope \vdash_m e_2 : \tau_2
-% }
-%     \infer2[T-Let]{\Gamma; \defscope \vdash_m \elet{x}{e_1}{e_2} : \tau[x \mapsto e_1]}
-%   \end{prooftree} \\ \\
-
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma; \defscope \vdash_m \estrlen{y} : \tau_1\\
-%         \Gamma; \defscope \vdash_m y : \tptr[c]{(\tntarray{le}{\_}{\tau_3})}\\
-%         \Gamma, x = \estrlen{y} : \tau_1, \\ y : \tptr[c]{(\tntarray{le}{x}{\tau_3})} ;  \defscope  \vdash_m e_2 : \tau_2
-%         \end{matrix}
-%         }
-%         \infer1[T-LetStr]{\Gamma; \defscope \vdash_m \elet{x}{\estrlen{y}}{e_2} : \tau[x \mapsto e_1]}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \hypo{
-%         \Gamma; \defscope \vdash_m e : \tptr[c]{(\tntarray{le}{he}{\tau})}
-%       }
-%         \infer1[T-Str]{\Gamma; \defscope \vdash_m \estrlen{y} : \tint}
-%       \end{prooftree} \\ \\
-
-%       \begin{prooftree}
-%         \hypo{
-%           \begin{matrix}
-%             \tau = \tint \vee \tau = \tptr[u]{\omega}~\vee  n=0~ \vee \\ \tau = \tptr[c]{(\tarray{0}{0}{\tau'})} \vee \\
-%             \tau = \tptr[c]{(\tntarray{0}{0}{\tau'})}
-%         \end{matrix}
-%       }
-%       \infer1[T-Base]{\Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tau}
-%     \end{prooftree} \\ \\
-
-%     \begin{prooftree}
-%       \hypo{
-%         \begin{matrix}
-%         \tau = \tptr[c]{\omega} \\
-%         \tau_0, ..., \tau_{j-1} = \mathrm{types}(D,\omega)\\
-%         \Gamma;\defscope, \evalue{n}{\tau}  \vdash_m {H(n+k)} : {\tau_k} ~~~ 0 \leq k < j
-%       \end{matrix}
-%       }
-%       \infer1[T-PtrC]{\Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tau}
-%     \end{prooftree} \\ \\
-
-%     \begin{prooftree}
-%       \hypo{
-%         \begin{matrix}
-%             \Gamma; \defscope \vdash_m e :  {\tptr[m]{\tstruct{T}}} \\
-%             % \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
-%             D(T) = ...; \tau_f~f; ...
-%         \end{matrix}
-%       }
-%       \infer1[T-Amper]{\Gamma; \defscope \vdash_m \eamper{e}{f} : \tptr[m]{\tau_f}}
-%     \end{prooftree} \\ \\
-
-
-%     \todo[inline]{YL: how to express le - n as a metafunction?}
-%     \begin{prooftree}
-%       \hypo{
-%         \begin{matrix}
-%         \Gamma; \defscope \vdash_m e_1 : \tptr[m']{(\tgarray{\alpha}{le}{he}{\tau})}\\
-%         \Gamma; \defscope \vdash_m \evalue{n}{\tau}  : \tint \\
-%         le' = le - n, he' = he - n
-%       \end{matrix}
-%     }
-%       \infer1[T-BinopInd]{\Gamma; \defscope \vdash_m (e_1 \plus \evalue{n}{\tau} ) : \tptr[m']{(\tgarray{\alpha}{le'}{he'}{\tau})}}
-%     \end{prooftree}
-% \caption{Typing}
-% \label{fig:typing}
-% \end{figure}
-
-% \begin{figure}[t!]
-%   \todo[inline]{no sizeof check because we don't know statically whether the allocation would be null}
-%   \begin{prooftree}
-%     \hypo{
-%       \omega = \tgarray{\alpha}{le}{he}{\tau} \Rightarrow le = 0
-%     }
-%     \infer1[T-Malloc]{\Gamma; \defscope \vdash_m \emalloc{\omega} : \tptr[c]{\omega}}
-%   \end{prooftree}\\\\
-
-%   \begin{prooftree}
-%     \hypo{
-%       \Gamma; \defscope \vdash_u e : \tau
-%     }
-%     \infer1[T-Unchecked]{\Gamma; \defscope \vdash_m \eunchecked{e} : \tau}
-%   \end{prooftree}\\\\
-
-%   \todo[inline]{any constraints on m'?}
-%   \begin{prooftree}
-%     \hypo{\Gamma; \defscope \vdash_m e :  \tptr[m']{(\tgarray{\alpha}{le'}{he'}{\tau})} }
-%     \infer1[T-DynCast]{\Gamma; \defscope \vdash_m \edyncast{\tptr[m']{(\tgarray{\alpha}{le}{he}{\tau})}}{e} : \tau}
-%   \end{prooftree}\\\\
-  
-%   \begin{prooftree}
-%     \hypo{\Gamma; \defscope \vdash_m e : \tau'}
-%     \infer1[T-Cast]{\Gamma; \defscope \vdash_m \ecast{\tau}{e} : \tau}
-%   \end{prooftree}\\\\
-
-
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\tgarray{\alpha}{le}{he}{\tau}} \\
-%         \Gamma; \defscope \vdash_m e_2 : \tint \\
-%         m' = u \Rightarrow m = u \\
-%       \end{matrix}
-%     }
-%     \infer1[T-Index]{\Gamma; \defscope \vdash_m \estar{(\ebinop{e_1}{e_2})} : \tau}
-%   \end{prooftree} \\\\
-
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\omega} \\
-%         \Gamma; \defscope \vdash_m e_2 : \tau \\
-%         m' = u \Rightarrow m = u \\
-%         \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
-%       \end{matrix}
-%     }
-%     \infer1[T-Assign]{\Gamma; \defscope \vdash_m \eassign{e_1}{e_2} : \tau}
-%   \end{prooftree}\\\\
-
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma; \defscope \vdash_m e_1 : \tptr[m']{\omega} \\
-%         \Gamma; \defscope \vdash_m e_2 : \tint \\
-%         \Gamma; \defscope \vdash_m e_3 : \tau \\
-%         m' = u \Rightarrow m = u \\
-%         \omega = \tau \vee \omega = \tgarray{\alpha}{le}{he}{\tau}
-%       \end{matrix}
-%     }
-%     \infer1[T-IndAssign]{\Gamma; \defscope \vdash_m \eassign{(e_1 \plus e_2)}{e_3} : \tau}
-%   \end{prooftree}
-
-% \caption{Typing Cont.}
-% \label{fig:typing2}
-% \end{figure}
-% \ignore{
-
-
-
-
-
-% \begin{figure}[t!]
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma \vdash x_0:\tau_0, \ldots, x_{j}:\tau_{j} \\
-%         \Gamma, x_0 = \kw{none} : \tau_0, \ldots, x_{j-1} = \kw{none} : \tau_{j-1}; \defscope \vdash e : \tau_{r}
-%       \end{matrix}
-%     }
-%     \infer1[WF-Fun]{\Gamma;\defscope \vdash \tau_{j}\;(x_0:\tau_0, \ldots, x_{j-1}:\tau_{j-1})\;e}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \infer0[WF-Nil]{\Gamma \vdash \circ}
-%   \end{prooftree} \\\\
-
-%   \begin{prooftree}
-%     \hypo{
-%       \begin{matrix}
-%         \Gamma \vdash \tau_0 \\
-%         \Gamma, x_0 = \kw{none} :\tau_0 \vdash x_1:\tau_{1}, \ldots, x_{j}:\tau_{j}
-%       \end{matrix}
-%     }
-%     \infer1[WF-Cons]{\Gamma \vdash x_0:\tau_0, \ldots, x_{j}:\tau_{j}}
-%   \end{prooftree} \\\\
-
-%   \begin{prooftree}
-%     \infer0[WF-Int]{\Gamma \vdash \tint}
-%   \end{prooftree} \\\\
-
-%   \begin{prooftree}
-%     \hypo{   \Gamma \vdash le }
-%      \hypo{   \Gamma \vdash he }
-%       \hypo{  \Gamma \vdash \tau}
-
-%     \infer3[WF-Array]{\Gamma \vdash \tptr[m]{(\tgarray{\alpha}{le}{he}{\tau})}}
-%   \end{prooftree} \\\\
-
-%   \begin{prooftree}
-%     \hypo{T \in dom(D)}
-%     \infer1[WF-Struct]{\Gamma \vdash \tptr[m]{\tstruct{T}}}
-%   \end{prooftree} \\\\
-
-%   \begin{prooftree}
-%     \hypo{\Gamma \vdash \tau}
-%     \infer1[WF-Ptr]{\Gamma \vdash \tptr[m]{\tau}}
-%   \end{prooftree} \\\\
-  
-%   \begin{prooftree}
-%     \infer0[WFB-Int]{\Gamma \vdash i}
-%   \end{prooftree}\\\\
-  
-%   \begin{prooftree}
-%     \hypo{x = e? : \tint \in \Gamma}
-%     \infer1[WFB-Var]{\Gamma \vdash x \plus i}
-%   \end{prooftree} \\\\
-
-%   \caption{Well-Formedness}
-%   \label{fig:wf}
-% \end{figure}
-
-
-
-% \begin{figure}[t!]
-%   \begin{prooftree}
-%     \infer0[Sub-Nt]{\subtype{\tptr[c]{(\tntarray{le}{he}{\tau})}}{\tptr[c]{(\tarray{le}{he}{\tau})}}}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \infer0[Sub-Refl]{\subtype{\tau}{\tau}}
-%   \end{prooftree} \\ \\
-
-%   \todo[inline]{what about ntarrays?}
-%   \begin{prooftree}
-%     \infer0[Sub-Ptr]{\subtype{\tptr[c]{\tau}}{\tptr{\tarray{0}{1}{\tau}}}}
-%   \end{prooftree} \\ \\
-
-%   \todo[inline]{the subtyping relation is not anti-symmetric..}
-%   \begin{prooftree}
-%     \infer0[Sub-Arr]{\subtype{\tptr[c]{\tarray{0}{1}{\tau}}}{\tptr{\tau}}}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     \hypo{\rboundle{le_0}{le_1}}
-%     \hypo{\rboundle{he_1}{he_0}}
-%     \infer2[Sub-Subsume]{\subtype{\tptr{(\tgarray{\alpha}{le}{he}{\tau})}{\cmode}}{ \tptr{(\tgarray{\alpha}{ le_1} {he_1} {\tau})}}}
-%   \end{prooftree} \\ \\
-
-%   \begin{prooftree}
-%     % check t-amper below
-%     \hypo{D(T) = \tau_f~f; ...}
-%     \hypo{\subtype{\tau_f}{\tau}}
-%     \infer2{\subtype{\tptr[c]{\tstruct{T}}}{\tau}}
-%   \end{prooftree}
-%   \caption{Subtyping}
-%   \label{fig:sub}
-% \end{figure}
-% }
-% }
-
-% \ignore{
-
-% \begin{figure*}[t]
-%   \begin{lstlisting}
-% int foo(nt_array_ptr<char> p : count(0)) {
-%   if (* p) {
-%     dyn_bounds_cast<nt_array_ptr<char>>(p, count(1));
-%   }
-%   dyn_bounds_cast<nt_array_ptr<char>>(p, count(1));
-%   return 0;
-% }
-%   \end{lstlisting}
-% \caption{The example where clang Checked C fails at run-time}
-% \label{fig:clangbad1}
-% \end{figure*}
-
-% \begin{figure*}[t]
-%   \begin{lstlisting}
-% /* nt_array_ptr<char> p : bounds(p,p) */
-% size_t cnt = 0;
-
-% while(*(p+cnt)) {
-%   ++cnt;
-% }
-% dyn_bounds_cast<nt_array_ptr<char>>(p, count(cnt));
-%   \end{lstlisting}
-% \caption{A useful program that the Checked C spec doesn't allow at run-time}
-% \label{fig:clangbad2}
-% \end{figure*}
-% }
-
-% \ignore{
-% The Clang CheckedC implementation uses statically determined
-% bounds to insert run-time checks. In Fig.~\ref{fig:clangbad1}, the
-% \code{dyn_bounds_cast} at line 3 will always succeed, because the
-% compiler knows that within the scope of then branch, the pointer
-% \code{p} must have at least one element. The same cast at line 5,
-% however, will always fail, since there is no way to tell statically
-% whether the program has entered the then branch before. The compiler
-% will check whether the \code{count(1)} bounds specification is
-% contained within the earlier \code{count(0)} specification, resulting
-% in a run-time failure even when we pass in a non-empty string.
-
-% Our formalization diverges from this run-time behavior and instead keeps
-% track of the bounds on the stack. After entering the then branch, we
-% increment the upper bound for \code{p}, effectively making the
-% updated bounds information available even after we exit the if
-% statement. The cast at line 5 will be checking the new bounds against
-% the incremented bounds for non-empty strings.
-
-% Fig.~\ref{fig:clangbad2} gives a more practical example of why keeping
-% track of the bounds on the stack is useful. The program snippet
-% implements the functionality of the \code{strlen} function using a
-% while loop and a \code{cnt} variable. Even though the type system is
-% unable to reason about the while loop, as long as the runtime system
-% updates the bounds in-place, the user can apply a
-% \code{dyn_bounds_cast} to soundly recover the more precise bounds
-% information.
-% }
-
-
-% \inferrule*[lab=T-Amper]
-% {
-%   \Gamma \proves e : \tptr[m]{\tstruct{T}} \\\\
-%   D(T) = ...; \tau_f~f; ...
-% }
-% {
-%   \Gamma \proves \eamper{e}{f} : \tptr[m]{\tau_f}
-% }
+The other compilation rules are given in \Cref{appx:add-type-sem}.

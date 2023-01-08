@@ -105,10 +105,10 @@ But in our case, we want a low-overhead code-centric partitioning, where the unc
 
 In this work, we propose a type-directed code-centric program partitioning approach.
 Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
-The checked types follow the standard Checked C typing rules. However, our type-system disallows all interactions between taint and untainted types.
-\liyi{really? I think they can exchange data in the unchecked region, and then the sandbox guarantee the correctness? }
+The checked types follow the standard Checked C typing rules.
+However, our type-system disallows any unsafe interactions between taint and untainted types.
  
-The developer starts by marking desired (i.e., unchecked) functions and pointers used in these functions as tainted.
+The developer starts by marking desired (\ie unchecked) functions and pointers used in these functions as tainted.
 Second,~\systemname partitions the given program into two partitions (\ucregion and~\cregion)  of different privileges:
 \liyi{can we just name them unchecked and checked regions, and then referring to them as \ucregion and~\cregion? We need to make it clear that we are re-define c and uc regions. }
 \begin{itemize}
@@ -140,9 +140,16 @@ Our type system restricts checked pointers usage only in~\cregion and ensures th
 Our modular design enables us to use existing sandboxed techniques to enforce memory and execution isolation.
 
 \myparagraph{Supporting callbacks to~\cregion with no Checked Pointer Exposure}
-Although we disallow access to~\cregion from~\ucregion, there can be cases where such access is needed. Specifically, when~\cregion wants to provide access to certain shared checked data to~\ucregion.
+Although we disallow access to~\cregion from~\ucregion, there can be cases where such access is needed.
+Specifically, when~\cregion wants to provide access to certain shared checked data to~\ucregion.
 To enable this, we support callback functions in~\cregion that can be invoked from~\ucregion through function pointers.
-However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of \systemname.
+%However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of \systemname.
+However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of~\systemname and leads to other attacks~\cite{hauser2019sleak}.
+
+We handle this by using indirection. Specifically, instead of directly accessing the~\cregion callbacks, the ~\ucregion accesses them using a protected trampoline function, which will direct the execution to the appropriate callback function.
+In addition, the trampoline function itself will be referenced using an opaque index rather than its virtual address, and we will utilize existing sandboxing techniques to implement this.
+
+\ignore{
 
 -- NEED TO FINISH THIS--
 Our third contribution is an added-up feature
@@ -168,6 +175,7 @@ In this case, no checked pointer address will be observed in the unchecked code 
 we automatically compile a tainted version by surrounding the function without a
 tainted shell.}
 \mz{What does this mean?}
+}
 % 
 
 \iffalse

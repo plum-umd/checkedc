@@ -1,4 +1,4 @@
-\section{\systemname Compiler Overview}
+\section{Overview}
 \label{sec:overview}
 
 \begin{listing}[t!]
@@ -49,11 +49,16 @@
 
 \input{figures/overview}
 
-\Cref{fig:overview} provides the compiler structure of \systemname. The \systemname type checker compiles a \systemname program by partitioning the different program regions, i.e., $c$ and $uc$ regions, as well as different pointers, i.e., checked, unchecked and tainted pointers. Any $uc$ region pointers are executed within a sandbox, while checked pointers are executed via the \checkedc compiler within the checked region.
+The~\Cref{fig:overview} shows the interaction between various components of~\systemname{}.
+Given an appropriately annotated source program and a sandbox configuration, our system creates an executable such that all tainted functions and data will reside in a sandbox and the~\cregion (non-sandboxed) region is not affected by the code in the sandbox.
 
-\Cref{sec:formal} provides the formalism of the different compiler components.
-Converting a C/checked-c program to \systemname is a two-step process that involves identifying unsafe/unchecked regions described in \Cref{subsec:identifyregionstosbx} followed by making the \systemname changes described in \Cref{subsec:moveregionstosbx}.  
-\subsection{Identify Unchecked Regions}
+We will present an overview of the~\systemname{} from a developer perspective and the details of individual components in the later sections.
+
+%\Cref{fig:overview} provides the compiler structure of \systemname. The \systemname type checker compiles a \systemname program by partitioning the different program regions, i.e., $c$ and $uc$ regions, as well as different pointers, i.e., checked, unchecked and tainted pointers. Any $uc$ region pointers are executed within a sandbox, while checked pointers are executed via the \checkedc compiler within the checked region.
+
+%\Cref{sec:formal} provides the formalism of the different compiler components.
+%Converting a C/checked-c program to \systemname is a two-step process that involves identifying unsafe/unchecked regions described in \Cref{subsec:identifyregionstosbx} followed by making the \systemname changes described in \Cref{subsec:moveregionstosbx}.  
+\subsection{Running Example}
 \label{subsec:identifyregionstosbx}
 Here,
 we use the example of a simple network server in~\lst{lst:comb} to explain changes required by the \systemname compiler.
@@ -66,8 +71,7 @@ As we can see, there is an arbitrary memory write vulnerability (indicated by~\r
 The variable~\code{i} can take any integer value as it is parsed from~\code{msg}, whose contents are read from socket in~\code{read_msg} indicated by~\rootcause.
 
 \liyi{The example looks good. But we are focusing on converting C to \checkedc here? }
-\subsection{\systemname Annotations}
-\label{subsec:moveregionstosbx}
+
 \myparagraph{Goal} 
 The developer's goal is to partition the code in~\lst{lst:comb} so that spatial memory vulnerabilities do not affect the overall program.
 Ideally, the developer must convert the entire code to Checked C so that the entire program achieves spatial memory safety.
@@ -79,18 +83,36 @@ However, as explained in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecke
 
 \liyi{Can we just assume that programmers know \checkedc and will use \checkedc, and then we added tainted type? }
 
-\myparagraph{Using tainted types}
-To handle this, the developer marks risky functions with unchecked pointers~\ie~\code{read_msg} and~\code{process_req1} as~\code{tainted} as shown in~\lst{lst:humantaint} indicated by~\useradded.
+\subsection{\systemname Annotations}
+\label{subsec:moveregionstosbx}
+%\myparagraph{Using tainted types}
+To handle this, the developer marks risky functions with unchecked pointers,~\ie~\code{read_msg} and~\code{process_req1} as~\code{tainted} as shown in~\lst{lst:humantaint} indicated by~\useradded.
 The developer starts using~\systemname{} with the resulting partially annotated program with checked and tainted types~\ie~\lst{lst:initialconv} and~\ref{lst:humantaint} atop of~\lst{lst:comb}.
 The initial tainted functions might require other pointers to be marked as tainted according to our typing rules (CITE).
 The developer uses our type checker to identify the additional annotations (\usermods) required to have a well-typed program and adds them as shown in~\lst{lst:humanadjust}.
 The resulting well-typed program as shown in~\lst{lst:final} will be passed to our source level program partitioner along with certain configuration parameters of the target sandbox.
 
-\myparagraph{Partitioning}
+\subsection{Partitioning}
 Our partitioner splits the provided program into two sets of source files with the necessary source changes required to communicate with sandboxed code.
 These sets of source files will be compiled with the corresponding compilers to get the corresponding object files.
 The c-region object file will have the necessary runtime checks enforcing~\systemname{} guarantees.
 The~\ucregion object file will be produced according to the corresponding sandbox mechanism.
 Finally, these two object files will be linked along with the necessary sandbox libraries to produce the final executable such that all the tainted functions will be executed in a sandbox (\ucregion) and the rest of the functions as regular code (\cregion).
+
+\subsection{Alternative Use Cases}
+\input{figures/newusecase}
+
+Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
+
+However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used alongside regular pointers, so the~\cregion{}~\emph{can} contain checked pointers as well.
+%
+This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
+
+For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
+
+The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
+It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
+
+%newusecase.tex
 
 
