@@ -135,7 +135,10 @@ This section describes the formal core model of~\systemname,
 named~\lang.
 We precisely present its syntax, semantics, type
 system, and compilation.
-The formal model also enables us to develop~\lang’s meta-
+% 
+\mzs{The formal model also enables us to}
+% 
+\mzr{From those, we} develop~\lang’s meta-
 theories, including the type soundness, non-exposure, non-crashing,
 and the compiler simulation theorems, which we present in~\apdx{sec:theorem}.
 
@@ -146,16 +149,46 @@ and the compiler simulation theorems, which we present in~\apdx{sec:theorem}.
 \subsection{Syntax}\label{sec:syntax}
 The~\fig{fig:checkc-syn} shows a simplified syntax of~\lang.
 \subsubsection{Types ($\omega$)}
-At a high level, we classify types as word-size values, multi-word values, or functions.
-The word-size values can be either integers or pointers.
-Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
-($\xi$, the difference between context and pointer modes is introduced shortly below) that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
-and a type ($\omega$) denoting valid values that can be pointed to.
+At a high level, we classify types as word-size value \mzr{type}s, multi-word
+value \mzr{type}s, or function \mzr{type}s.
+%
+\mz{
+  % 
+  You cannot classify a type as values. You can only classify types into other 3
+  categories, namely, word, multi-word and function types.
+  % 
+}
+% 
+\mzs{The}\mzr{A} word-size value\mzs{s} can be either \mzr{of type integer} or
+\mzr{of type pointer}.
+% 
+\mzr{Each} pointer type\mzs{s} ($\tptr{\omega}{\xi}$) \mzr{is represented by} a
+pointer mode annotation ($\xi$, the difference between context and pointer modes
+is introduced shortly below) that is either checked (\cmode), tainted (\tmode),
+or unchecked (\umode), and a type ($\omega$) denoting \mzr{the valid type of
+  values it can refer to}.
+% 
 
-Multi-word values represent arrays and null-terminated arrays, which include both the type of elements ($\tau$) and a bound ($\bvar$).
-The bounds can be either integer literals $n$, expressions $x + n$, or an explicit specification of lower and upper bound,~\ie $(b_l,b_h)$.
-We denote null-terminated arrays using $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$ otherwise (we elide $\cdot$ when writing types).
+% 
+\mzr{The multi-word value type ($ \tallarrayb{\bvar}{\tau}$) that ranges over 
+arrays and null-terminated arrays is constructed by the type of elements in the
+array ($\tau$), an array bound ($\bvar$) and an array flag ($\kappa$).}
+% 
+\mzr{A} bound can be either \mzr{an} integer literal $n$, \mzr{an} expressions
+$x + n$, or an explicit specification of lower and upper bound\mzr{s},~\ie
+$(b_l,b_h)$.
+%
+\mzr{ %
+  Additionally, to distinguish null-terminated arrays from other arrays, we set
+  \(\kappa\) to be \textit{nt} for nt-arrays and \(\cdot\) for other arrays (for
+  convenience, we will elide \(\cdot\) in the text).
+  % 
+}
+% 
+
+% 
 An example representation of an array and null-terminated array in~\lang syntax is shown below:
+% 
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
@@ -167,17 +200,32 @@ $\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 \end{array}
 \end{array}
 \]
-To simplify the representation, we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
-$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
-be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+\mzr{For simplicity}\mzs{To simplify the representation}, we write
+$\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean $\tptr{\tarray{0}{b}{\tau}}{\cmode}$,
+so the above examples could be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
-\emph{Disallowing unsafe types.}
+\emph{\mzr{Rejecting}\mzs{Disallowing} unsafe types.}
 The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
-These requirements add additional restrictions for type creation and restrict the creation of unsafe types.
-For instance, we cannot create a tainted array whose elements are checked pointers,~\eg Although syntactically valid, the type~\code{_t_Array_ptr<_Ptr<int>>} is~\emph{not} well-formed and is not allowed in~\lang.
-However, we can have a checked array whose elements are tainted pointers,~\eg~\code{_t_Array_ptr<_t_Ptr<int>>} is a valid type.
+% 
+These requirements \mzs{add additional restrictions for type creation and restrict the creation of unsafe types.}
+\mzr{prevents unsafe types from being constructed}.
+% 
+\mzr{
+  % 
+  Consider the type ~\code{_t_Array_ptr<_Ptr<int>>} which describes a tainted
+  array of checked pointers.
+  % 
+  Syntactically valid, this type is however \emph{illegal} in~\lang{} and
+  rejected by the well-formedness requirement. 
+}
+% 
+\mz{Made some changes to shift the emphasis in hope of improving clearness.}
+% 
+However, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_t_Array_ptr<_t_Ptr<int>>} is a valid type.
+% 
 
+% 
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
 where $\overline{x}$ represents a list of \tint{} type variables that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
