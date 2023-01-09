@@ -416,6 +416,38 @@ their types) and a predicate environment $\Theta$ (mapping integer-typed
 variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
 in context mode $m$.
 
+In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
+We provide some example descriptions here.
+Type equality $\tau=_{\Theta}\tau'$
+is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
+and the alpha equivalence of two function types;
+i.e., two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
+$\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
+$\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
+are equivalent, if we can find a same length (as $\overline{x}$ and $\overline{y}$) variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
+and the substitution results are equal.
+\aravind{For the above paragraph, give concrete example, For example: array is a subtype of ptr, etc}
+
+
+
+\aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
+
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+a -> checked pointer
+b -> Tainted pointer
+c -> Unchecked pointer.
+
+_Ptr<int> a;
+_t_Ptr<int> b;
+int *c;
+
+a = b; // Not allowed.
+b = a; // Not allowed.
+
+a = (_Ptr<int>)c; // This is okay.
+a = (_Ptr<int>)b; // Not allowed.
+\end{minted}
+
 \subsection{Semantics and Typing}\label{sec:semantics}
 
 % The semantics
