@@ -404,6 +404,18 @@ $
   \label{fig:c-context}
 \end{figure}
 
+\subsection{Type Checking}
+\label{sec:typechecking}
+Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
+A few selected type rules are presented in~\fig{fig:type-system-1}.
+The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
+
+Each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
+which states that in a type environment $\Gamma$ (mapping variables to
+their types) and a predicate environment $\Theta$ (mapping integer-typed
+variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
+in context mode $m$.
+
 \subsection{Semantics and Typing}\label{sec:semantics}
 
 % The semantics
