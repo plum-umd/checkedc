@@ -20,8 +20,8 @@ open-source extension to C
   Specifically, \checkedc extends C with checked pointer types, which are
   restricted by the compiler to spatially safe uses.}
 % 
-\mzr{ with additional annotations and types, checked pointer types in
-  particular, to ensure a program’s spatial safety.}
+\mzr{to ensure a program’s spatial safety by introducing additional annotations and
+  enforcing new types, checked pointer types in particular.}
 % 
 \mz{Redundancy?}
 % 
@@ -82,6 +82,7 @@ This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in 
 Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 \fi
+% 
 This mechanism is called program partitioning~\cite{rul2009towards}.
 Existing mechanisms are not suitable as they are based on process isolation and have high overhead, and are data-centric~\emph{data-centric} (\sect{subsec:background:programpart}).
 Furthermore, these techniques are hard to engineer to co-exist with~\checkedc.
@@ -92,20 +93,69 @@ In this work, we propose a type-directed code-centric program partitioning appro
 Specifically, our system,~\systemname, extends Checked c using~\textbf{tainted} (\taintt) types, which can be used to mark functions and pointers that need to be isolated from the original program.
 The checked types follow the standard Checked C typing rules.
 However, our type-system disallows any unsafe interactions between taint and untainted types.
- 
+% 
+\mz{It sounds hard to follow. The subjects in these sentences are  ``our
+  system''. ``checked types'' and ``our type-system''.
+  %
+  For readers, the connection among checked, tainted and unchecked seems weak.
+  % 
+} 
+% 
+% Specifically, in our system,~\systemname, extending CheckedC,
+% functions and pointers that need to be isolated from the original program can be
+% marked with ~\textbf{tainted} (\taintt) types.
+% 
+
+% 
 The developer starts by marking desired (\ie unchecked) functions and pointers used in these functions as tainted.
-Second,~\systemname partitions the given program into two partitions (\umode and~\cmode regions)  of different privileges:
+Second,~\systemname partitions the given program into two partitions (\umode and~\cmode regions)  of different \mzu{privileges}:
+% 
+\mz{need a bit more description (4-5 words) before introducing the word
+  ``privilege''}
+% 
 
 \begin{itemize}
 \item~\umode \emph{region} or~\emph{tainted region} (low privilege tainted region): This partition contains tainted types (\ie functions and pointers) and can only access tainted pointers.
 \item~\cmode \emph{region} or~\emph{safe region} (high privilege untainted or checked region): This partition contains the remaining (untainted) code and data and has complete access to~\cmode region.
 The functions in~\cregion can invoke any function in~\ucregion and access all its data but not the other way around, except for call-back functions, which we will discuss later.
 \end{itemize}
+% 
+\mz{                            %
+  This paragraph is unclear. 
+  % 
+  How does regions look like? Can one region nested in another?
+  %
+  If not, ``This partition contains the remaining (untainted) code and data and
+  has complete access to~\cmode region.'' creates a sense of recursive
+  definition of \cregion.
+}
+% 
+
+% 
 Finally, during program execution, the~\ucregion partition will be executed in an existing sandboxed environment (\eg WASM sandbox), and our compiler will add the necessary instrumentation to facilitate the communication between code in~\cregion{} and~\ucregion{}.
 
 The combination of tainted types and privileged partitions enables us to enforce isolation and provide memory safety without marshaling costs.
-As functions in the~\ucregion can only access tainted types (or unchecked types),~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
-We avoid marshaling by allocating all tainted pointers (\ie tainted buffers) in~\ucregion and thus can be accessed in both partitions.
+% 
+\mzu{As functions in the~\ucregion can only access tainted types (or unchecked
+types),~\cregion functions should use tainted types to pass pointer arguments
+to~\ucregion functions.
+% 
+We avoid marshaling by allocating all tainted pointers (\ie tainted buffers)
+in~\ucregion and thus can be accessed in both partitions.}
+%
+\mz{I don't quite understand the logical consequence here. Why does allocating
+  tainted points avoids marchaling. 
+  % 
+  I see that ``allocating all tainted pointers'' makes ptrs accessable in both
+  regions, but avoiding marchaling doesn't seem to cause that.
+  %
+  The question I should probably ask is what marshaling means? 
+  % 
+  Does the procedure that copies a checked buffer to a tainted one counts as
+  marshaling?
+  % 
+}
+% 
 Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
 Our compiler avoids these attacks by ensuring, through dynamic checks that tainted pointers validly point to \ucregion address space.
 Such checks are statically generated by our compiler.
@@ -119,6 +169,8 @@ We extend~\checkedc compiler to support our type system.
 We formalize our system by extending~\checkedc formalism~\citet{li22checkedc} with the non-crashing guarantee and other new features below.
 We formally prove the~\emph{non-crashing theorem} and use model-based randomized testing (CITE) to certify the simulation relation between the~\systemname semantics and the compiler.
 To the best of our knowledge,~\systemname is the first C(-like) language and compiler formalism with the program partitioning mechanism.
+%
+\mz{uh}
 
 \myparagraph{Type-Directed Program Partitioning}
 We present a type-directed program partition technique to separate checked and unchecked code regions and ensure that the code in checked region~\textit{cannot crash} due to spatial safety violations.
@@ -133,7 +185,11 @@ To enable this, we support callback functions in~\cregion that can be invoked fr
 However, knowing the address of~\cregion functions in~\ucregion violates the program partition principle of~\systemname and leads to other attacks~\cite{hauser2019sleak}.
 
 We handle this by using indirection. Specifically, instead of directly accessing the~\cregion callbacks, the ~\ucregion accesses them using a protected trampoline function, which will direct the execution to the appropriate callback function.
-In addition, the trampoline function itself will be referenced using an opaque index rather than its virtual address, and we will utilize existing sandboxing techniques to implement this. In our \systemname formalism, we formally verified that our formalism is \emph{non-exposure}, \ie, no \cregion pointer addresses will be leaked in \ucregion code.
+In addition, the trampoline function itself will be referenced using an opaque index rather than its virtual address, and \mzu{we will utilize existing sandboxing techniques to implement this}.\mz{tense?}
+% 
+In our \systemname formalism, we formally verified that our formalism is
+\emph{non-exposure}, \ie, no \cregion pointer addresses will be leaked in
+\ucregion code.
 
 \ignore{
 
