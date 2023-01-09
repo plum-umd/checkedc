@@ -155,7 +155,6 @@ and a type ($\omega$) denoting valid values that can be pointed to.
 Multi-word values represent arrays and null-terminated arrays, which include both the type of elements ($\tau$) and a bound ($\bvar$).
 The bounds can be either integer literals $n$, expressions $x + n$, or an explicit specification of lower and upper bound,~\ie $(b_l,b_h)$.
 We denote null-terminated arrays using $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$ otherwise (we elide $\cdot$ when writing types).
-The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
 An example representation of an array and null-terminated array in~\lang syntax is shown below:
 \[\hspace*{-0.5em}
 \begin{array}{l}
@@ -173,6 +172,12 @@ $\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
 be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
+\emph{Disallowing unsafe types.}
+The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
+These requirements add additional restrictions for type creation and restrict the creation of unsafe types.
+For instance, we cannot create a tainted array whose elements are checked pointers,~\eg Although syntactically valid, the type~\code{_t_Array_ptr<_Ptr<int>>} is~\emph{not} well-formed and is not allowed in~\lang.
+However, we can have a checked array whose elements are tainted pointers,~\eg~\code{_t_Array_ptr<_t_Ptr<int>>} is a valid type.
+
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
 where $\overline{x}$ represents a list of \tint{} type variables that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
@@ -184,8 +189,10 @@ $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{),}$\\
 \Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
-Note that the well-formed requirement (\fig{fig:wffunctions} in Appendix) of a function type ensures that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+The function type also has well-formed requirements (\fig{fig:wffunctions} in Appendix), which disallows nesting checked or unchecked pointers inside tainted pointers.
+Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 \aravind{The syntax of well-formed requirements for functions is incorrect. It looks like the forall qualifier is missing.}
+
 
 %The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
 %There are two type notions in \lang.  Types $\tau$ classify
@@ -341,6 +348,7 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 %in \checkedc, so we omit them.
 
 \aravind{Why we have only function pointers in function call?}
+\aravind{Talk about the ret expression after adding it in the syntax.}
 
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
 %   POINTERS: Array and NT-array types have two relative bounds, whose structures
