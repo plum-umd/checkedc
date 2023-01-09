@@ -84,7 +84,7 @@ We need~\emph{an isolation mechanism to ensure that code executed as part of unc
 \fi
 % 
 This mechanism is called program partitioning~\cite{rul2009towards}.
-Existing mechanisms are not suitable as they are based on process isolation and have high overhead, and are data-centric~\emph{data-centric} (\sect{subsec:background:programpart}).
+Existing mechanisms are not suitable as they are based on process isolation and have high overhead, and are data-centric~\emph{data-centric} \lc{duplicate?}(\sect{subsec:background:programpart}).
 Furthermore, these techniques are hard to engineer to co-exist with~\checkedc.
 \liyi{why? Can we not say this? It seems that the whole reason people should care our work is we did it in \checkedc, but \checkedc itself is the selling product here.... }
 But in our case, we want a low-overhead code-centric partitioning, where the unchecked code (or functions) should be isolated (or partitioned) from checked code. We also want the technique to co-exist and be compatible with Checked C guarantees such that the partition containing checked code should still enjoy its spatial safety.
@@ -100,6 +100,7 @@ However, our type-system disallows any unsafe interactions between taint and unt
   For readers, the connection among checked, tainted and unchecked seems weak.
   % 
 } 
+\lc{it's  a little bit hard to follow. it talks about tainted -> checked -> unsafe interactions but doesn't explain how these are related}
 % 
 % Specifically, in our system,~\systemname, extending CheckedC,
 % functions and pointers that need to be isolated from the original program can be
@@ -107,7 +108,7 @@ However, our type-system disallows any unsafe interactions between taint and unt
 % 
 
 % 
-The developer starts by marking desired (\ie unchecked) functions and pointers used in these functions as tainted.
+The developer starts by marking desired (\ie unchecked) functions and pointers used in these functions as tainted. \lc{what's "these functions" in "used in these functions as tainted"? (and "Second" seems wired here)}
 Second,~\systemname partitions the given program into two partitions (\umode and~\cmode regions)  of different \mzu{privileges}:
 % 
 \mz{need a bit more description (4-5 words) before introducing the word
@@ -128,7 +129,7 @@ The functions in~\cregion can invoke any function in~\ucregion and access all it
   If not, ``This partition contains the remaining (untainted) code and data and
   has complete access to~\cmode region.'' creates a sense of recursive
   definition of \cregion.
-}
+}\lc{<- same question, maybe giving an abstract example?}
 % 
 
 % 
@@ -397,3 +398,4 @@ Our compiler avoids these attacks by ensuring, either statically or through dyna
 %\caption{Simple server example.}
 %\label{lst:comb}
 %\end{listing*}
+

@@ -121,8 +121,8 @@ manually.
 \subsection{No Safety Against Unchecked Code}
 \label{subsec:nosafetyagsintuncheckedcode}
 The spatial safety guarantee~\checkedc provides applies to completely converted programs,~\ie programs that uses only checked types.
-Although, the backward compatibility of~\checkedc helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (\ie checked or safe regions).
-The unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+Although,\lc{why use "Although" here? seems like this is not an opposite/new idea} the backward compatibility of~\checkedc helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (\ie checked or safe regions).
+The unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}. \lc{I'm confused, does the partially checked program "enjoy spatial memory safety" or not?}
 Although the blameless proof exists~\cite{ruef2019achieving, li22checkedc} for~\checkedc, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
 Consider the following example:
 \begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
@@ -741,3 +741,4 @@ contains any checked pointers\mzs{, as well as no output is of a checked type}.
 % Second, in formalizing the \checkedc language, we investigate the balance between program execution efficiency and user practicality. We re-investigate the \checkedc type system with subtyping relations to make it more efficient and user-friendly.
 % Second, we also develop random testing tools in Redex \cite{pltredex} to test the \checkedc compiler and make sure it is properly developed. We are able to find and reproduce many bugs/faults in the \checkedc compiler \liyi{numbers?}. The random testing tool is able to generate tens of thousands of programs to properly validate the \checkedc compiler. Third, we also spent a great amount of work in developing experiments to compare \checkedc and other existing C-like languages that guarantee the spatial safety and eliminating undefined behaviors. We found that \checkedc keeps the best balance between execution efficiency and user practicality.
 % }
+
