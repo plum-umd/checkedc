@@ -477,7 +477,10 @@ and the substitution results are equal.
 \aravind{For the above paragraph, give concrete example, For example: array is a subtype of ptr, etc}
 
 
+The type checker rules are designed such that any well-typed (\ie follows all the rules) is isolated by sandboxed code. We present the corresponding formal proof in~\apdx{}.
 
+One of the important type cheker rules is disallowing unsafe interactions between tainted and untainted (c/u) pointers.
+\aravind{Explain about the LET rule}
 \aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
