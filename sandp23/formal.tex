@@ -217,7 +217,7 @@ These requirements \mzs{add additional restrictions for type creation and restri
   array of checked pointers.
   % 
   Syntactically valid, this type is however \emph{illegal} in~\lang{} and
-  rejected by the well-formedness requirement. 
+  is rejected by the well-formedness requirement. 
 }
 % 
 \mz{Made some changes to shift the emphasis in hope of improving clearness.}
@@ -227,7 +227,7 @@ However, we can have a checked array whose elements are tainted pointers\mzs{,}\
 
 % 
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
-where $\overline{x}$ represents a list of \tint{} type variables that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
+where $\overline{x}$ represents a list of \tint{} type variables that bind \mzu{bound}\mz{free?} variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
 \[\hspace*{-0.5em}
 \begin{array}{l}
