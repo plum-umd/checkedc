@@ -289,36 +289,48 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 %be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 %$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 \subsubsection{Expressions ($e$)}
-\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)($n\!:\!\tau$), pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.)
+\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)
+\mzu{($n\!:\!\tau$)}\mz{what's this?}, pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}}, the \texttt{strlen} operation ($\estrlen{x}$),
 memory allocation ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
 For instance, a dynamic bounds cast expression
-
-\noindent
-{\footnotesize
-\code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
-}
+\begin{center}
+  {\footnotesize
+    \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,
+      count(}$n$\code{))} }
+\end{center}
 becomes 
-{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}
-. 
+{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}. 
+% 
 
-We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
+% 
+\mzu{We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.}
+\mz{This sentence is unclear. I suppose that you mean an integer literal
+  can be both of interger type and pointer type depending on the context.  }
 For instance, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer.
 The~\code{strlen} expression plays an important role in the type-checking of null-terminated arrays.
-For simplifying type checking, we assume~\code{strlen} to operate on variables $x$ rather than arbitrary expressions.
+For simplifying type checking, we assume~\code{strlen} to operate on variables \mzs{$x$} rather than arbitrary expressions.
+% 
 The heap allocation expression $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions (\cregion or \ucregion).
 We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-The $\echeckedtext$ and $\euncheckedtext$ expressions are used to represent the corresponding code regions.
+The $\echeckedtext$ and $\euncheckedtext$ expressions are used to
+\mzs{represent the corresponding} \mzr{delimit} code regions.
 To guarantee the non-exposure property, we extend the base syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$.
-Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.
+\mzu{Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.}
+\mz{Is this sentence grammatical?}
+% 
 
-\lang aims to be simple enough to work with but powerful enough to
+% 
+\lang{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example, mutable local
-variables can be encoded as immutable locals that point to the heap;
-the use of \code{&} can be simulated with \code{malloc};
+  variables can be encoded as immutable locals that point to the heap;
+\mzu{the use of \code{&} can be simulated with \code{malloc};}
+\mz{This doesn't make sense if you use \code{&} to create alias. You don't want
+  to allocate memory.}
+% 
 and loops can be encoded as recursive function calls. \code{struct}s are
 not included in~\fig{fig:checkc-syn} for space reasons, but they are
 supported as shown in~\apdx{appx:struct}.
@@ -456,6 +468,9 @@ $
 \label{sec:typechecking}
 Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
 A few selected type rules are presented in~\fig{fig:type-system-1}.
+% 
+\mz{Move the figure here.}
+% 
 The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
 
 Each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
@@ -550,6 +565,16 @@ and $\heapup{m}{n}{\evalue{n'}{\tau}}$
 to update location $n$ with the value $\evalue{n'}{\tau}$ in the $m$ heap.
 It is worth noting that \systemname is not a fat-pointer system;
 thus, in every heap update, the value type annotation remains the same through program executions.
+% 
+\mz{Does a ``non-fat pointer'' system cause the type preservation of heap
+  values?
+  % 
+  The story seems to be that you design the system in a certain way s.t. heap
+  value types are unchanged, which allows you to erase the type.
+  % 
+  And, from the type erasure property, we know that we don't need fat pointers.
+}
+% 
 Additionally, for both stack and heap, 
 we ensure $\fv(\tau)=\emptyset$ for all the value type annotations $\tau$.
 
@@ -561,13 +586,17 @@ mutable heap.
 As mentioned, value $\evalue{0}{\tau}$
 represents a $\enull$ pointer when $\tau$ is a pointer type.
 Correspondingly, $\heap(m,0)$ should always be undefined.
-The relation steps to a \emph{result} $r$,
-which is either an expression or a $\enull$ or $\ebounds$ failure,
-represent a null-pointer dereference or out-of-bounds access,
-respectively. Such failures are a \emph{good} outcome; stuck states
+% 
+The relation steps to a \emph{result} $r$, which is \mzs{either} \mzr{one of} an
+expression, a $\enull$ or $\ebounds$ failure, represent \mzr{an expression right
+  after the reduction}, a null-pointer dereference or out-of-bounds access,
+respectively.
+% 
+Such failures are a \emph{good} outcome; stuck states
 (non-value expressions that cannot transition to a result $r$)
 characterizing undefined behavior.
 %
+% 
 The context mode $m$ (in $\longrightarrow_{m}$) indicates whether the
 stepped redex within $e$ was in a $\cmode$ or $\umode$ region.
 
@@ -920,10 +949,18 @@ Otherwise, it violates the non-exposure safety.
 For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
 if any argument for \code{handle_request} is a checked pointer, 
 it means that we are exposing a checked pointer address to unsafe regions.
-A $\echeckedtext$ or $\euncheckedtext$ block represents 
-the context switching from a checked to an checked region, or vice versa.
-We need to make sure no checked pointers are information exposed to unsafe code regions.
+% 
+\mzu{A $\echeckedtext$ or $\euncheckedtext$ block represents 
+  the context switching from a checked to an checked region, or vice versa.
+}
+% 
+\mz{An action + checked/unchecked block represents the switching.}
+% 
+We need to make sure no checked pointers are \mzs{information} exposed to unsafe code regions.
 as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
+% 
+\mz{This paragraph is not that cohesive.}
+% 
 
 \myparagraph{Let Bindings and Dependent Function Pointers}
 %
