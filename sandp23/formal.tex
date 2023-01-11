@@ -496,7 +496,34 @@ The type checker rules are designed such that any well-typed (\ie follows all th
 
 One of the important type cheker rules is disallowing unsafe interactions between tainted and untainted (c/u) pointers.
 \aravind{Explain about the LET rule}
+
 \aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
+
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+a -> checked pointer
+b -> Tainted pointer
+c -> Unchecked pointer.
+
+_Ptr<int> a;
+_t_Ptr<int> b;
+int *c;
+
+a = b; // Not allowed.
+b = a; // Not allowed.
+\end{minted}
+
+
+The \textsc{T-CastPtr} rule in \Cref{fig:type-system-1}
+permits casting from an expression of type $\tau'$ to a checked pointer when
+$\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
+$\sqsubseteq$ is built on the type equality ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). 
+The rule  ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
+\tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
+pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
+
+\aravind{Explain this with .}
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 a -> checked pointer
