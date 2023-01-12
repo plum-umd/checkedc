@@ -496,6 +496,24 @@ The type checker rules are designed such that any well-typed (\ie follows all th
 
 One of the important type cheker rules is disallowing unsafe interactions between tainted and untainted (c/u) pointers.
 \aravind{Explain about the LET rule}
+%
+Rules \textsc{T-Let} and \textsc{T-LetInt} in in \Cref{fig:type-system-1} type a $\elettext$ expression, which also admits
+type dependency. 
+In particular, the result of evaluating a $\elettext$ expression
+may have a type that refers to one of its bound variables (e.g., if
+the result is a checked pointer with a variable-defined bound). 
+If so, we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). 
+Note that we restrict the expression $e_1$ to syntactically match the
+structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
+Rule \textsc{T-RetInt} types a $\erettext$ expression when $x$ is of type $\tint$.
+$\erettext$ does not appear in source programs but is introduced by the semantics when
+evaluating a let binding (rule \textsc{S-Let} in
+Fig.~\ref{fig:semantics}). 
+%\liyi{why? }
+% After the evaluation of a let binding a variable $x$ concludes,
+%we need to restore any prior binding of $x$, which is either
+%$\bot$ (meaning that there is no $x$ originally) or some value
+%$\evalue{n}{\tau}$.
 
 \aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
 
@@ -523,7 +541,7 @@ pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
 Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
 if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
 
-\aravind{Explain this with .}
+\aravind{Explain how the cast rule allows/prevents the casts.}
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 a -> checked pointer
@@ -541,7 +559,107 @@ a = (_Ptr<int>)c; // This is okay.
 a = (_Ptr<int>)b; // Not allowed.
 \end{minted}
 
-\subsection{Semantics and Typing}\label{sec:semantics}
+\myparagraph{Constant Validity}
+Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
+describe type assumptions for constants appearing in a program.
+$\neg \cmode(\tau)$ judges that a constant pointer 
+in an unchecked region cannot be of a checked type.
+The restriction ensures that programmers 
+cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+In rule \textsc{T-ConstC}, we requires a static 
+verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
+
+The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
+validates the constant $\evalue{n}{\tau}$, 
+where $\heap(m)$ is the initial heap that the constant resides on and
+$\sigma$ is a set of constant assumed to be checked.
+A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
+A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
+and the address stores a function with the right type.
+The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
+where every element in the pointer range ($[0,\size(\omega))$) should be well
+typed.
+A checked pointer checks validity in type step as rule \textsc{T-ConstC},
+while a tainted/unchecked pointer does not check for such during the type checking.
+Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
+
+\myparagraph{Unchecked and Checked Blocks}
+%
+During the type checking,
+Both $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$
+check all free variables in $e$ are within $\overline{x}$;
+the types for $\overline{x}$ and the final return type $\tau$ of $e$ have no checked pointers.
+Otherwise, it violates the non-exposure safety.
+For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
+if any argument for \code{handle_request} is a checked pointer, 
+it means that we are exposing a checked pointer address to unsafe regions.
+% 
+\mzu{A $\echeckedtext$ or $\euncheckedtext$ block represents 
+  the context switching from a checked to an checked region, or vice versa.
+}
+% 
+\mz{An action + checked/unchecked block represents the switching.}
+% 
+We need to make sure no checked pointers are \mzs{information} exposed to unsafe code regions.
+as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
+% 
+\mz{This paragraph is not that cohesive.}
+% 
+
+\myparagraph{Dependent Function Pointers}
+Rule \textsc{T-Fun} in \Cref{fig:type-system-1} is the dependent function call rule. 
+Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
+from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
+we confirm that each of $\overline{\tau'}$ is
+a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$,
+which replaces possible integer bound variables $\overline{x}$ with bound expressions $\overline{e'}$.
+The final result type is the defined target type $\tau$ appearing in the function pointer type
+also with such replacement, written as $\tau[\overline{e'} / \overline{x}]$.
+Consider the \code{process_req2} function in
+Fig.~\ref{lst:final}; its parameter type for \code{msg} 
+depends on \code{m_1}. The \textsc{T-Fun} rule will substitute 
+\code{n} with the argument at a call-site.
+The semantics manages variable scopes using the special $\erettext$
+form. \textsc{S-Let} evaluates to a configuration whose expression is
+$\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
+and remember $x$ and its new value $\evalue{n}{\tau}$
+in $e$'s scope that is defined by the $\erettext$ operation.
+Every time when evaluation proceeds on $e$ (rule \textsc{S-RetCon}),
+we install the stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$ for the current scope.
+After one-step evaluation is completed, 
+we store $x$'s change in the result $\erettext$ operation $\ret{x}{\varphi'(x)}{e'})$,
+and restore $x$'s outer score value $\varphi(x)$ in $\varphi'$. 
+This procedure continues until $e'$ becomes a literal
+$n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
+the literal. 
+
+\textsc{S-FunC} and \textsc{S-FunT} are
+for $\cmode$ and $\tmode$ mode function pointers, respectively. 
+A call to a function pointer $n$ retrieves
+ the function definition in $n$'s location in the global function store $\Xi$,
+which maps function pointers to
+function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\xi,e)$, where
+$\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
+is the parameter list of variables and their types, 
+$\xi$ determines the mode of the function, and $e$ is the
+function body. 
+Similar to \heap, the global function store $\Xi$ is also partitioned into
+two parts ($\cmode$ and $\umode$ stores), each of which
+maps addresses (integer literals) to the function data described above.
+
+\systemname{} has dependent functions, whose semantic explaination is given in \Cref{appx:add-type-sem}.
+Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
+  annotations $\overline{\tau_a}$ with
+  $\overline{\tau}$ (after instantiation) from the function's
+  signature. Using $\overline{\tau_a}$ when executing the body of
+the function has no impact on the soundness of \lang, but will violate
+Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
+Rule \textsc{S-FunT} defines the tainted version of function call semantics.
+In such case, the verification process 
+$\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}$
+makes sure that the function in the global store is well-defined and has the right type.
+
+\subsection{Semantics}\label{sec:semantics}
 
 % The semantics
 % gives an independent account of spatial safety in \lang by
@@ -566,17 +684,18 @@ a = (_Ptr<int>)b; // Not allowed.
 % \mwh{Yes, it is modeled as 0, and the semantics checks for
 %   dereferences of 0. }
 
-Here, we discuss the \lang type system (\Cref{fig:type-system-1}) and operational semantics (\Cref{fig:semantics}); 
+Here, we discuss the \lang operational semantics (\Cref{fig:semantics}); 
 mainly focusing on the new changes on top of \checkedc in \cite{li22checkedc} with function pointers, modes, and function calls.
 The other type and semantic rules about (NT)-arrays are given in \cite{li22checkedc} and \Cref{sec:literal-pointer-typing}.
 
-The typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
-which states that in a type environment $\Gamma$ (mapping variables to
-their types) and a predicate environment $\Theta$ (mapping integer-typed
-variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
-in context mode $m$. Key rules for this judgment are given in
-Fig.~\ref{fig:type-system-1},
-while the operational semantics for \lang is defined as a small-step
+%The typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
+%which states that in a type environment $\Gamma$ (mapping variables to
+%their types) and a predicate environment $\Theta$ (mapping integer-typed
+%variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
+%in context mode $m$. Key rules for this judgment are given in
+%Fig.~\ref{fig:type-system-1},
+
+The operational semantics for \lang is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$.
  Here, $\varphi$ is a
@@ -841,6 +960,64 @@ $
 \end{figure*}
 \end{DIFnomarkup}
 
+\begin{DIFnomarkup}
+ \begin{figure}[t]
+ {\small
+
+ \begin{mathpar}
+   \inferrule
+       {}
+       {\Theta;\heap;\sigma \vdash_m n : \tint}
+
+   \inferrule
+       {}
+       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\xi}}
+
+   \inferrule
+       {(m = \cmode \Rightarrow \xi \neq \cmode) \\\\ (m=\umode \Rightarrow \xi = \umode)}
+       {\Theta;\heap;\sigma \vdash_{\cmode} n : \tptr{\omega}{\tmode}}
+  
+   \inferrule
+       {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+
+
+   \inferrule
+       {\tptr{\omega'}{\xi'} \sqsubseteq_{\Theta} \tptr{\omega}{\xi} 
+            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\xi'}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+
+   \inferrule
+       { \xi \le m 
+     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\xi,e)
+       \\  \overline{x} = \{x|(x:\tint) \in (\overline{x'}:\overline{\tau}) \}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\xi}}
+  
+   \inferrule
+       {\neg\funptr(\omega)\\ \xi \le m\\
+        \forall i \in [0,\size(\omega)) \;.\;
+            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\xi})) \}\vdash_m \heap(m,n+i)}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+ \end{mathpar}
+ }
+{\footnotesize
+\[
+\begin{array}{l} 
+\funptr(\tfun{\overline{x}}{\overline{\tau}}{\tau}) = \texttt{true}
+\qquad
+\funptr(\omega) = \texttt{false}\;\;{[\emph{owise}]}
+\end{array}
+\]
+}
+ \caption{Verification/Type Rules for Constants}
+ \label{fig:const-type}
+ \end{figure}
+\end{DIFnomarkup}
+
+
+% SKIPPING THIS
+\iffalse
+
 \myparagraph{Type Equality and Subtyping and Casting}
 %
 In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
@@ -1077,6 +1254,7 @@ makes sure that the function in the global store is well-defined and has the rig
 
 % The last three rules in Fig.~\ref{fig:semantics} describe the semantic behaviors of an $\eiftext$ branching operation when the Boolean guard is a dereference of an NT-array pointer. The first one states that if the type upper bound of the pointer $x$ is $0$, and the pointer data value $n_a$ is not $0$, we can conclude that the upper bound is not the last position of the NT-array pointer, so we can then update $1$ in the upper bound while jump to the $\etrue$ branch. The second rule describes that we do not extend the upper bound if the upper-bound of the type of $x$ is not zero because we know that we are not in the NT-array's last position. The third rule describes the behavior of jumping to the $\efalse$ branch when the pointer content is $0$. In this case, we also do not need to increase the upper-bound of the type of $x$.}
 
+\fi
 \subsection{Compilation}\label{sec:compilation}
 
 As we have shown in \Cref{fig:overview}, the \systemname compiler utilizes the sandbox mechanism \cite{rul2009towards} and the \checkedc compiler \cite{li22checkedc} to compile programs. Here, we introduce how \systemname compiles a program into these two components.
