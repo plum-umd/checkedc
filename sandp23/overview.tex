@@ -60,9 +60,7 @@ We will present an overview of the~\systemname{} from a developer perspective an
 %Converting a C/checked-c program to \systemname is a two-step process that involves identifying unsafe/unchecked regions described in \Cref{subsec:identifyregionstosbx} followed by making the \systemname changes described in \Cref{subsec:moveregionstosbx}.  
 \subsection{Running Example}
 \label{subsec:identifyregionstosbx}
-Here,
-we use the example of a simple network server in~\lst{lst:comb} to explain changes required by the \systemname compiler.
-The~\lst{lst:comb} shows the C code of the redacted version of a simple network server with~\code{server_loop} as its entry point (\entrypoint).
+to explain changes required by the \systemname compiler.The~\lst{lst:comb} shows the C code of the redacted version of a simple network server with~\code{server_loop} as its entry point (\entrypoint).
 The server runs in a loop and calls~\code{handle_request}, which handles each network request.
 The function~\code{handle_request} reads data from the socket through~\code{read_msg} and based on the first byte, either~\code{process_req1} or~\code{process_req2} will be called to handle the request.
 

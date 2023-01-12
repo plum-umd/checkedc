@@ -1,3 +1,70 @@
+\section{\systemname Implementation} \label{sec:implementation}
+\subsection{Overview}
+\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
+\subsection{\systemname Function Qualifiers}
+\systemname function qualifiers are introduced with a purpose of semantic policing to allow the developer to perform dependency-resolved program partitioning into checked and unchecked regions from within the checked sources. Each of the newly introduced qualifiers "\_Tainted", "\_Mirror", "\_TLIB" and "\_Callback" enforce different semantic-ruling at compile time to allow "unchecked" and "checked" functions to communicate and access global data in a region-exclusive manner. Although checked functions are allowed to call and access "unchecked" data within the checked region, "unchecked" region can only access checked data through a specialized callback mechanism. Each of these function qualifiers differently control casting, caller, callee and data-access rules within its qualifier-scope. For example, \_TLIB qualifier allows tainted pointer parameters to be cast to non-tainted pointer arguments at the call-site of a qualified function with developer's discretion that the qualified function does not leak tainted addresses. This type-checker relaxation is granted to enable developer to avoid marshalling costs when passing tainted pointers to external library functions.     
+
+\subsection{CheckMate S2S transformation}
+\subsubsection{\textbf{Need for Callback}}
+Here, we use the example of a simple \systemname annotated string authentication program snippet in ~\lst{lst:callbackBefore} with~\code{StringProc} as its entry point (\entrypoint). ~\code{StringProc} was found to internally perform a lot of unsafe string parsing and manipulation on the user input and thereby has been marked \_Tainted. However, ~\code{StringProc} internally calls ~\code{StringAuth} that performs final authentication on user input by referencing classified global checked data. In interests of maintaining confidentiality of global checked data from the unchecked region whilst satisfying this control and data dependency, ~\code{StringAuth} has been qualified as a \_Callback, thereby bestowing it with WASM Sandbox's addition sanity checks at its call-sites within the unchecked region.
+
+\subsubsection{\textbf{CheckMate S2S transformation on Checked Sources}}
+\myparagraph{WebAssembly Sandbox:}
+Unchecked region implemented as a WebAssembly sandbox requires registering ~\code{StringAuth} with its expected WebAssembly callee signature as a requirement to safeguard the control-flow between the two regions.
+Within the WebAssembly sandbox, all functions are defined with an extra sandbox pointer argument and all pointer members are unsigned integers. 
+
+\myparagraph{CheckMate Instrumentation: }
+Consequently, ~\code{StringAuth}'s corresponding call-site signature in the tainted region would be 
+\newline
+~\code{_T_StringAuth}, which is an indirected trampoline call to the actual callback function. CheckMate identifies ~\code{StringAuth} to be a \_Callback qualified callee and correspondingly generates callback trampoline ~\code{StringAuth} and callback registration code 
+\newline
+~\code{registerCallback_StringAuth} within the checked region as show in ~\lst{lst:callbackAfter}. 
+~\code{registerCallback_StringAuth} registers the WebAssembly-specific callback function ~\code{_T_StringAuth} by calling ~\code{\_SBXREG\_} with callback-specific argument count and argument signature. 
+CheckMate replaces \_Tainted qualified ~\code{StringProc}'s definition with an indirect call to sandbox specific implementation ~\code{w2c_StringProc}. The \_Mirror qualifier is used mark a function in checked region as a local to both the checked and the unchecked regions. Consequently, CheckMate does not modify \_Mirror qualified ~\code{isStringMatching} and simply duplicates this function in the unchecked region.
+
+\subsubsection{\textbf{CheckMate S2S generation of Tainted Sources}}
+Implementing \systemname's unchecked region as a WebAssembly sandbox requires compiling unchecked functions and unchecked variables checked-region-exclusively with a sandbox-specific compiler (WebAssembly). Consequently, CheckMate copies each of the \_Mirror and \_Tainted qualified function definitions to a new source file and runs an OCAML parser to convert \systemname code to generic-C as shown in ~\lst{lst:callbackAfterTainted} which shows the CheckMate generated code for ~\code{StringProc}.
+After running CheckMate, each of newly generated tainted sources can be compiled to an "unchecked" static library using a sandbox-specific compiler.
+CheckMate's OCAML parser also modifies each of the tainted STDLIB functions from ~\code{t_strncpy} under ~\lst{lst:callbackBefore} to ~\code{strncpy} under ~\lst{lst:callbackAfterTainted}
+
+\begin{listing}
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_before_checkmate.c}
+\caption{Callback Annotations before running CheckMate}
+\label{lst:callbackBefore}
+\end{listing}
+\begin{listing}[t!]
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate.c}
+\caption{CheckMate generated Callback Annotations in Checked Sources }
+\label{lst:callbackAfter}
+\end{listing}
+\begin{listing}[t!]
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate_tainted.c}
+\caption{CheckMate generated Unchecked Sources }
+\label{lst:callbackAfterTainted}
+\end{listing}
+
+\subsection{\systemname Dynamic Instrumentation}
+\systemname compiler is implemented to be sandbox-agnostic and differs in inserted instrumentation based on the sandbox type specified by a compiler flag. However, the scope of this paper restricts discussion to the 32-Bit WebAssembly sandbox wherein which pointers are represented as 4-Byte offsets from a base sandbox heap. Similar analogy has been applied in \systemname for WebAssembly wherein all tainted pointers in the checked region store zero-extended offsets, that upon access, are transformed to full addresses by the function \ref{O2P}.   
+\subsubsection{\textbf{Overview}}
+\systemname compiler inserts run-time instrumentation on every access to a tainted pointer to assert pointer taintedness and to generate dereferencible address from the pointer offset. Pointer taintedness is an invariant that prevents checked memory addresses from leaking into the tainted region by establishing the tainted pointer to only point into the Sandbox memory.
+Since WebAssembly sandbox is implemented in 32-Bit, specialized struct type is created and instrumentation is inserted by the \systemname compiler at every pointer access to account for pointer-swizzling across different pointer representations.
+
+\subsubsection{\textbf{Pointer-swizzling}}
+WebAssmebly implementation of \systemname motivates Tainted pointers in checked region to implemented as a zero-extended 32-bit offset into the Sandbox. Every access to the tainted pointer calls for a pointer generation mechanism that generates a fully de-referencible pointer address as    
+shown by the equation\ref{O2P}.
+
+Since \systemname does not require qualified functions to mandatorily execute in the unchecked region, tainted pointers may never have to cross into the sandbox. In such cases, we need not swizzle and the tainted pointers are implemented as 64-Bit pointers that contain zero extended 4-Byte pointer offsets into the Sandbox memory.
+However, Need for swizzling emerges when indexing into multi-level tainted pointers or tainted pointers to structures that are passed into the sandbox region. “\_Decoy” is a pointer variable qualifier that informs the compiler to enforce 64-Bit to 32-bit pointer swizzling throughout the qualified variable's lifetime in the checked region. 
+Pointer-Swizzling is implemented in Clang-CodeGen as a modified GEP-instruction that considers \_Decoy when generating swizzled addresses causing \_Decoy qualified variables to be accessed as 32-bit pointers in the checked region.
+\begin{equation}
+  \_T\_ptr\_ADDR = \_T\_ptr\_OFFSET + SBX\_HEAP\_BASE
+\label{O2P}
+\end{equation}
+
+\subsubsection{\textbf{Tainted Structures}}
+Tainted Pointers to structures crossing into the sandbox are expected to only allow encapsulation of pointer members that are of the tainted type. Consequently, Tstructs have been introduced as a specialized struct type that enforces compile-time semantics to allow prevent its pointer members from being of non-tainted type. \systemname also restricts tainted pointers to only point to structures of Tstruct type. These semantic restrictions of Tstructs are put in place to prevent checked pointer from leaking into the unchecked regions as members of pointer structures. Tstruct variables follow the conventional layout unless qualified as a \_Decoy variable, in which case, the Tstruct's pointer member accesses follow a 32-Bit layout. 
+
+
 \section{Evaluation}\label{sec:evaluation}
 
 % \review{While I found the idea behind section V very interesting, the current version
@@ -17,103 +84,105 @@
 %   methodology to derive such rules? Are these rules the same as the "admissible
 %   but redundant typing rules" from above?}
 % \liyi{Deena? Leo? }
-Our evaluation of \systemname consists of a series of tests that can be categorized into Micro-benchmarks and Program Benchmarks.
+Our evaluation of \systemname consists of a series of tests that can be categorized into Micro-benchmarks and Program Benchmarks with the use of WebAssembly Sandbox. Consequently, all further references to sandbox refer to unchecked code in the WebAssembly Sandbox. 
 MicroBenchmarking involves evaluating performance on fundamental operations involving tainted pointers, context switching between checked and sandboxed regions, and sandboxed execution of functions.
 We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
 
+\subsection{Program Run-time Benchmarks}
+\begin{figure*}[t]
+\includegraphics[width=1.0\linewidth]{images/program_runtime_benchmark.png}
+\caption{Run-time benchmarking of ~\systemname.}
+\label{fig:runtime}
+\end{figure*}
+
 \myparagraph{Benchmarking Methodology}
-We use C's~\code{<time.h>} library to evaluate the Runtime performance by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs). Our timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. We use Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, we record Peak Memory usage as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLib functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandboxed allocations which happen in the shadow memory. 
+\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. However, the scope of \systemname changes made on each of the programs is varied and the converted programs themselves are relatively tiny. Since each of the program is evaluated on a pre-included test-suite that runs on a single instance of the program, sandbox creation cost is a one-time constant due to \systemname implementing RLBOX's \cite{rlbox-paper} WebAssembly sandbox creation API. Run-time performance is evaluated with C's~\code{<time.h>} library by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs) and measuring latency delta as a percentage. Timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. Memory overhead is measured with Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, Peak Memory is recorded as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLIB functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandbox's Heap allocations which are linearly proportional to sandboxed code and tainted pointers.  
 All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of RAM, running Ubuntu 20.04.3 LTS and the benchmarks for every test were sampled as the mean of ten consecutive iterations.
 
 \subsection{Micro-Benchmarks}
-\subsubsection{Memory Access in SBX}
-Memory access performance between the checked and the WASM region involves crafting a test case that involves a simple pointer arithmetic operation enclosed in a loop of 100k iterations. 156.6\% overhead with \systemname is caused by the code executing in WASM Sandbox which is comparatively inefficient as WASM compiler toolchain does not support code optimization like LLVM/GCC. 
 
-\subsubsection{Indirect-Call}
-This test involves evaluating the overhead involved in making indirect calls and is recorded by benchmarking the time taken for a sandboxed Callee (call from the checked region into the SBX) to return. This metric is evaluated against the time taken for a checked Callee (call within local scope) to return. Observed overhead is once again a consequence of code executing in the WASM Sandbox and call indirection.
+\begin{figure}[h!]
+\includegraphics[width=1.0\linewidth]{images/microbenchmark.png}
+\caption{\systemname Micro-Benchmarks}
+\label{fig:microbenchmarks}
+\end{figure}
 
-\subsubsection{Pointer Access}
-Run-time Pointer overhead is evaluated by benchmarking a test that involves 100k read/write/arithmetic operations on the pointer. 34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
+Figure \ref{fig:microbenchmarks} shows calls to the sandbox and sandboxed code execution to have significantly higher overhead in comparison to that of Tainted pointers. This observation suggests for sandboxing less performance intensive code and reducing the indirect calls between the two regions. Consequently, unsafe regions of code can be annotated cost-effectively by choosing to annotate the unsafe pointer references within the demarked unsafe function as tainted at the cost of losing out on the Sandbox's safety features. 
 
-\begin{center}
-\label{fig:micrbenchmarks}
-\begin{tabular}{||c c||} 
- \hline
- Test-Name & \systemname overhead \\ [0.5ex] 
- \hline\hline
- Memory Access in SBX & +156\% \\
- Indirect-Call & +398\% \\ 
- Pointer Access & +34.16\% \\ [1ex]
- \hline 
-\end{tabular}
-\end{center}
+\subsubsection{\textbf{Memory Access in SBX}}
+Memory access performance between the checked and the WASM region involves crafting a test case that involves a simple pointer arithmetic operation enclosed in a loop of 100k iterations. 
 
-\subsection{Program Run-time Benchmarks}
+\myparagraph{Results}
+156.6\% overhead as shown in Figure \ref{fig:microbenchmarks} is caused by the code executing in WASM Sandbox which is comparatively inefficient as WASM compiler toolchain does not support code optimization like LLVM/GCC. 
+
+
+\subsubsection{\textbf{Indirect-Calls}}
+This test involves evaluating the overhead involved in making indirect calls and is recorded by benchmarking the time taken for a sandboxed Callee (call from the checked region into the SBX) to return. This metric is evaluated against the time taken for a checked Callee (call within local scope) to return.
+
+\myparagraph{Result}
+Observed overhead is a consequence of control transfer overhead between the checked and unchecked region as mentioned in \cite{rlbox-paper}
+
+\subsubsection{\textbf{Pointer Accesses}}
+Run-time Pointer overhead is evaluated by benchmarking a test that involves 100k read/write/arithmetic operations on the pointer.
+
+\myparagraph{Result}
+34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
+\myparagraph{Result:}
+Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
+\begin{figure*}[t]
+\includegraphics[width=1.0\linewidth]{images/program_memory_benchmark.png}
+\caption{Memory benchmarking of ~\systemname.}
+\label{fig:memory}
+\end{figure*}
+
+
+\begin{table*}[htb]
+  \centering
+  \begin{tabular}{|p{2.6 cm }|p{1.6 cm}|p{1.9cm}|p{1.7cm}|p{2cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}
+    \hline
+    \textbf{Task} & \textbf{ProFTPD} & \textbf{MicroHTTPD} & \textbf{UFTPD} & \textbf{LibPNG} & \textbf{Tiny Bignum} & \textbf{parsons (wasm)} & \textbf{parsons (tainted) }\\
+    \hline
+     \textbf{Pointers Annotated} & 6 & 139 & 146 & 248 & 69 & 364 & 378 \\
+     \textbf{Lines Sandboxed} & 0 & 650 & 90 & 0 & 30 & 800 & 0  \\
+     \textbf{CVEs fixed} & CVE-2010-4221 & CVE-2013-7039 & CVE-2020-14149, CVE-2020-5204 & CVE-2018-144550 & - & - & -  \\
+     \textbf{Time To Port} & 1 Day & 2 Days & 2 Days & 3 Days & 4 Hours & 1 Day & 2 Days \\
+    \hline
+  \end{tabular}
+  \caption{Conversion Efforts}
+\end{table*}
+
+
+\subsection{Program Benchmarks}
 \myparagraph{Overview}
-We evaluate \systemname on the basis of conversion efforts and performance on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Conversion style and extent qualitatively dictate the converted program's conversion efforts required and the run-time performance. Consequently, each of the conversions for the six programs follows a varied approach. 
+We evaluate \systemname on the basis of conversion efforts and performance on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Consequently, each of the conversions for the six programs follows a varied approach. 
 
-\myparagraph{Parsons}
-Parsons is annotated comprehensively in two variants parsons\_wasm and parsons\_tainted. parsons\_wasm has most of its input parsing functions moved into the sandbox, whilst having all its pointers marked as tainted. These sandboxed functions interact with the checked region by making indirect calls through RLBOX's callback mechanism. However, with parsons\_tainted, we do not move any of the functions to the sandbox but still mark all the pointers as tainted. The test suite itself consists of 328 tests comprehensively testing the JSON parser's functionality. Benchmarks for both of these forks are recorded using the mean difference between the \systemname and generic-C/checked-C variants when executing 10 consecutive iterations of the test suite. parsons\_wasm expectedly shows 200/266\% runtime overhead when evaluated against checked-c and generic-c respectively due to the performance limitation of WebAssembly. However, evaluating parsons\_tainted against checked-c shows \systemname to be faster because \systemname by itself performs lighter run-time-instrumentation on tainted pointers as compared to the run-time bounds checking performed on checked pointers by checked-c. Furthermore, we only see an average peak memory of 9.5 KiB as compared to the anticipated 82 KiB overhead as Valgrind does not consider the WASM Shadow memory allocated to the tainted pointers.
+\myparagraph{Observations}
+Our evaluation of \systemname on six programs yields the following results inferred from Figure ~\ref{fig:runtime} and Figure ~\ref{fig:memory}:
+\begin{itemize}
+  \item Run-time Overhead is proportional to the extent of 
+annotated pointers and sandboxed code.
+  \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
+  \item Marshalling data might sometimes be cost-effective instead of propagating the taintedness of a pointer
+  \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
+  \item Conversion style and extent qualitatively dictate the converted program's conversion efforts and is modest at a couple of days. 
+\end{itemize}
 
-\myparagraph{LibPNG}
-\systemname changes for libPNG is narrow in scope and begins with the encapsulation CVE-2018-144550 and a buffer overflow in compare\_read(). However, we also annotate sections of Lib-png that involve reading, writing, and image processing (interlace, intrapixel, etc) on user-input image data as tainted. That is, rows of image bytes are read into tainted pointers and the taintedness for the row\_bytes is propagated throughout the program. All our changes extend to the png2pnm and pnm2png executables. To evaluate png2pnm, we take the mean of 10 iterations of a test script that runs png2pnm on 52 png files located within the libpng's pngsuite. To test pnm2png, we take the mean of 10 iterations of pnm2png in converting a 52MB 5184x3456 pixels large pnm image file to png. Valgrind's reported lower Heap space consumption for \systemname converted code is due to the discounted space consumed on the heap by the Sandbox's shadow memory. Consequently, when evaluating pnm2png, \systemname's heap consumption was 52 MB lower as the entire image was loaded onto the shadow memory.  
+\subsubsection{\textbf{ProFTPD}}
+\systemname changes for ProFTPD were limited in extent and aimed at the exact changes required to encapsulate CVE-2010-4221. We mark the user input to the unsafe function "pr\_netio\_telnet\_gets()" as tainted (\_TPtr<char>) and propagate its tainted-ness to its callers and callees enclosed within its defined scope.
 
-\myparagraph{ProFTPD}
-\systemname changes for ProFTPD are further limited in extent and aimed at the exact changes required to encapsulate CVE-2010-4221. We mark the user input to the unsafe function "pr\_netio\_telnet\_gets()" as tainted (\_TPtr<char>) and propagate its tainted-ness to its callers and callees enclosed within its defined scope. Our changes for the above function were policed by 24 unique API tests, which we use to benchmark the performance. For each test, our benchmark samples the delta between the call and return time of pr\_netio\_telnet\_gets(). This sampling is repeated 10 times and its mean value is reflected in the below table. Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
+\myparagraph{Testbench:}
+Our changes for the above function were policed by 24 unique API tests, which we use to benchmark the performance. For each test, our benchmark samples the delta between the call and return time of pr\_netio\_telnet\_gets(). This sampling is repeated 10 times and its mean value is reflected in the below table.
 
-\myparagraph{MicroHTTPD}
-MicroHTTPD demonstrates the practical difficulties in converting a program to \systemname. Our conversion for this program was aimed at sandboxing memory vulnerabilities CVE-2021-3466 and CVE-2013-7039. CVE-2021-3466 is described as a vulnerability from a buffer overflow that occurs in an unguarded "memcpy" which copies data into a structure pointer (struct MHD\_PostProcessor pp) which is type-casted to a char buffer (char *kbuf = (char *) \&pp[1]). Our changes would require making the "memcpy" safe by marking this pointer as tainted. However, this would either require marshaling the data pointed by this structure (and its sub-structure pointer members) pointer or would require marking every reference to this structure pointer as tainted, which in turn requires every pointer member of this structure to be tainted. Marshalling data between structure pointers is not easy and demands substantial marshaling code due to the spatial non-linearity of its pointer members unlike a char*. This did not align with our conversion goals which were aimed at making minimal changes. Consequently, the above CVE stands un-handled by \systemname.  Our changes for CVE-2013-7039 involve marking the user input data arguments of this function as tainted pointers and in the interests of seeking minimal conversion changes, we do not propagate the tainted-ness on these functions. Following up on the chronological impossibility of sandboxing bugs before they are discovered and the general programmer intuiting, we moved many of the core internal functions (like MHD\_str\_pct\_decode\_strict\_() and MHD\_http\_unescape()) into the sandbox. 
+\subsubsection{\textbf{UFTPD}}
+\systemname changes for UFTPD were aimed at sandboxing CVE-2020-14149 and CVE-2020-5204. CVE-2020-14149 was recorded as a NULL pointer dereference in the handle\_CWD() which could have led to a DoS in versions before 2.12, thereby, requiring us to sandbox this function. CVE-2020-5204 was recorded as a buffer overflow vulnerability in the handle\_PORT() due to sprintf() which also required us to sandbox this function. Although we could have chosen to only mark the faulty pointers as tainted, we intended to keep our changes more generic.
 
-\myparagraph{UFTPD}
-\systemname changes for UFTPD were aimed at sandboxing CVE-2020-14149 and CVE-2020-5204. CVE-2020-14149 was recorded as a NULL pointer dereference in the handle\_CWD() which could have led to a DoS in versions before 2.12, thereby, requiring us to sandbox this function. CVE-2020-5204 was recorded as a buffer overflow vulnerability in the handle\_PORT() due to sprintf() which also required us to sandbox this function. Although we could have chosen to only mark the faulty pointers as tainted, we intended to keep our changes more generic. For evaluation, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" request 10 times in a loop. Following this we record an entry for each of these tests as a mean of recorded timestamps for 10 executions for \systemname and generic-c versions, following which we record the relative average latency across the three tests between both of these UFTPD versions as a percentage in the below table.   
+\myparagraph{Testbench:}
+For evaluation, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" request 10 times in a loop. Following this we record an entry for each of these tests as a mean of recorded timestamps for 10 executions for \systemname and generic-c versions, following which we record the relative average latency across the three tests between both of these UFTPD versions as a percentage in the below table.   
 
-\myparagraph{Tiny-bignum}
-Due to its small size and simplicity, \systemname changes for Tiny-bignum was chosen to be comprehensive. Furthermore, bignum\_to\_string() was moved to the sandbox due to a memory-unsafe use of sprintf(). Given that significant \systemname conversion efforts is attributed to understanding the source-code and finding the precise extent to which we choose to propagate the taintedness or to stop and give up to marshalling the data between regions, Tiny-bignum only required 4 hours. The evaluation was performed on Tiny-bignum's test suite consisting of 4 Test cases, each of which test the functionality to scale on big numbers subject to all of the supported unary and binary operations.  
-
-\begin{center}
-\label{fig:prgrbenchmarks}
-\begin{tabular}{||c | p{1.3cm} | p{1.8cm}||} 
- \hline
- Program & Run-Time & Avg Peak Memory \\ [0.5ex] 
- \hline\hline
- ProFTPD & +47.8\% & +82.1 KiB  \\
- MicroHTTPD & +171.7\% & +24.7 KiB\\ 
- UFTPD & +2.7\% & +86.3 KiB \\ 
- Tiny-Bignum (vs checked-c) & -23.4\% &  +81.1 KiB \\
- Tiny-Bignum &  +121.7\% &  +81.1 KiB \\
- parsons\_wasm (vs checked-c) & +200.2\% & +9.8 KiB\\ 
- parsons\_tainted (vs checked-c) & -8.7\% & +9.2 KiB\\
- parsons\_wasm & +266.5\% & +9.8 KiB\\ 
- parsons\_tainted & +10.45\% & +9.2 KiB\\ 
- LibPNG (png2pnm) & +11.41\% & -102.5 KiB\\ 
- LibPNG (pnm2png) & +46.5\% & -51.6 MiB\\ [1ex]
- \hline 
-
-\end{tabular}
-\end{center}
+\myparagraph{Result:}
+Although, \systemname-UFTPD consists of modest changes in annotations and sandboxed code, observed overhead is significantly less at 10\% due to the less performance intensive sandboxed code and FTP-protocol overshadowed overhead from \systemname instrumentation and sandbox.     
 
 
-\begin{center}
-\begin{tabular}{||p{2 cm} | p{1.2cm} | p{1.2cm} | p{1.0cm} | p{1.0cm}||} 
- \hline
- Program & Pointers Annotated  & Lines Sandboxed & CVEs fixed & Time To Port \\ [0.5ex] 
- \hline\hline
- ProFTPD & 6 & 0 & - & 1 Day  \\
- \hline
- MicroHTTPD & 139 & 650 & 1 & 4 Days \\
- \hline
- UFTPD & 146 & 90 & 2 & 3 Days \\ 
- \hline
- LibPNG & 248 &  0 & 1 & 8 Days \\
- \hline
- Tiny-Bignum &  69 &  30 & - & 4 Hours \\
- \hline
- parsons\_wasm & 364 & 800 &  - & 3 Days \\ 
- \hline
- parsons\_tainted & 378 & 0 & - & 8 Days \\ [1ex]
- \hline 
-\end{tabular}
-\end{center}
 % 
 %\leo{The following is extremely
 %  weak. ``Most of them'', were there any that weren't? Which ones? For
