@@ -49,9 +49,8 @@
 
 \input{figures/overview}
 
-The~\Cref{fig:overview} shows the interaction between various components of~\systemname{}.
-Given an appropriately annotated source program and a sandbox configuration, our system creates an executable such that all tainted functions and data will reside in a sandbox and the~\cregion (non-sandboxed) region is not affected by the code in the sandbox.
-
+\Cref{fig:overview} shows the interaction between various components of~\systemname{}.
+Given an appropriately annotated source program and a sandbox configuration, our system creates an executable such that all tainted functions and data will reside in a sandbox and the~\cregion (non-sandboxed) is not affected by the code in the sandbox.
 We will present an overview of the~\systemname{} from a developer perspective and the details of individual components in the later sections.
 
 %\Cref{fig:overview} provides the compiler structure of \systemname. The \systemname type checker compiles a \systemname program by partitioning the different program regions, i.e., $c$ and $uc$ regions, as well as different pointers, i.e., checked, unchecked and tainted pointers. Any $uc$ region pointers are executed within a sandbox, while checked pointers are executed via the \checkedc compiler within the checked region.
@@ -68,8 +67,6 @@ The function~\code{handle_request} reads data from the socket through~\code{read
 As we can see, there is an arbitrary memory write vulnerability (indicated by~\realbug) in~\code{process_req1} because of using~\code{i} as an index into the array~\code{msg} without any sanity check.
 The variable~\code{i} can take any integer value as it is parsed from~\code{msg}, whose contents are read from socket in~\code{read_msg} indicated by~\rootcause.
 
-\liyi{The example looks good. But we are focusing on converting C to \checkedc here? }
-
 \myparagraph{Goal} 
 The developer's goal is to partition the code in~\lst{lst:comb} so that spatial memory vulnerabilities do not affect the overall program.
 Ideally, the developer must convert the entire code to Checked C so that the entire program achieves spatial memory safety.
@@ -77,9 +74,7 @@ However, Checked C has restrictions that can result in a considerable conversion
 For instance,~\code{void*} pointers are not directly supported by Checked C.
 Consequently, the developer needs to convert functions using~\code{void*} pointers into generic versions -- this could be tedious.
 To handle this, the developer can do a best-effort conversion and annotate only a few pointers~\eg by using an automated conversion tool such as~\threec{} which annotates few pointers as shown in~\lst{lst:initialconv}.
-However, as explained in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecked code can also affect the safety of checked pointers.
-
-\liyi{Can we just assume that programmers know \checkedc and will use \checkedc, and then we added tainted type? }
+However, as shown in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecked code can also affect the safety of checked pointers.
 
 \subsection{\systemname Annotations}
 \label{subsec:moveregionstosbx}
@@ -93,10 +88,12 @@ The resulting well-typed program as shown in~\lst{lst:final} will be passed to o
 \subsection{Partitioning}
 Our partitioner splits the provided program into two sets of source files with the necessary source changes required to communicate with sandboxed code.
 These sets of source files will be compiled with the corresponding compilers to get the corresponding object files.
-The c-region object file will have the necessary runtime checks enforcing~\systemname{} guarantees.
+The \cregion object file will have the necessary runtime checks enforcing~\systemname{} guarantees.
 The~\ucregion object file will be produced according to the corresponding sandbox mechanism.
 Finally, these two object files will be linked along with the necessary sandbox libraries to produce the final executable such that all the tainted functions will be executed in a sandbox (\ucregion) and the rest of the functions as regular code (\cregion).
 
+
+\liyi{This paper should just introduce the language and the compiler, right? I do not think the following is necessary. Instead, we can have an overview section introduce the compiler with examples; especially highlight the callback. }
 \subsection{Alternative Use Cases}
 \input{figures/newusecase}
 
@@ -110,6 +107,7 @@ For our example in~\lst{lst:final}, we can make only the function \code{process_
 
 The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
 It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
+\aravind{Change title of this section and say that this mode has no guarentees and move this before evaluation.}
 
 %newusecase.tex
 

@@ -141,11 +141,11 @@
 \newcommand{\ptr}{\ensuremath{ptr}}
 \newcommand{\arr}{\ensuremath{arr}}
 \newcommand{\ntarr}{\ensuremath{ntarr}}
-\newcommand{\ptrT}[1]{\code{ptr<}$#1$\code{>}}
-\newcommand{\arrT}[1]{\code{array_ptr<}$#1$\code{>}}
-\newcommand{\ntarrT}[1]{\code{nt_array_ptr<}$#1$\code{>}}
-\newcommand{\ucregion}{\ensuremath{uc-region}\xspace}
-\newcommand{\cregion}{\ensuremath{c-region}\xspace}
+\newcommand{\ptrT}[1]{\code{_Ptr<}$#1$\code{>}}
+\newcommand{\arrT}[1]{\code{_Array_ptr<}$#1$\code{>}}
+\newcommand{\ntarrT}[1]{\code{_NT_Array_ptr<}$#1$\code{>}}
+\newcommand{\ucregion}{\umode region\xspace}
+\newcommand{\cregion}{\cmode region\xspace}
 \newcommand{\taintt}{\code{t_*}}
 
 \newif\ifsubmit\submitfalse
@@ -173,8 +173,8 @@
 
 \usepackage[normalem]{ulem}
 \colorlet{MZ}{violet!80!pink}
-\newcommand{\mz}[1]{{\color{MZ}\textbf{\textit{MZ: #1}}}}
-\newcommand{\mzs}[1]{{\color{MZ} \sout{#1}}}
+\newcommand{\mz}[1]{\textbf{\textcolor{MZ}{MZ: #1}}}
+\newcommand{\mzs}[1]{{\color{MZ}\sout{#1}}}
 \newcommand{\mzu}[1]{{\color{MZ}\uline{#1}}}
 \newcommand{\mzr}[1]{{\color{MZ}{#1}}}
 \fi
@@ -333,9 +333,9 @@
 \newcommand{\fm}{\mathit{FM}}
 \newcommand{\size}{\mathit{size}}
 
-\newcommand{\cmode}{\texttt{c}}
-\newcommand{\umode}{\texttt{u}}
-\newcommand{\tmode}{\texttt{t}}
+\newcommand{\cmode}{\textcolor{blue}{\texttt{c}}\xspace}
+\newcommand{\umode}{\textcolor{blue}{\texttt{u}}\xspace}
+\newcommand{\tmode}{\textcolor{blue}{\texttt{t}}\xspace}
 
 \newcommand{\bvar}{\ensuremath{\beta}}
 \newcommand{\mode}{\textit{mode}}

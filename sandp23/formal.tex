@@ -135,7 +135,10 @@ This section describes the formal core model of~\systemname,
 named~\lang.
 We precisely present its syntax, semantics, type
 system, and compilation.
-The formal model also enables us to develop~\lang’s meta-
+% 
+\mzs{The formal model also enables us to}
+% 
+\mzr{From those, we} develop~\lang’s meta-
 theories, including the type soundness, non-exposure, non-crashing,
 and the compiler simulation theorems, which we present in~\apdx{sec:theorem}.
 
@@ -146,17 +149,46 @@ and the compiler simulation theorems, which we present in~\apdx{sec:theorem}.
 \subsection{Syntax}\label{sec:syntax}
 The~\fig{fig:checkc-syn} shows a simplified syntax of~\lang.
 \subsubsection{Types ($\omega$)}
-At a high level, we classify types as word-size values, multi-word values, or functions.
-The word-size values can be either integers or pointers.
-Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
-($\xi$, the difference between context and pointer modes is introduced shortly below) that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
-and a type ($\omega$) denoting valid values that can be pointed to.
+At a high level, we classify types as word-size value \mzr{type}s, multi-word
+value \mzr{type}s, or function \mzr{type}s.
+%
+\mz{
+  % 
+  You cannot classify a type as values. You can only classify types into other 3
+  categories, namely, word, multi-word and function types.
+  % 
+}
+% 
+\mzs{The}\mzr{A} word-size value\mzs{s} can be either \mzr{of type integer} or
+\mzr{of type pointer}.
+% 
+\mzr{Each} pointer type\mzs{s} ($\tptr{\omega}{\xi}$) \mzr{is represented by} a
+pointer mode annotation ($\xi$, the difference between context and pointer modes
+is introduced shortly below) that is either checked (\cmode), tainted (\tmode),
+or unchecked (\umode), and a type ($\omega$) denoting \mzr{the valid type of
+  values it can refer to}.
+% 
 
-Multi-word values represent arrays and null-terminated arrays, which include both the type of elements ($\tau$) and a bound ($\bvar$).
-The bounds can be either integer literals $n$, expressions $x + n$, or an explicit specification of lower and upper bound,~\ie $(b_l,b_h)$.
-We denote null-terminated arrays using $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$ otherwise (we elide $\cdot$ when writing types).
-The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
+% 
+\mzr{The multi-word value type ($ \tallarrayb{\bvar}{\tau}$) that ranges over 
+arrays and null-terminated arrays is constructed by the type of elements in the
+array ($\tau$), an array bound ($\bvar$) and an array flag ($\kappa$).}
+% 
+\mzr{A} bound can be either \mzr{an} integer literal $n$, \mzr{an} expressions
+$x + n$, or an explicit specification of lower and upper bound\mzr{s},~\ie
+$(b_l,b_h)$.
+%
+\mzr{ %
+  Additionally, to distinguish null-terminated arrays from other arrays, we set
+  \(\kappa\) to be \textit{nt} for nt-arrays and \(\cdot\) for other arrays (for
+  convenience, we will elide \(\cdot\) in the text).
+  % 
+}
+% 
+
+% 
 An example representation of an array and null-terminated array in~\lang syntax is shown below:
+% 
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
@@ -168,13 +200,34 @@ $\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 \end{array}
 \end{array}
 \]
-To simplify the representation, we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
-$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the above examples could
-be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+\mzr{For simplicity}\mzs{To simplify the representation}, we write
+$\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean $\tptr{\tarray{0}{b}{\tau}}{\cmode}$,
+so the above examples could be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
+\emph{\mzr{Rejecting}\mzs{Disallowing} unsafe types.}
+The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
+% 
+These requirements \mzs{add additional restrictions for type creation and restrict the creation of unsafe types.}
+\mzr{prevents unsafe types from being constructed}.
+% 
+\mzr{
+  % 
+  Consider the type ~\code{_t_Array_ptr<_Ptr<int>>} which describes a tainted
+  array of checked pointers.
+  % 
+  Syntactically valid, this type is however \emph{illegal} in~\lang{} and
+  is rejected by the well-formedness requirement. 
+}
+% 
+\mz{Made some changes to shift the emphasis in hope of improving clearness.}
+% 
+However, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_t_Array_ptr<_t_Ptr<int>>} is a valid type.
+% 
+
+% 
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
-where $\overline{x}$ represents a list of \tint{} type variables that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
+where $\overline{x}$ represents a list of \tint{} type variables that bind \mzu{bound}\mz{free?} variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
 \[\hspace*{-0.5em}
 \begin{array}{l}
@@ -184,8 +237,10 @@ $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{),}$\\
 \Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
-Note that the well-formed requirement (\fig{fig:wffunctions} in Appendix) of a function type ensures that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+The function type also has well-formed requirements (\fig{fig:wffunctions} in Appendix), which disallows nesting checked or unchecked pointers inside tainted pointers.
+Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 \aravind{The syntax of well-formed requirements for functions is incorrect. It looks like the forall qualifier is missing.}
+
 
 %The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
 %There are two type notions in \lang.  Types $\tau$ classify
@@ -234,36 +289,48 @@ Note that the well-formed requirement (\fig{fig:wffunctions} in Appendix) of a f
 %be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 %$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 \subsubsection{Expressions ($e$)}
-\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)($n\!:\!\tau$), pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.)
+\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)
+\mzu{($n\!:\!\tau$)}\mz{what's this?}, pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}}, the \texttt{strlen} operation ($\estrlen{x}$),
 memory allocation ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
 For instance, a dynamic bounds cast expression
-
-\noindent
-{\footnotesize
-\code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
-}
+\begin{center}
+  {\footnotesize
+    \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,
+      count(}$n$\code{))} }
+\end{center}
 becomes 
-{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}
-. 
+{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}. 
+% 
 
-We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
+% 
+\mzu{We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.}
+\mz{This sentence is unclear. I suppose that you mean an integer literal
+  can be both of interger type and pointer type depending on the context.  }
 For instance, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer.
 The~\code{strlen} expression plays an important role in the type-checking of null-terminated arrays.
-For simplifying type checking, we assume~\code{strlen} to operate on variables $x$ rather than arbitrary expressions.
+For simplifying type checking, we assume~\code{strlen} to operate on variables \mzs{$x$} rather than arbitrary expressions.
+% 
 The heap allocation expression $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions (\cregion or \ucregion).
 We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-The $\echeckedtext$ and $\euncheckedtext$ expressions are used to represent the corresponding code regions.
+The $\echeckedtext$ and $\euncheckedtext$ expressions are used to
+\mzs{represent the corresponding} \mzr{delimit} code regions.
 To guarantee the non-exposure property, we extend the base syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$.
-Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.
+\mzu{Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.}
+\mz{Is this sentence grammatical?}
+% 
 
-\lang aims to be simple enough to work with but powerful enough to
+% 
+\lang{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example, mutable local
-variables can be encoded as immutable locals that point to the heap;
-the use of \code{&} can be simulated with \code{malloc};
+  variables can be encoded as immutable locals that point to the heap;
+\mzu{the use of \code{&} can be simulated with \code{malloc};}
+\mz{This doesn't make sense if you use \code{&} to create alias. You don't want
+  to allocate memory.}
+% 
 and loops can be encoded as recursive function calls. \code{struct}s are
 not included in~\fig{fig:checkc-syn} for space reasons, but they are
 supported as shown in~\apdx{appx:struct}.
@@ -341,6 +408,7 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 %in \checkedc, so we omit them.
 
 \aravind{Why we have only function pointers in function call?}
+\aravind{Talk about the ret expression after adding it in the syntax.}
 
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
 %   POINTERS: Array and NT-array types have two relative bounds, whose structures
@@ -396,6 +464,83 @@ $
   \label{fig:c-context}
 \end{figure}
 
+\subsection{Type Checking}
+\label{sec:typechecking}
+Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
+A few selected type rules are presented in~\fig{fig:type-system-1}.
+% 
+\mz{Move the figure here.}
+% 
+The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
+
+Each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
+which states that in a type environment $\Gamma$ (mapping variables to
+their types) and a predicate environment $\Theta$ (mapping integer-typed
+variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
+in context mode $m$.
+
+In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
+We provide some example descriptions here.
+Type equality $\tau=_{\Theta}\tau'$
+is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
+and the alpha equivalence of two function types;
+i.e., two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
+$\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
+$\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
+are equivalent, if we can find a same length (as $\overline{x}$ and $\overline{y}$) variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
+and the substitution results are equal.
+\aravind{For the above paragraph, give concrete example, For example: array is a subtype of ptr, etc}
+
+
+The type checker rules are designed such that any well-typed (\ie follows all the rules) is isolated by sandboxed code. We present the corresponding formal proof in~\apdx{}.
+
+One of the important type cheker rules is disallowing unsafe interactions between tainted and untainted (c/u) pointers.
+\aravind{Explain about the LET rule}
+
+\aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
+
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+a -> checked pointer
+b -> Tainted pointer
+c -> Unchecked pointer.
+
+_Ptr<int> a;
+_t_Ptr<int> b;
+int *c;
+
+a = b; // Not allowed.
+b = a; // Not allowed.
+\end{minted}
+
+
+The \textsc{T-CastPtr} rule in \Cref{fig:type-system-1}
+permits casting from an expression of type $\tau'$ to a checked pointer when
+$\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
+$\sqsubseteq$ is built on the type equality ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). 
+The rule  ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
+\tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
+pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
+
+\aravind{Explain this with .}
+
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+a -> checked pointer
+b -> Tainted pointer
+c -> Unchecked pointer.
+
+_Ptr<int> a;
+_t_Ptr<int> b;
+int *c;
+
+a = b; // Not allowed.
+b = a; // Not allowed.
+
+a = (_Ptr<int>)c; // This is okay.
+a = (_Ptr<int>)b; // Not allowed.
+\end{minted}
+
 \subsection{Semantics and Typing}\label{sec:semantics}
 
 % The semantics
@@ -447,6 +592,16 @@ and $\heapup{m}{n}{\evalue{n'}{\tau}}$
 to update location $n$ with the value $\evalue{n'}{\tau}$ in the $m$ heap.
 It is worth noting that \systemname is not a fat-pointer system;
 thus, in every heap update, the value type annotation remains the same through program executions.
+% 
+\mz{Does a ``non-fat pointer'' system cause the type preservation of heap
+  values?
+  % 
+  The story seems to be that you design the system in a certain way s.t. heap
+  value types are unchanged, which allows you to erase the type.
+  % 
+  And, from the type erasure property, we know that we don't need fat pointers.
+}
+% 
 Additionally, for both stack and heap, 
 we ensure $\fv(\tau)=\emptyset$ for all the value type annotations $\tau$.
 
@@ -458,13 +613,17 @@ mutable heap.
 As mentioned, value $\evalue{0}{\tau}$
 represents a $\enull$ pointer when $\tau$ is a pointer type.
 Correspondingly, $\heap(m,0)$ should always be undefined.
-The relation steps to a \emph{result} $r$,
-which is either an expression or a $\enull$ or $\ebounds$ failure,
-represent a null-pointer dereference or out-of-bounds access,
-respectively. Such failures are a \emph{good} outcome; stuck states
+% 
+The relation steps to a \emph{result} $r$, which is \mzs{either} \mzr{one of} an
+expression, a $\enull$ or $\ebounds$ failure, represent \mzr{an expression right
+  after the reduction}, a null-pointer dereference or out-of-bounds access,
+respectively.
+% 
+Such failures are a \emph{good} outcome; stuck states
 (non-value expressions that cannot transition to a result $r$)
 characterizing undefined behavior.
 %
+% 
 The context mode $m$ (in $\longrightarrow_{m}$) indicates whether the
 stepped redex within $e$ was in a $\cmode$ or $\umode$ region.
 
@@ -817,10 +976,18 @@ Otherwise, it violates the non-exposure safety.
 For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
 if any argument for \code{handle_request} is a checked pointer, 
 it means that we are exposing a checked pointer address to unsafe regions.
-A $\echeckedtext$ or $\euncheckedtext$ block represents 
-the context switching from a checked to an checked region, or vice versa.
-We need to make sure no checked pointers are information exposed to unsafe code regions.
+% 
+\mzu{A $\echeckedtext$ or $\euncheckedtext$ block represents 
+  the context switching from a checked to an checked region, or vice versa.
+}
+% 
+\mz{An action + checked/unchecked block represents the switching.}
+% 
+We need to make sure no checked pointers are \mzs{information} exposed to unsafe code regions.
 as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
+% 
+\mz{This paragraph is not that cohesive.}
+% 
 
 \myparagraph{Let Bindings and Dependent Function Pointers}
 %

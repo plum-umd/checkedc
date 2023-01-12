@@ -84,9 +84,10 @@ Tainted Pointers to structures crossing into the sandbox are expected to only al
 %   methodology to derive such rules? Are these rules the same as the "admissible
 %   but redundant typing rules" from above?}
 % \liyi{Deena? Leo? }
-Our evaluation of \systemname consists of a series of tests that can be categorized into Micro-benchmarks and Program Benchmarks with the use of WebAssembly Sandbox. Consequently, all further references to sandbox refer to unchecked code in the WebAssembly Sandbox. 
+Our evaluation of \systemname consists of a set of tests that can be classified into Micro-benchmarks and Program Benchmarks that evaluate \systemname on WebAssembly sandbox. Consequently, all further references to sandbox refer to unchecked code in the WebAssembly Sandbox. 
 MicroBenchmarking involves evaluating performance on fundamental operations involving tainted pointers, context switching between checked and sandboxed regions, and sandboxed execution of functions.
 We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
+
 
 \subsection{Program Run-time Benchmarks}
 \begin{figure*}[t]
