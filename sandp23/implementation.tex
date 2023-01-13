@@ -30,6 +30,7 @@ Developers can use the~\code{_Mirror} qualifier, which copies the function into 
 \noindent\emph{\_TLIB}:
 This qualifier relaxes type-checking rules on library functions avoiding unnecessary copying of tainted data.
 Specifically, this annotation enables developers to pass tainted pointers as arguments to library functions in~\cregion.
+
 For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
 We cannot use~\code{strncat} because our type-checker restricts this as it expects both the pointers to be non-tainted as we are in~\cregion.
 We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then call~\code{strncpy} as~\code{strncat(dst, tmp, n);}.
@@ -41,7 +42,7 @@ The~\code{_TLIB} qualifier enables this as shown below:
 strncpy(dst, t_str, n);
 \end{minted}
 \aravind{Fix the above code}
-Once annotated, our type-checker allows tainted arguments to~\code{strncat} functions.
+The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
 
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
