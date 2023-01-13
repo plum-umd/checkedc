@@ -150,7 +150,7 @@ and the compiler simulation theorems.
 \subsection{Syntax}\label{sec:syntax}
 The~\fig{fig:checkc-syn} shows the syntax of~\lang.
 
-\myparagraph{Types}
+\myparagraph{Type Syntax}
 At a high level, we classify types as word-size value, multi-word
 value, or function types. A word-size value can be either integer or pointer.
 Every pointer type ($\tptr{\omega}{\xi}$) includes a
@@ -258,54 +258,37 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 %be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 %$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 \myparagraph{Expressions}
-\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$)
-\mzu{($n\!:\!\tau$)}\mz{what's this?}, pointer dereference and assignment ($\estar{e}$) and ($\eassign{e_1}{e_2}$), resp.
+\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
+pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}}, the \texttt{strlen} operation ($\estrlen{x}$),
 memory allocation ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
-For instance, a dynamic bounds cast expression
-\begin{center}
+For example, a dynamic bounds cast
   {\footnotesize
-    \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,
-      count(}$n$\code{))} }
-\end{center}
+    \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
 becomes 
 {\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}. 
 % 
 
 % 
-\mzu{We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.}
-\mz{This sentence is unclear. I suppose that you mean an integer literal
-  can be both of interger type and pointer type depending on the context.  }
+We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
 For instance, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer.
-The~\code{strlen} expression plays an important role in the type-checking of null-terminated arrays.
-For simplifying type checking, we assume~\code{strlen} to operate on variables \mzs{$x$} rather than arbitrary expressions.
-% 
 The heap allocation expression $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions (\cregion or \ucregion).
 We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-The $\echeckedtext$ and $\euncheckedtext$ expressions are used to
-\mzs{represent the corresponding} \mzr{delimit} code regions.
-To guarantee the non-exposure property, we extend the base syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$.
-\mzu{Wherein $\overline{x}$ restricts all free variables appearing in $e$ to be checked or unchecked pointers according to the corresponding region.}
-\mz{Is this sentence grammatical?}
-% 
+The $\echeckedtext$ and $\euncheckedtext$ expressions are used to delimit code regions.
+To guarantee the non-exposure property, we extend the \checkedc syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$,
+where $\overline{x}$ represents all variables that are allowed to communicate between instructions outside and inside of the block $e$, and cannot contain checked pointers.
+$\erettext$ is introduced by the semantics when evaluating a \texttt{let} binding; explained shortly below.
 
 % 
 \lang{} aims to be simple enough to work with but powerful enough to
-encode realistic \systemname idioms. For example, mutable local
-  variables can be encoded as immutable locals that point to the heap;
-\mzu{the use of \code{&} can be simulated with \code{malloc};}
-\mz{This doesn't make sense if you use \code{&} to create alias. You don't want
-  to allocate memory.}
-% 
-and loops can be encoded as recursive function calls. \code{struct}s are
+encode realistic \systemname idioms. For example,
+loops can be encoded as recursive function calls. \code{struct}s are
 not included in~\fig{fig:checkc-syn} for space reasons, but they are
-supported as shown in~\apdx{appx:struct}.
+supported as shown in~\cite{li22checkedc}.
 C-style \code{union}s have no safe typing in \checkedc, so we omit them.
-
-
 Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
 
 %\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
@@ -376,9 +359,6 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 %C-style \code{union}s have no safe typing
 %in \checkedc, so we omit them.
 
-\aravind{Why we have only function pointers in function call?}
-\aravind{Talk about the ret expression after adding it in the syntax.}
-
 % \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
 %   POINTERS: Array and NT-array types have two relative bounds, whose structures
 % can be either an integer or a variable plus an integer. For example,
@@ -403,7 +383,6 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 $\hspace*{-1.2em}
     \begin{array}{l}
     \begin{array}{lll}
-e & ::= & \ldots \mid \ret{x}{\evalue{n}{\tau}}{e}\\
 r & ::= & e \mid \enull \mid \ebounds\\
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
 &&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid \eif{E}{e}{e}\\[0.2em]
