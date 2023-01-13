@@ -1,8 +1,52 @@
-\section{\systemname Implementation} \label{sec:implementation}
-\subsection{Overview}
-\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
-\subsection{\systemname Function Qualifiers}
-\systemname function qualifiers are introduced with a purpose of semantic policing to allow the developer to perform dependency-resolved program partitioning into checked and unchecked regions from within the checked sources. Each of the newly introduced qualifiers "\_Tainted", "\_Mirror", "\_TLIB" and "\_Callback" enforce different semantic-ruling at compile time to allow "unchecked" and "checked" functions to communicate and access global data in a region-exclusive manner. Although checked functions are allowed to call and access "unchecked" data within the checked region, "unchecked" region can only access checked data through a specialized callback mechanism. Each of these function qualifiers differently control casting, caller, callee and data-access rules within its qualifier-scope. For example, \_TLIB qualifier allows tainted pointer parameters to be cast to non-tainted pointer arguments at the call-site of a qualified function with developer's discretion that the qualified function does not leak tainted addresses. This type-checker relaxation is granted to enable developer to avoid marshalling costs when passing tainted pointers to external library functions.     
+\section{Implementation} \label{sec:implementation}
+As mentioned in~\sect{sec:overview}, our implementation of~\systemname{} has two main components,~\ie source level program partitioner (\sourcerewriter) and compiler.
+Given a well-typed~\systemname{} program and a sandbox configuration,~\sourcerewriter performs source-to-source transformation and splits the program into two parts (\ie two sets of source files) -- checked and tainted source files corresponding to~\cregion and~\ucregion respectively.
+Our compiler will compile the checked source files and adds the necessary dynamic instruction.
+The tainted source files need to be compiled with the target sandbox compiler.
+Finally, these two sets of object files will be linked along with any sandbox library to produce the final executable that enforces our security guarantees.
+
+\subsection{\sourcerewriter} \label{subsec:checkmate}
+The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
+However, we use a small OCAML program (\numocamllines{}) module to remove annotations and make the code compilable with the sandbox compiler (CITE CORRESPONDING IMPL SECTION).
+
+\subsubsection{Additional Function Qualifiers}
+In addition to the~\code{_Tainted} qualifier that marks functions to be in~\ucregion, we provide a few other qualifiers that enable developers to provide additional information and ease the partitioning process.
+Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_Mirror}, and~\code{_TLIB}.
+
+\noindent\emph{\_Callback}:
+Developers should use this qualifier to mark callback functions,~\ie functions in~\cregion, that can be called from the tainted region. 
+The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\sect{}).
+
+\noindent\emph{\_Mirror}: 
+This qualifier copies the corresponding function both into~\cregion and~\ucregion code. Such that callers from each region will invoke the corresponding copy.
+This helps handle certain simple utility functions that might be called from both~\cregion and~\ucregion code.
+\aravind{Give an example from our evaluation program. (E.g., function foo in program1)}.
+
+Placing such common functions in either of the regions restricts their usage from the other region. For instance, if we place~\code{foo} in~\ucregion, then all parameters of it should be tainted. Consequently, callers from~\cregion should use tainted pointers to invoke~\code{foo}, making the arguments and other dependent pointers tainted, leading to over-tainting.
+Similarly, placing~\code{foo} in~\cregion will make it hard for the callers in~\ucregion as they should now use the callback mechanism to invoke~\code{foo}.
+
+Developers can use the~\code{_Mirror} qualifier, which copies the function into both the region so that callers in each region will invoke the corresponding copy avoiding unnecessary tainting. 
+
+\noindent\emph{\_TLIB}:
+This qualifier relaxes type-checking rules on library functions avoiding unnecessary copying of tainted data.
+Specifically, this annotation enables developers to pass tainted pointers as arguments to library functions in~\cregion.
+For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
+We cannot use~\code{strncat} because our type-checker restricts this as it expects both the pointers to be non-tainted as we are in~\cregion.
+We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then call~\code{strncpy} as~\code{strncat(dst, tmp, n);}.
+Both of these approaches are inefficient and, if not done correctly, might result in security bugs.
+If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use~\code{strncat} with tainted source pointer in~\cregion.
+The~\code{_TLIB} qualifier enables this as shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+// Put your example annotation here.
+strncpy(dst, t_str, n);
+\end{minted}
+\aravind{Fix the above code}
+Once annotated, our type-checker allows tainted arguments to~\code{strncat} functions.
+
+%\subsection{Overview}
+%\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
+%\subsection{\systemname Function Qualifiers}
+%\systemname function qualifiers are introduced with a purpose of semantic policing to allow the developer to perform dependency-resolved program partitioning into checked and unchecked regions from within the checked sources. Each of the newly introduced qualifiers "\_Tainted", "\_Mirror", "\_TLIB" and "\_Callback" enforce different semantic-ruling at compile time to allow "unchecked" and "checked" functions to communicate and access global data in a region-exclusive manner. Although checked functions are allowed to call and access "unchecked" data within the checked region, "unchecked" region can only access checked data through a specialized callback mechanism. Each of these function qualifiers differently control casting, caller, callee and data-access rules within its qualifier-scope. For example, \_TLIB qualifier allows tainted pointer parameters to be cast to non-tainted pointer arguments at the call-site of a qualified function with developer's discretion that the qualified function does not leak tainted addresses. This type-checker relaxation is granted to enable developer to avoid marshalling costs when passing tainted pointers to external library functions.     
 
 \subsection{CheckMate S2S transformation}
 \subsubsection{\textbf{Need for Callback}}
