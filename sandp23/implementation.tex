@@ -5,9 +5,15 @@ Our compiler will compile the checked source files and adds the necessary dynami
 The tainted source files need to be compiled with the target sandbox compiler.
 Finally, these two sets of object files will be linked along with any sandbox library to produce the final executable that enforces our security guarantees.
 
+We created the sandbox library once and for all for each sandbox.
+This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
+For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
+We will present our implementation using WASM~\cite{bosamiya2020webassembly} as our target sandbox.
+However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
+
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
-However, we use a small OCAML program (\numocamllines{}) module to remove annotations and make the code compilable with the sandbox compiler (CITE CORRESPONDING IMPL SECTION).
+However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (CITE CORRESPONDING IMPL SECTION).
 
 \subsubsection{Additional Function Qualifiers}
 In addition to the~\code{_Tainted} qualifier that marks functions to be in~\ucregion, we provide a few other qualifiers that enable developers to provide additional information and ease the partitioning process.
@@ -44,6 +50,25 @@ strncpy(dst, t_str, n);
 \aravind{Fix the above code}
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
 
+\subsubsection{Generating~\cregion Source Partition}
+We copy all non-tainted functions into~\cregion source files and make the following modifications to enable interaction with~\ucregion (\ie sandboxed code).
+
+We created a library once and for all for each sandbox.
+This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
+For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
+
+\noindent\emph{Handling Tainted Buffers in~\cregion}:
+All buffers that are marked as tainted in~\cregion should be allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
+We perform source rewriting and make the buffer into a pointer variable and allocate the corresponding number of bytes using the sandbox-specific allocator. For instance, we perform the following rewriting for~\code{buff} in~\lst{lst:final} with WASM sandbox.
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+// char buff[MAX_MSG_SIZE] __Tainted;
+char *buff = ....
+\end{minted}
+\aravind{Arun, please fix the above example on how exactly we replace it with WASM allocator.}
+Note that we also add the necessary deallocator calls at function exit points.
+
+\noindent\emph{Handling Calls to Tainted Functions}:
+In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
 %\subsection{\systemname Function Qualifiers}
