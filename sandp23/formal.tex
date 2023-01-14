@@ -412,100 +412,61 @@ $
   \label{fig:c-context}
 \end{figure}
 
-\subsection{Type Checking}
+\subsection{Typing and Semantics}
 \label{sec:typechecking}
-Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
-A few selected type rules are presented in~\fig{fig:type-system-1}.
-% 
-\mz{Move the figure here.}
-% 
-The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
 
+The \lang system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
+Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
+
+As partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{T-}$X$),
 Each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
 which states that in a type environment $\Gamma$ (mapping variables to
 their types) and a predicate environment $\Theta$ (mapping integer-typed
 variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
 in context mode $m$.
+The operational semantics for \lang is defined as a small-step
+transition relation with the judgment $ (\varphi,\heap,e)
+\longrightarrow_m (\varphi',\heap',r)$, as partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{S-}$X$).
+ Here, $\varphi$ is a
+\emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
+$\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ heaps), each of which
+maps addresses (integer literals) to values $\evalue{n}{\tau}$.
+The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
 
-In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
-We provide some example descriptions here.
-Type equality $\tau=_{\Theta}\tau'$
-is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
-and the alpha equivalence of two function types;
-i.e., two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
-$\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
-$\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
-are equivalent, if we can find a same length (as $\overline{x}$ and $\overline{y}$) variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
-and the substitution results are equal.
-\aravind{For the above paragraph, give concrete example, For example: array is a subtype of ptr, etc}
+\myparagraph{Modes, Static Casting, and Subtyping}
+In \lang, Context modes $m$ appearing in a type rule determine the code region 
+that permits pointer dereferences and value-assignments, depending on the pointer modes.
+We define a three point lattice $\xi_1 \le \xi_2$ to describe such permission, where $\tmode \le \xi$ and $m \le m$.
+This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can perform such operations in $\cmode$ and $\umode$ regions, respectively.
+Pointer modes are also useful in determining if a nested pointer has a valid type.
+For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
 
-
-The type checker rules are designed such that any well-typed (\ie follows all the rules) is isolated by sandboxed code. We present the corresponding formal proof in~\apdx{}.
-
-One of the important type cheker rules is disallowing unsafe interactions between tainted and untainted (c/u) pointers.
-\aravind{Explain about the LET rule}
-%
-Rules \textsc{T-Let} and \textsc{T-LetInt} in in \Cref{fig:type-system-1} type a $\elettext$ expression, which also admits
-type dependency. 
-In particular, the result of evaluating a $\elettext$ expression
-may have a type that refers to one of its bound variables (e.g., if
-the result is a checked pointer with a variable-defined bound). 
-If so, we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). 
-Note that we restrict the expression $e_1$ to syntactically match the
-structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
-Rule \textsc{T-RetInt} types a $\erettext$ expression when $x$ is of type $\tint$.
-$\erettext$ does not appear in source programs but is introduced by the semantics when
-evaluating a let binding (rule \textsc{S-Let} in
-Fig.~\ref{fig:semantics}). 
-%\liyi{why? }
-% After the evaluation of a let binding a variable $x$ concludes,
-%we need to restore any prior binding of $x$, which is either
-%$\bot$ (meaning that there is no $x$ originally) or some value
-%$\evalue{n}{\tau}$.
-
-\aravind{We should explain how our type checker restricts unsafe interactions between checked and tainted pointer types.}
+\lang also has static casting operations. As described in rule \textsc{T-CastPtr},
+an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to another pointer type \tptr{\tau_2}{\xi_2},
+if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2} $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
+In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-a -> checked pointer
-b -> Tainted pointer
-c -> Unchecked pointer.
-
-_Ptr<int> a;
-_t_Ptr<int> b;
-int *c;
-
-a = b; // Not allowed.
-b = a; // Not allowed.
-\end{minted}
-
-
-The \textsc{T-CastPtr} rule in \Cref{fig:type-system-1}
-permits casting from an expression of type $\tau'$ to a checked pointer when
-$\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
-$\sqsubseteq$ is built on the type equality ($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). 
-The rule  ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
-\tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
-pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
-Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
-if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
-
-\aravind{Explain how the cast rule allows/prevents the casts.}
-
-\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-a -> checked pointer
-b -> Tainted pointer
-c -> Unchecked pointer.
-
-_Ptr<int> a;
-_t_Ptr<int> b;
-int *c;
-
-a = b; // Not allowed.
-b = a; // Not allowed.
-
-a = (_Ptr<int>)c; // This is okay.
+//_Ptr<int> a; _t_Ptr<int> b; int *c;
+c = (int *)b; // This is okay.
 a = (_Ptr<int>)b; // Not allowed.
 \end{minted}
+
+In the above example, a $\tmode$ mode pointer can be cast to $\umode$ mode but casting $\tmode$ mode to $\cmode$ mode is disallowed.
+The complete subtyping relation was described in \Cref{fig:checkc-subtype}.
+\ignore{
+For example, the rule ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{\xi}\sqsubseteq
+\tarrayptr{b_l}{b_h}{\tau}{\xi}$) permits treating a singleton
+pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).}
+Notice that \texttt{let} statements are immutable in \lang, so the following code is not possible, because variables \code{x} and \code{y} must have the same type in \lang.
+
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+//_Ptr<int> x;  _t_Ptr<int> y;
+x = y; // Not allowed.
+\end{minted}
+
 
 \myparagraph{Constant Validity}
 Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
