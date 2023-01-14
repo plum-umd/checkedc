@@ -79,9 +79,21 @@ case REQ1:
 \end{minted}
 \aravind{Arun, please fix the above example with the exact details.}
 
-\noindent\emph{Handling~\texttt{} Qualifiers}:
+\noindent\emph{Handling~\texttt{\_Callback} Qualifiers}:
 As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
 Consider the following~\code{StringAuth} function that checks whether the provided user is authenticated and needs to be invoked from~\ucregion and hence a callback.
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+_Callback _TPtr<char> StringAuth(_T_Array_Ptr<const char> usertoken : count(len),
+                                 size_t len) {
+...
+// Checks whether usertoken is authenticated
+/*
+ These functions will be restricted to only accept
+ tainted parameters.
+*/
+...
+}
+\end{minted}
 
 Note that the function accepts a tainted array pointer as its parameter, enabling~\ucregion (tainted) region to invoke it.
 
