@@ -620,19 +620,33 @@ it means that we are exposing a checked pointer address to unsafe regions,
 which means that users might randomly manipulate the data region pointed to by the checked pointer
 and \lang forbids such behavior.
 
-\myparagraph{Dependent Function Pointers}
-Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
-from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
-we confirm that each of $\overline{\tau'}$ is
-a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$ 
-in rule \textsc{T-Fun} (\Cref{fig:type-system-1}),
-which replaces possible integer bound variables $\overline{x}$ with bound expressions $\overline{e'}$.
-The final result type is the defined target type $\tau$ appearing in the function pointer type
-also with such replacement, written as $\tau[\overline{e'} / \overline{x}]$.
+\myparagraph{Dependent Function Pointers} %
+The rule \textsc{T-Fun} (\Cref{fig:type-system-1}) states the type judgement for
+dependent function pointer application where we represent the result of
+replacing all integer bound variables $\overline{x}$ in the type \(\tau\) with
+with bound expressions $\overline{e'}$ by $\tau[\overline{e'} / \overline{x}]$
+and write $\overline{\tau}[\overline{e'} / \overline{x}]$ to lift the
+substitution to every type \(\overline{\tau}\).
+% 
+Given an expression $e$ of function pointer type
+($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$) and arguments
+$\overline{e}$ of types $\overline{\tau'}$,
+% 
+the result of the application will
+be of type $\tau[\overline{e'} / \overline{x}]$ 
+% 
+if for each pair of \(\tau'\) and \(\tau''\) in \(\overline{\tau'}\) and
+$\overline{\tau}[\overline{e'} / \overline{x}]$, \(\tau'\) is a subtype of
+\(\tau''\).
+% 
+\mz{I rewrote the sentences above.}
+% 
 Consider the \code{process_req2} function in
 Fig.~\ref{lst:final}; its parameter type for \code{msg} 
-depends on \code{m_1}. The \textsc{T-Fun} rule will substitute 
-\code{n} with the argument at a call-site.
+depends on \code{m_1}. The \textsc{T-Fun} rule will
+\mzu{substitute \code{n} with the argument}
+\mz{\code{n} seems unbound here.}
+at a call-site.
 \ignore{
 The semantics manages variable scopes using the special $\erettext$
 form. \textsc{S-Let} evaluates to a configuration whose expression is
