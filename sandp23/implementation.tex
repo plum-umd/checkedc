@@ -8,12 +8,12 @@ Finally, these two sets of object files will be linked along with any sandbox li
 We created the sandbox library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
-We will present our implementation using WASM~\cite{bosamiya2020webassembly} as our target sandbox.
+We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020webassembly}) as our target sandbox.
 However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
-However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (CITE CORRESPONDING IMPL SECTION).
+However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
 
 \subsubsection{Additional Function Qualifiers}
 \label{subsubsec:addfuncqual}
@@ -52,6 +52,7 @@ strncpy(dst, t_str, n);
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
 
 \subsubsection{Generating~\cregion Source Partition}
+\label{subsub:gencregion}
 We copy all non-tainted functions into~\cregion source files and make the following modifications to enable interaction with~\ucregion (\ie sandboxed code).
 
 We created a library once and for all for each sandbox.
@@ -132,6 +133,24 @@ Lastly, we change all instances where the callback function pointer is given to 
 \aravind{Arun, please check above code example to see if they make sense.}
 
 \subsubsection{Generating~\ucregion Source Partition}
+\label{subsubsec:genucregion}
+We create~\ucregion partition by first copying all functions marked as~\code{_Tained} and~\code{_Mirror}.
+Next, we convert the partition into regular C by replacing all~\systemname{} tainted types with the corresponding C types.
+For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
+The~\code{read_msg} function signature in~\lst{} will be modified as shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+size_t read_msg(int sock_fd, char *msg,
+-                             size_t sz) __Tainted {
++                             size_t sz) {
+\end{minted}
+
+Finally, we convert all calls to~\cregion callbacks with sandbox-specific invocations. For instance, for the~\code{StringAuth} call back (\sect{subsub:gencregion}), we modify~\code{...UNCHECKED FUNC..} as shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{c}
+SAY HOW WE MODIFY UNCHECKED CODE
+TO INVOKE CALLBACK FUNCTIONS.
+\end{minted}
+\aravind{Arun, please fix the above example}
+
 
 
 %\subsection{Overview}
@@ -139,44 +158,44 @@ Lastly, we change all instances where the callback function pointer is given to 
 %\subsection{\systemname Function Qualifiers}
 %\systemname function qualifiers are introduced with a purpose of semantic policing to allow the developer to perform dependency-resolved program partitioning into checked and unchecked regions from within the checked sources. Each of the newly introduced qualifiers "\_Tainted", "\_Mirror", "\_TLIB" and "\_Callback" enforce different semantic-ruling at compile time to allow "unchecked" and "checked" functions to communicate and access global data in a region-exclusive manner. Although checked functions are allowed to call and access "unchecked" data within the checked region, "unchecked" region can only access checked data through a specialized callback mechanism. Each of these function qualifiers differently control casting, caller, callee and data-access rules within its qualifier-scope. For example, \_TLIB qualifier allows tainted pointer parameters to be cast to non-tainted pointer arguments at the call-site of a qualified function with developer's discretion that the qualified function does not leak tainted addresses. This type-checker relaxation is granted to enable developer to avoid marshalling costs when passing tainted pointers to external library functions.     
 
-\subsection{CheckMate S2S transformation}
-\subsubsection{\textbf{Need for Callback}}
-Here, we use the example of a simple \systemname annotated string authentication program snippet in ~\lst{lst:callbackBefore} with~\code{StringProc} as its entry point (\entrypoint). ~\code{StringProc} was found to internally perform a lot of unsafe string parsing and manipulation on the user input and thereby has been marked \_Tainted. However, ~\code{StringProc} internally calls ~\code{StringAuth} that performs final authentication on user input by referencing classified global checked data. In interests of maintaining confidentiality of global checked data from the unchecked region whilst satisfying this control and data dependency, ~\code{StringAuth} has been qualified as a \_Callback, thereby bestowing it with WASM Sandbox's addition sanity checks at its call-sites within the unchecked region.
-
-\subsubsection{\textbf{CheckMate S2S transformation on Checked Sources}}
-\myparagraph{WebAssembly Sandbox:}
-Unchecked region implemented as a WebAssembly sandbox requires registering ~\code{StringAuth} with its expected WebAssembly callee signature as a requirement to safeguard the control-flow between the two regions.
-Within the WebAssembly sandbox, all functions are defined with an extra sandbox pointer argument and all pointer members are unsigned integers. 
-
-\myparagraph{CheckMate Instrumentation: }
-Consequently, ~\code{StringAuth}'s corresponding call-site signature in the tainted region would be 
-\newline
-~\code{_T_StringAuth}, which is an indirected trampoline call to the actual callback function. CheckMate identifies ~\code{StringAuth} to be a \_Callback qualified callee and correspondingly generates callback trampoline ~\code{StringAuth} and callback registration code 
-\newline
-~\code{registerCallback_StringAuth} within the checked region as show in ~\lst{lst:callbackAfter}. 
-~\code{registerCallback_StringAuth} registers the WebAssembly-specific callback function ~\code{_T_StringAuth} by calling ~\code{\_SBXREG\_} with callback-specific argument count and argument signature. 
-CheckMate replaces \_Tainted qualified ~\code{StringProc}'s definition with an indirect call to sandbox specific implementation ~\code{w2c_StringProc}. The \_Mirror qualifier is used mark a function in checked region as a local to both the checked and the unchecked regions. Consequently, CheckMate does not modify \_Mirror qualified ~\code{isStringMatching} and simply duplicates this function in the unchecked region.
-
-\subsubsection{\textbf{CheckMate S2S generation of Tainted Sources}}
-Implementing \systemname's unchecked region as a WebAssembly sandbox requires compiling unchecked functions and unchecked variables checked-region-exclusively with a sandbox-specific compiler (WebAssembly). Consequently, CheckMate copies each of the \_Mirror and \_Tainted qualified function definitions to a new source file and runs an OCAML parser to convert \systemname code to generic-C as shown in ~\lst{lst:callbackAfterTainted} which shows the CheckMate generated code for ~\code{StringProc}.
-After running CheckMate, each of newly generated tainted sources can be compiled to an "unchecked" static library using a sandbox-specific compiler.
-CheckMate's OCAML parser also modifies each of the tainted STDLIB functions from ~\code{t_strncpy} under ~\lst{lst:callbackBefore} to ~\code{strncpy} under ~\lst{lst:callbackAfterTainted}
-
-\begin{listing}
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_before_checkmate.c}
-\caption{Callback Annotations before running CheckMate}
-\label{lst:callbackBefore}
-\end{listing}
-\begin{listing}[t!]
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate.c}
-\caption{CheckMate generated Callback Annotations in Checked Sources }
-\label{lst:callbackAfter}
-\end{listing}
-\begin{listing}[t!]
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate_tainted.c}
-\caption{CheckMate generated Unchecked Sources }
-\label{lst:callbackAfterTainted}
-\end{listing}
+%\subsection{CheckMate S2S transformation}
+%\subsubsection{\textbf{Need for Callback}}
+%Here, we use the example of a simple \systemname annotated string authentication program snippet in ~\lst{lst:callbackBefore} with~\code{StringProc} as its entry point (\entrypoint). ~\code{StringProc} was found to internally perform a lot of unsafe string parsing and manipulation on the user input and thereby has been marked \_Tainted. However, ~\code{StringProc} internally calls ~\code{StringAuth} that performs final authentication on user input by referencing classified global checked data. In interests of maintaining confidentiality of global checked data from the unchecked region whilst satisfying this control and data dependency, ~\code{StringAuth} has been qualified as a \_Callback, thereby bestowing it with WASM Sandbox's addition sanity checks at its call-sites within the unchecked region.
+%
+%\subsubsection{\textbf{CheckMate S2S transformation on Checked Sources}}
+%\myparagraph{WebAssembly Sandbox:}
+%Unchecked region implemented as a WebAssembly sandbox requires registering ~\code{StringAuth} with its expected WebAssembly callee signature as a requirement to safeguard the control-flow between the two regions.
+%Within the WebAssembly sandbox, all functions are defined with an extra sandbox pointer argument and all pointer members are unsigned integers. 
+%
+%\myparagraph{CheckMate Instrumentation: }
+%Consequently, ~\code{StringAuth}'s corresponding call-site signature in the tainted region would be 
+%\newline
+%~\code{_T_StringAuth}, which is an indirected trampoline call to the actual callback function. CheckMate identifies ~\code{StringAuth} to be a \_Callback qualified callee and correspondingly generates callback trampoline ~\code{StringAuth} and callback registration code 
+%\newline
+%~\code{registerCallback_StringAuth} within the checked region as show in ~\lst{lst:callbackAfter}. 
+%~\code{registerCallback_StringAuth} registers the WebAssembly-specific callback function ~\code{_T_StringAuth} by calling ~\code{\_SBXREG\_} with callback-specific argument count and argument signature. 
+%CheckMate replaces \_Tainted qualified ~\code{StringProc}'s definition with an indirect call to sandbox specific implementation ~\code{w2c_StringProc}. The \_Mirror qualifier is used mark a function in checked region as a local to both the checked and the unchecked regions. Consequently, CheckMate does not modify \_Mirror qualified ~\code{isStringMatching} and simply duplicates this function in the unchecked region.
+%
+%\subsubsection{\textbf{CheckMate S2S generation of Tainted Sources}}
+%Implementing \systemname's unchecked region as a WebAssembly sandbox requires compiling unchecked functions and unchecked variables checked-region-exclusively with a sandbox-specific compiler (WebAssembly). Consequently, CheckMate copies each of the \_Mirror and \_Tainted qualified function definitions to a new source file and runs an OCAML parser to convert \systemname code to generic-C as shown in ~\lst{lst:callbackAfterTainted} which shows the CheckMate generated code for ~\code{StringProc}.
+%After running CheckMate, each of newly generated tainted sources can be compiled to an "unchecked" static library using a sandbox-specific compiler.
+%CheckMate's OCAML parser also modifies each of the tainted STDLIB functions from ~\code{t_strncpy} under ~\lst{lst:callbackBefore} to ~\code{strncpy} under ~\lst{lst:callbackAfterTainted}
+%
+%\begin{listing}
+%\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_before_checkmate.c}
+%\caption{Callback Annotations before running CheckMate}
+%\label{lst:callbackBefore}
+%\end{listing}
+%\begin{listing}[t!]
+%\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate.c}
+%\caption{CheckMate generated Callback Annotations in Checked Sources }
+%\label{lst:callbackAfter}
+%\end{listing}
+%\begin{listing}[t!]
+%\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/callback_mechanism_sample_after_checkmate_tainted.c}
+%\caption{CheckMate generated Unchecked Sources }
+%\label{lst:callbackAfterTainted}
+%\end{listing}
 
 \subsection{\systemname Dynamic Instrumentation}
 \systemname compiler is implemented to be sandbox-agnostic and differs in inserted instrumentation based on the sandbox type specified by a compiler flag. However, the scope of this paper restricts discussion to the 32-Bit WebAssembly sandbox wherein which pointers are represented as 4-Byte offsets from a base sandbox heap. Similar analogy has been applied in \systemname for WebAssembly wherein all tainted pointers in the checked region store zero-extended offsets, that upon access, are transformed to full addresses by the function \ref{O2P}.   
