@@ -607,34 +607,25 @@ In addition to the no \enull check in $\cmode$ mode pointer dereference,
 any dynamic heap access of a tainted pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
 
 \myparagraph{Unchecked and Checked Blocks}
-%
-During the type checking,
-Both $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$
-check all free variables in $e$ are within $\overline{x}$;
-the types for $\overline{x}$ and the final return type $\tau$ of $e$ have no checked pointers.
-Otherwise, it violates the non-exposure safety.
+The execution of a $\echeckedtext$ or $\euncheckedtext$ block represents 
+the context switching from a checked to an checked region, or vice versa,
+with its type and semantic rules given in \Cref{fig:type-system-1}.
+In this context switching, to guarantee the checked pointer non-exposure property, 
+checked pointers are not allowed to pass through, which is guaranteed by the predicates 
+$\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))$ and $\neg\cmode(\tau)$,
+as well as the check that all free variables in the block content $e$ are in $\overline{x}$.
 For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
 if any argument for \code{handle_request} is a checked pointer, 
-it means that we are exposing a checked pointer address to unsafe regions.
-% 
-\mzu{A $\echeckedtext$ or $\euncheckedtext$ block represents 
-  the context switching from a checked to an checked region, or vice versa.
-}
-% 
-\mz{An action + checked/unchecked block represents the switching.}
-% 
-We need to make sure no checked pointers are \mzs{information} exposed to unsafe code regions.
-as rules \textsc{S-Unchecked} and \textsc{S-Checked} in \Cref{fig:semantics}.
-% 
-\mz{This paragraph is not that cohesive.}
-% 
+it means that we are exposing a checked pointer address to unsafe regions, 
+which means that users might randomly manipulate the data region pointed to by the checked pointer
+and \lang forbids such behavior.
 
 \myparagraph{Dependent Function Pointers}
-Rule \textsc{T-Fun} in \Cref{fig:type-system-1} is the dependent function call rule. 
 Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
 from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
 we confirm that each of $\overline{\tau'}$ is
-a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$,
+a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$ 
+in rule \textsc{T-Fun} (\Cref{fig:type-system-1}),
 which replaces possible integer bound variables $\overline{x}$ with bound expressions $\overline{e'}$.
 The final result type is the defined target type $\tau$ appearing in the function pointer type
 also with such replacement, written as $\tau[\overline{e'} / \overline{x}]$.
@@ -642,6 +633,7 @@ Consider the \code{process_req2} function in
 Fig.~\ref{lst:final}; its parameter type for \code{msg} 
 depends on \code{m_1}. The \textsc{T-Fun} rule will substitute 
 \code{n} with the argument at a call-site.
+\ignore{
 The semantics manages variable scopes using the special $\erettext$
 form. \textsc{S-Let} evaluates to a configuration whose expression is
 $\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
@@ -655,6 +647,7 @@ and restore $x$'s outer score value $\varphi(x)$ in $\varphi'$.
 This procedure continues until $e'$ becomes a literal
 $n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
 the literal. 
+}
 
 \textsc{S-FunC} and \textsc{S-FunT} are
 for $\cmode$ and $\tmode$ mode function pointers, respectively. 
@@ -669,19 +662,12 @@ function body.
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
 maps addresses (integer literals) to the function data described above.
-
-\systemname{} has dependent functions, whose semantic explanation is given in \Cref{appx:add-type-sem}.
-Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
-  annotations $\overline{\tau_a}$ with
-  $\overline{\tau}$ (after instantiation) from the function's
-  signature. Using $\overline{\tau_a}$ when executing the body of
-the function has no impact on the soundness of \lang, but will violate
-Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
 Rule \textsc{S-FunT} defines the tainted version of function call semantics.
 In such case, the verification process 
 $\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}$
 makes sure that the function in the global store is well-defined and has the right type.
 
+\ignore{
 \subsection{Semantics}\label{sec:semantics}
 
 % The semantics
@@ -1257,3 +1243,4 @@ we place a check \code{verify_fun(read_msg, not_null(c, p_lo, p_hi) && type_matc
 The compilation of function calls (compiling to $\elcall{m}{e}{\overline{e}}$) 
 is similar to the manipulation of pointer access operations in \Cref{fig:flagtable}.
 The other compilation rules are given in \Cref{appx:add-type-sem}.
+}
