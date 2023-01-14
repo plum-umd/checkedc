@@ -16,6 +16,7 @@ The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\
 However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (CITE CORRESPONDING IMPL SECTION).
 
 \subsubsection{Additional Function Qualifiers}
+\label{subsubsec:addfuncqual}
 In addition to the~\code{_Tainted} qualifier that marks functions to be in~\ucregion, we provide a few other qualifiers that enable developers to provide additional information and ease the partitioning process.
 Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_Mirror}, and~\code{_TLIB}.
 
@@ -77,6 +78,25 @@ case REQ1:
 + rc = .....
 \end{minted}
 \aravind{Arun, please fix the above example with the exact details.}
+
+\noindent\emph{Handling~\texttt{} Qualifiers}:
+As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
+Consider the following~\code{StringAuth} function that checks whether the provided user is authenticated and needs to be invoked from~\ucregion and hence a callback.
+
+Note that the function accepts a tainted array pointer as its parameter, enabling~\ucregion (tainted) region to invoke it.
+
+For each such function, we create a corresponding trampoline function that serves as the entry point for the callback function, as shown below:
+
+The trampoline function performs the necessary conversion of pointer arguments and eventually invokes the callback.
+
+We also add the code to register this trampoline function with the sandbox. The registration function for WASM sandbox is as shown below:
+
+This registration function creates an opaque handle for the trampoline function and enables~\ucregion to call the trampoline using the corresponding handle.
+
+Lastly, we change all instances where the callback function pointer is given to tainted functions to use the handle for the corresponding trampoline a shown below:
+
+
+
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
 %\subsection{\systemname Function Qualifiers}
