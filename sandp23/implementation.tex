@@ -60,15 +60,23 @@ For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 \noindent\emph{Handling Tainted Buffers in~\cregion}:
 All buffers that are marked as tainted in~\cregion should be allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
 We perform source rewriting and make the buffer into a pointer variable and allocate the corresponding number of bytes using the sandbox-specific allocator. For instance, we perform the following rewriting for~\code{buff} in~\lst{lst:final} with WASM sandbox.
-\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-// char buff[MAX_MSG_SIZE] __Tainted;
-char *buff = ....
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
+- char buff[MAX_MSG_SIZE] __Tainted;
++ char *buff = ....
 \end{minted}
 \aravind{Arun, please fix the above example on how exactly we replace it with WASM allocator.}
 Note that we also add the necessary deallocator calls at function exit points.
 
 \noindent\emph{Handling Calls to Tainted Functions}:
 In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
+We rewrite all calls to tainted functions with corresponding sandbox invocations.
+For instance, we modify the call to~\code{process_req1} in~\lst{lst:final} as below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
+case REQ1: 
+- rc = process_req1(buff); 
++ rc = .....
+\end{minted}
+\aravind{Arun, please fix the above example with the exact details.}
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
 %\subsection{\systemname Function Qualifiers}
