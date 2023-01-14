@@ -151,7 +151,23 @@ TO INVOKE CALLBACK FUNCTIONS.
 \end{minted}
 \aravind{Arun, please fix the above example}
 
+\subsection{Compiler}
+The~\systemname compiler includes the type checker (\sect{}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
+We implemented the compiler on top of the existing~\checkedc compiler.
 
+For all tainted pointer access, our instrumentation adds a check (executed at runtime) to see we check if the address is within the valid range for the sandbox. An example of the check is shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+_TPtr<int> t = ...
++ if (!is_in_range(t, SBX_LOW(), SBX_HIGH()))
++  handle_violation();
+*t = 1;
+\end{minted}
+We show the added check in C for clarify. However, our instrumentation works on LLVM IR.
+
+Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
+\cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers.
+
+\iffalse
 
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
@@ -217,3 +233,4 @@ Pointer-Swizzling is implemented in Clang-CodeGen as a modified GEP-instruction 
 
 \subsubsection{\textbf{Tainted Structures}}
 Tainted Pointers to structures crossing into the sandbox are expected to only allow encapsulation of pointer members that are of the tainted type. Consequently, Tstructs have been introduced as a specialized struct type that enforces compile-time semantics to allow prevent its pointer members from being of non-tainted type. \systemname also restricts tainted pointers to only point to structures of Tstruct type. These semantic restrictions of Tstructs are put in place to prevent checked pointer from leaking into the unchecked regions as members of pointer structures. Tstruct variables follow the conventional layout unless qualified as a \_Decoy variable, in which case, the Tstruct's pointer member accesses follow a 32-Bit layout. 
+\fi
