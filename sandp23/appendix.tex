@@ -2078,3 +2078,30 @@ MicroHTTPD demonstrates the practical difficulties in converting a program to \s
 
 \subsubsection{Tiny-bignum}
 Due to its small size and simplicity, \systemname changes for Tiny-bignum was chosen to be comprehensive. Furthermore, bignum\_to\_string() was moved to the sandbox due to a memory-unsafe use of sprintf(). Given that significant \systemname conversion efforts is attributed to understanding the source-code and finding the precise extent to which we choose to propagate the taintedness or to stop and give up to marshalling the data between regions, Tiny-bignum only required 4 hours. The evaluation was performed on Tiny-bignum's test suite consisting of 4 Test cases, each of which test the functionality to scale on big numbers subject to all of the supported unary and binary operations.  
+
+
+
+\myparagraph{Constant Validity}
+Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
+describe type assumptions for constants appearing in a program.
+$\neg \cmode(\tau)$ judges that a constant pointer 
+in an unchecked region cannot be of a checked type.
+The restriction ensures that programmers 
+cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+In rule \textsc{T-ConstC}, we requires a static 
+verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
+
+The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
+validates the constant $\evalue{n}{\tau}$, 
+where $\heap(m)$ is the initial heap that the constant resides on and
+$\sigma$ is a set of constant assumed to be checked.
+A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
+A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
+and the address stores a function with the right type.
+The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
+where every element in the pointer range ($[0,\size(\omega))$) should be well
+typed.
+A checked pointer checks validity in type step as rule \textsc{T-ConstC},
+while a tainted/unchecked pointer does not check for such during the type checking.
+Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
+

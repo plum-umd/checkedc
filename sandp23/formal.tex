@@ -415,6 +415,95 @@ $
 \subsection{Typing and Semantics}
 \label{sec:typechecking}
 
+
+
+\begin{DIFnomarkup}
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+     \inferrule[T-CastPtr]
+               {\Gamma;\Theta \vdash_m e : \tau' \\
+                 \tau' \sqsubseteq_{\Theta} \tptr{\tau}{\xi}}
+               {\Gamma;\Theta \vdash_m \ecast{\tptr{\tau}{\xi}}{e} : \tptr{\tau}{\xi}}
+                
+    \inferrule[S-Cast]
+              {}
+              {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
+
+\\\\
+    \inferrule[T-Def]
+              {\xi \leq m \\\Gamma;\Theta \vdash_m e : \tptr{\tau}{\xi}}
+              {\Gamma;\Theta \vdash_m \estar{e} : \tau}
+\quad
+        \inferrule[S-DefC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{c}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+\quad
+        \inferrule[S-DefT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}
+         \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+\quad
+    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+
+    \inferrule[T-Checked]
+              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
+                     \\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
+              {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
+
+    \inferrule[T-Unchecked]
+              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
+                \\\\ \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
+              {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
+
+    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+
+
+\inferrule[T-Fun]
+    {\Gamma;\Theta \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \\
+        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
+         \overline{e'}=\{e'|(e',\tint)\in (\overline{e} : \overline{\tau'})\}\\\\
+         \forall e'\;.\;e' \in \overline{e'} \Rightarrow e'\in \text{Bound}\\
+             \overline{\tau'} \sqsubseteq_{\Theta}
+               \overline{\tau}[\overline{e'} / \overline{x}]}
+    {\Gamma; \Theta \vdash_m e(\overline{e}) : \tau[\overline{e'} / \overline{x}]}
+
+
+    \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
+        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
+\quad
+    \inferrule[S-FunT]{ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\tmode,e)
+                  \\ \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}}
+        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\tmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
+
+  \end{mathpar}
+}
+% {\footnotesize
+% \begin{center}
+% $
+% \begin{array}{l}
+% \fm(e)\triangleq(\exists x\; n\; \tau. e=x+\evalue{n}{\tau}) \vee (\exists n\;\tau. e = \evalue{n}{\tau})
+% \\[0.2em]
+% \tau[\overline{e} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall e_i\in\overline{e}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \wedge (x_i \in \fv(\tau) \Rightarrow \fm(e_i)) \Rightarrow \tau[e_i / x_i]
+% \end{array}
+% $
+% \end{center}
+% }
+{\footnotesize
+$
+\cmode(\tint)=\texttt{false}
+\qquad
+\cmode(\tptr{\omega}{\cmode})=\texttt{true}
+\qquad
+\cmode(\tptr{\omega}{\xi})=\texttt{false}\;\;{[\emph{owise}]}
+$
+}
+\caption{Selected type rules}
+\label{fig:type-system-1}
+\end{figure*}
+\end{DIFnomarkup}
+
 The \lang system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
 Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
 
@@ -433,33 +522,70 @@ $\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umod
 maps addresses (integer literals) to values $\evalue{n}{\tau}$.
 The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
 
+We wrote $\heap(m,n)$ to retrieve the $n$-location heap value in the $m$ heap,
+and $\heapup{m}{n}{\evalue{n'}{\tau}}$ 
+to update location $n$ with the value $\evalue{n'}{\tau}$ in the $m$ heap.
+While heap bindings can change, stack bindings are immutable---once
+variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
+be updated. 
+%We can model mutable stack variables as pointers into the mutable heap.
+As mentioned, value $\evalue{0}{\tau}$
+represents a $\enull$ pointer when $\tau$ is a pointer type.
+Correspondingly, $\heap(m,0)$ should always be undefined.
+% 
+The relation steps to a \emph{result} $r$, which is either an
+expression, a $\enull$ or $\ebounds$ failure, represent an expression right
+  after the reduction, a null-pointer dereference or out-of-bounds access,
+respectively.
+% 
+Such failures are a \emph{good} outcome; stuck states
+(non-value expressions that cannot transition to a result $r$)
+characterizing undefined behavior.
+%The context mode $m$ (in $\longrightarrow_{m}$) indicates whether the stepped redex within $e$ was in a $\cmode$ or $\umode$ region.
+
+The rules for the main operational semantics
+judgment \emph{evaluation} are given at the bottom of
+Fig.~\ref{fig:c-context}.
+The first rule takes an expression $e$, decomposes
+it into an \emph{evaluation context} $E$ and a sub-expression $e'$
+(such that replacing the hole $\Box$ in $E$ with $e'$ would yield
+$e$), and then evaluates $e'$ according to the \emph{computation}
+  relation $(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$,
+whose rules are given along with type rules in Fig.~\ref{fig:type-system-1}, discussed
+shortly.
+The $\mode$ function in Fig.~\ref{fig:c-context}
+determines the context mode that the expression $e'$ locates based on the context $E$.
+In \Cref{lst:humantaint}, the function call expression \code{read_msg} has $\umode$ mode since it is inside a tainted function.
+The second rule describes the exception handling 
+for possible crashing behaviors in unchecked regions.
+A $\umode$ mode operation can non-deterministically crash
+and the \systemname sandbox mechanism recovers
+the program to a safe point ($\evalue{0}{\tau}$)
+and continues with the existing program state.
+Evaluation contexts $E$ define a standard left-to-right evaluation order. 
+%(We explain the $\ret{x}{\mu}{e}$ syntax shortly.)
+%There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
+
 \myparagraph{Modes, Static Casting, and Subtyping}
 In \lang, Context modes $m$ appearing in a type rule determine the code region 
 that permits pointer dereferences and value-assignments, depending on the pointer modes.
-We define a three point lattice $\xi_1 \le \xi_2$ to describe such permission, where $\tmode \le \xi$ and $m \le m$.
+We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ since $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
 This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can perform such operations in $\cmode$ and $\umode$ regions, respectively.
-Pointer modes are also useful in determining if a nested pointer has a valid type.
-For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
+%Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
 
-\lang also has static casting operations. As described in rule \textsc{T-CastPtr},
+\lang also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
 an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to another pointer type \tptr{\tau_2}{\xi_2},
 if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2} $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
 In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-//_Ptr<int> a; _t_Ptr<int> b; int *c;
-c = (int *)b; // This is okay.
-a = (_Ptr<int>)b; // Not allowed.
+//_Ptr<int> x; _t_Ptr<int> y; int *z;
+z = (int *)y; // This is okay.
+x = (_Ptr<int>)y; // Not allowed.
 \end{minted}
 
 In the above example, a $\tmode$ mode pointer can be cast to $\umode$ mode but casting $\tmode$ mode to $\cmode$ mode is disallowed.
 The complete subtyping relation was described in \Cref{fig:checkc-subtype}.
-\ignore{
-For example, the rule ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{\xi}\sqsubseteq
-\tarrayptr{b_l}{b_h}{\tau}{\xi}$) permits treating a singleton
-pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
-Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
-if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).}
 Notice that \texttt{let} statements are immutable in \lang, so the following code is not possible, because variables \code{x} and \code{y} must have the same type in \lang.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
@@ -467,30 +593,18 @@ Notice that \texttt{let} statements are immutable in \lang, so the following cod
 x = y; // Not allowed.
 \end{minted}
 
+\myparagraph{Pointer Dereference}
+The type and semantic rules for pointer dereference (\textsc{T-Def}, \textsc{S-DefC},
+\textsc{S-DefT}, \textsc{S-DefNull} in \Cref{fig:type-system-1})
+reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in evaluation stage.
+The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
+With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a \enull pointer is used,
+\lang captures the runtime error.
+Type and semantic rules for array types and pointer assignments are given in \Cref{appx:add-type-sem}.
 
-\myparagraph{Constant Validity}
-Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
-describe type assumptions for constants appearing in a program.
-$\neg \cmode(\tau)$ judges that a constant pointer 
-in an unchecked region cannot be of a checked type.
-The restriction ensures that programmers 
-cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
-In rule \textsc{T-ConstC}, we requires a static 
-verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
-
-The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
-validates the constant $\evalue{n}{\tau}$, 
-where $\heap(m)$ is the initial heap that the constant resides on and
-$\sigma$ is a set of constant assumed to be checked.
-A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
-A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
-and the address stores a function with the right type.
-The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
-where every element in the pointer range ($[0,\size(\omega))$) should be well
-typed.
-A checked pointer checks validity in type step as rule \textsc{T-ConstC},
-while a tainted/unchecked pointer does not check for such during the type checking.
-Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
+Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereference, respectively.
+In addition to the no \enull check in $\cmode$ mode pointer dereference,
+any dynamic heap access of a tainted pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
 
 \myparagraph{Unchecked and Checked Blocks}
 %
@@ -556,7 +670,7 @@ Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
 maps addresses (integer literals) to the function data described above.
 
-\systemname{} has dependent functions, whose semantic explaination is given in \Cref{appx:add-type-sem}.
+\systemname{} has dependent functions, whose semantic explanation is given in \Cref{appx:add-type-sem}.
 Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
   annotations $\overline{\tau_a}$ with
   $\overline{\tau}$ (after instantiation) from the function's
@@ -678,64 +792,6 @@ Evaluation contexts $E$ define a standard left-to-right evaluation order. (We ex
 $\ret{x}{\mu}{e}$ syntax shortly.)
 %There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
 
-
-\begin{DIFnomarkup}
-\begin{figure*}[t]
-{\small
-  \begin{mathpar}
-        \inferrule[S-DefC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{c}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-\quad
-        \inferrule[S-DefT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}
-         \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-\quad
-    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
-\quad
-    \inferrule[S-Cast]
-              {}
-              {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
-
-    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{\evalue{n'}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n'}{\tau'})}
-
-        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e})}
-
-    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
-
-    \inferrule[S-RetCon]{ (\varphi[x\mapsto \evalue{n}{\tau}],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi'[x\mapsto \varphi(x)],\heap',\ret{x}{\varphi'(x)}{e'})}
-
-    \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
-
-    \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
-        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
-   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
-\quad
-    \inferrule[S-FunT]{ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\tmode,e)
-                  \\ \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}}
-        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\tmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
-   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
-
-
- % \inferrule[S-IfNTNot]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(n)\neq 0\\ 0 < n_h}
- %            {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
-
-\end{mathpar}
-}
-% {\footnotesize
-% \begin{center}
-% $
-% \begin{array}{l}
-% \tau[\overline{n} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall n_i\in\overline{n}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \Rightarrow \tau[n_i / x_i]\\[0.2em]
-% \mathtt{let}\;\overline{x}=\overline{e}\;\mathtt{in}...\triangleq \mathtt{let}\;x_0=e_0\;\mathtt{in}\;\mathtt{let}\;x_1=e_1\;\mathtt{in}...
-% \end{array}
-% $
-% \end{center}
-% }
-\caption{\lang Semantics: Computation (Selected Rules)}
-\label{fig:semantics}
-\end{figure*}
-\end{DIFnomarkup}
-
 Fig.~\ref{fig:semantics} shows selected rules for the computation relation.
 The rules for pointer related operations---\textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-DefNull}, and \textsc{S-Cast}.
@@ -780,94 +836,6 @@ produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
 % \liyi{The comment seems to confuse the meaning of the text about the if-then-else rules. Making the rule specific will help. }
 
 
-
-\begin{DIFnomarkup}
-\begin{figure*}[t]
-{\small
-  \begin{mathpar}
-   \inferrule[T-ConstU]
-       { \neg \cmode(\tau)}
-       {\Gamma;\Theta\vdash_u \evalue{n}{\tau} : \tau}
-
-   \inferrule[T-ConstC]
-       {\Theta;\heap;\emptyset \vdash_c n : \tau}
-       {\Gamma;\Theta\vdash_c \evalue{n}{\tau} : \tau}
-
-    \inferrule[T-Def]
-              {\xi \leq m \\\\\Gamma;\Theta \vdash_m e : \tptr{\tau}{\xi}}
-              {\Gamma;\Theta \vdash_m \estar{e} : \tau}
-
-     \inferrule[T-CastPtr]
-               {\Gamma;\Theta \vdash_m e : \tau' \\
-                 \tau' \sqsubseteq_{\Theta} \tptr{\tau}{\xi}}
-               {\Gamma;\Theta \vdash_m \ecast{\tptr{\tau}{\xi}}{e} : \tptr{\tau}{\xi}}
-                
-   \inferrule[T-Let]
-    { x\not\in \fv(\tau') \\
-        \Gamma;\Theta \vdash_m e_1 : \tau \\\\
-          \Gamma[x\mapsto \tau];\Theta \vdash_m e_2 : \tau'
-             }
-    {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'}
-
-   \inferrule[T-LetInt]
-    { x\in \fv(\tau') \Rightarrow e_1 \in \text{Bound} \\
-        \Gamma;\Theta \vdash_m e_1 : \tint \\\\
-           \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{e_1}] \vdash_m e_2 : \tau'
-             }
-    {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'[e_1 / x]}
-\qquad
-   \inferrule[T-RetInt]
-    { \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
-    {\Gamma;\Theta \vdash_m \eret{x}{\evalue{n}{\tint}}{e} : \tau}
-
-    \inferrule[T-Checked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                     \\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
-              {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
-
-    \inferrule[T-Unchecked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                \\\\ \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
-              {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
-
-\inferrule[T-Fun]
-    {\Gamma;\Theta \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \\
-        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
-         \overline{e'}=\{e'|(e',\tint)\in (\overline{e} : \overline{\tau'})\}\\\\
-         \forall e'\;.\;e' \in \overline{e'} \Rightarrow e'\in \text{Bound}\\
-             \overline{\tau'} \sqsubseteq_{\Theta}
-               \overline{\tau}[\overline{e'} / \overline{x}]}
-    {\Gamma; \Theta \vdash_m e(\overline{e}) : \tau[\overline{e'} / \overline{x}]}
-
-
-
-
-  \end{mathpar}
-}
-% {\footnotesize
-% \begin{center}
-% $
-% \begin{array}{l}
-% \fm(e)\triangleq(\exists x\; n\; \tau. e=x+\evalue{n}{\tau}) \vee (\exists n\;\tau. e = \evalue{n}{\tau})
-% \\[0.2em]
-% \tau[\overline{e} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall e_i\in\overline{e}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \wedge (x_i \in \fv(\tau) \Rightarrow \fm(e_i)) \Rightarrow \tau[e_i / x_i]
-% \end{array}
-% $
-% \end{center}
-% }
-{\footnotesize
-$
-\cmode(\tint)=\texttt{false}
-\qquad
-\cmode(\tptr{\omega}{\cmode})=\texttt{true}
-\qquad
-\cmode(\tptr{\omega}{\xi})=\texttt{false}\;\;{[\emph{owise}]}
-$
-}
-\caption{Selected type rules}
-\label{fig:type-system-1}
-\end{figure*}
-\end{DIFnomarkup}
 
 \begin{DIFnomarkup}
  \begin{figure}[t]
