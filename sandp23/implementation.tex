@@ -83,8 +83,9 @@ case REQ1:
 As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
 Consider the following~\code{StringAuth} function that checks whether the provided user is authenticated and needs to be invoked from~\ucregion and hence a callback.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-_Callback _TPtr<char> StringAuth(_T_Array_Ptr<const char> usertoken : count(len),
-                                 size_t len) {
+_Callback _TPtr<char> StringAuth(
+               _T_Array_Ptr<const char> usertoken : count(len),
+               size_t len) {
 ...
 // Checks whether usertoken is authenticated
 /*
@@ -94,19 +95,43 @@ _Callback _TPtr<char> StringAuth(_T_Array_Ptr<const char> usertoken : count(len)
 ...
 }
 \end{minted}
+These callback functions are only allowed to use tainted parameters as they will be called from a tainted region.
 
-Note that the function accepts a tainted array pointer as its parameter, enabling~\ucregion (tainted) region to invoke it.
 
 For each such function, we create a corresponding trampoline function that serves as the entry point for the callback function, as shown below:
-
-The trampoline function performs the necessary conversion of pointer arguments and eventually invokes the callback.
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
++ unsigned int _T_StringAuth(unsigned sandbox,
++               unsigned int arg_1,
++               unsigned long int arg_2) {
++   // Perform necessary conversion of arguments.
++   // uname <- conver arg_1
++   // len <- arg_2
++   ret = StringAuth(uname, len);
++   // ret_val <- ret
++   return ret_val;
++ }
+\end{minted}
+The trampoline function handles the invocations from sandbox (and hence the extra parameter~\code{sandbox}), performs the necessary conversion of pointer arguments, and eventually invokes the callback.
 
 We also add the code to register this trampoline function with the sandbox. The registration function for WASM sandbox is as shown below:
-
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
++ void registerCallback_StringAuth(void){
++ //callback function signature {ret <- int, arg_1 <- int, arg_2 <- long}
++ int ret_param_types[] = {0, 0, 1};
++ // 2 <- arg count, 1 <- ret count
++ __StringAuth__C_ = _SBXREG_((void*)_T_StringAuth,2,1, ret_param_types);
++ }
+\end{minted}
 This registration function creates an opaque handle for the trampoline function and enables~\ucregion to call the trampoline using the corresponding handle.
 
 Lastly, we change all instances where the callback function pointer is given to tainted functions to use the handle for the corresponding trampoline a shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{c}
+// How do we change the call-sites where the function pointer is passed
+// as the call-back.
+\end{minted}
+\aravind{Arun, please check above code example to see if they make sense.}
 
+\subsubsection{Generating~\ucregion Source Partition}
 
 
 %\subsection{Overview}
