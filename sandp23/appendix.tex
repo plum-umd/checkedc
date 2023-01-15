@@ -89,7 +89,7 @@
 
 \Cref{fig:wftypes} defines the well-formedness for nested pointers, guaranteeing that no tainted ($\tmode$) pointer has a checked ($\cmode$) element field.
 Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, $\xi_2\le \xi_1$.
-\Cref{fig:wftypesandbounds} defines the well-formedness for bounds appearing in a type.
+\Cref{fig:wftypesandbounds} defines the well-formedness for bounds appearing in a type, which requires that any bound must be $\tint$ type and has instance in $\Gamma$.
 All bound variables appearing in a type must be either an instance of the type environment $\Gamma$,
 or a bound variable appearing in a function pointer.
 
@@ -125,6 +125,8 @@ or a bound variable appearing in a function pointer.
 
   \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
     \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
+
+    && \tptr{\tau}{\tmode}&\sqsubseteq_{\Theta}& \tptr{\tau}{\umode}\\[0.2em]
 
     0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
     b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
