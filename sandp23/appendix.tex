@@ -1,5 +1,783 @@
 \section{Appendix}\label{app:main}
 
+
+\subsection{Well-formedness and Subtype}
+\label{app:le}
+  
+
+\begin{figure}[h]
+{\small
+  \begin{mathpar}
+
+  \inferrule[]
+  {}
+  {m \vdash \tint}
+
+  \inferrule[]
+  {\xi \wedge m\vdash \tau \\ \xi \le m}
+  {m \vdash \tptr{\tallarrayb{\bvar}{\tau}}{\xi}}
+
+  \inferrule[]
+  {\xi \wedge m \vdash \tau\\ \xi \le m}
+  {m \vdash \tptr{\tau}{\xi}}
+
+  \inferrule[]
+  {\xi \wedge m \vdash \tau\\ \xi \le m \\\\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
+  {m \vdash \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi})}
+  \end{mathpar}
+}
+{\footnotesize
+\[
+\begin{array}{l} 
+\tmode \wedge \cmode = \umode \qquad \xi \wedge \umode = \umode
+\qquad \cmode \wedge m = m 
+\qquad  m_1 \wedge m_2 = m_2 \wedge m_1
+\end{array}
+\]
+}
+ \caption{Well-formedness for Nested Pointers}
+\label{fig:wftypes}
+\end{figure}
+
+\begin{figure}[h]
+{\small
+  \begin{mathpar}
+
+    \inferrule[]
+    {}
+    {\Gamma \vdash n}
+
+    \inferrule[]
+    {x:\tint \in \Gamma}
+    {\Gamma \vdash x + n}
+
+    \inferrule[]
+    {\Gamma \vdash b_l\\
+    \Gamma \vdash b_h}
+  {\Gamma \vdash (b_l,b_h)}
+
+  \inferrule[]
+  {}
+  {\Gamma \vdash \tint}
+
+  \inferrule[]
+  {\Gamma \vdash \bvar \\
+  \Gamma \vdash \tau}
+  {\Gamma \vdash \tptr{\tallarrayb{\bvar}{\tau}}{m}}
+
+  \inferrule[]
+  {\Gamma \vdash \tau}
+  {\Gamma \vdash \tptr{\tau}{m}}
+
+  \inferrule[]
+  {T \in D}
+  {\Gamma \vdash \tptr{\tstruct{T}}{m}}
+
+  \inferrule[]
+  {\Gamma \vdash \tau}
+  {\Gamma \vdash \tptr{\tau}{m}}
+
+  \inferrule[]
+  {\forall \tau_i\in \overline{\tau}\,.\,\Gamma[\forall x\in\overline{x}\,.\, x\mapsto \tint] \vdash \tau_i\\\\
+   \Gamma[\forall x\in\overline{x}\,.\, x\mapsto \tint] \vdash \tau }
+  {\Gamma \vdash \tfun{\overline{x}}{\overline{\tau}}{\tau}}
+  \end{mathpar}
+}
+ \caption{Well-formedness for Types and Bounds}
+\label{fig:wftypesandbounds}
+\end{figure}
+
+\Cref{fig:wftypes} defines the well-formedness for nested pointers, guaranteeing that no tainted ($\tmode$) pointer has a checked ($\cmode$) element field.
+Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, $\xi_2\le \xi_1$.
+\Cref{fig:wftypesandbounds} defines the well-formedness for bounds appearing in a type.
+All bound variables appearing in a type must be either an instance of the type environment $\Gamma$,
+or a bound variable appearing in a function pointer.
+
+\begin{DIFnomarkup}
+\begin{figure}
+{\small
+\[\hspace*{-1.2em}
+\begin{array}{l}
+\textcolor{blue}{\text{Bound Inequality and Equality:}}\\[0.3em]
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+     n \le n' &\Rightarrow& n &\le_{\Theta} & n'\\
+     n \le n' &\Rightarrow& x+n &\le_{\Theta} & x+n'\\
+     n \le n' \wedge \Theta(x)=\tgez &\Rightarrow& n &\le_{\Theta} & x+n'\\
+     \Theta(x)=\teq{b} \wedge b+n\le_{\Theta}b'  &\Rightarrow& x+n & \le_{\Theta} & b'\\
+     \Theta(x)=\teq{b}\wedge b'\le_{\Theta}b+n  &\Rightarrow& b' & \le_{\Theta} & x+n\\
+     b \le_{\Theta} b' \wedge b' \le_{\Theta} b  &\Rightarrow& b & =_{\Theta} & b'
+    \end{array}
+  \\[1.5em]
+\textcolor{blue}{\text{Type Equility:}}\\
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+     && \tint & =_{\Theta} & \tint\\
+     \omega =_{\Theta} \omega' &\Rightarrow& \tptr{\omega}{\xi} & =_{\Theta} & \tptr{\omega'}{\xi}\\
+     \bvar =_{\Theta} \bvar' \wedge  \tau =_{\Theta} \tau'
+             &\Rightarrow& \tallarrayb{\bvar}{\tau} & =_{\Theta} & \tallarrayb{\bvar'}{\tau'}\\
+
+    \textit{cond}(\overline{x},\overline{\tau}\to\tau,\overline{y},\overline{\tau'}\to\tau')
+
+ &\Rightarrow& \tfun{\overline{x}}{\overline{\tau}}{\tau} & 
+                         =_{\Theta} & \tfun{\overline{y}}{\overline{\tau'}}{\tau'}\\
+    \end{array}
+  \\[0.7em]
+\textcolor{blue}{\text{Subtype:}}\\[0.3em]
+
+  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
+    \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
+
+    0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
+    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
+    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
+    %% b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow&  \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq&  \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
+    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tallarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tallarrayptr{b_l'}{b_h'}{\tau}{m}
+\\[0.2em]
+\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}\wedge \tau\sqsubseteq_{\Theta}\tau' &\Rightarrow& \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} &\sqsubseteq_{\Theta}& \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}
+
+    \end{array}
+\end{array}
+  \]
+}
+{\footnotesize
+\[
+\begin{array}{l}
+n'+n = add(n',n)
+\qquad
+(x+n')+n = x+add(n',n)\\
+\textit{cond}(\overline{x},\tau,\overline{y},\tau')
+=\exists\overline{z}\;.\;\overline{x}\cupdot\overline{z}
+  \wedge \overline{y}\cupdot\overline{z}
+  \wedge \size(\overline{x})=\size(\overline{y})=\size(\overline{z})
+\\\qquad\qquad\qquad\qquad\qquad
+  \wedge \tau[\overline{z}/\overline{x}]= \tau'[\overline{z}/\overline{x}]
+\end{array}
+\]
+}
+  \caption{Type Equality and Subtyping}
+  \label{fig:checkc-subtype}
+\end{figure}
+\end{DIFnomarkup}
+
+
+In \lang, type equality $\tau=_{\Theta}\tau'$
+is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
+and the alpha equivalence of two function types in \Cref{fig:checkc-subtype};
+i.e., two (NT-)array pointer types $\tallarrayb{\bvar}{\tau} $ and $ \tallarrayb{\bvar'}{\tau'}$ are equivalent, if 
+$\bvar =_{\Theta} \bvar'$ and $\tau=_{\Theta}\tau'$; two function types 
+$\tfun{\overline{x}}{\overline{\tau}}{\tau} $ and $ \tfun{\overline{y}}{\overline{\tau'}}{\tau'}$
+are equivalent, if we can find a same length (as $\overline{x}$ and $\overline{y}$) variable list $\overline{z}$ that is substituted for $\overline{x}$ and $\overline{y}$ in $\overline{\tau} \to {\tau}$ and $\overline{\tau'} \to {\tau'}$, resp.,
+and the substitution results are equal.
+
+ The \textsc{T-CastPtr} rule
+permits casting from an expression of type $\tau'$ to a checked pointer when
+$\tau' \sqsubseteq \tptr{\tau}{\cmode}$. This subtyping relation
+$\sqsubseteq$ is given in Fig.~\ref{fig:checkc-subtype} and is built on the type equality
+($\tau =_{\Theta} \tau'\Rightarrow\tau \sqsubseteq_{\Theta} \tau'$). The many
+rules ensure the relation is transitive. Most of the rules manage
+casting between array pointer types. The rule 
+($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
+\tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
+pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
+%There is another casting rule in \Cref{app:main} stating that
+% users are free to cast types in unchecked code regions, since unchecked regions can contain C code.
+
+
+The subtyping relation given in Fig.~\ref{fig:checkc-subtype} involves
+dependent bounds, i.e., bounds that may refer to variables. To decide
+premises $b \leq_{\Theta} b'$ in \Cref{fig:checkc-subtype}, we need a decision procedure that accounts for
+the possible values of these variables. This process considers
+$\Theta$, tracked by the typing judgment, and $\varphi$, the current
+stack snapshot (when performing subtyping as part of the type
+preservation proof).
+
+Since bounds expressions may
+contain variables, determining assumptions like $b_l \leq_{\Theta} b_l'$
+requires reasoning about the probable values of these variables'. The type
+system uses $\Theta$ to make such reasoning more precise.
+$\Theta$ is a map from variables $x$ to
+equation predicates $P$, which have the form $P ::= \tgez \;|\; \teq{b}$.
+It maps variables to equations that are recorded along the type checking procedure.
+If $\Theta$ maps $x$ to $\tgez$, that means that $x \ge 0$;
+$\teq{b}$ means that $x$ is equivalent to the bound value $b$ in the current context, 
+such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-RetInt}.
+
+$\sqsubseteq$ is parameterized by
+$\Theta$, which provides the range of allowed values for a bound
+variable; thus, more $\sqsubseteq$ relation is provable. For example,
+rule \rulelab{T-LetInt} inserts a predicate $\teq{e_1}$ for variable $x$.
+Assume that $e_1$ is equal to $0$,
+when $x$ is used as a type variable in type $\tntarrayptr{0}{x}{\tint}{\cmode}$ in $e_2$,
+the subtyping relation $\tntarrayptr{0}{x}{\tint}{\cmode} \sqsubseteq
+\tntarrayptr{0}{0}{\tint}{\cmode}$ is provable when we know
+\code{x}$\teq{0}$.
+
+To capture bound variables in dependent types, the \checkedc subtyping
+relation ($\sqsubseteq$) is parameterized by a restricted stack
+snapshot $\varphi|_{\rho}$ and the predicate map $\Theta$, where
+$\varphi$ is a stack and $\rho$ is a set of
+variables. $\varphi|_{\rho}$ means to restrict the domain of $\varphi$
+to the variable set $\rho$. Clearly, we have the relation:
+$\varphi|_{\rho} \subseteq \varphi$. $\sqsubseteq$
+being parameterized by $\varphi|_{\rho}$ refers to that when we
+compare two bounds $b \le_{\Theta} b'$, we actually do
+$\varphi|_{\rho}(b) \le_{\Theta} \varphi|_{\rho}(b')$ by interpreting the
+variables in $b$ and $b'$ with possible values in $\varphi|_{\rho}$.
+Let's define a subset relation $\preceq$ for two restricted stack
+snapshot $\varphi|_{\rho}$ and $\varphi'|_{\rho}$:
+
+
+\begin{DIFnomarkup}
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+   \inferrule[T-ConstU]
+       { \neg \cmode(\tau)}
+       {\Gamma;\Theta\vdash_u \evalue{n}{\tau} : \tau}
+\quad
+   \inferrule[T-ConstC]
+       {\Theta;\heap;\emptyset \vdash_c n : \tau}
+       {\Gamma;\Theta\vdash_c \evalue{n}{\tau} : \tau}
+\quad      
+   \inferrule[T-Let]
+    { x\not\in \fv(\tau') \\
+        \Gamma;\Theta \vdash_m e_1 : \tau \\\\
+          \Gamma[x\mapsto \tau];\Theta \vdash_m e_2 : \tau'
+             }
+    {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'}
+\quad
+   \inferrule[T-LetInt]
+    { x\in \fv(\tau') \Rightarrow e_1 \in \text{Bound} \\
+        \Gamma;\Theta \vdash_m e_1 : \tint \\\\
+           \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{e_1}] \vdash_m e_2 : \tau'
+             }
+    {\Gamma;\Theta \vdash_m \elet{x}{e_1}{e_2} : \tau'[e_1 / x]}
+\quad
+   \inferrule[T-RetInt]
+    { \Gamma[x\mapsto \tint];\Theta[x\mapsto \teq{n}] \vdash_m e : \tau}
+    {\Gamma;\Theta \vdash_m \eret{x}{\evalue{n}{\tint}}{e} : \tau}
+
+    \inferrule[T-Mac]
+              {\xi\le m}
+              {\Gamma; \Theta \vdash_m \emalloc{\xi}{\omega} : \tptr{\omega}{\xi}}
+
+    \inferrule[T-Add]
+              {\Gamma; \Theta \vdash_m e_1 : \tint \\
+                \Gamma; \Theta \vdash_m e_2 : \tint}
+              {\Gamma; \Theta \vdash_m (e_1 \plus e_2) : \tint }
+
+    \inferrule[T-Ind] 
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{\xi} \\
+                \Gamma; \Theta \vdash_m e_2 : \tint \\
+                \xi \leq m}              
+              {\Gamma; \Theta \vdash_m \estar{(\ebinop{e_1}{e_2})} : \tau}
+
+    \inferrule[T-Assign]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tau}{\xi} \\
+                \Gamma; \Theta \vdash_m e_2 : \tau' \\\\
+                \tau'\sqsubseteq_{\Theta} \tau \\
+                \xi \leq m}
+              {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}
+
+    \inferrule[T-AssignArr]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{\xi}\\\\
+                \Gamma; \Theta \vdash_m e_2 : \tau' \\
+                \tau'\sqsubseteq_{\Theta} \tau\\
+                \xi \leq m}
+              {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}              
+
+   \inferrule[T-IndAssign]
+              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{\xi}\\
+                \Gamma; \Theta \vdash_m e_2 : \tint \\\\
+                \Gamma; \Theta \vdash_m e_3 : \tau' \\
+                \tau'\sqsubseteq_{\Theta} \tau \\
+                \xi \leq m}
+              {\Gamma; \defscope \vdash_m \eassign{(e_1 \plus e_2)}{e_3} : \tau}
+
+
+  \end{mathpar}
+}
+% {\footnotesize
+% \begin{center}
+% $
+% \begin{array}{l}
+% \fm(e)\triangleq(\exists x\; n\; \tau. e=x+\evalue{n}{\tau}) \vee (\exists n\;\tau. e = \evalue{n}{\tau})
+% \\[0.2em]
+% \tau[\overline{e} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall e_i\in\overline{e}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \wedge (x_i \in \fv(\tau) \Rightarrow \fm(e_i)) \Rightarrow \tau[e_i / x_i]
+% \end{array}
+% $
+% \end{center}
+% }
+\caption{Remaining \lang Type Rules (extends Fig.~\ref{fig:type-system-1})}
+\label{fig:rem-type-system}
+\end{figure*}
+\end{DIFnomarkup}
+
+\begin{defi}[Subset of Stack Snapshots]
+  Given two $\varphi|_{\rho}$ and $\varphi'|_{\rho}$,
+  $\varphi|_{\rho} \preceq \varphi'|_{\rho}$, iff for $x\in\rho$ and
+  $y$,
+  $(x,y) \in \varphi|_{\rho} \Rightarrow (x,y) \in \varphi'|_{\rho}$.
+\end{defi}
+
+For every two restricted stack snapshots $\varphi|_{\rho}$ and
+$\varphi'|_{\rho}$, such that
+$\varphi|_{\rho} \preceq \varphi'|_{\rho}$, we have the following
+theorem in \checkedc (proved in Coq):
+
+\begin{thm}[Stack Snapshot Theorem]
+  Given two types $\tau$ and $\tau'$, two restricted stack snapshots
+  $\varphi|_{\rho}$ and $\varphi'|_{\rho}$, if
+  $\varphi|_{\rho}\preceq \varphi'|_{\rho}$, and
+  $\tau \sqsubseteq \tau'$ under the parameterization of
+  $\varphi|_{\rho}$, then $\tau \sqsubseteq \tau'$ under the
+  parameterization of $\varphi'|_{\rho}$.
+\end{thm}
+
+Clearly, for every $\varphi|_{\rho}$, we have
+$\emptyset \preceq \varphi|_{\rho}$. The type checking stage is a
+compile-time process, so $\varphi|_{\rho}$
+is $\emptyset$ at the type checking stage. Stack snapshots are needed
+for proving type preserving, as variables in bounds expressions are
+evaluated away.
+
+
+\subsection{Other Type Rules and Literal Validity Checks}\label{rem-type}
+
+Here we show the type rules for other \lang operations in Fig.~\ref{fig:rem-type-system}.
+Rule \textsc{T-Mac} deals with
+$\emalloctext$ operations. There is a well-formedness check to require
+that the possible bound variables in $\omega$ must be in the domain of
+$\Gamma$ (see Fig.~\ref{fig:wftypesandbounds}). This is similar to the well-formedness assumption of the type environment (Definition~\ref{type-wellformed}). Rule \textsc{T-Add} deals with binary operations whose sub-terms are integer expressions.
+The other rules are explained as follows.
+
+\myparagraph{Pointer Access}
+%
+The \textsc{T-AssignArr} rule examines array assignment operations, returning the type of
+pointed-to objects. Rules for pointers for other object types are
+similar, such that Rule \textsc{T-Assign} assigns a value to a non-array pointer location.
+The condition $\xi\le m$ ensures that checked and unchecked pointers 
+can only be dereferenced in checked and unchecked regions, respectively;
+The type rules do not attempt to reason whether the access is in bounds;
+such check is deferred to the semantics.
+Rule \textsc{T-Ind} serves the case for pointer arithmetic. For simplicity, in the \checkedc formalization, we do not allow arbitrary pointer arithmetic. The only pointer arithmetic operations allowed are the forms shown in rules \textsc{T-Ind} and \textsc{T-IndAssign} in Fig.~\ref{fig:rem-type-system}.  The predicate $\tau'\sqsubseteq_{\Theta} \tau$ requires that the value being assigned is a subtype of the pointer type.
+The \textsc{T-IndAssign} rule is an extended assignment operation for handling assignments for array/NT-array pointers with pointer arithmetic.
+
+% Subtyping and casting operations are briefly introduced in
+% Sec.~\ref{sec:intros}~and~\ref{sec:overview}.  Subtyping is useful in
+% static casting operations that allow users to view a pointer in one
+% type as another, such as casting an NT-array pointer to an array
+% one. \checkedc provides a set of safe static casting operations that
+% have no cost in execution.  Moreover, subtyping acts as oracles for
+% bound widening and dynamic casting operations; thus, \checkedc is
+% different from a complete static array pointer bound system.  For
+% example, if $e$ has type $\tau'$ and $\varphi$ is the current stack
+% snapshot, the semantics of $\edyncast{\tau}{e}$ does not transition to
+% an error state when $\varphi(\tau')\sqsubseteq\varphi(\tau)$.  In a
+% function call, for every argument, \lang permits users to input a
+% subtype entity and we prove that this does not affect the correctness
+% of the program.
+
+\begin{DIFnomarkup}
+ \begin{figure}[t]
+ {\small
+
+ \begin{mathpar}
+   \inferrule
+       {}
+       {\Theta;\heap;\sigma \vdash_m n : \tint}
+
+   \inferrule
+       {}
+       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\xi}}
+
+   \inferrule
+       {(m = \cmode \Rightarrow \xi \neq \cmode) \\\\ (m=\umode \Rightarrow \xi = \umode)}
+       {\Theta;\heap;\sigma \vdash_{\cmode} n : \tptr{\omega}{\tmode}}
+  
+   \inferrule
+       {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+
+
+   \inferrule
+       {\tptr{\omega'}{\xi'} \sqsubseteq_{\Theta} \tptr{\omega}{\xi} 
+            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\xi'}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+
+   \inferrule
+       { \xi \le m 
+     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\xi,e)
+       \\  \overline{x} = \{x|(x:\tint) \in (\overline{x'}:\overline{\tau}) \}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\xi}}
+  
+   \inferrule
+       {\neg\funptr(\omega)\\ \xi \le m\\
+        \forall i \in [0,\size(\omega)) \;.\;
+            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\xi})) \}\vdash_m \heap(m,n+i)}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+ \end{mathpar}
+ }
+{\footnotesize
+\[
+\begin{array}{l} 
+\funptr(\tfun{\overline{x}}{\overline{\tau}}{\tau}) = \texttt{true}
+\qquad
+\funptr(\omega) = \texttt{false}\;\;{[\emph{owise}]}
+\end{array}
+\]
+}
+ \caption{Verification/Type Rules for Constants}
+ \label{fig:const-type}
+ \end{figure}
+\end{DIFnomarkup}
+
+\myparagraph{Literal Constant Validity}
+Rules \textsc{T-ConstU} and \textsc{T-ConstC}
+describes type assumptions for literals appearing in a program.
+$\cmode(\tau)$ judges that a literal pointer 
+in an unchecked region cannot be of a checked type,
+which represents an assumption that programmers 
+cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+In rule \textsc{T-ConstC}, we requires a static 
+verification procedure for validating a literal pointer, 
+which is similar to the dynamic verification process in \Cref{sec:typechecking}. 
+
+The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$ checks (\Cref{fig:const-type})
+validate the literal $\evalue{n}{\tau}$, 
+where $\heap(m)$ is the initial heap that the literal resides on and
+$\sigma$ is a set of literals assumed to be checked.
+A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
+A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
+and the address stores a function with the right type.
+The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
+where every element in the pointer range ($[0,\size(\omega))$) should be well
+typed.
+
+
+\begin{figure*}[t]
+{\small
+\begin{mathpar}
+
+\inferrule [S-Var]{} {(\varphi,\heap,x)\longrightarrow (\varphi,\heap,\varphi(x))}
+
+    \inferrule[S-DefArrayC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-DefArrayT]{\heap(\umode,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h) 
+               \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
+     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+\quad
+    \inferrule[S-DefNTArrayBound]{0 \notin [n_l,n_h]}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+\quad
+    \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+
+    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{\evalue{n'}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n'}{\tau'})}
+
+        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e})}
+
+    \inferrule[S-AssignNull]{}
+      {(\varphi,\heap,\eassign{\evalue{0}{\tptr{\omega}{\xi}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\enull)}
+
+    \inferrule[S-RetCon]{ (\varphi[x\mapsto \evalue{n}{\tau}],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi'[x\mapsto \varphi(x)],\heap',\ret{x}{\varphi'(x)}{e'})}
+
+    \inferrule[S-AssignArrC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heapup{\cmode}{n}{\evalue{n_1}{\tau_a}},\evalue{n_1}{\tau})}
+
+    \inferrule[S-AssignArrT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) 
+               \\ \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}}
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\tmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heapup{\umode}{n}{\evalue{n_1}{\tau_a}},\evalue{n_1}{\tau})}
+
+    \inferrule[S-AssignArrBound]{0 \not\in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+    \inferrule[S-AssignC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tptr{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+
+  \inferrule[S-Malloc]{\varphi(\omega)=\omega_a \\ \mathtt{alloc}(\heap,\xi,\omega_a)=(n,\heap')}
+   { (\varphi,\heap,\emalloc{\xi}{\omega}) \longrightarrow (\varphi,\heap',\evalue{n}{\tptr{\omega_a}{\xi}})}
+
+  \inferrule[S-MallocBound]{\varphi(\omega)=\tallarray{n_l}{n_h}{\tau}\\ (n_l \neq 0 \vee n_h \le 0)}
+    { (\varphi,\heap,\emalloc{\omega}) \longrightarrow (\varphi,\heap',\ebounds)}
+
+  \inferrule[S-IfNTNotC]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(\cmode,n)\neq 0\\ 0 < n_h}
+             {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
+
+    \inferrule[S-IfT]{n \neq 0 }
+    {(\varphi,\heap,\eif{\evalue{n}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
+
+    \inferrule[S-IfF]{}
+    {(\varphi,\heap,\eif{\evalue{0}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
+
+    \inferrule[S-Add]{n = n_1 + n_2}
+    {(\varphi,\heap,\evalue{n_1}{\tint} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, n)}
+
+    \inferrule[S-AddArr]{n = n_1 + n_2\\ n_l' = n_l - n_2 \\ n_h' = n_h - n_2}
+    {(\varphi,\heap,\evalue{n_1}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau}{\xi}})}
+
+n    \inferrule[S-AddArrNull]{}
+    {(\varphi,\heap,\evalue{0}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \enull)}
+
+\end{mathpar}
+
+}
+\caption{Remaining \lang Semantics Rules (extends Fig.~\ref{fig:type-system-1})}
+\label{fig:rem-semantics}
+\end{figure*}
+
+A checked pointer checks validity in type step as rule \textsc{T-ConstC},
+while a tainted/unchecked pointer does not check for such during the type checking.
+Tainted pointers are verified through the validity check in dynamic execution as we mentioned above.
+
+If the literal's type is an integer, an unchecked pointer, or a null
+pointer, it is well typed, as shown by the top three rules in
+Fig.~\ref{fig:const-type}. However, if it is a checked pointer
+$\tptr{\omega}{\cmode}$, we need to ensure that what it points to in
+the heap is of the appropriate pointed-to type ($\omega$), and also
+recursively ensure that any literal pointers reachable this way are
+also well-typed. This is captured by the bottom rule in the figure,
+which states that for every location $n+i$ in the pointers' range
+%
+$[n, n+\size(\omega))$, where $\size$ yields the size of its argument,
+  then the value at the location $\heap(n+i)$ is also well-typed.
+  However, as heap snapshots can contain cyclic structures (which
+  would lead to infinite typing deriviations), we use a scope $\sigma$
+  to assume that the original pointer is well-typed when checking the
+  types of what it points to. The middle rule then accesses the scope
+  to tie the knot and keep the derivation finite, just like in
+  \citet{ruef18checkedc-incr}.
+
+\myparagraph{Let Bindings}
+%
+Rules \textsc{T-Let} and \textsc{T-LetInt} type a $\elettext$ expression, which also admits
+type dependency. 
+In particular, the result of evaluating a $\elettext$
+may have a type that refers to one of its bound variables (e.g., if
+the result is a checked pointer with a variable-defined bound). If so, we must substitute away this variable once it goes out of scope (\textsc{T-LetInt}). 
+Note that we restrict the expression $e_1$ to syntactically match the
+structure of a Bounds expression $b$ (see Fig.~\ref{fig:checkc-syn}).
+Rule \textsc{T-RetInt} types a $\erettext$ expression when $x$ is of type $\tint$.
+$\erettext$ does not appear in source programs but is introduced by the semantics when
+evaluating a let binding (rule \textsc{S-Let} in
+Fig.~\ref{fig:rem-semantics}). 
+
+\subsection{Other Semantic Rules}\label{sec:rem-semantics}
+
+Fig.~\ref{fig:rem-semantics} shows the remaining semantic rules for
+$\lang$. We explain a selected few rules in this subsection.
+% other few low-level semantic rules for variable and dereference and $\emalloctext$ operations in \checkedc. Other operations are defined in the same manner.
+
+
+Rule \textsc{S-Var} loads the value for $x$ in stack $\varphi$.
+Rule \textsc{S-DefArray} dereferences an array pointer, which is similar to the Rule \textsc{S-DefNTArray} in Fig.~\ref{fig:semantics} (dealing with null-terminated array pointers).
+The only difference is that the range of $0$ is at $[n_l,n_h)$ not $[n_l,n_h]$, meaning that one cannot dereference the upper-bound position in an array.
+Rules \textsc{DefArrayBound} and \textsc{DefNTArrayBound} describe an error case for a dereference operation.
+If we are dereferencing an array/NT-array pointer and the mode is $\cmode$, $0$ must be in the range from $n_l$ to $n_h$ (meaning that the dereference is in-bound); if not, the system results in a $\ebounds$ error. Obviously, the dereference of an array/NT-array pointer also experiences a $\enull$ state transition if $n\le 0$.
+
+Rules \textsc{S-Malloc} and \textsc{S-MallocBound} describe the $\emalloctext$ semantics. Given a valid type $\omega_a$ that contains no free variables, $\mathtt{alloc}$ function returns an address pointing at the first position of an allocated space whose size is equal to the size of $\omega_a$, and a new heap snapshot $\heap'$ that marks the allocated space for the new allocation. The $\emalloctext$ is transitioned to the address $n$ with the type ${\tptr{\omega_a}{\cmode}}$ and new updated heap. It is possible for $\emalloctext$ to transition to a $\ebounds$ error if the $\omega_a$ is an array/NT-array type $\tallarray{n_l}{n_h}{\tau}$, and either $n_l \neq 0$ or $n_h \le 0$. This can happen when the bound variable is evaluated to a bound constant that is not desired. 
+
+
+
+
+
+\subsection{Additional Type and Semantic Rules}\label{appx:add-type-sem}
+
+
+Since bounds expressions may
+contain variables, determining assumptions like $b_l \leq b_l'$
+requires reasoning about the probable values of these variables'. The type
+system uses $\Theta$ to make such reasoning more precise.
+$\Theta$ is a map from variables $x$ to
+equation predicates $P$, which have the form $P ::= \tgez \;|\; \teq{b}$.
+It maps variables to equations that are recorded along the type checking procedure.
+If $\Theta$ maps $x$ to $\tgez$, that means that $x \ge 0$;
+$\teq{b}$ means that $x$ is equivalent to the bound value $b$ in the current context, 
+such as in the type judgment for $e_2$ in Rule \textsc{T-LetInt} and \textsc{T-RetInt}.
+\iftr
+  Appendix~\ref{app:le}.
+\else
+  the supplemental report~\cite{checkedc-tech-report}.
+\fi has an example rule for populating $\Theta$ with a $\tgez$ predicate.
+
+\begin{figure}[t]
+{\small
+{\captionsetup[lstlisting]{margin = 8 mm}
+  \begin{lstlisting}[xleftmargin=8 mm]
+nt_array_ptr<char> safe_strcat
+   (nt_array_ptr<char> dst : count(n),
+    nt_array_ptr<char> src : count(0), int n) {
+  int x = strlen(dst);
+  int y = strlen(src);
+  nt_array_ptr<char> c : count(n) =
+    dyn_bounds_cast
+           <nt_array_ptr<char>>(dst,count(n));
+    // sets c == dst with bound n (not x)
+  if (x+y < n) {
+    for (int i = 0; i < y; ++i)
+      *(c+x+i) = *(src+i);
+    *(c+x+y) = '\0';
+    return dst;
+  }
+  return null;
+}
+  \end{lstlisting}
+}
+}
+\caption{Implementation of safe \code{strcat}}
+\label{fig:strcat-ex}
+\end{figure}
+
+Recall that array
+bounds in types may refer to in-scope variables; e.g., parameter
+\code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
+2-3 in \Cref{fig:strcat-ex}. 
+All dependent bound variables appearing in function headers 
+are bounded by a variable list in the function pointer type, which is checked in the type rule.
+Semantically,
+the call is expanded into a \texttt{let} which binds
+parameter variables $\overline{x}$ to the actual arguments
+$\overline{n}$, but annotated with the parameter types
+$\overline{\tau}$ (this will be safe for type-correct programs). 
+The function body $e$ is wrapped in a static cast
+$(\tau[\overline{n} / \overline{x}])$ which is the function's return
+type but with any integer parameter variables $\overline{x}$ appearing in that
+type, as type bound variables,
+substituted with the call's actual arguments $\overline{n}$.
+To see why this is needed, suppose that \code{safe_strcat} in
+Fig.~\ref{fig:strcat-ex} is defined to return a
+\code{nt_array_ptr<int>:count(n)} typed term, and assume that we
+perform a \code{safe_strcat} function call as
+\code{x=safe_strcat(a,b,10)}. After the evaluation of \code{safe_strcat}, the
+function returns a value with type \code{nt_array_ptr<int>:count(10)}
+because we substitute bound variable \code{n} in the 
+defined return type with \code{10} from the function call's
+argument list.
+
+
+\begin{figure}[t!]
+  \begin{small}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+int deref_array(n : int,
+     p :  $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\cmode}$,
+     q : $\color{green!40!black}\tntarrayptr{0}{n}{\tint}{\tmode}$) {
+  /* $\color{purple!40!black}\rho$(p) = p_lo,p_hi,p_m */
+  /* $\color{purple!40!black}\rho$(q) = q_lo,q_hi,q_m */
+    * p;
+    * q = 1;
+}
+...
+/* p0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\cmode}$ */
+/* q0 : $\color{purple!40!black}\tntarrayptr{0}{5}{\tint}{\tmode}$ */
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\begin{frame}
+
+\tikz\draw[-Latex,line width=2pt,color=orange] (0,0) -- (1,0);
+
+\end{frame}
+\begin{lstlisting}[mathescape,xleftmargin=4 mm]
+deref_array(int n, int* p, int * q) {
+  //m is the current context mode
+  let p_lo = 0; let p_hi = n; 
+  let q_lo = 0; let q_hi = n; 
+  /* runtime checks */
+  assert(p_lo <= 0 && 0 <= p_hi);
+  assert(p != 0);
+  *(mode(p) $\wedge$ m,p);
+  verify(q, not_null(m, q_lo, q_hi) 
+             && q_lo <= 0 && 0 <= q_hi);
+  *(mode(q) $\wedge$ m,q)=1;
+}
+...
+deref_array(5, p0, q0);
+    \end{lstlisting}
+\end{small}
+    \caption{Compilation Example for Dependent Functions}
+\label{fig:compilationexample1}
+\end{figure}
+
+For compiling dependent function calls,
+\Cref{fig:compilationexample1} provides a hint.
+Notice that the bounds for the array pointer \code{p} are not passed as
+arguments. Instead, they are initialized according to \code{p}'s
+type---see line~4 of the original \lang program at the top of the figure.
+Line~$3$ of the generated code
+sets the lower bound  to \code{0} and the
+upper bound to \code{n}.
+
+
+
+\begin{defi}[Type Environment Well-formedness]\label{type-wellformed}
+A type environment $\Gamma$ is well-formed if every variable mentioned as type bounds in $\Gamma$ are bounded by $\tint$ typed variables in $\Gamma$.
+\end{defi}
+
+\begin{defi}[Heap Well-formedness]
+For every $m$, A heap $\heap$ is well-formed if (i) $\heap(m,0)$ is undefined, and
+(ii) for all $\evalue{n}{\tau}$ in the range of $\heap(m)$, type $\tau$
+contains no free variables. 
+\end{defi}
+
+\begin{defi}[Stack Well-formedness]
+A stack snapshot $\varphi$ is well-formed if
+for all $\evalue{n}{\tau}$ in the range of $\varphi$, type $\tau$
+contains no free variables. 
+\end{defi}
+
+We also need to introduce a notion of
+\emph{consistency}, relating heap environments before and after a
+reduction step, and type environments, predicate sets, and stack
+snapshots together.
+
+
+\begin{defi}[Stack Consistency]
+A type environment $\Gamma$, variable predicate set $\Theta$, and
+stack snapshot $\varphi$ are consistent---written $\Gamma;\Theta\vdash
+\varphi$---if for every variable $x$, $\Theta(x)$ is defined implies
+$\Gamma(x) = \tau$ for some $\tau$ and 
+$\varphi(x) =\evalue{n}{\tau'}$ for some $n,\tau'$ where $\tau' \sqsubseteq_{\Theta} \tau$. 
+\end{defi}
+
+\begin{defi}[Checked Stack-Heap Consistency]
+A stack snapshot $\varphi$ is consistent with heap $\heap$---written $\heap \vdash \varphi$---if
+for every variable $x$, $\varphi(x)= \evalue{n}{\tau}$ with $\mode(\tau)=\cmode$ implies $\emptyset;\heap(\cmode);\emptyset \vdash_{\cmode} n:\tau$.
+\end{defi}
+
+\begin{defi}[Checked Heap-Heap Consistency]
+A heap $\heap'$ is consistent with $\heap$---written $\heap \triangleright \heap'$---if
+for every constant $n$, $\emptyset;\heap;\emptyset \vdash_{\cmode} n:\tau$ implies $\emptyset;\heap';\emptyset \vdash_{\cmode} n:\tau$.
+\end{defi}
+
+\myparagraph{Constant Validity}
+Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
+describe type assumptions for constants appearing in a program.
+$\neg \cmode(\tau)$ judges that a constant pointer 
+in an unchecked region cannot be of a checked type.
+The restriction ensures that programmers 
+cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
+In rule \textsc{T-ConstC}, we requires a static 
+verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
+
+The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
+validates the constant $\evalue{n}{\tau}$, 
+where $\heap(m)$ is the initial heap that the constant resides on and
+$\sigma$ is a set of constant assumed to be checked.
+A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
+A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
+and the address stores a function with the right type.
+The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
+where every element in the pointer range ($[0,\size(\omega))$) should be well
+typed.
+A checked pointer checks validity in type step as rule \textsc{T-ConstC},
+while a tainted/unchecked pointer does not check for such during the type checking.
+Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
+
+
 \subsection{Meta Theories}\label{sec:theorem}
 
 % Before we present our main theorems, we need to first
@@ -815,264 +1593,7 @@ simplifies typing/consistency and term generation during randomized testing.
 % \yiyun{It is supposed to refer to the ANF transformation of the erased language, not the source
 %   language. I moved it to the discussion of ANF form below in \ref{appx:comp1}. }
 
-\subsection{Typing Rules for Literal Pointers}\label{sec:literal-pointer-typing}
 
-The typing of integer literals, which can also be pointers to the
-heap, was presented in Sec.~\ref{sec:theorem} in Fig.~\ref{fig:const-type}. Here
-we describe these rules further.
-
-The variable type rule
-($\textsc{T-Var}$) simply checks if a given variable has the defined
-type in $\Gamma$; the constant rule ($\textsc{T-Const}$) is slightly
-more involved.  First, it ensures that the type annotation $\tau$ does
-not contain any free variables. More importantly, it ensures that the
-literal itself is well typed using an auxilliary typing relation
-$\heap;\sigma \vdash n : \tau$.
-
-If the literal's type is an integer, an unchecked pointer, or a null
-pointer, it is well typed, as shown by the top three rules in
-Fig.~\ref{fig:const-type}. However, if it is a checked pointer
-$\tptr{\omega}{\cmode}$, we need to ensure that what it points to in
-the heap is of the appropriate pointed-to type ($\omega$), and also
-recursively ensure that any literal pointers reachable this way are
-also well-typed. This is captured by the bottom rule in the figure,
-which states that for every location $n+i$ in the pointers' range
-%
-$[n, n+\size(\omega))$, where $\size$ yields the size of its argument,
-  then the value at the location $\heap(n+i)$ is also well-typed.
-  However, as heap snapshots can contain cyclic structures (which
-  would lead to infinite typing deriviations), we use a scope $\sigma$
-  to assume that the original pointer is well-typed when checking the
-  types of what it points to. The middle rule then accesses the scope
-  to tie the knot and keep the derivation finite, just like in
-  \citet{ruef18checkedc-incr}.
-
-\subsection{Other Semantic Rules}\label{sec:rem-semantics}
-
-Fig.~\ref{fig:rem-semantics} shows the remaining semantic rules for
-$\lang$. We explain a selected few rules in this subsection.
-% other few low-level semantic rules for variable and dereference and $\emalloctext$ operations in \checkedc. Other operations are defined in the same manner.
-
-\begin{figure*}[t]
-{\small
-\begin{mathpar}
-
-\inferrule [S-Var]{} {(\varphi,\heap,x)\longrightarrow (\varphi,\heap,\varphi(x))}
-
-    \inferrule[S-DefArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-
-
-    \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
-     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\ebounds)}
-
-    \inferrule[S-DefNTArrayBound]{0 \notin [n_l,n_h]}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\ebounds)}
-
-
-    \inferrule[S-Assign]{\heap(n)=\evalue{n_a}{\tau_a} }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tptr{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
-
-    \inferrule[S-AssignNull]{}
-      {(\varphi,\heap,\eassign{\evalue{0}{\tptr{\omega}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\enull)}
-
-    \inferrule[S-AssignArrBound]{0 \not\in [n_l,n_h) }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\ebounds)}
-
-  \inferrule[S-Malloc]{\varphi(\omega)=\omega_a \\ \mathtt{alloc}(\heap,\omega_a)=(n,\heap')}
-   { (\varphi,\heap,\emalloc{\omega}) \longrightarrow (\varphi,\heap',\evalue{n}{\tptr{\omega_a}{\cmode}})}
-
-  \inferrule[S-MallocBound]{\varphi(\omega)=\tallarray{n_l}{n_h}{\tau}\\ (n_l \neq 0 \vee n_h \le 0)}
-    { (\varphi,\heap,\emalloc{\omega}) \longrightarrow (\varphi,\heap',\ebounds)}
-
-    \inferrule[S-IfT]{n \neq 0 }
-    {(\varphi,\heap,\eif{\evalue{n}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
-
-    \inferrule[S-IfF]{}
-    {(\varphi,\heap,\eif{\evalue{0}{\tau}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
-
-    \inferrule[S-Unchecked]{}
-    {(\varphi,\heap,\eunchecked{\evalue{n}{\tau}} \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
-
-    \inferrule[S-Str]{
-        0 \in [n_l,n_h]
-\\ n_a \le n_h
-\\ \heap(n+n_a) = 0 
-\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
-    {(\varphi,\heap,\estrlen{\evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tint})}
-
-    \inferrule[S-StrBounds]{
-        0 \notin [n_l,n_h]
-}
-    {(\varphi,\heap,\estrlen{\evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\ebounds)}
-
-    \inferrule[S-StrNull]{}
-    {(\varphi,\heap,\estrlen{\evalue{0}{\tarrayptr{n_l}{n_h}{\tau}{c}}}) \longrightarrow (\varphi,\heap,\enull)}
-
-    \inferrule[S-Add]{n = n_1 + n_2}
-    {(\varphi,\heap,\evalue{n_1}{\tint} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, n)}
-
-    \inferrule[S-AddArr]{n = n_1 + n_2\\ n_l' = n_l - n_2 \\ n_h' = n_h - n_2}
-    {(\varphi,\heap,\evalue{n_1}{\tallarrayptr{n_l}{n_h}{\tau}{m}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau}{m}})}
-
-n    \inferrule[S-AddArrNull]{}
-    {(\varphi,\heap,\evalue{0}{\tallarrayptr{n_l}{n_h}{\tau}{c}} \plus \evalue{n_2}{\tint}) \longrightarrow (\varphi,\heap, \enull)}
-
-\end{mathpar}
-
-}
-\caption{Remaining \lang Semantics Rules (extends Fig.~\ref{fig:semantics})}
-\label{fig:rem-semantics}
-\end{figure*}
-
-Rule \textsc{S-Var} loads the value for $x$ in stack $\varphi$.
-Rule \textsc{S-DefArray} dereferences an array pointer, which is similar to the Rule \textsc{S-DefNTArray} in Fig.~\ref{fig:semantics} (dealing with null-terminated array pointers).
-The only difference is that the range of $0$ is at $[n_l,n_h)$ not $[n_l,n_h]$, meaning that one cannot dereference the upper-bound position in an array.
-Rules \textsc{DefArrayBound} and \textsc{DefNTArrayBound} describe an error case for a dereference operation.
-If we are dereferencing an array/NT-array pointer and the mode is $\cmode$, $0$ must be in the range from $n_l$ to $n_h$ (meaning that the dereference is in-bound); if not, the system results in a $\ebounds$ error. Obviously, the dereference of an array/NT-array pointer also experiences a $\enull$ state transition if $n\le 0$.
-
-Rules \textsc{S-Malloc} and \textsc{S-MallocBound} describe the $\emalloctext$ semantics. Given a valid type $\omega_a$ that contains no free variables, $\mathtt{alloc}$ function returns an address pointing at the first position of an allocated space whose size is equal to the size of $\omega_a$, and a new heap snapshot $\heap'$ that marks the allocated space for the new allocation. The $\emalloctext$ is transitioned to the address $n$ with the type ${\tptr{\omega_a}{\cmode}}$ and new updated heap. It is possible for $\emalloctext$ to transition to a $\ebounds$ error if the $\omega_a$ is an array/NT-array type $\tallarray{n_l}{n_h}{\tau}$, and either $n_l \neq 0$ or $n_h \le 0$. This can happen when the bound variable is evaluated to a bound constant that is not desired. 
-
-
-\subsection{Subtyping for dependent types}
-\label{app:le}
-  
-The subtyping relation given in Fig.~\ref{fig:checkc-subtype} involves
-dependent bounds, i.e., bounds that may refer to variables. To decide
-premises $b \leq b'$, we need a decision procedure that accounts for
-the possible values of these variables. This process considers
-$\Theta$, tracked by the typing judgment, and $\varphi$, the current
-stack snapshot (when performing subtyping as part of the type
-preservation proof).
-
-\begin{defi}[Inequality]
-
-\begin{itemize}
-
-\item $n \le m$ if $n$ is less than or equal to $m$.
-\item $x+n \le x + m$ if $n$ is less than or equal to $m$.
-\item All other cases result in $\efalse$.
-
-\end{itemize}
-\end{defi}
-
-To capture bound variables in dependent types, the \checkedc subtyping
-relation ($\sqsubseteq$) is parameterized by a restricted stack
-snapshot $\varphi|_{\rho}$ and the predicate map $\Theta$, where
-$\varphi$ is a stack and $\rho$ is a set of
-variables. $\varphi|_{\rho}$ means to restrict the domain of $\varphi$
-to the variable set $\rho$. Clearly, we have the relation:
-$\varphi|_{\rho} \subseteq \varphi$. $\sqsubseteq$
-being parameterized by $\varphi|_{\rho}$ refers to that when we
-compare two bounds $b \le b'$, we actually do
-$\varphi|_{\rho}(b) \le \varphi|_{\rho}(b')$ by interpreting the
-variables in $b$ and $b'$ with possible values in $\varphi|_{\rho}$.
-Let's define a subset relation $\preceq$ for two restricted stack
-snapshot $\varphi|_{\rho}$ and $\varphi'|_{\rho}$:
-
-\begin{defi}[Subset of Stack Snapshots]
-  Given two $\varphi|_{\rho}$ and $\varphi'|_{\rho}$,
-  $\varphi|_{\rho} \preceq \varphi'|_{\rho}$, iff for $x\in\rho$ and
-  $y$,
-  $(x,y) \in \varphi|_{\rho} \Rightarrow (x,y) \in \varphi'|_{\rho}$.
-\end{defi}
-
-For every two restricted stack snapshots $\varphi|_{\rho}$ and
-$\varphi'|_{\rho}$, such that
-$\varphi|_{\rho} \preceq \varphi'|_{\rho}$, we have the following
-theorem in \checkedc (proved in Coq):
-
-\begin{thm}[Stack Snapshot Theorem]
-  Given two types $\tau$ and $\tau'$, two restricted stack snapshots
-  $\varphi|_{\rho}$ and $\varphi'|_{\rho}$, if
-  $\varphi|_{\rho}\preceq \varphi'|_{\rho}$, and
-  $\tau \sqsubseteq \tau'$ under the parameterization of
-  $\varphi|_{\rho}$, then $\tau \sqsubseteq \tau'$ under the
-  parameterization of $\varphi'|_{\rho}$.
-\end{thm}
-
-Clearly, for every $\varphi|_{\rho}$, we have
-$\emptyset \preceq \varphi|_{\rho}$. The type checking stage is a
-compile-time process, so $\varphi|_{\rho}$
-is $\emptyset$ at the type checking stage. Stack snapshots are needed
-for proving type preserving, as variables in bounds expressions are
-evaluated away.
-
-
-\begin{figure}[h!]
-{\small
-  \begin{mathpar}
-    \inferrule[T-Def]
-              {\Gamma;\Theta \vdash_m e : \tptr{\tau}{m'} \\
-                m \leq m'}
-              {\Gamma;\Theta \vdash_m \estar{e} : \tau}
-
-    \inferrule[T-Mac]
-              {}
-              {\Gamma; \Theta \vdash_m \emalloc{\omega} : \tptr{\omega}{\cmode}}
-
-    \inferrule[T-Add]
-              {\Gamma; \Theta \vdash_m e_1 : \tint \\
-                \Gamma; \Theta \vdash_m e_2 : \tint}
-              {\Gamma; \Theta \vdash_m (e_1 \plus e_2) : \tint }
-
-    \inferrule[T-Ind] 
-              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'} \\
-                \Gamma; \Theta \vdash_m e_2 : \tint \\
-                m \leq m'}              
-              {\Gamma; \Theta \vdash_m \estar{(\ebinop{e_1}{e_2})} : \tau}
-
-    \inferrule[T-Assign]
-              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tau}{m'} \\
-                \Gamma; \Theta \vdash_m e_2 : \tau' \\
-                \tau'\sqsubseteq \tau \\
-                m \leq m'}
-              {\Gamma; \Theta \vdash_m \eassign{e_1}{e_2} : \tau}
-
-   \inferrule[T-IndAssign]
-              {\Gamma; \Theta \vdash_m e_1 : \tptr{\tallarrayb{\bvar}{\tau}}{m'}\\
-                \Gamma; \Theta \vdash_m e_2 : \tint \\
-                \Gamma; \Theta \vdash_m e_3 : \tau' \\
-                \tau'\sqsubseteq \tau \\
-                m \leq m'}
-              {\Gamma; \defscope \vdash_m \eassign{(e_1 \plus e_2)}{e_3} : \tau}
-
-  \end{mathpar}
-}
-\caption{Remaining \lang Type Rules (extends Fig.~\ref{fig:type-system-1})}
-\label{fig:rem-type-system}
-\end{figure}
-
-As mentioned in the main text, $\sqsubseteq$ is also parameterized by
-$\Theta$, which provides the range of allowed values for a bound
-variable; thus, more $\sqsubseteq$ relation is provable. For example,
-in Fig.~\ref{fig:strcat-ex}, the \code{strlen} operation in line 4
-turns the type of \code{dst} to be $\tntarrayptr{0}{x}{\tint}{\cmode}$
-and extends the upper bound to \code{x}. In the \code{strlen} type
-rule, it also inserts a predicate \code{x}$\ge 0$ in $\Theta$; thus,
-the cast operation in line 16 is valid because
-$\tntarrayptr{0}{x}{\tint}{\cmode} \sqsubseteq
-\tntarrayptr{0}{0}{\tint}{\cmode}$ is provable when we know
-\code{x}$\ge 0$.
-
-
-Note that if $\varphi$ and $\Theta$ are $\emptyset$, we do only the
-syntactic $\le$ comparison; otherwise, we apply $\varphi$ to both
-sides of $\sqsubseteq$, and then determine the $\le$ comparasion based
-on a Boolean predicate decision procedure on top of $\Theta$. This
-process allows us to type check both an input expression and the
-intermediate expression after evaluating an expression. 
-
-\subsection{Other Type Rules}\label{rem-type}
-
-Here we show the type rules for other \checkedc operations in Fig.~\ref{fig:rem-type-system}.
-Rule \textsc{T-Def} is for dereferencing a non-array pointer. 
-The statement $m \leq m'$ ensures that no unchecked pointers are used in checked regions.
-Rule \textsc{T-Mac} deals with
-$\emalloctext$ operations. There is a well-formedness check to require
-that the possible bound variables in $\omega$ must be in the domain of
-$\Gamma$ (see Fig.~\ref{fig:wftypesandbounds}). This is similar to the well-formedness assumption of the type environment (Definition~\ref{type-wellformed}) Rule \textsc{T-Add} deals with binary operations whose sub-terms are integer expressions, while rule \textsc{T-Ind} serves the case for pointer arithmetic. For simplicity, in the \checkedc formalization, we do not allow arbitrary pointer arithmetic. The only pointer arithmetic operations allowed are the forms shown in rules \textsc{T-Ind} and \textsc{T-IndAssign} in Fig.~\ref{fig:rem-type-system}. Rule \textsc{T-Assign} assigns a value to a non-array pointer location. The predicate $\tau'\sqsubseteq \tau$ requires that the value being assigned is a subtype of the pointer type.
-The \textsc{T-IndAssign} rule is an extended assignment operation for handling assignments for array/NT-array pointers with pointer arithmetic. Rule \textsc{T-Unchecked} type checks \code{unchecked} blocks.
 
 \subsection{Struct Pointers}\label{appx:struct}
 
@@ -1139,76 +1660,6 @@ $
   \label{fig:checkc-struct}
 \end{figure}
 
-\begin{figure}[t]
-{\small
-  \begin{mathpar}
-
-    \inferrule[]
-    {}
-    {\Gamma \vdash n}
-
-    \inferrule[]
-    {x:\tint \in \Gamma}
-    {\Gamma \vdash x + n}
-
-    \inferrule[]
-    {\Gamma \vdash b_l\\
-    \Gamma \vdash b_h}
-  {\Gamma \vdash (b_l,b_h)}
-
-  \inferrule[]
-  {}
-  {\Gamma \vdash \tint}
-
-  \inferrule[]
-  {\Gamma \vdash \bvar \\
-  \Gamma \vdash \tau}
-  {\Gamma \vdash \tptr{\tallarrayb{\bvar}{\tau}}{m}}
-
-  \inferrule[]
-  {\Gamma \vdash \tau}
-  {\Gamma \vdash \tptr{\tau}{m}}
-
-  \inferrule[]
-  {T \in D}
-  {\Gamma \vdash \tptr{\tstruct{T}}{m}}
-  \end{mathpar}
-}
- \caption{Well-formedness for Types and Bounds}
-\label{fig:wftypesandbounds}
-\end{figure}
-
-
-% \inferrule[T-Fun]
-%     {\Xi(f) = \tau\;(\overline{x}:\overline{\tau})\;e \\\\
-%         \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
-%              \overline{\tau'} \sqsubseteq 
-%                \overline{\tau}[\overline{e} / \overline{x}]}
-%     {\Gamma; \Theta \vdash_m f(\overline{e}) : \tau[\overline{e} / \overline{x}]}
-
-
-\begin{figure}[t]
-{\small
-  \begin{mathpar}
-    \inferrule[]
-    {\Gamma \vdash \overline{x}:\overline{\tau} \\
-      \Gamma[\overline{x} \mapsto \overline{\tau}] \vdash \tau \\
-    \Gamma[\overline{x} \mapsto \overline{\tau}]; \Theta  \vdash_{\cmode} e : \tau}
-    {\Gamma \vdash \tau\;(\overline{x}:\overline{\tau})\;e}
-
-    \inferrule[]
-    {}
-    {\Gamma \vdash \cdot}
-
-    \inferrule[]
-    {\Gamma \vdash \tau \\
-    \Gamma[x \mapsto \tau] \vdash \overline{x}:\overline{\tau}}
-    {\Gamma \vdash x:\tau, \overline{x}:\overline{\tau}}
-  \end{mathpar}
-}
- \caption{Well-formedness for functions}
-\label{fig:wffunctions}
-\end{figure}
 
 
 \begin{figure}[t]
@@ -1833,73 +2284,6 @@ ones that have a non-empty heap.
 
 % }
 
-\subsection{Additional Type and Semantic Rules}\label{appx:add-type-sem}
-
-\begin{DIFnomarkup}
-\begin{figure}
-{\small
-\[\hspace*{-1.2em}
-\begin{array}{l}
-\textcolor{blue}{\text{Bound Inequality and Equality:}}\\[0.3em]
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-     n \le n' &\Rightarrow& n &\le_{\Theta} & n'\\
-     n \le n' &\Rightarrow& x+n &\le_{\Theta} & x+n'\\
-     n \le n' \wedge \Theta(x)=\tgez &\Rightarrow& n &\le_{\Theta} & x+n'\\
-     \Theta(x)=\teq{b} \wedge b+n\le_{\Theta}b'  &\Rightarrow& x+n & \le_{\Theta} & b'\\
-     \Theta(x)=\teq{b}\wedge b'\le_{\Theta}b+n  &\Rightarrow& b' & \le_{\Theta} & x+n\\
-     b \le_{\Theta} b' \wedge b' \le_{\Theta} b  &\Rightarrow& b & =_{\Theta} & b'
-    \end{array}
-  \\[1.5em]
-\textcolor{blue}{\text{Type Equility:}}\\
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-     && \tint & =_{\Theta} & \tint\\
-     \omega =_{\Theta} \omega' &\Rightarrow& \tptr{\omega}{\xi} & =_{\Theta} & \tptr{\omega'}{\xi}\\
-     \bvar =_{\Theta} \bvar' \wedge  \tau =_{\Theta} \tau'
-             &\Rightarrow& \tallarrayb{\bvar}{\tau} & =_{\Theta} & \tallarrayb{\bvar'}{\tau'}\\
-
-    \textit{cond}(\overline{x},\overline{\tau}\to\tau,\overline{y},\overline{\tau'}\to\tau')
-
- &\Rightarrow& \tfun{\overline{x}}{\overline{\tau}}{\tau} & 
-                         =_{\Theta} & \tfun{\overline{y}}{\overline{\tau'}}{\tau'}\\
-    \end{array}
-  \\[0.7em]
-\textcolor{blue}{\text{Subtype:}}\\[0.3em]
-
-  \begin{array}{r@{~}c@{~}l@{~}c@{~}l}
-    \tau =_{\Theta} \tau'&\Rightarrow&\tau &\sqsubseteq_{\Theta}& \tau'\\[0.2em]
-
-    0\le_{\Theta} b_l \wedge b_h \le_{\Theta} 1 &\Rightarrow& \tptr{\tau}{m}&\sqsubseteq_{\Theta}& \tarrayptr{b_l}{b_h}{\tau}{m}\\[0.2em]
-    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
-    b_l \le_{\Theta} 0 \wedge 1 \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tptr{\tau}{m}\\[0.2em]
-    %% b_l \le b_l' \wedge b_h' \le b_h &\Rightarrow&  \tarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq&  \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
-    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tntarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tarrayptr{b_l'}{b_h'}{\tau}{m}\\[0.6em]
-    b_l \le_{\Theta} b_l' \wedge b_h' \le_{\Theta} b_h &\Rightarrow& \tallarrayptr{b_l}{b_h}{\tau}{m} &\sqsubseteq_{\Theta}& \tallarrayptr{b_l'}{b_h'}{\tau}{m}
-\\[0.2em]
-\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}\wedge \tau\sqsubseteq_{\Theta}\tau' &\Rightarrow& \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} &\sqsubseteq_{\Theta}& \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}
-
-    \end{array}
-\end{array}
-  \]
-}
-{\footnotesize
-\[
-\begin{array}{l}
-n'+n = add(n',n)
-\qquad
-(x+n')+n = x+add(n',n)\\
-\textit{cond}(\overline{x},\tau,\overline{y},\tau')
-=\exists\overline{z}\;.\;\overline{x}\cupdot\overline{z}
-  \wedge \overline{y}\cupdot\overline{z}
-  \wedge \size(\overline{x})=\size(\overline{y})=\size(\overline{z})
-\\\qquad\qquad\qquad\qquad\qquad
-  \wedge \tau[\overline{z}/\overline{x}]= \tau'[\overline{z}/\overline{x}]
-\end{array}
-\]
-}
-  \caption{Type Equality and Subtyping}
-  \label{fig:checkc-subtype}
-\end{figure}
-\end{DIFnomarkup}
 
 Since bounds expressions may
 contain variables, determining assumptions like $b_l \leq b_l'$
@@ -2081,27 +2465,5 @@ Due to its small size and simplicity, \systemname changes for Tiny-bignum was ch
 
 
 
-\myparagraph{Constant Validity}
-Rules \textsc{T-ConstU} and \textsc{T-ConstC} in \Cref{fig:type-system-1}
-describe type assumptions for constants appearing in a program.
-$\neg \cmode(\tau)$ judges that a constant pointer 
-in an unchecked region cannot be of a checked type.
-The restriction ensures that programmers 
-cannot guess a checked pointer address and utilize it in an unchecked region in \systemname.
-In rule \textsc{T-ConstC}, we requires a static 
-verification procedure for validating a constant pointer in \Cref{fig:const-type}. 
 
-The verification process $\Theta;\heap;\sigma \vdash_m n : \tau$
-validates the constant $\evalue{n}{\tau}$, 
-where $\heap(m)$ is the initial heap that the constant resides on and
-$\sigma$ is a set of constant assumed to be checked.
-A global function store $\Xi(m)$ is also required to check the validity of a function pointer.
-A valid function pointer should appear in the right store region ($\cmode$ or $\umode$)
-and the address stores a function with the right type.
-The last rule in \Cref{fig:const-type} describes the validity check for a non-function pointer, 
-where every element in the pointer range ($[0,\size(\omega))$) should be well
-typed.
-A checked pointer checks validity in type step as rule \textsc{T-ConstC},
-while a tainted/unchecked pointer does not check for such during the type checking.
-Tainted pointers are validated through the validity check in dynamic execution as we mentioned in rule \rulelab{S-DefT}.
 
