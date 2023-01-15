@@ -80,14 +80,20 @@ Note that we also add the necessary deallocator calls at function exit points.
 
 \noindent\emph{Handling Calls to Tainted Functions}:
 In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
-We rewrite all calls to tainted functions with corresponding sandbox invocations.
-For instance, we modify the call to~\code{process_req1} in~\lst{lst:final} as below:
+However, modifying every call site of tainted functions is tedious and also requires precise pointer analysis~\cite{milanova2002precise} to handle indirect calls through function pointers.
+
+We handle this by~\emph{indirection}: Instead of modifying the call sites, we modify the body of tainted functions to invoke the corresponding function in the sandbox.
+For instance, we modify the body of tainted function~\code{process_req1} (\lst{lst:final}) in~\cregion as below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
-case REQ1: 
-- rc = process_req1(buff); 
-+ rc = .....
+int process_req1(char *msg, size_t m_l) _Tainted {
+- int rc = -1, i;
+- if (m_l > MIN_SIZE) {
+- ...
++ HOW DO WE HANDLE SANDBOX CALL.
+}
 \end{minted}
-\aravind{Arun, please fix the above example with the exact details.}
+This ensures that all calls (even through function pointers) to the tainted function~\code{process_req1} are redirected to the sandbox.
+\aravind{Arun, add the call on how to call sandbox function.}
 
 \noindent\emph{Handling~\texttt{\_Callback} Qualifiers}:
 As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
@@ -146,10 +152,10 @@ Lastly, we change all instances where the callback function pointer is given to 
 We create~\ucregion partition by first copying all functions marked as~\code{_Tained} and~\code{_Mirror}.
 Next, we convert the partition into regular C by replacing all~\systemname{} tainted types with the corresponding C types.
 For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
-The~\code{read_msg} function signature in~\lst{} will be modified as shown below:
+The~\code{read_msg} function signature in~\lst{lst:final} will be modified as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
 size_t read_msg(int sock_fd, char *msg,
--                             size_t sz) __Tainted {
+-                             size_t sz) _Tainted {
 +                             size_t sz) {
 \end{minted}
 
