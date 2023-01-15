@@ -136,11 +136,8 @@
 
 This section describes the formal core model of~\systemname,
 named~\lang.
-We precisely present its syntax, semantics, type
-system, and compilation.
-% 
-From those, we develop~\lang’s meta-
-theories, including the type soundness, non-exposure, and non-crashing theorems.
+We present its syntax, semantics, type system,
+as well as \lang’s meta-theories, including the type soundness, non-exposure, and non-crashing theorems.
 
 %This section describes the formal core model of \systemname, named
 %\lang, making precise its syntax, semantics, type system, and compilation. It also
@@ -151,7 +148,7 @@ theories, including the type soundness, non-exposure, and non-crashing theorems.
 
 \myparagraph{Type Syntax}
 At a high level, we classify types as word-size value, multi-word
-value, or function types. A word-size value can be either integer or pointer.
+value, or function types. A word-size value can be either an integer or pointer.
 Every pointer type ($\tptr{\omega}{\xi}$) includes a
 pointer mode annotation ($\xi$, the difference between context and pointer modes
 is introduced shortly below) that is either checked (\cmode), tainted (\tmode),
@@ -189,12 +186,10 @@ The well-formedness of these types are presented in~\Cref{app:le}.
 It prevents unsafe types from being constructed.
   Consider the type ~\code{_t_Array_ptr<_Ptr<int>>} which describes a tainted
   array of checked pointers.
-  Syntactically, this type is however \emph{illegal} in~\lang{} and
-  is rejected by the well-formedness. 
-However, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
-% 
-
-% 
+  This is \emph{illegal} in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region;
+  thus, it is rejected by the well-formedness. 
+  Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
+%
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
 where $\overline{x}$ represents a list of \tint{} type variables that bind type variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
@@ -264,10 +259,10 @@ memory allocation ($\emalloc{\xi}{\omega}$),
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
 For example, a dynamic bounds cast
-  {\footnotesize
+  { \footnotesize
     \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
-becomes 
-{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}. 
+is formalized as 
+{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \lang. 
 % 
 
 % 
@@ -502,15 +497,15 @@ $
 \end{figure*}
 \end{DIFnomarkup}
 
-The \lang system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
+The \lang type system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
 Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
 
 As partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{T-}$X$),
-Each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
+each typing judgment has the form $\Gamma;\Theta\vdash_m e : \tau$,
 which states that in a type environment $\Gamma$ (mapping variables to
 their types) and a predicate environment $\Theta$ (mapping integer-typed
 variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
-in context mode $m$.
+in context mode $m$, indicating that the code is in $m$ region.
 The operational semantics for \lang is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$, as partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{S-}$X$).
@@ -552,10 +547,10 @@ $e$), and then evaluates $e'$ according to the \emph{computation}
 whose rules are given along with type rules in Fig.~\ref{fig:type-system-1}, discussed
 shortly.
 The $\mode$ function in Fig.~\ref{fig:c-context}
-determines the context mode that the expression $e'$ locates based on the context $E$.
-In \Cref{lst:humantaint}, the function call \code{handle_request} has $\umode$ context mode (is in $\umode$ region) since it is inside an unchecked function \code{server_loop}.
+determines the context mode, i.e., region, that the expression $e'$ locates based on the context $E$.
+In \Cref{lst:humantaint}, the function call \code{handle_request} is in $\umode$ region since it is inside an unchecked function \code{server_loop}.
 The second rule describes the exception handling 
-for possible crashing behaviors in unchecked regions.
+for possible crashing behaviors in $\umode$ regions.
 Operations in $\umode$ region can non-deterministically crash
 and the \systemname sandbox mechanism recovers
 the program to a safe point ($\evalue{0}{\tau}$)
@@ -566,14 +561,14 @@ Evaluation contexts $E$ define a standard left-to-right evaluation order.
 
 \myparagraph{Modes, Static Casting, and Subtyping}
 In \lang, Context modes $m$ appearing in a type rule determine the code region 
-that permits pointer dereferences and value-assignments, depending on the pointer modes.
-We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ since $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
+that permits pointer dereferences and value-assignments, which also depends on the pointer modes.
+We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
 This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can perform such operations in $\cmode$ and $\umode$ regions, respectively.
 %Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
 
 \lang also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
 an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to another pointer type \tptr{\tau_2}{\xi_2},
-if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2} $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
+if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2}, i.e., $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
 In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
@@ -594,29 +589,31 @@ x = y; // Not allowed.
 \myparagraph{Pointer Dereference}
 The type and semantic rules for pointer dereference (\textsc{T-Def}, \textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-DefNull} in \Cref{fig:type-system-1})
-reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in evaluation stage.
+reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
 The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
-With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a \enull pointer is used,
+With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a $\enull$ pointer is used,
 \lang captures the runtime error.
 Type and semantic rules for array types and pointer assignments are given in \Cref{rem-type,sec:rem-semantics}.
 
-Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereference, respectively.
-In addition to the no \enull check in $\cmode$ mode pointer dereference,
-any dynamic heap access of a tainted pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
+Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereferences, respectively.
+In addition to the no $\enull$ check in $\cmode$ mode pointer dereference,
+any dynamic heap access of a tainted pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to that the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
 
 \myparagraph{Unchecked and Checked Blocks}
 The execution of a $\echeckedtext$ or $\euncheckedtext$ block represents 
-the context switching from a checked to an checked region, or vice versa,
+the context switching from a $\cmode$ to an $\umode$ region, or vice versa,
 with its type and semantic rules given in \Cref{fig:type-system-1}.
 In this context switching, to guarantee the checked pointer non-exposure property, 
 checked pointers are not allowed to pass through, which is guaranteed by the predicates 
 $\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))$ and $\neg\cmode(\tau)$,
 as well as the check that all free variables in the block content $e$ are in $\overline{x}$.
-For example, \code{read_msg} in the \code{handle_request} function is tainted in \Cref{lst:humantaint},
-if any argument for \code{handle_request} is a checked pointer, 
-it means that we are exposing a checked pointer address to unsafe regions, 
-which means that users might randomly manipulate the data region pointed to by the checked pointer
-and \lang forbids such behavior.
+For example, \code{StringAuth} in \Cref{subsub:gencregion} is a trampoline function that disallows
+checked pointers as arguments and return values.
+The use of the function in the following \code{_T_StringAuth}, which is in $\umode$ region,
+cannot legally acknowledges any checked pointers; otherwise, we might expose a checked pointer address to unsafe code regions.
+In \systemname, we actually permits the accesses of checked pointers inside \code{StringAuth},
+since the function body of a trampoline function is in $\cmode$ region.
+More information is given in \Cref{subsub:gencregion}.
 
 \myparagraph{Dependent Function Pointers} %
 Rule \textsc{T-Fun} (\Cref{fig:type-system-1}) states the type judgment for
@@ -637,12 +634,15 @@ if for each pair of \(\tau'\) and \(\tau''\) in \(\overline{\tau'}\) and
 $\overline{\tau}[\overline{e'} / \overline{x}]$, \(\tau'\) is a subtype of
 \(\tau''\).
 Consider the \code{process_req2} function in
-Fig.~\ref{lst:final}; its parameter type for \code{msg} 
+Fig.~\ref{lst:final}, whose parameter type for \code{msg} 
 depends on \code{m_1}.
 Its function pointer type is 
 $\tptr{\tfun{\code{m_1}}{\tint,\tntarray{0}{\code{m_1}}{\texttt{char}}}{\tint}}{\tmode}$.
+In \code{handle_request}, the call \code{process_req2(buff, r_len)} binds variable \code{m_1} to \code{r_len}.
+After the call returns, \code{m_1}'s scope is ended, so we need to substitute it with \code{r_len} in the final return type
+because it might contain \code{m_1}.
 
-\textsc{S-FunC} and \textsc{S-FunT} are
+\textsc{S-FunC} and \textsc{S-FunT} define the semantics
 for $\cmode$ and $\tmode$ mode function pointers, respectively. 
 A call to a function pointer $n$ retrieves
  the function definition in $n$'s location in the global function store $\Xi$,
@@ -655,8 +655,8 @@ function body.
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
 maps addresses (integer literals) to the function data described above.
-Rule \textsc{S-FunT} defines the tainted version of function call semantics.
-In such case, the verification process 
+Rule \textsc{S-FunT} defines the tainted version of function call
+with the verification process 
 $\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}$
 makes sure that the function in the global store is well-defined and has the right type.
 
@@ -744,12 +744,12 @@ makes sure that the function in the global store is well-defined and has the rig
 % \mwh{This was stale text (dropped); $e$'s well formedness follows from the
 %   assumption of well typing; we have added more details about that.}
 
-In this subsection, we focus on our main meta-theoretic results about
+Here, we discuss our main meta-theoretic results for
 \lang: type soundness (progress and preservation),
 non-exposure, and non-crashing.
 These proofs have been conducted in our Coq model.
 Type soundness relies on several \emph{well-formedness} given in \cite{li22checkedc} and \Cref{sec:meta}.
-Progress states that a \lang program can always make a move:
+The progress theorem below states that a \lang program can always make a move.
 
 \begin{thm}[Progress]\label{thm:progress}
 
@@ -771,10 +771,10 @@ one of the following holds:
 %{\em Proof:} By induction on the typing derivation.
 
 \noindent
-There are two forms of preservation regarding the checked and unchecked regions.
+There are two forms of preservation regarding the $\cmode$ and $\umode$ regions.
 Checked Preservation states that a reduction step preserves both the
-type and consistency of the program being reduced.
-Unchecked Preservation states that any evaluation happens at unchecked region does not affect the checked heap.
+type and consistency of the program being reduced, while
+unchecked Preservation states that any evaluation happens at $\umode$ region does not affect the $\cmode$ mode heap.
 
 \begin{thm}[Checked Preservation]
 For any \lang program $e$, heap $\heap$, stack
@@ -784,8 +784,8 @@ that are all are well-formed, consistent
 typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
 $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \longrightarrow_{\cmode} (\varphi',\heap',e')$, then $\heap'$ is
-checked region consistent with $\heap$ ($\heap \triangleright \heap'$) and there exists
-$\Gamma'$ and $\tau'$ that are well formed, checked region consistent
+$\cmode$ region consistent with $\heap$ ($\heap \triangleright \heap'$) and there exists
+$\Gamma'$ and $\tau'$ that are well formed, $\cmode$ region consistent
 ($\Gamma';\Theta\vdash \varphi'$ and $\heap' \vdash \varphi'$) and
 well typed ($\Gamma';\Theta \vdash_{\cmode} e: \tau'$), where
 $\tau'\sqsubseteq_{\Theta} \tau$.
@@ -801,9 +801,8 @@ $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \longrightarrow_{\umode} (\varphi',\heap',e')$, then $\heap'(\cmode)=\heap(\cmode)$.
 \end{thm}
 
-$\heap(\cmode)$ refers to all $\cmode$ mode pointers in heap $\heap$.
 Using the above theorem, we first show the non-exposure theorem,
-where code in unchecked region cannot observe a valid checked pointer address.
+where code in $\umode$ region cannot observe a valid checked pointer address.
 
 \begin{thm}[Non-Exposure]
 For any \lang program $e$, heap $\heap$, stack
