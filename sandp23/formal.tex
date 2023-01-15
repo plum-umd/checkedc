@@ -140,15 +140,14 @@ We precisely present its syntax, semantics, type
 system, and compilation.
 % 
 From those, we develop~\lang’s meta-
-theories, including the type soundness, non-exposure, non-crashing,
-and the compiler simulation theorems.
+theories, including the type soundness, non-exposure, and non-crashing theorems.
 
 %This section describes the formal core model of \systemname, named
 %\lang, making precise its syntax, semantics, type system, and compilation. It also
 %develops \lang's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
 
 \subsection{Syntax}\label{sec:syntax}
-The~\fig{fig:checkc-syn} shows the syntax of~\lang.
+\Cref{fig:checkc-syn} shows the syntax of~\lang.
 
 \myparagraph{Type Syntax}
 At a high level, we classify types as word-size value, multi-word
@@ -186,13 +185,12 @@ so the above examples could be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
 \myparagraph{Disallowing Unsafe Types}
-The well-formed requirements of these types are presented in~\fig{fig:wftypesandbounds} (Appendix).
-% 
-These requirements prevents unsafe types from being constructed.
+The well-formedness of these types are presented in~\Cref{app:le}.
+It prevents unsafe types from being constructed.
   Consider the type ~\code{_t_Array_ptr<_Ptr<int>>} which describes a tainted
   array of checked pointers.
-  Syntactically valid, this type is however \emph{illegal} in~\lang{} and
-  is rejected by the well-formedness requirement. 
+  Syntactically, this type is however \emph{illegal} in~\lang{} and
+  is rejected by the well-formedness. 
 However, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
 % 
 
@@ -208,7 +206,7 @@ $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
 \Leftrightarrow\; $\tptr{(\tfun{n}{\tint \times \tntarrayptr{0}{n}{\tau_2}{\tmode} \times \tntarrayptr{0}{n}{\tau_1}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
-The function type also has well-formed requirements (\fig{fig:wffunctions} in Appendix), which disallows nesting checked pointers inside tainted pointers.
+The function type also has well-formed requirements (\Cref{app:le}), which disallows nesting checked pointers inside tainted pointers.
 Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 
 %The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
@@ -261,7 +259,7 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 \lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
- static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}}, the \texttt{strlen} operation ($\estrlen{x}$),
+ static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \cite{li22checkedc}}, the \texttt{strlen} operation ($\estrlen{x}$),
 memory allocation ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
@@ -499,7 +497,7 @@ $
 \cmode(\tptr{\omega}{\xi})=\texttt{false}\;\;{[\emph{owise}]}
 $
 }
-\caption{Selected type rules}
+\caption{Selected typing (\rulelab{T}-$X$) and semantic (\rulelab{S}-$X$) rules. First line is for cast operations, second line is for pointer dereferences, third line is for checked/unchecked blocks, and the rest is for function calls.}
 \label{fig:type-system-1}
 \end{figure*}
 \end{DIFnomarkup}
@@ -520,7 +518,7 @@ transition relation with the judgment $ (\varphi,\heap,e)
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
 $\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ heaps), each of which
 maps addresses (integer literals) to values $\evalue{n}{\tau}$.
-The complete set of typing rules and special handling of (NT)-arrays are provided in~\apdx{sec:literal-pointer-typing}.
+The complete set of typing rules and special handling of (NT)-arrays are provided in~\Cref{rem-type,sec:rem-semantics}.
 
 We wrote $\heap(m,n)$ to retrieve the $n$-location heap value in the $m$ heap,
 and $\heapup{m}{n}{\evalue{n'}{\tau}}$ 
@@ -555,10 +553,10 @@ whose rules are given along with type rules in Fig.~\ref{fig:type-system-1}, dis
 shortly.
 The $\mode$ function in Fig.~\ref{fig:c-context}
 determines the context mode that the expression $e'$ locates based on the context $E$.
-In \Cref{lst:humantaint}, the function call expression \code{read_msg} has $\umode$ mode since it is inside a tainted function.
+In \Cref{lst:humantaint}, the function call \code{handle_request} has $\umode$ context mode (is in $\umode$ region) since it is inside an unchecked function \code{server_loop}.
 The second rule describes the exception handling 
 for possible crashing behaviors in unchecked regions.
-A $\umode$ mode operation can non-deterministically crash
+Operations in $\umode$ region can non-deterministically crash
 and the \systemname sandbox mechanism recovers
 the program to a safe point ($\evalue{0}{\tau}$)
 and continues with the existing program state.
@@ -585,7 +583,7 @@ x = (_Ptr<int>)y; // Not allowed.
 \end{minted}
 
 In the above example, a $\tmode$ mode pointer can be cast to $\umode$ mode but casting $\tmode$ mode to $\cmode$ mode is disallowed.
-The complete subtyping relation was described in \Cref{fig:checkc-subtype}.
+The complete subtyping relation was described in \Cref{app:le}.
 Notice that \texttt{let} statements are immutable in \lang, so the following code is not possible, because variables \code{x} and \code{y} must have the same type in \lang.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
@@ -600,7 +598,7 @@ reflect the key \lang feature, where our type checker directs the insertions of 
 The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
 With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a \enull pointer is used,
 \lang captures the runtime error.
-Type and semantic rules for array types and pointer assignments are given in \Cref{appx:add-type-sem}.
+Type and semantic rules for array types and pointer assignments are given in \Cref{rem-type,sec:rem-semantics}.
 
 Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereference, respectively.
 In addition to the no \enull check in $\cmode$ mode pointer dereference,
@@ -621,8 +619,8 @@ which means that users might randomly manipulate the data region pointed to by t
 and \lang forbids such behavior.
 
 \myparagraph{Dependent Function Pointers} %
-The rule \textsc{T-Fun} (\Cref{fig:type-system-1}) states the type judgement for
-dependent function pointer application where we represent the result of
+Rule \textsc{T-Fun} (\Cref{fig:type-system-1}) states the type judgment for
+dependent function pointer application, where we represent the result of
 replacing all integer bound variables $\overline{x}$ in the type \(\tau\) with
 with bound expressions $\overline{e'}$ by $\tau[\overline{e'} / \overline{x}]$
 and write $\overline{\tau}[\overline{e'} / \overline{x}]$ to lift the
@@ -638,30 +636,11 @@ be of type $\tau[\overline{e'} / \overline{x}]$
 if for each pair of \(\tau'\) and \(\tau''\) in \(\overline{\tau'}\) and
 $\overline{\tau}[\overline{e'} / \overline{x}]$, \(\tau'\) is a subtype of
 \(\tau''\).
-% 
-\mz{I rewrote the sentences above.}
-% 
 Consider the \code{process_req2} function in
 Fig.~\ref{lst:final}; its parameter type for \code{msg} 
-depends on \code{m_1}. The \textsc{T-Fun} rule will
-\mzu{substitute \code{n} with the argument}
-\mz{\code{n} seems unbound here.}
-at a call-site.
-\ignore{
-The semantics manages variable scopes using the special $\erettext$
-form. \textsc{S-Let} evaluates to a configuration whose expression is
-$\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
-and remember $x$ and its new value $\evalue{n}{\tau}$
-in $e$'s scope that is defined by the $\erettext$ operation.
-Every time when evaluation proceeds on $e$ (rule \textsc{S-RetCon}),
-we install the stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$ for the current scope.
-After one-step evaluation is completed, 
-we store $x$'s change in the result $\erettext$ operation $\ret{x}{\varphi'(x)}{e'})$,
-and restore $x$'s outer score value $\varphi(x)$ in $\varphi'$. 
-This procedure continues until $e'$ becomes a literal
-$n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
-the literal. 
-}
+depends on \code{m_1}.
+Its function pointer type is 
+$\tptr{\tfun{\code{m_1}}{\tint,\tntarray{0}{\code{m_1}}{\texttt{char}}}{\tint}}{\tmode}$.
 
 \textsc{S-FunC} and \textsc{S-FunT} are
 for $\cmode$ and $\tmode$ mode function pointers, respectively. 
@@ -769,7 +748,7 @@ In this subsection, we focus on our main meta-theoretic results about
 \lang: type soundness (progress and preservation),
 non-exposure, and non-crashing.
 These proofs have been conducted in our Coq model.
-Type soundness relies on several \emph{well-formedness} given in \cite{li22checkedc} and \Cref{appx:add-type-sem}.
+Type soundness relies on several \emph{well-formedness} given in \cite{li22checkedc} and \Cref{sec:meta}.
 Progress states that a \lang program can always make a move:
 
 \begin{thm}[Progress]\label{thm:progress}
