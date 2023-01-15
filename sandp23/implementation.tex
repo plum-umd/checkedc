@@ -66,6 +66,7 @@ We created a library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 
+\iffalse
 \noindent\emph{Handling Tainted Buffers in~\cregion}:
 All buffers that are marked as tainted in~\cregion should be allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
 We perform source rewriting and make the buffer into a pointer variable and allocate the corresponding number of bytes using the sandbox-specific allocator. For instance, we perform the following rewriting for~\code{buff} in~\lst{lst:final} with WASM sandbox.
@@ -75,6 +76,7 @@ We perform source rewriting and make the buffer into a pointer variable and allo
 \end{minted}
 \aravind{Arun, please fix the above example on how exactly we replace it with WASM allocator.}
 Note that we also add the necessary deallocator calls at function exit points.
+\fi
 
 \noindent\emph{Handling Calls to Tainted Functions}:
 In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
@@ -162,6 +164,18 @@ TO INVOKE CALLBACK FUNCTIONS.
 The~\systemname compiler includes the type checker (\sect{}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
 We implemented the compiler on top of the existing~\checkedc compiler.
 
+Our type checker verifies the constraints (\fig{fig:type-system-1}) and displays violations as errors, enabling developers to make additional annotations.
+For instance, for the code in~\lst{lst:final}, our type checker emits an error saying that ``~\emph{buffer~\code{buff} is tainted, but it is allocated in~\cregion}''.
+Consequently, the developer has to make the following changes to allocate~\code{buff} in the sandbox:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+- char buff[MAX_MSG_SIZE] _Tainted;
++ _t_Array_ptr<char> buff: count(MAX_MSG_SIZE)
++    = sbx_allocate(MAX_MSG_SIZE);
+...
++ sbx_free(buff)
+return rc;
+\end{minted}
+
 For all tainted pointer access, our instrumentation adds a check (executed at runtime) to see we check if the address is within the valid range for the sandbox. An example of the check is shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
 _TPtr<int> t = ...
@@ -187,8 +201,12 @@ For our example in~\lst{lst:final}, we can make only the function \code{process_
 
 The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
 It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
-\aravind{Change title of this section and say that this mode has no guarentees and move this before evaluation.}
-
+We add the additional constraint of not allowing casting from taint types to generic types to enable this generic use case without violating the safety guarantees of~\systemname.
+Specifically, we disallow the following casting in~\cregion:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+//_t_Ptr<int> y; int *z;
+|\faRemove| z = (int *)y; // Not allowed.
+\end{minted}
 \iffalse
 
 %\subsection{Overview}
