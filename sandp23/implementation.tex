@@ -40,15 +40,21 @@ Specifically, this annotation enables developers to pass tainted pointers as arg
 
 For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
 We cannot use~\code{strncat} because our type-checker restricts this as it expects both the pointers to be non-tainted as we are in~\cregion.
-We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then call~\code{strncpy} as~\code{strncat(dst, tmp, n);}.
+We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then invoke~\code{strncat(dst, tmp, n);}.
 Both of these approaches are inefficient and, if not done correctly, might result in security bugs.
 If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use~\code{strncat} with tainted source pointer in~\cregion.
 The~\code{_TLIB} qualifier enables this as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 // Put your example annotation here.
-strncpy(dst, t_str, n);
+// First, manually check the memory is in tainted region.
+// if yes, then call strncpy.
+if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
+  handle_violation();
+// our type checker ignores this because 
+// the above _TLIB annotation.
+strncat(dst, t_str, n);
 \end{minted}
-\aravind{Fix the above code}
+\aravind{Arun, Fix the above code. i.e., Add \_TLIB annotation to strncpy }
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
 
 \subsubsection{Generating~\cregion Source Partition}
