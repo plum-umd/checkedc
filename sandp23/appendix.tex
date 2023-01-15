@@ -1,5 +1,33 @@
 \section{Appendix}\label{app:main}
 
+\subsection{Converting C to \checkedc}
+\label{app:convertctocc}
+%
+The safety guarantees of Checked C come with certain restrictions. For instance,
+as shown below, Checked C programs cannot use address-taken variables in a
+bounds expression as the bounds relations may not hold because of possible
+modifications through pointers.
+% 
+\begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+...
+_Array_ptr<int> p : count (n) = NULL;
+|\textcolor{red}{\faTimes}|..,&n,.
+\end{minted}
+% 
+Consequently, converting existing C programs to Checked C might require
+refactoring,~\eg eliminate~\inlinecode{&n} from the program above without
+changing its functionality.
+% 
+This might require considerable effort~\cite{duanrefactoring} depending on the
+program's complexity.
+% 
+Recently, Machiry~\etal developed~\threec~\cite{machiry2022c} that tries to
+automatically convert a program to Checked C by adding appropriate pointer
+annotations.
+However, as described in \threec, completely automated conversion
+is \emph{infeasible}, and it requires the developer to convert some code regions
+manually. 
+
 
 \subsection{Well-formedness and Subtype}
 \label{app:le}

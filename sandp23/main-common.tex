@@ -9,6 +9,8 @@
 %
 %\IEEEpeerreviewmaketitle
 
+\PassOptionsToPackage{table}{xcolor}
+
 \documentclass[sigconf, anonymous]{acmart}
 
 \fancyhf{} % Remove fancy page headers 
@@ -35,7 +37,7 @@
 \usepackage{textcomp}
 \usepackage{mathpartir}
 \usepackage{color}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \DeclareMathAlphabet{\mathpzc}{OT1}{pzc}{m}{it}
 \usepackage{cleveref} % must be loaded after hyperref and amsmath
 %% Some recommended packages.
@@ -364,6 +366,7 @@
 % Implementation stats
 \newcommand{\numcheckmatelines}{XXXK SLoc}
 \newcommand{\numocamllines}{YYYK SLoc}
+\newcommand{\numcompilerlines}{ZZZZK SLoc}
 
 
 % metafunctions & relations

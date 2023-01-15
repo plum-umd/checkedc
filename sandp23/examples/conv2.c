@@ -1,5 +1,5 @@
 size_t read_msg(int sock_fd, char *msg, 
-                size_t sz) __tainted {
+                size_t sz) _Tainted {
  size_t nr;
  nr = read(sock_fd, (void*)msg, sz);
  ...
@@ -8,7 +8,7 @@ size_t read_msg(int sock_fd, char *msg,
 }
 
 int process_req1(char *msg, size_t m_l) 
-                 __tainted {
+                 _Tainted {
  int rc = -1, i;
  if (m_l > MIN_SIZE) {
    sscanf(msg, "%d", &i);

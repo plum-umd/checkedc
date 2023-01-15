@@ -17,10 +17,28 @@
 %   methodology to derive such rules? Are these rules the same as the "admissible
 %   but redundant typing rules" from above?}
 % \liyi{Deena? Leo? }
-Our evaluation of \systemname consists of a set of tests that can be classified into Micro-benchmarks and Program Benchmarks that evaluate \systemname on WebAssembly sandbox. Consequently, all further references to sandbox refer to unchecked code in the WebAssembly Sandbox. 
-MicroBenchmarking involves evaluating performance on fundamental operations involving tainted pointers, context switching between checked and sandboxed regions, and sandboxed execution of functions.
-We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
+We evaluate~\systemname in terms of the following three aspects:
+\begin{itemize}
+\item\textbf{Performance Overhead:} What is the performance overhead (both runtime and memory) in using~\systemname?
+\item\textbf{Conversion Effort:} How much developer effort is needed to annotate parts of programs to run in~\systemname?
+\item\textbf{Security Impact:} How effective is the isolation provided by~\systemname{} in preventing security vulnerabilities?
+\end{itemize}
 
+%Our evaluation of \systemname consists of a set of tests that can be classified into Micro-benchmarks and Program Benchmarks that evaluate \systemname on WebAssembly sandbox. Consequently, all further references to sandbox refer to unchecked code in the WebAssembly Sandbox. 
+%MicroBenchmarking involves evaluating performance on fundamental operations involving tainted pointers, context switching between checked and sandboxed regions, and sandboxed execution of functions.
+%We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
+
+\subsection{Dataset}
+\input{tables/datasettable}
+Network-facing programs such as servers directly interact with external input, often process complex data types, and are more susceptible to security issues.
+We primarily focus on network servers as they can benefit most from our partitioning approach.
+We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
+We selected network servers that we could (with minimal effort) compile with the WASM compiler.
+We also selected a few standalone programs suggested by the ~\checkedc team, which are good candidates to evaluate modifications to~\checkedc.
+The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset.
+\aravind{Arun, please fix the dataset table with details of all programs.}
+
+\subsection{Experimental Setup}
 
 \subsection{Program Run-time Benchmarks}
 \begin{figure*}[t]

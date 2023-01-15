@@ -14,6 +14,7 @@ We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020web
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
 However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
+\aravind{Arun, please fix the number of lines you changed for clang frontend and ocaml program}
 
 \subsubsection{Additional Function Qualifiers}
 \label{subsubsec:addfuncqual}
@@ -167,8 +168,9 @@ TO INVOKE CALLBACK FUNCTIONS.
 \aravind{Arun, please fix the above example}
 
 \subsection{Compiler}
-The~\systemname compiler includes the type checker (\sect{}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
-We implemented the compiler on top of the existing~\checkedc compiler.
+The~\systemname compiler includes the type checker (\sect{sec:typechecking}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
+We implemented the compiler (\numcompilerlines{}) on top of the existing~\checkedc compiler.
+\aravind{Arun, please fix the number of changes you made for the compiler}
 
 Our type checker verifies the constraints (\fig{fig:type-system-1}) and displays violations as errors, enabling developers to make additional annotations.
 For instance, for the code in~\lst{lst:final}, our type checker emits an error saying that ``~\emph{buffer~\code{buff} is tainted, but it is allocated in~\cregion}''.
@@ -191,8 +193,10 @@ _TPtr<int> t = ...
 \end{minted}
 We show the added check in C for clarify. However, our instrumentation works on LLVM IR.
 
+The~\ucregion source files will be compiled with sandbox compiler,~\ie NAMEOFSANDBOXCOMPILER (CITATION).
 Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
-\cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers.
+\cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
+\aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
 
 \subsection{Supporting General Partioning Use Case}
 \input{figures/newusecase}

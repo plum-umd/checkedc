@@ -19,13 +19,14 @@ int handle_request(int sock_fd) {
  size_t r_len;
  r_len = read_msg(sock_fd, buff, 
                   MAX_MSG_SIZE);
- if (r_len > 0) {
+ if (r_len > 0 && 
+     r_len < MAX_MSG_SIZE) {
   switch(buff[0]) {
    case REQ1: 
-    rc = process_req1(buff); 
+    rc = process_req1(buff, r_len); 
     break;
    case REQ2: 
-    rc = process_req2(buff); 
+    rc = process_req2(buff, r_len); 
     break;
    ...
   }

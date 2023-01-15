@@ -81,7 +81,7 @@ However, as shown in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecked co
 %\myparagraph{Using tainted types}
 To handle this, the developer marks risky functions with unchecked pointers,~\ie~\code{read_msg} and~\code{process_req1} as~\code{tainted} as shown in~\lst{lst:humantaint} indicated by~\useradded.
 The developer starts using~\systemname{} with the resulting partially annotated program with checked and tainted types~\ie~\lst{lst:initialconv} and~\ref{lst:humantaint} atop of~\lst{lst:comb}.
-The initial tainted functions might require other pointers to be marked as tainted according to our typing rules (CITE).
+The initial tainted functions might require other pointers to be marked as tainted according to our typing rules (\sect{sec:typechecking}).
 The developer uses our type checker to identify the additional annotations (\usermods) required to have a well-typed program and adds them as shown in~\lst{lst:humanadjust}.
 The resulting well-typed program as shown in~\lst{lst:final} will be passed to our source level program partitioner along with certain configuration parameters of the target sandbox.
 
