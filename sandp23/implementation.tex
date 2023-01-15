@@ -9,7 +9,7 @@ We created the sandbox library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020webassembly}) as our target sandbox.
-However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
+%However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
@@ -22,7 +22,7 @@ Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_M
 
 \noindent\emph{\_Callback}:
 Developers should use this qualifier to mark callback functions,~\ie functions in~\cregion, that can be called from the tainted region. 
-The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\sect{}).
+The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\sect{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
 This qualifier copies the corresponding function both into~\cregion and~\ucregion code. Such that callers from each region will invoke the corresponding copy.
