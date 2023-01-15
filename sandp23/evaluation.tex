@@ -48,7 +48,15 @@ The~\tbl{table:dataset} shows the program selected as part of our evaluation dat
 \end{figure*}
 
 \myparagraph{Benchmarking Methodology}
-\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. However, the scope of \systemname changes made on each of the programs is varied and the converted programs themselves are relatively tiny. Since each of the program is evaluated on a pre-included test-suite that runs on a single instance of the program, sandbox creation cost is a one-time constant due to \systemname implementing RLBOX's \cite{rlbox-paper} WebAssembly sandbox creation API. Run-time performance is evaluated with C's~\code{<time.h>} library by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs) and measuring latency delta as a percentage. Timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. Memory overhead is measured with Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, Peak Memory is recorded as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLIB functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandbox's Heap allocations which are linearly proportional to sandboxed code and tainted pointers.  
+\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. 
+However, the scope of \systemname changes made on each of the programs is varied and the converted programs themselves are relatively tiny.
+Since each of the program is evaluated on a pre-defined test-suite that runs on a single instance of the program, sandbox creation cost is a one-time constant due to \systemname implementing RLBOX's \cite{rlbox-paper} WebAssembly sandbox API. 
+\liyi{I do not understand the following sentence, what is test-bench? }
+Run-time performance is evaluated with C's~\code{<time.h>} library by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs) and measuring latency delta as a percentage. 
+\liyi{need to rewrite}
+Timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. 
+\liyi{What is Valgrind? }
+Memory overhead is measured with Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, Peak Memory is recorded as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLIB functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandbox's Heap allocations which are linearly proportional to sandboxed code and tainted pointers.  
 All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of RAM, running Ubuntu 20.04.3 LTS and the benchmarks for every test were sampled as the mean of ten consecutive iterations.
 
 \subsection{Micro-Benchmarks}
@@ -58,6 +66,8 @@ All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of R
 \caption{\systemname Micro-Benchmarks}
 \label{fig:microbenchmarks}
 \end{figure}
+
+\liyi{What is SBX, and how it is related to indirect-calls, pointer accesses and what is micro-benchimarks doing? Should we elaborate a little? }
 
 Figure \ref{fig:microbenchmarks} shows calls to the sandbox and sandboxed code execution to have significantly higher overhead in comparison to that of Tainted pointers. This observation suggests for sandboxing less performance intensive code and reducing the indirect calls between the two regions. Consequently, unsafe regions of code can be annotated cost-effectively by choosing to annotate the unsafe pointer references within the demarked unsafe function as tainted at the cost of losing out on the Sandbox's safety features. 
 
@@ -119,6 +129,7 @@ annotated pointers and sandboxed code.
   \item Conversion style and extent qualitatively dictate the converted program's conversion efforts and is modest at a couple of days. 
 \end{itemize}
 
+\liyi{results?}
 \subsubsection{\textbf{ProFTPD}}
 \systemname changes for ProFTPD were limited in extent and aimed at the exact changes required to encapsulate CVE-2010-4221. We mark the user input to the unsafe function "pr\_netio\_telnet\_gets()" as tainted (\_TPtr<char>) and propagate its tainted-ness to its callers and callees enclosed within its defined scope.
 
