@@ -56,6 +56,7 @@ strncat(dst, t_str, n);
 \end{minted}
 \aravind{Arun, Fix the above code. i.e., Add \_TLIB annotation to strncpy }
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
+Note that developer needs to manually add the check before calling~\code{strcat}.
 
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
