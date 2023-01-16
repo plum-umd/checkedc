@@ -34,32 +34,75 @@ Network-facing programs such as servers directly interact with external input, o
 We primarily focus on network servers as they can benefit most from our partitioning approach.
 We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
 We selected network servers that we could (with minimal effort) compile with the WASM compiler.
-We also selected a few standalone programs suggested by the ~\checkedc team, which are good candidates to evaluate modifications to~\checkedc.
+We also selected a few standalone programs suggested by the ~\checkedc team~\cite{benchmarkcc}, which are good candidates to evaluate modifications to~\checkedc.
 The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset.
 \aravind{Arun, please fix the dataset table with details of all programs.}
 
 \subsection{Experimental Setup}
+All our experiments are performed on a 6-Core Intel i7-10700H machine with 40 GB of RAM, running Ubuntu 20.04.3 LTS.
+We use WASM as our target sandbox and use a similar configuration as that of the recent work~\cite{rlbox-paper}.
+We use Valgrind's "massif" memory profiler~\cite{seward2008valgrind} to measure the memory usage and consider the peak heap usage of an application as its memory consumption.
+We measure runtime using the difference in elapsed clock cycles using~\code{clock()} API from POSIX's~\code{<time.h>}.
+We perform every measurement ten times and use the average as the final result.
 
-\subsection{Program Run-time Benchmarks}
+%\subsection{Program Run-time Benchmarks}
 \begin{figure*}[t]
 \includegraphics[width=1.0\linewidth]{images/program_runtime_benchmark.png}
 \caption{Run-time benchmarking of ~\systemname.}
 \label{fig:runtime}
 \end{figure*}
 
-\myparagraph{Benchmarking Methodology}
-\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. 
-However, the scope of \systemname changes made on each of the programs is varied and the converted programs themselves are relatively tiny.
-Since each of the program is evaluated on a pre-defined test-suite that runs on a single instance of the program, sandbox creation cost is a one-time constant due to \systemname implementing RLBOX's \cite{rlbox-paper} WebAssembly sandbox API. 
-\liyi{I do not understand the following sentence, what is test-bench? }
-Run-time performance is evaluated with C's~\code{<time.h>} library by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs) and measuring latency delta as a percentage. 
-\liyi{need to rewrite}
-Timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. 
-\liyi{What is Valgrind? }
-Memory overhead is measured with Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, Peak Memory is recorded as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLIB functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandbox's Heap allocations which are linearly proportional to sandboxed code and tainted pointers.  
-All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of RAM, running Ubuntu 20.04.3 LTS and the benchmarks for every test were sampled as the mean of ten consecutive iterations.
+%\myparagraph{Benchmarking Methodology}
+%\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. 
+%However, the scope of \systemname changes made on each of the programs is varied and the converted programs themselves are relatively tiny.
+%Since each of the program is evaluated on a pre-defined test-suite that runs on a single instance of the program, sandbox creation cost is a one-time constant due to \systemname implementing RLBOX's \cite{rlbox-paper} WebAssembly sandbox API. 
+%\liyi{I do not understand the following sentence, what is test-bench? }
+%Run-time performance is evaluated with C's~\code{<time.h>} library by placing each of the test-bench calls within the timing scope (Program scope within which the timer runs) and measuring latency delta as a percentage. 
+%\liyi{need to rewrite}
+%Timing scope excludes marshaling activities within the test-case environment with an intuition that marshaling is irrelevant if tainted-ness of a pointer is propagated from the call site up until its declaration. 
+%\liyi{What is Valgrind? }
+%Memory overhead is measured with Valgrind's "massif" memory profiler to benchmark the peak memory usage of the Heap. Unlike the Runtime performance, Peak Memory is recorded as a relative offset to original program because most programs are extremely small in comparison to the constant overhead from the sandbox (81 KiB approx). This can further be optimized away by choosing to only compile custom Tainted wrappers for those STDLIB functions that are in use by the tainted pointers in the program. Valgrind's memory figures do not account for Sandbox's Heap allocations which are linearly proportional to sandboxed code and tainted pointers.  
+%All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of RAM, running Ubuntu 20.04.3 LTS and the benchmarks for every test were sampled as the mean of ten consecutive iterations.
+\subsection{Performance Overhead}
+Recent work~\cite{jangda2019not} shows that code executed as part of WASM sandbox incurs significant runtime overhead,~\ie$\sim$200\%.
+To better understand our runtime overhead, we first perform micro benchmarking of additional sandbox-related operations involved in~\systemname{}.
 
-\subsection{Micro-Benchmarks}
+\subsubsection{Micro-Benchmarking}
+\aravind{Arun, Draw Figure 7 using Latex and use the symbols below.}
+The~\fig{FIXTHIS} shows the results of our micro-benchmarking.
+We measure the following operations as part of this:
+
+\noindent\emph{Memory access in WASM Sandbox ($SBX_{m}$):} 
+All memory access in a sandbox goes through additional verification by the sandbox runtime resulting in runtime overhead.
+We perform 100K memory access (read and write) in a loop, measure the time inside the sandbox, and compare it with the time executed as a regular program.
+
+Our results (\fig{FIXTHIS}) show that we incur 156.6\% overhead for memory access in the WASM sandbox compared to that in a normal program.
+This is inline with the observations of the recent work~\cite{jangda2019not}.
+
+\noindent\emph{Sandbox Roundtrip ($SBX_{RT}$):}
+Here, we measure the time it takes to make a round trip between~\cregion and sandbox (\ucregion) compared to a regular function call and return.
+We create a no-op function as shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+void noop() { return; }
+\end{minted}
+We place this~\code{noop} function in the sandbox and measure the time it takes to call and return from it:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+s = clock();
+sandbox_noop();
+e = clock();
+\end{minted}
+We compare the time with the regular call,~\ie when we place~\code{noop} in~\cregion.
+
+As shown in~\fig{FIXTHIS}, we incur an overhead of $\sim 400\%$. This is also in-line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
+This is expected because transitioning to/from sandbox requires a context switch which is relatively more expensive than a regular function call (\ie\code{call} and~\code{ret} instruction).
+
+\noindent\emph{Tainted Pointer Access in~\cregion ($TP_{c}$):}
+As explained in~\sect{subsec:compilerimple}, we need to perform pointer swizzling to convert the sandbox-specific representation of tainted pointers to raw addresses.
+In addition, our instrumentation also checks at runtime that all tainted pointers are within the sandbox address range before accessing them.
+We measure this additional overhead by comparing tainted pointer access with regular pointer access.
+
+As shown in~\fig{FIXTHIS}, we incur 34\% overhead in accessing tainted pointers in~\cregion.
+Most of this is because of the validation check, which requires executing two additional compare instructions for every memory access.
 
 \begin{figure}[h!]
 \includegraphics[width=1.0\linewidth]{images/microbenchmark.png}
@@ -67,30 +110,36 @@ All of the evaluation was performed using 6-Core Intel i7-10700H with 40 GB of R
 \label{fig:microbenchmarks}
 \end{figure}
 
-\liyi{What is SBX, and how it is related to indirect-calls, pointer accesses and what is micro-benchimarks doing? Should we elaborate a little? }
-
-Figure \ref{fig:microbenchmarks} shows calls to the sandbox and sandboxed code execution to have significantly higher overhead in comparison to that of Tainted pointers. This observation suggests for sandboxing less performance intensive code and reducing the indirect calls between the two regions. Consequently, unsafe regions of code can be annotated cost-effectively by choosing to annotate the unsafe pointer references within the demarked unsafe function as tainted at the cost of losing out on the Sandbox's safety features. 
-
-\subsubsection{\textbf{Memory Access in SBX}}
-Memory access performance between the checked and the WASM region involves crafting a test case that involves a simple pointer arithmetic operation enclosed in a loop of 100k iterations. 
-
-\myparagraph{Results}
-156.6\% overhead as shown in Figure \ref{fig:microbenchmarks} is caused by the code executing in WASM Sandbox which is comparatively inefficient as WASM compiler toolchain does not support code optimization like LLVM/GCC. 
 
 
-\subsubsection{\textbf{Indirect-Calls}}
-This test involves evaluating the overhead involved in making indirect calls and is recorded by benchmarking the time taken for a sandboxed Callee (call from the checked region into the SBX) to return. This metric is evaluated against the time taken for a checked Callee (call within local scope) to return.
-
-\myparagraph{Result}
-Observed overhead is a consequence of control transfer overhead between the checked and unchecked region as mentioned in \cite{rlbox-paper}
-
-\subsubsection{\textbf{Pointer Accesses}}
-Run-time Pointer overhead is evaluated by benchmarking a test that involves 100k read/write/arithmetic operations on the pointer.
-
-\myparagraph{Result}
-34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
-\myparagraph{Result:}
-Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
+%\subsection{Micro-Benchmarks}
+%
+%
+%
+%\liyi{What is SBX, and how it is related to indirect-calls, pointer accesses and what is micro-benchimarks doing? Should we elaborate a little? }
+%
+%Figure \ref{fig:microbenchmarks} shows calls to the sandbox and sandboxed code execution to have significantly higher overhead in comparison to that of Tainted pointers. This observation suggests for sandboxing less performance intensive code and reducing the indirect calls between the two regions. Consequently, unsafe regions of code can be annotated cost-effectively by choosing to annotate the unsafe pointer references within the demarked unsafe function as tainted at the cost of losing out on the Sandbox's safety features. 
+%
+%\subsubsection{\textbf{Memory Access in SBX}}
+%Memory access performance between the checked and the WASM region involves crafting a test case that involves a simple pointer arithmetic operation enclosed in a loop of 100k iterations. 
+%
+%\myparagraph{Results}
+%156.6\% overhead as shown in Figure \ref{fig:microbenchmarks} is caused by the code executing in WASM Sandbox which is comparatively inefficient as WASM compiler toolchain does not support code optimization like LLVM/GCC. 
+%
+%
+%\subsubsection{\textbf{Indirect-Calls}}
+%This test involves evaluating the overhead involved in making indirect calls and is recorded by benchmarking the time taken for a sandboxed Callee (call from the checked region into the SBX) to return. This metric is evaluated against the time taken for a checked Callee (call within local scope) to return.
+%
+%\myparagraph{Result}
+%Observed overhead is a consequence of control transfer overhead between the checked and unchecked region as mentioned in \cite{rlbox-paper}
+%
+%\subsubsection{\textbf{Pointer Accesses}}
+%Run-time Pointer overhead is evaluated by benchmarking a test that involves 100k read/write/arithmetic operations on the pointer.
+%
+%\myparagraph{Result}
+%34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
+%\myparagraph{Result:}
+%Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
 \begin{figure*}[t]
 \includegraphics[width=1.0\linewidth]{images/program_memory_benchmark.png}
 \caption{Memory benchmarking of ~\systemname.}
