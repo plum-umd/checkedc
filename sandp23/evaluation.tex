@@ -104,6 +104,9 @@ We measure this additional overhead by comparing tainted pointer access with reg
 As shown in~\fig{FIXTHIS}, we incur 34\% overhead in accessing tainted pointers in~\cregion.
 Most of this is because of the validation check, which requires executing two additional compare instructions for every memory access.
 
+\subsubsection{Overhead on Dataset}
+\label{subsec:programoverhead}
+
 \begin{figure}[h!]
 \includegraphics[width=1.0\linewidth]{images/microbenchmark.png}
 \caption{\systemname Micro-Benchmarks}
