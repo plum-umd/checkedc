@@ -7,8 +7,10 @@ size_t read_msg(int sock_fd, char *msg,
  return nr;
 }
 
-int process_req1(char *msg, size_t m_l) 
-                 _Tainted {
+int process_req1(_T_Array_ptr<char> msg :
+                 count(m_l), size_t m_l) 
+                 __tainted {
+
  int rc = -1, i;
  if (m_l > MIN_SIZE) {
    sscanf(msg, "%d", &i);
@@ -18,7 +20,7 @@ int process_req1(char *msg, size_t m_l)
  return rc;
 }
 
-int process_req2(|\textcolor{taintcolor}{\_t\_Array\_ptr}|<char> msg : 
+int process_req2(|\textcolor{taintcolor}{\_T\_Array\_ptr}|<char> msg : 
                  count(m_l), 
                  size_t m_l) {
  size_t i = 0, j = 0;
