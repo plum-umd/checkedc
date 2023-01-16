@@ -227,19 +227,20 @@ Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
 \cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
 \aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
 
-\subsection{Supporting General Partioning Use Case}
+\subsection{Having Non-sandboxed Pointers}
 \input{figures/newusecase}
 
 Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
 
 However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used alongside regular pointers, so the~\cregion{}~\emph{can} contain regular (unchecked) pointers as well.
-%
-This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
-
+This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. 
 For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
 
+
+In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
 The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
-It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
+It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted,
+which maintains the assurance and overhead balance.
 We add the additional constraint of not allowing casting from taint types to generic types to enable this generic use case without violating the safety guarantees of~\systemname.
 Specifically, we disallow the following casting in~\cregion:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
