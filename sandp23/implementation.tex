@@ -84,7 +84,6 @@ Note that developer needs to manually add the check before calling~\code{strcat}
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
 We copy all non-tainted functions into~\cregion source files and make the following modifications to enable interaction with~\ucregion (\ie sandboxed code).
-
 We created a library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
