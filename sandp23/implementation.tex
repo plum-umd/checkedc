@@ -183,9 +183,8 @@ For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
 
 The~\code{read_msg} function signature in \lst{lst:final} will be modified in the ~\ucregion as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
-- size_t read_msg(int sock_fd, _T_Array_ptr<char> msg,
--                             size_t sz) __Tainted {
-+ size_t read_msg(int sock_fd, char* msg,
+size_t read_msg(int sock_fd, char* msg,
+-                             size_t sz) _Tainted {
 +                             size_t sz) {
 \end{minted}
 
