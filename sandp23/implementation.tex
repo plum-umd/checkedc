@@ -227,7 +227,7 @@ Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
 \cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
 \aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
 
-\subsection{Having Non-sandboxed Pointers}
+\subsection{Balance Assurance and Overhead}
 \input{figures/newusecase}
 
 Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
