@@ -81,7 +81,7 @@ However, as shown in~\sect{subsec:nosafetyagsintuncheckedcode}, the unchecked co
 %\myparagraph{Using tainted types}
 To handle this, the developer marks risky functions with unchecked pointers,~\ie~\code{read_msg} and~\code{process_req1} as~\code{tainted} as shown in~\lst{lst:humantaint} indicated by~\useradded.
 The developer starts using~\systemname{} with the resulting partially annotated program with checked and tainted types~\ie~\lst{lst:initialconv} and~\ref{lst:humantaint} atop of~\lst{lst:comb}.
-The initial tainted functions might require other pointers to be marked as tainted according to our typing rules (CITE).
+The initial tainted functions might require other pointers to be marked as tainted according to our typing rules (\sect{sec:typechecking}).
 The developer uses our type checker to identify the additional annotations (\usermods) required to have a well-typed program and adds them as shown in~\lst{lst:humanadjust}.
 The resulting well-typed program as shown in~\lst{lst:final} will be passed to our source level program partitioner along with certain configuration parameters of the target sandbox.
 
@@ -91,23 +91,6 @@ These sets of source files will be compiled with the corresponding compilers to 
 The \cregion object file will have the necessary runtime checks enforcing~\systemname{} guarantees.
 The~\ucregion object file will be produced according to the corresponding sandbox mechanism.
 Finally, these two object files will be linked along with the necessary sandbox libraries to produce the final executable such that all the tainted functions will be executed in a sandbox (\ucregion) and the rest of the functions as regular code (\cregion).
-
-
-\liyi{This paper should just introduce the language and the compiler, right? I do not think the following is necessary. Instead, we can have an overview section introduce the compiler with examples; especially highlight the callback. }
-\subsection{Alternative Use Cases}
-\input{figures/newusecase}
-
-Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
-
-However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used alongside regular pointers, so the~\cregion{}~\emph{can} contain checked pointers as well.
-%
-This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
-
-For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
-
-The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
-It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
-\aravind{Change title of this section and say that this mode has no guarentees and move this before evaluation.}
 
 %newusecase.tex
 

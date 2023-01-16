@@ -9,11 +9,12 @@ We created the sandbox library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020webassembly}) as our target sandbox.
-However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
+%However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
 However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
+\aravind{Arun, please fix the number of lines you changed for clang frontend and ocaml program}
 
 \subsubsection{Additional Function Qualifiers}
 \label{subsubsec:addfuncqual}
@@ -58,20 +59,27 @@ Specifically, this annotation enables developers to pass tainted pointers as arg
 
 For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
 We cannot use~\code{strncat} because our type-checker restricts this as it expects both the pointers to be non-tainted as we are in~\cregion.
-We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then call~\code{strncpy} as~\code{strncat(dst, tmp, n);}.
+We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then invoke~\code{strncat(dst, tmp, n);}.
 Both of these approaches are inefficient and, if not done correctly, might result in security bugs.
 If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use~\code{strncat} with tainted source pointer in~\cregion.
 Consequently, ~\code{\_TLIB} qualified functions originally implemented in ~\cregion are expected to be non memory-modifying and thereby, its safe use is left at developer's discretion as \systemname does not enforce any semantics for this.  For example, malloc cannot be qualified with ~\code{_TLIB} and thereby is implemented as an indirect call to sandbox-specific allocator.    
 
 The~\code{_TLIB} qualifier enables the qualified function to be used as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-/* Append SRC onto DEST.  */
+
 _TLIB extern char *strcat (char *__restrict __dest,
-            const char *__restrict __src)
-...        
+            const char *__restrict __src); // In the header file
+...
+// First, manually check the memory is in tainted region.
+// if yes, then call strncpy.
+if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
+  handle_violation();
+// our type checker ignores this because 
+// the above _TLIB annotation.
 strncat(dst, t_str, n);
 \end{minted}
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
+Note that developer needs to manually add the check before calling~\code{strcat}.
 
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
@@ -81,6 +89,7 @@ We created a library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 
+\iffalse
 \noindent\emph{Handling Tainted Buffers in~\cregion}:
 All buffers that are marked as tainted in~\cregion should be manually allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
 We perform source rewriting and make the buffer into a pointer variable and allocate the corresponding number of bytes using the sandbox-specific allocator. For instance, we perform the following rewriting for~\code{buff} in~\lst{lst:final} with WASM sandbox.
@@ -89,22 +98,23 @@ We perform source rewriting and make the buffer into a pointer variable and allo
 + _TPtr<char> buff = (_TPtr<char>)t_malloc(MAX_MSG_SIZE);  
 \end{minted}
 Note that we also add the necessary deallocator calls at function exit points.
+\fi
 
-\noindent\emph{Handling Tainted Functions}:
-In~\cregion, we also need to modify tainted functions as they need to execute inside the sandbox (separate address space).
-Consequently, We rewrite the tainted function's body with its corresponding sandbox invocation, thereby, routing all ~\cregion calls to tainted functions to their respective sandboxed implementations in ~\ucregion.
-For instance, we modify the function body of ~\code{process_req1} in~\lst{lst:final} as below:
+\noindent\emph{Handling Calls to Tainted Functions}:
+In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
+However, modifying every call site of tainted functions is tedious and also requires precise pointer analysis~\cite{milanova2002precise} to handle indirect calls through function pointers.
+
+We handle this by~\emph{indirection}: Instead of modifying the call sites, we modify the body of tainted functions to invoke the corresponding function in the sandbox.
+For instance, we modify the body of tainted function~\code{process_req1} (\lst{lst:final}) in~\cregion as below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
-int process_req1(_T_Array_ptr<char> msg :
-count(m_l), size_t m_l)
-__tainted {
+int process_req1(char *msg, size_t m_l) _Tainted {
 - int rc = -1, i;
-- // complex code
-- return rc;
+- if (m_l > MIN_SIZE) {
+- ...
 + return w2c_process_req1(msg, m_l);
 }
-
 \end{minted}
+This ensures that all calls (even through function pointers) to the tainted function~\code{process_req1} are redirected to the sandbox.
 
 \noindent\emph{Handling~\texttt{\_Callback} Qualifiers}:
 As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
@@ -170,7 +180,8 @@ We create~\ucregion partition by first copying all functions and variables marke
 Next, we convert the partition into regular C by replacing all~\systemname{} tainted types with the corresponding C types.
 \newline
 For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
-The~\code{read_msg} function signature in \lst{lst:final} will be modified as shown below in the ~\ucregion:
+
+The~\code{read_msg} function signature in \lst{lst:final} will be modified in the ~\ucregion as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
 - size_t read_msg(int sock_fd, _T_Array_ptr<char> msg,
 -                             size_t sz) __Tainted {
@@ -186,7 +197,57 @@ The~\code{read_msg} function signature in \lst{lst:final} will be modified as sh
 % \end{minted}
 % \aravind{Arun, please fix the above example}
 
+\subsection{Compiler}
+The~\systemname compiler includes the type checker (\sect{sec:typechecking}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
+We implemented the compiler (\numcompilerlines{}) on top of the existing~\checkedc compiler.
+\aravind{Arun, please fix the number of changes you made for the compiler}
 
+Our type checker verifies the constraints (\fig{fig:type-system-1}) and displays violations as errors, enabling developers to make additional annotations.
+For instance, for the code in~\lst{lst:final}, our type checker emits an error saying that ``~\emph{buffer~\code{buff} is tainted, but it is allocated in~\cregion}''.
+Consequently, the developer has to make the following changes to allocate~\code{buff} in the sandbox:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+- char buff[MAX_MSG_SIZE] _Tainted;
++ _t_Array_ptr<char> buff: count(MAX_MSG_SIZE)
++    = sbx_allocate(MAX_MSG_SIZE);
+...
++ sbx_free(buff)
+return rc;
+\end{minted}
+
+For all tainted pointer access, our instrumentation adds a check (executed at runtime) to see we check if the address is within the valid range for the sandbox. An example of the check is shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+_TPtr<int> t = ...
++ if (!is_in_range(t, SBX_LOW(), SBX_HIGH()))
++  handle_violation();
+*t = 1;
+\end{minted}
+We show the added check in C for clarify. However, our instrumentation works on LLVM IR.
+
+The~\ucregion source files will be compiled with sandbox compiler,~\ie NAMEOFSANDBOXCOMPILER (CITATION).
+Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
+\cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
+\aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
+
+\subsection{Supporting General Partioning Use Case}
+\input{figures/newusecase}
+
+Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
+
+However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used alongside regular pointers, so the~\cregion{}~\emph{can} contain regular (unchecked) pointers as well.
+%
+This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
+
+For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
+
+The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
+It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
+We add the additional constraint of not allowing casting from taint types to generic types to enable this generic use case without violating the safety guarantees of~\systemname.
+Specifically, we disallow the following casting in~\cregion:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+//_t_Ptr<int> y; int *z;
+|\faRemove| z = (int *)y; // Not allowed.
+\end{minted}
+\iffalse
 
 %\subsection{Overview}
 %\systemname is implemented as a \systemname compiler and a \systemname source-level partitioning assistant (CheckMate). Given a well-typed \systemname program as an input, CheckMate performs the automation of moving the \systemname qualified function definitions to new "unchecked" source files, whilst inserting STD library headers needed for the successful compilation of these "unchecked" sources to an object file with a Sandbox-specific compiler. Since \systemname is irrelevant to the Sandbox-specific compiler, CheckMate internally runs an OCAML translator to cleanse away the \systemname annotations by converting these tainted definitions to generic-C. Now with the \systemname qualified functions and variables re-defined under the "unchecked" library object, the \systemname qualified functions definitions in the "checked" region are modified by the CheckMate accordingly to allow communication between the two regions. 
@@ -252,3 +313,4 @@ Pointer-Swizzling is implemented in Clang-CodeGen as a modified GEP-instruction 
 
 \subsubsection{\textbf{Tainted Structures}}
 Tainted Pointers to structures crossing into the sandbox are expected to only allow encapsulation of pointer members that are of the tainted type. Consequently, Tstructs have been introduced as a specialized struct type that enforces compile-time semantics to allow prevent its pointer members from being of non-tainted type. \systemname also restricts tainted pointers to only point to structures of Tstruct type. These semantic restrictions of Tstructs are put in place to prevent checked pointer from leaking into the unchecked regions as members of pointer structures. Tstruct variables follow the conventional layout unless qualified as a \_Decoy variable, in which case, the Tstruct's pointer member accesses follow a 32-Bit layout. 
+\fi

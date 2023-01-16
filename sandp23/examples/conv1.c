@@ -15,12 +15,13 @@ void server_loop(int sock_fd) {
 }
 
 int handle_request(int sock_fd) {
- char buff[MAX_MSG_SIZE] |\textcolor{taintcolor}{\_\_tainted}|;
+ char buff[MAX_MSG_SIZE] |\textcolor{taintcolor}{\_Tainted}|;
  int rc = -1;
  size_t r_len;
  r_len = read_msg(sock_fd, buff, 
                   MAX_MSG_SIZE);
- if (r_len > 0) {
+ if (r_len > 0 && 
+     r_len < MAX_MSG_SIZE) {
   switch(buff[0]) {
    case REQ1: 
     rc = process_req1(buff, r_len); 

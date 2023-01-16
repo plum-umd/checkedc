@@ -1,5 +1,5 @@
 int handle_request(int sock_fd) {
- char buff[MAX_MSG_SIZE] |\textcolor{taintcolor}{\_\_tainted} \usermods|;
+ char buff[MAX_MSG_SIZE] |\textcolor{taintcolor}{\_Tainted} \usermods|;
  ...
 }
 
