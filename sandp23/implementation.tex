@@ -12,8 +12,8 @@ We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020web
 We also formalize the implementation and show a simulation theorem in \Cref{appx:comp1}.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
-The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
-However, we use a small OCAML program (\numocamllines{}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
+The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{3028}).
+However, we use a small OCAML program (\numocamllines{680}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
 \aravind{Arun, please fix the number of lines you changed for clang frontend and ocaml program}
 
 \subsubsection{Additional Function Qualifiers}
@@ -26,50 +26,27 @@ Developers should use this qualifier to mark callback functions,~\ie functions i
 The~\sourcerewriter inserts appropriate sandbox dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
-This qualifier makes ~\sourcerewriter copy the corresponding function into both ~\cregion and~\ucregion code such that callers from each region can invoke the corresponding copy.
-This helps handle certain simple utility functions that might be called from both ~\cregion and~\ucregion code. For example, ~\code{json_value_get_type} in our evaluation of parsons\_wasm has callers from both the ~\cregion and ~\ucregion. 
+This qualifier permits copying the corresponding function into both ~\cregion and~\ucregion, which permits the handling of certain simple utility functions that might be called from both regions. For example, ~\code{append_string} in our evaluation of parsons\_wasm has callers from both the regions. 
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-/* JSON Value API */
-_Mirror JSON_Value_Type json_value_get_type  
-      (_TPtr<const TJSON_Value> value) {
-    return value ? value->type : JSONError;
-}
-
-_Mirror _TPtr<TJSON_Object> json_value_get_object
-(_TPtr<const TJSON_Value> value) {
-    return json_value_get_type(value) == JSONObject ?
-    value->value.object : NULL;
+_Mirror int append_string(_TPtr<char> buf,
+const char* appendStr : itype(_Nt_array_ptr<const char>),
+_TPtr<char> buf_start, size_t buf_len) {
+/* Qualifier Rules:
+1.) No access to global data NOT marked "const"
+2.) Callees must be _Tainted or _Mirror
+*/
+...
 }
 
 \end{minted}
-
-Placing such common functions in either of the regions restricts their usage from the other region. For instance, if we place~\code{foo} in~\ucregion, then all parameters of it should be tainted. Consequently, callers from~\cregion should use tainted pointers to invoke~\code{foo}, making the arguments and other dependent pointers tainted, leading to over-tainting.
-Similarly, placing~\code{foo} in~\cregion will make it hard for the callers in~\ucregion as they should now use the callback mechanism to invoke~\code{foo}.
-
-Developers can use the ~\code{_Mirror} qualifier, which makes ~\sourcerewriter copy the function into both regions so that callers in each region will invoke the corresponding copy, thereby, avoiding unnecessary tainting. 
-
-However, ~\code{_Mirror} qualifier semantically asserts the function to only have callees that are either qualified with ~\code{_Tainted} or ~\code {_Mirror}. For example, ~\code{json_value_get_object}'s only callee 
-\newline
-~\code{json_value_get_type} is ~\code{\_Mirror} qualified.
-Similarly, \systemname enforces ~\code{_Mirror} qualified functions to only access global checked data that are marked constant. These control-flow and data-flow compile-time semantics are enforced by \systemname to assert region locality and exclusivity amongst qualified function scopes in both the regions.   
+Qualifying ~\code{append_string} with~\code{_Mirror} duplicates the function in both regions,
+so that calling \code{append_string} permits the avoidance of over-tainting \code{appendStr},
+as \code{appendStr} can be unchecked and checked pointers in $\umode$ and $\cmode$ regions, respectively.
+"\_Mirror" enforces control-flow and data-flow compile-time semantic rules as shown above to assert region locality and exclusivity amongst between both the regions. \liyi{fix the sentence.}
 
 \noindent\emph{\_TLIB}:
-This qualifier relaxes type-checking rules on library functions, thereby, avoiding unnecessary copying of tainted data.
-Specifically, this annotation enables developers to pass tainted pointers as arguments to library functions in~\cregion.
-
-For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
-We cannot use~\code{strncat} because our type-checker restricts this as it expects both the pointers to be non-tainted as we are in~\cregion.
-We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then invoke~\code{strncat(dst, tmp, n);}.
-Both of these approaches are inefficient and, if not done correctly, might result in security bugs.
-If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use~\code{strncat} with tainted source pointer in~\cregion.
-Consequently, ~\code{\_TLIB} qualified functions originally implemented in ~\cregion are expected to be non memory-modifying and thereby, its safe use is left at developer's discretion as \systemname does not enforce any semantics for this.  For example, malloc cannot be qualified with ~\code{_TLIB} and thereby is implemented as an indirect call to sandbox-specific allocator.    
-
-The~\code{_TLIB} qualifier enables the qualified function to be used as shown below:
+This qualifier relaxes type-checking rules on library functions without memory modification allowing developers to use the function freely in ~\cregion.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-
-_TLIB extern char *strcat (char *__restrict __dest,
-            const char *__restrict __src); // In the header file
-...
 // First, manually check the memory is in tainted region.
 // if yes, then call strncpy.
 if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
@@ -78,8 +55,17 @@ if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
 // the above _TLIB annotation.
 strncat(dst, t_str, n);
 \end{minted}
-The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
-Note that developer needs to manually add the check before calling~\code{strcat}.
+
+Passing tainted pointer ~\code{t_str} to unqualified ~\code{strncat} above is disallowed by our type-checker as it expects both the pointers to be non-tainted since we are in ~\cregion. If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use ~\code{strncat} with tainted source pointer in ~\cregion, instead of implementing the logic for string concatenation in ~\ucregion or marshalling data between the two regions.  
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
+- extern char *strncat (char *__restrict __dest,
++ _TLIB extern char *strncat (char *__restrict __dest,
+const char *__restrict __src, size_t __n); // In the header file
+}
+\end{minted}
+
+Consequently, annotating ~\code{strncat} as shown above relaxes type-checking for all the arguments to its calls. However, \systemname does not enforce any semantics to ensure ~\code{\_TLIB} functions implemented in ~\cregion are non memory-modifying, thereby, requiring developers to be careful to while using ~\code{\_TLIB} to prevent memory address leaks.
+
 
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
