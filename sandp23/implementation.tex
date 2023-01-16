@@ -1,7 +1,7 @@
 \section{Implementation} \label{sec:implementation}
-As mentioned in~\sect{sec:overview}, our implementation of~\systemname{} has two main components,~\ie source level program partitioner (\sourcerewriter) and compiler.
-Given a well-typed~\systemname{} program and a sandbox configuration,~\sourcerewriter performs source-to-source transformation and splits the program into two parts (\ie two sets of source files) -- checked and tainted source files corresponding to~\cregion and~\ucregion respectively.
-Our compiler will compile the checked source files and adds the necessary dynamic instruction.
+As mentioned in~\Cref{sec:overview}, our implementation of~\systemname{} has two main components,~\ie source level program partitioner (\sourcerewriter) and compiler.
+Given a well-typed~\systemname{} program and a sandbox configuration,~\sourcerewriter performs source-to-source transformation and splits the program into two parts (\ie two sets of source files) -- checked and tainted source files corresponding to~$\cmode$ and~\ucregion respectively.
+Our compiler translates the checked source files and adds the necessary dynamic instruction.
 The tainted source files need to be compiled with the target sandbox compiler.
 Finally, these two sets of object files will be linked along with any sandbox library to produce the final executable that enforces our security guarantees.
 
@@ -9,7 +9,7 @@ We created the sandbox library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020webassembly}) as our target sandbox.
-%However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
+We also formalize the implementation and show a simulation theorem in \Cref{appx:comp1}.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
@@ -23,7 +23,7 @@ Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_M
 
 \noindent\emph{\_Callback}:
 Developers should use this qualifier to mark callback functions,~\ie functions in~\cregion, that can be called from the tainted region. 
-The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\ref{subsub:gencregion}).
+The~\sourcerewriter inserts appropriate sandbox dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
 This qualifier makes ~\sourcerewriter copy the corresponding function into both ~\cregion and~\ucregion code such that callers from each region can invoke the corresponding copy.
