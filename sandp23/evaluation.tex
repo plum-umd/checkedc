@@ -96,9 +96,10 @@ Our evaluation of \systemname on six programs yields the following results infer
   \item Run-time Overhead is proportional to the extent of 
 annotated pointers and sandboxed code.
   \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
-  \item Marshalling data might sometimes be cost-effective instead of propagating the taintedness of a pointer
+  \item Marshalling data might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout the program.
   \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
-  \item Conversion style and extent qualitatively dictate the converted program's conversion efforts and is modest at a couple of days. 
+  \item Conversion style and extent dictate the converted program's conversion efforts and is modest at a couple of days. 
+  \item Annotating unsafe variables with tainted pointers is more cost-effective than sandboxing the entire function, given the function is assured to be control-flow safe.  
 \end{itemize}
 
 \subsubsection{\textbf{ProFTPD}}

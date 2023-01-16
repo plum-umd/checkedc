@@ -22,20 +22,38 @@ Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_M
 
 \noindent\emph{\_Callback}:
 Developers should use this qualifier to mark callback functions,~\ie functions in~\cregion, that can be called from the tainted region. 
-The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\sect{}).
+The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
-This qualifier copies the corresponding function both into~\cregion and~\ucregion code. Such that callers from each region will invoke the corresponding copy.
-This helps handle certain simple utility functions that might be called from both~\cregion and~\ucregion code.
-\aravind{Give an example from our evaluation program. (E.g., function foo in program1)}.
+This qualifier makes ~\sourcerewriter copy the corresponding function into both ~\cregion and~\ucregion code such that callers from each region can invoke the corresponding copy.
+This helps handle certain simple utility functions that might be called from both ~\cregion and~\ucregion code. For example, ~\code{json_value_get_type} in our evaluation of parsons\_wasm has callers from both the ~\cregion and ~\ucregion. 
+\begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
+/* JSON Value API */
+_Mirror JSON_Value_Type json_value_get_type  
+      (_TPtr<const TJSON_Value> value) {
+    return value ? value->type : JSONError;
+}
+
+_Mirror _TPtr<TJSON_Object> json_value_get_object
+(_TPtr<const TJSON_Value> value) {
+    return json_value_get_type(value) == JSONObject ?
+    value->value.object : NULL;
+}
+
+\end{minted}
 
 Placing such common functions in either of the regions restricts their usage from the other region. For instance, if we place~\code{foo} in~\ucregion, then all parameters of it should be tainted. Consequently, callers from~\cregion should use tainted pointers to invoke~\code{foo}, making the arguments and other dependent pointers tainted, leading to over-tainting.
 Similarly, placing~\code{foo} in~\cregion will make it hard for the callers in~\ucregion as they should now use the callback mechanism to invoke~\code{foo}.
 
-Developers can use the~\code{_Mirror} qualifier, which copies the function into both the region so that callers in each region will invoke the corresponding copy avoiding unnecessary tainting. 
+Developers can use the ~\code{_Mirror} qualifier, which makes ~\sourcerewriter copy the function into both regions so that callers in each region will invoke the corresponding copy, thereby, avoiding unnecessary tainting. 
+
+However, ~\code{_Mirror} qualifier semantically asserts the function to only have callees that are either qualified with ~\code{_Tainted} or ~\code {_Mirror}. For example, ~\code{json_value_get_object}'s only callee 
+\newline
+~\code{json_value_get_type} is ~\code{\_Mirror} qualified.
+Similarly, \systemname enforces ~\code{_Mirror} qualified functions to only access global checked data that are marked constant. These control-flow and data-flow compile-time semantics are enforced by \systemname to assert region locality and exclusivity amongst qualified function scopes in both the regions.   
 
 \noindent\emph{\_TLIB}:
-This qualifier relaxes type-checking rules on library functions avoiding unnecessary copying of tainted data.
+This qualifier relaxes type-checking rules on library functions, thereby, avoiding unnecessary copying of tainted data.
 Specifically, this annotation enables developers to pass tainted pointers as arguments to library functions in~\cregion.
 
 For instance, consider that in~\cregion, we want to string concat~\code{n} characters from tainted pointer~\code{t_str} to~\code{dst} (a checked pointer).
@@ -43,12 +61,16 @@ We cannot use~\code{strncat} because our type-checker restricts this as it expec
 We need to either implement the logic for string concatenation in~\cregion or first copy the contents of~\code{t_str} into a~\cregion temporary buffer (sat~\code{tmp}) and then call~\code{strncpy} as~\code{strncat(dst, tmp, n);}.
 Both of these approaches are inefficient and, if not done correctly, might result in security bugs.
 If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use~\code{strncat} with tainted source pointer in~\cregion.
-The~\code{_TLIB} qualifier enables this as shown below:
+Consequently, ~\code{\_TLIB} qualified functions originally implemented in ~\cregion are expected to be non memory-modifying and thereby, its safe use is left at developer's discretion as \systemname does not enforce any semantics for this.  For example, malloc cannot be qualified with ~\code{_TLIB} and thereby is implemented as an indirect call to sandbox-specific allocator.    
+
+The~\code{_TLIB} qualifier enables the qualified function to be used as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-// Put your example annotation here.
-strncpy(dst, t_str, n);
+/* Append SRC onto DEST.  */
+_TLIB extern char *strcat (char *__restrict __dest,
+            const char *__restrict __src)
+...        
+strncat(dst, t_str, n);
 \end{minted}
-\aravind{Fix the above code}
 The above qualifier relaxes type-checking for all the arguments to the calls to~\code{strncat}, enabling the developer to use the function freely in~\cregion.
 
 \subsubsection{Generating~\cregion Source Partition}
@@ -60,29 +82,33 @@ This library abstracts the sandbox-specific details and exposes a uniform interf
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 
 \noindent\emph{Handling Tainted Buffers in~\cregion}:
-All buffers that are marked as tainted in~\cregion should be allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
+All buffers that are marked as tainted in~\cregion should be manually allocated in the sandbox. For instance,~\code{buff} in function~\code{handle_request} of~\lst{lst:final}.
 We perform source rewriting and make the buffer into a pointer variable and allocate the corresponding number of bytes using the sandbox-specific allocator. For instance, we perform the following rewriting for~\code{buff} in~\lst{lst:final} with WASM sandbox.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
 - char buff[MAX_MSG_SIZE] __Tainted;
-+ char *buff = ....
++ _TPtr<char> buff = (_TPtr<char>)t_malloc(MAX_MSG_SIZE);  
 \end{minted}
-\aravind{Arun, please fix the above example on how exactly we replace it with WASM allocator.}
 Note that we also add the necessary deallocator calls at function exit points.
 
-\noindent\emph{Handling Calls to Tainted Functions}:
-In~\cregion, we also need to modify calls to tainted functions as they execute inside the sandbox (separate address space) and thus cannot be invoked as regular functions.
-We rewrite all calls to tainted functions with corresponding sandbox invocations.
-For instance, we modify the call to~\code{process_req1} in~\lst{lst:final} as below:
+\noindent\emph{Handling Tainted Functions}:
+In~\cregion, we also need to modify tainted functions as they need to execute inside the sandbox (separate address space).
+Consequently, We rewrite the tainted function's body with its corresponding sandbox invocation, thereby, routing all ~\cregion calls to tainted functions to their respective sandboxed implementations in ~\ucregion.
+For instance, we modify the function body of ~\code{process_req1} in~\lst{lst:final} as below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
-case REQ1: 
-- rc = process_req1(buff); 
-+ rc = .....
+int process_req1(_T_Array_ptr<char> msg :
+count(m_l), size_t m_l)
+__tainted {
+- int rc = -1, i;
+- // complex code
+- return rc;
++ return w2c_process_req1(msg, m_l);
+}
+
 \end{minted}
-\aravind{Arun, please fix the above example with the exact details.}
 
 \noindent\emph{Handling~\texttt{\_Callback} Qualifiers}:
 As mentioned in~\sect{subsubsec:addfuncqual}, functions with these qualifiers can be called from~\ucregion.
-Consider the following~\code{StringAuth} function that checks whether the provided user is authenticated and needs to be invoked from~\ucregion and hence a callback.
+Consider the following~\code{StringAuth} function that checks whether the provided user input ~\code{usertoken} is authenticated by accessing checked data. Since this needs to be invoked from ~\ucregion it is annotated as a ~\code{\_Callback}.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 _Callback _TPtr<char> StringAuth(
                _T_Array_Ptr<const char> usertoken : count(len),
@@ -101,10 +127,10 @@ These callback functions are only allowed to use tainted parameters as they will
 
 For each such function, we create a corresponding trampoline function that serves as the entry point for the callback function, as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
-+ unsigned int _T_StringAuth(unsigned sandbox,
++ unsigned int _T_StringAuth(void* sandbox,
 +               unsigned int arg_1,
 +               unsigned long int arg_2) {
-+   // Perform necessary conversion of arguments.
++   // Perform necessary Type-conversion of arguments.
 +   // uname <- conver arg_1
 +   // len <- arg_2
 +   ret = StringAuth(uname, len);
@@ -112,6 +138,7 @@ For each such function, we create a corresponding trampoline function that serve
 +   return ret_val;
 + }
 \end{minted}
+
 The trampoline function handles the invocations from sandbox (and hence the extra parameter~\code{sandbox}), performs the necessary conversion of pointer arguments, and eventually invokes the callback.
 
 We also add the code to register this trampoline function with the sandbox. The registration function for WASM sandbox is as shown below:
@@ -125,31 +152,39 @@ We also add the code to register this trampoline function with the sandbox. The 
 \end{minted}
 This registration function creates an opaque handle for the trampoline function and enables~\ucregion to call the trampoline using the corresponding handle.
 
-Lastly, we change all instances where the callback function pointer is given to tainted functions to use the handle for the corresponding trampoline a shown below:
-\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{c}
-// How do we change the call-sites where the function pointer is passed
-// as the call-back.
+Lastly, we change the tainted function's body to include an indirect call to the sandbox's implementation of the tainted function. However, instead of passing the callback function pointer directly from the argument list, we pass the generated trampoline handle ~\code{__StringAuth__C_} as shown below:
+\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
+_Tainted _TPtr<char> StringProc(_TPtr<_TPtr<const char>> user_input,
+_TPtr<_TPtr<char>(_TPtr<const char> input, size_t len)>StringAuth) {
+-  ...
+-  //complex Function Body       
+- return StringAuth(one_past_start, string_len);
++ return w2c_StringProc(_SBX_(), (unsigned int)string, __StringAuth__C_);
+
+}
 \end{minted}
-\aravind{Arun, please check above code example to see if they make sense.}
 
 \subsubsection{Generating~\ucregion Source Partition}
 \label{subsubsec:genucregion}
-We create~\ucregion partition by first copying all functions marked as~\code{_Tained} and~\code{_Mirror}.
+We create~\ucregion partition by first copying all functions and variables marked as~\code{_Tained} and~\code{_Mirror}.
 Next, we convert the partition into regular C by replacing all~\systemname{} tainted types with the corresponding C types.
+\newline
 For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
-The~\code{read_msg} function signature in~\lst{} will be modified as shown below:
+The~\code{read_msg} function signature in \lst{lst:final} will be modified as shown below in the ~\ucregion:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
-size_t read_msg(int sock_fd, char *msg,
+- size_t read_msg(int sock_fd, _T_Array_ptr<char> msg,
 -                             size_t sz) __Tainted {
++ size_t read_msg(int sock_fd, char* msg,
 +                             size_t sz) {
 \end{minted}
 
-Finally, we convert all calls to~\cregion callbacks with sandbox-specific invocations. For instance, for the~\code{StringAuth} call back (\sect{subsub:gencregion}), we modify~\code{...UNCHECKED FUNC..} as shown below:
-\begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{c}
-SAY HOW WE MODIFY UNCHECKED CODE
-TO INVOKE CALLBACK FUNCTIONS.
-\end{minted}
-\aravind{Arun, please fix the above example}
+% ** We Do NOT modify callback function in checked sources **
+% Finally, we convert all calls to~\cregion callbacks with sandbox-specific invocations. For instance, for the~\code{StringAuth} call back (\sect{subsub:gencregion}), we modify~\code{...UNCHECKED FUNC..} as shown below:
+% \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{c}
+% SAY HOW WE MODIFY UNCHECKED CODE
+% TO INVOKE CALLBACK FUNCTIONS.
+% \end{minted}
+% \aravind{Arun, please fix the above example}
 
 
 

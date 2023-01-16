@@ -22,10 +22,10 @@ int handle_request(int sock_fd) {
  if (r_len > 0) {
   switch(buff[0]) {
    case REQ1: 
-    rc = process_req1(buff); 
+    rc = process_req1(buff, r_len); 
     break;
    case REQ2: 
-    rc = process_req2(buff); 
+    rc = process_req2(buff, r_len); 
     break;
    ...
   }
