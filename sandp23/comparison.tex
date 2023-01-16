@@ -82,16 +82,22 @@ which is typically called program partitioning~\cite{rul2009towards}, and there 
 The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
 The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
 
-\citet{rlbox-paper}, a.k.a RLBox, merged a type checker with a sandbox mechanism to better achieve the programming partitioning hechanism.
-They allow tainted pointers to be shared among different code regions. There are several differences between their work with \systemname.
+\citet{rlbox-paper}, a.k.a RLBox, merged a type checker with a sandbox mechanism to better achieve the programming partitioning mechanism.
+They allow tainted pointers to be shared among different code regions. 
+However, the RLBox type system is primarily based on C++ templates, making it hard or impossible to apply directly to C programs.
+Furthermore, their technique has no formal guarantees and can only isolate complete libraries instead of arbitrary functions.
+\systemname is a generic formally verified system that enables partitioning arbitrary functions with stronger guarantees.
 
-\begin{itemize}
-\item There is no RLBox formalism.
-\item RLBox implements program partition without spatial safety guarantee, while \systemname provides the non-crashing guarantee.
-\item RLBox's type system is based on C++ templates, which might contain potential unknown faulty.
-\item RLBox only provides program partition for third party library functions, while \systemname can context-switch between checked and unchecked code regions for arbitrary functions.
-\item RLBox has no non-exposure guarantee, a checked pointer might leak its pointer address in a untrust third party library function, while \systemname ensures that checked pointers cannot be leaked to unchecked code regions.
-\end{itemize}
+%\citet{rlbox-paper}, a.k.a RLBox, merged a type checker with a sandbox mechanism to better achieve the programming partitioning hechanism.
+%They allow tainted pointers to be shared among different code regions. There are several differences between their work with \systemname.
+%
+%\begin{itemize}
+%\item There is no RLBox formalism.
+%\item RLBox implements program partition without spatial safety guarantee, while \systemname provides the non-crashing guarantee.
+%\item RLBox's type system is based on C++ templates, which might contain potential unknown faulty.
+%\item RLBox only provides program partition for third party library functions, while \systemname can context-switch between checked and unchecked code regions for arbitrary functions.
+%\item RLBox has no non-exposure guarantee, a checked pointer might leak its pointer address in a untrust third party library function, while \systemname ensures that checked pointers cannot be leaked to unchecked code regions.
+%\end{itemize}
 
 % \item Lee \textsf{et al.} \cite{Lee:2017:TUB:3140587.3062343} proposed
 %   a math model for defining some undefinedness in LLVM. Mainly,  they
