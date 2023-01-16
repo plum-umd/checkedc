@@ -26,8 +26,7 @@ Developers should use this qualifier to mark callback functions,~\ie functions i
 The~\sourcerewriter inserts appropriate sandbox dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
-This qualifier makes ~\sourcerewriter copy the corresponding function into both ~\cregion and~\ucregion code such that callers from each region can invoke the corresponding copy.
-This helps handle certain simple utility functions that might be called from both regions. For example, ~\code{append_string} in our evaluation of parsons\_wasm has callers from both the regions. 
+This qualifier permits copying the corresponding function into both ~\cregion and~\ucregion, which permits the handling of certain simple utility functions that might be called from both regions. For example, ~\code{append_string} in our evaluation of parsons\_wasm has callers from both the regions. 
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 _Mirror int append_string(_TPtr<char> buf,
 const char* appendStr : itype(_Nt_array_ptr<const char>),
@@ -40,13 +39,13 @@ _TPtr<char> buf_start, size_t buf_len) {
 }
 
 \end{minted}
-Placing ~\code{append_string} in ~\ucregion would require marking ~\code{appendStr} as tainted, thereby, requiring callers from ~\cregion to pass tainted parameter to ~\code{appendStr} at call-site. This would require either costly marshalling or making the arguments and other dependent pointers tainted, leading to over-tainting.
-Similarly, placing ~\code{append_string} only in ~\cregion will make it hard for the callers in ~\ucregion as they should now use the callback mechanism to invoke~\code{append_string}.
-Qualifying ~\code{append_string} with~\code{_Mirror} makes ~\sourcerewriter duplicate the function to ~\ucregion so that callers in each region will invoke their corresponding local copy, thereby, avoiding unnecessary tainting. 
-"\_Mirror" enforces control-flow and data-flow compile-time semantic rules as shown above to assert region locality and exclusivity amongst between both the regions.
+Qualifying ~\code{append_string} with~\code{_Mirror} duplicates the function in both regions,
+so that calling \code{append_string} permits the avoidance of over-tainting \code{appendStr},
+as \code{appendStr} can be unchecked and checked pointers in $\umode$ and $\cmode$ regions, respectively.
+"\_Mirror" enforces control-flow and data-flow compile-time semantic rules as shown above to assert region locality and exclusivity amongst between both the regions. \liyi{fix the sentence.}
 
 \noindent\emph{\_TLIB}:
-This qualifier relaxes type-checking rules on non-memory modifying library functions allowing developers to use the function freely in ~\cregion.
+This qualifier relaxes type-checking rules on library functions without memory modification allowing developers to use the function freely in ~\cregion.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 // First, manually check the memory is in tainted region.
 // if yes, then call strncpy.
@@ -57,7 +56,7 @@ if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
 strncat(dst, t_str, n);
 \end{minted}
 
-In the above code, passing tainted pointer ~\code{t_str} to unqualified ~\code{strncat} is disallowed by our type-checker as it expects both the pointers to be non-tainted as we are in ~\cregion. If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use ~\code{strncat} with tainted source pointer in ~\cregion, instead of implementing the logic for string concatenation in ~\ucregion or marshalling data between the two regions.  
+Passing tainted pointer ~\code{t_str} to unqualified ~\code{strncat} above is disallowed by our type-checker as it expects both the pointers to be non-tainted since we are in ~\cregion. If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use ~\code{strncat} with tainted source pointer in ~\cregion, instead of implementing the logic for string concatenation in ~\ucregion or marshalling data between the two regions.  
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
 - extern char *strncat (char *__restrict __dest,
 + _TLIB extern char *strncat (char *__restrict __dest,
