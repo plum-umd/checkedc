@@ -3,28 +3,13 @@
 
 Our work is most closely related to prior formalizations of C(-like)
 languages and program partitioning mechanism 
-that aim at enforcing memory safety, but it also touches on
-C-language formalization in general.
-%, and work that uses random
-%testing to connect a formal development to a reference implementation.
-
-
-\myparagraph{Formalizing C and Low-level code}
-%
+that aim at enforcing memory safety.
 A number of prior works have looked at formalizing the semantics of C,
 including CompCert~\cite{Blazy2009,leroy:hal-00703441},
 \citet{ellison-rosu-2012-popl}, \citet{Kang:2015:FCM:2813885.2738005},
-and \citet{10.1145/2980983.2908081, Memarian:2019:ECS:3302515.3290380}. These works also model
-pointers as logically coupled with either the bounds of the blocks
-they point to, or provenance information from which bounds can be
-derived. None of these is directly concerned with enforcing
-spatial safety, and that is reflected in the design. For example,
-memory itself is not be represented as a flat address space, as in our
-model or real machines, so memory corruption due to spatial safety
-violations, which Checked C's type system aims to prevent, may not be
-expressible. That said, these formalizations consider much more of the
-C language than does \lang, since they are interested in the entire
-language's behavior.
+and \citet{10.1145/2980983.2908081, Memarian:2019:ECS:3302515.3290380},
+but they are not directly concerned with enforcing
+spatial safety.
 
 \myparagraph{Spatially Safe C Formalizations}
 %
@@ -33,11 +18,8 @@ dialects aiming to ensure spatial safety.
 %
 \citet{10.1145/2813885.2737979} extended the formalization
 of \citet{ellison-rosu-2012-popl} to produce a semantics that detects
-violations of spatial safety (and other forms of undefinedness). It
-uses a CompCert-style memory model, but ``fattens'' logical pointer
-representations to facilitate adding side conditions similar to \lang's.
-Its concern is bug finding, not compiling programs to
-use this semantics.
+violations of spatial safety (and other forms of undefinedness) 
+by focusing on bug finding, not compiling programs to use this semantics.
 
 CCured~\cite{Necula2005} and Softbound~\cite{softbound} implement
 spatially safe semantics for normal C via program transformation. Like
@@ -45,35 +27,20 @@ spatially safe semantics for normal C via program transformation. Like
 their bounds. CCured's equivalent of array pointers are compiled to be
 ``fat,'' while SoftBound compiles bounds metadata to a separate
 hashtable, thus retaining binary compatibility at higher checking
-cost. Checked C uses static type information to enable bounds checks
-without need of pointer-attached metadata, as we show in
-Section~\ref{sec:compilation}. Neither CCured nor Softbound models
-null-terminated array pointers, whereas our semantics ensures that
-such pointers respect the zero-termination invariant, leveraging
-bounds widening to enhance expressiveness.
-
+cost. \systemname uses static type information to enable bounds checks
+without need of pointer-attached metadata.
 Cyclone \cite{Jim2002,GrossmanMJHWC02} is a C dialect that aims to
 ensure memory safety; its pointer types are similar to
-CCured. Cyclone's formalization~\cite{GrossmanMJHWC02} focuses on the
-use of \emph{regions} to ensure temporal safety; it does not formalize
-arrays or threats to spatial safety. Deputy~\cite{Feng2006,Condit2007}
-is another safe-C dialect that aims to avoid fat pointers. It was an
-initial inspiration for Checked C's design~\cite{Elliott2018}, though
-it provides no specific modeling for null-terminated array
-pointers. Deputy's formalization~\cite{Condit2007} defines its
-semantics directly in terms of compilation, similar in style to what
-we present in Section~\ref{sec:compilation}. Doing so tightly couples
-typing, compilation, and semantics, which are treated independently in
-\lang. Separating semantics from compilation isolates meaning 
-from mechanism, easing understandability. Indeed, it was this
-separation that led us to notice the 
-limitation with Checked C's handling of bounds widening.
+CCured and its formalization~\cite{GrossmanMJHWC02} focuses on ensuring temporal safety. 
+Deputy~\cite{Feng2006,Condit2007}
+is another safe-C dialect that aims to avoid fat pointers,
+with its formalization~\cite{Condit2007} defines its
+semantics directly in terms of compilation.
+None of the above work touches program partitioning and sandbox mechanism. 
 
 The most closely related work is the
-formalization of \checkedc done by \citet{ruef18checkedc-incr} and \citet{li22checkedc}. They
-presented the type system and semantics of a core model of \checkedc,
-mechanized in Coq, and prove a blame theorem. 
-The difference between these works and \systemname is listed in \Cref{sec:intros} and \Cref{sec:overview}.
+implementation and formalization of \checkedc done by \citet{checkedc}, \citet{machiry2022c}, \citet{ruef18checkedc-incr} and \citet{li22checkedc}.
+The difference between these works and \systemname is listed in \Cref{sec:intros,sec:overview}.
 
 \myparagraph{Program Partitioning Mechanism}
 %
