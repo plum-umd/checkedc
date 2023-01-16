@@ -1,7 +1,7 @@
 \section{Implementation} \label{sec:implementation}
-As mentioned in~\sect{sec:overview}, our implementation of~\systemname{} has two main components,~\ie source level program partitioner (\sourcerewriter) and compiler.
-Given a well-typed~\systemname{} program and a sandbox configuration,~\sourcerewriter performs source-to-source transformation and splits the program into two parts (\ie two sets of source files) -- checked and tainted source files corresponding to~\cregion and~\ucregion respectively.
-Our compiler will compile the checked source files and adds the necessary dynamic instruction.
+As mentioned in~\Cref{sec:overview}, our implementation of~\systemname{} has two main components,~\ie source level program partitioner (\sourcerewriter) and compiler.
+Given a well-typed~\systemname{} program and a sandbox configuration,~\sourcerewriter performs source-to-source transformation and splits the program into two parts (\ie two sets of source files) -- checked and tainted source files corresponding to~$\cmode$ and~\ucregion respectively.
+Our compiler translates the checked source files and adds the necessary dynamic instruction.
 The tainted source files need to be compiled with the target sandbox compiler.
 Finally, these two sets of object files will be linked along with any sandbox library to produce the final executable that enforces our security guarantees.
 
@@ -9,7 +9,7 @@ We created the sandbox library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
 We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020webassembly}) as our target sandbox.
-%However, as we discuss in~\sect{}, our implementation can be easily extended to other sandbox mechanisms.
+We also formalize the implementation and show a simulation theorem in \Cref{appx:comp1}.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
 The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{}).
@@ -23,7 +23,7 @@ Specifically, we provide three additional qualifiers:~\code{_Callback},~\code{_M
 
 \noindent\emph{\_Callback}:
 Developers should use this qualifier to mark callback functions,~\ie functions in~\cregion, that can be called from the tainted region. 
-The~\sourcerewriter inserts appropriate sandbox-dependent mechanisms to enable this (\ref{subsub:gencregion}).
+The~\sourcerewriter inserts appropriate sandbox dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
 This qualifier makes ~\sourcerewriter copy the corresponding function into both ~\cregion and~\ucregion code such that callers from each region can invoke the corresponding copy.
@@ -84,7 +84,6 @@ Note that developer needs to manually add the check before calling~\code{strcat}
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
 We copy all non-tainted functions into~\cregion source files and make the following modifications to enable interaction with~\ucregion (\ie sandboxed code).
-
 We created a library once and for all for each sandbox.
 This library abstracts the sandbox-specific details and exposes a uniform interface (header file) to be used in~\cregion.
 For instance,~\code{_SBX_()} gets an opaque pointer to the target sandbox.
@@ -183,9 +182,8 @@ For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
 
 The~\code{read_msg} function signature in \lst{lst:final} will be modified in the ~\ucregion as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
-- size_t read_msg(int sock_fd, _T_Array_ptr<char> msg,
--                             size_t sz) __Tainted {
-+ size_t read_msg(int sock_fd, char* msg,
+size_t read_msg(int sock_fd, char* msg,
+-                             size_t sz) _Tainted {
 +                             size_t sz) {
 \end{minted}
 
@@ -198,6 +196,7 @@ The~\code{read_msg} function signature in \lst{lst:final} will be modified in th
 % \aravind{Arun, please fix the above example}
 
 \subsection{Compiler}
+\label{subsec:compilerimple}
 The~\systemname compiler includes the type checker (\sect{sec:typechecking}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
 We implemented the compiler (\numcompilerlines{}) on top of the existing~\checkedc compiler.
 \aravind{Arun, please fix the number of changes you made for the compiler}
@@ -228,19 +227,20 @@ Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
 \cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
 \aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
 
-\subsection{Supporting General Partioning Use Case}
+\subsection{Balance Assurance and Overhead}
 \input{figures/newusecase}
 
 Tainting all functions that are not checked may lead to a large number of transitions to the sandbox, which could add unnecessary overhead. In our example, in~\lst{lst:final}, marking~\code{read_msg} function as tainted would cause the system to transition to and from the sandbox every time a message is read, which could be inefficient. 
 
 However, as mentioned in~\sect{subsec:checkedc}, checked pointers can be used alongside regular pointers, so the~\cregion{}~\emph{can} contain regular (unchecked) pointers as well.
-%
-This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
-
+This allows for flexibility in how the program is partitioned, such as only tainting a few high-risk unchecked functions rather than all of them. 
 For our example in~\lst{lst:final}, we can make only the function \code{process_req1} as tainted, thereby transitioning into a sandbox only when the corresponding (high-risk) request is received.
 
+
+In this way, the system can be used as a generic program partitioning technique that balances the trade-off between overhead and security assurance.
 The general guidelines for this alternative use case are shown in~\fig{fig:mixedmodesupport}.
-It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted. This allows for a flexible partitioning system that balances the need for security assurance with the overhead of converting to~\checkedc.
+It is best to annotate all functions with checked types for security purposes. However, if it is difficult to convert all functions, it may be more practical to only mark certain high-risk functions with a high probability of vulnerabilities as tainted,
+which maintains the assurance and overhead balance.
 We add the additional constraint of not allowing casting from taint types to generic types to enable this generic use case without violating the safety guarantees of~\systemname.
 Specifically, we disallow the following casting in~\cregion:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
