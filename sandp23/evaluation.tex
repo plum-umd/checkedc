@@ -36,21 +36,14 @@ We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any 
 We selected network servers that we could (with minimal effort) compile with the WASM compiler.
 We also selected a few standalone programs suggested by the ~\checkedc team~\cite{benchmarkcc}, which are good candidates to evaluate modifications to~\checkedc.
 The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset.
-\aravind{Arun, please fix the dataset table with details of all programs.}
+
 
 \subsection{Experimental Setup}
 All our experiments are performed on a 6-Core Intel i7-10700H machine with 40 GB of RAM, running Ubuntu 20.04.3 LTS.
 We use WASM as our target sandbox and use a similar configuration as that of the recent work~\cite{rlbox-paper}.
 We use Valgrind's "massif" memory profiler~\cite{seward2008valgrind} to measure the memory usage and consider the peak heap usage of an application as its memory consumption.
-We measure runtime using the difference in elapsed clock cycles using~\code{clock()} API from POSIX's~\code{<time.h>}.
+We measure runtime using the difference in elapsed clock cycles using~\code{clock()} API from POSIX's~\code{<time.h>} and linux's ~\code{time} command.
 We perform every measurement ten times and use the average as the final result.
-
-%\subsection{Program Run-time Benchmarks}
-\begin{figure*}[t]
-\includegraphics[width=1.0\linewidth]{images/program_runtime_benchmark.png}
-\caption{Run-time benchmarking of ~\systemname.}
-\label{fig:runtime}
-\end{figure*}
 
 %\myparagraph{Benchmarking Methodology}
 %\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. 
@@ -83,8 +76,7 @@ This is needed for data isolation-only cases, where the developer might want to 
 As explained in~\sect{subsec:compilerimple}, all access through tainted pointers will be dynamically checked to ensure that every access is within sandbox.
 This provides partial spatial safety by ensuring that any spatial violation involving tainted pointer cannot affect~\cregion.
 
-\input{tables/conversioneffort}
-\aravind{Arun, Please fix Table 2 with all details also remove Table 3} 
+\input{tables/conversioneffort} 
 \subsubsection{Conversion Methodology}
 We partitioned each program in our dataset using one of the above three methods.
 
@@ -92,7 +84,7 @@ Our goal is to isolate risky input processing routines from the application code
 We manually analyzed the source code of each application to identify which functions handle the input data and how.
 We also looked into previously reported vulnerabilities to identify risky input processing routined.
 We picked one of the above methods to partition based on how the input data is processed.
-\tbl{} shows the summary of our partitioning of the dataset.
+Table ~\ref{table:conversioneffort} shows the summary of our partitioning of the dataset.
 For~\texttt{ProFTPD}, we use $T_{Pr}$ method and mark the input data as trained, and consequently, five other pointers need to be marked as tainted according to the type rules. This resulted in a total of 6 pointer annotations. There is no code in~\ucregion as used $T_{Pr}$ method and used only tainted pointers.
 We followed the same approach for~\texttt{LibPNG} (\texttt{png2pnm} and~\texttt{pnm2png}). However, in this case, we had to annotate a lot more pointers (248) because of the complex nature of~\texttt{libPNG}'s internal structures.
 
@@ -103,7 +95,6 @@ The rest of the non-sandboxed code is annotated completely using~\checkedc types
 
 
 \subsubsection{Conversion Effort}
-\aravind{Arun, fix the average hours}
 The last column shows the number of hours required to partition each application.
 On average, it takes $\sim$ XX hours for each application. However, the exact time depends on the complexity of the code and pointers used in an application.
 Although the absolute time is high, partitioning is just a one-time effort for each application.
@@ -128,15 +119,14 @@ Recent work~\cite{jangda2019not} shows that code executed as part of WASM sandbo
 To better understand our runtime overhead, we first perform micro benchmarking of additional sandbox-related operations involved in~\systemname{}.
 
 \subsubsection{Micro-Benchmarking}
-\aravind{Arun, Draw Figure 7 using Latex and use the symbols below.}
-The~\fig{FIXTHIS} shows the results of our micro-benchmarking.
+The figure ~\ref{fig:microbenchmarks} shows the results of our micro-benchmarking.
 We measure the following operations as part of this:
 
 \noindent\emph{Memory access in WASM Sandbox ($SBX_{m}$):} 
 All memory access in a sandbox goes through additional verification by the sandbox runtime resulting in runtime overhead.
 We perform 100K memory access (read and write) in a loop, measure the time inside the sandbox, and compare it with the time executed as a regular program.
 
-Our results (\fig{FIXTHIS}) show that we incur 156.6\% overhead for memory access in the WASM sandbox compared to that in a normal program.
+Our results (~\fig{fig:microbenchmarks}) show that we incur 156.6\% overhead for memory access in the WASM sandbox compared to that in a normal program.
 This is inline with the observations of the recent work~\cite{jangda2019not}.
 
 \noindent\emph{Sandbox Roundtrip ($SBX_{RT}$):}
@@ -153,7 +143,7 @@ e = clock();
 \end{minted}
 We compare the time with the regular call,~\ie when we place~\code{noop} in~\cregion.
 
-As shown in~\fig{FIXTHIS}, we incur an overhead of $\sim 400\%$. This is also in-line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
+As shown in ~\fig{fig:microbenchmarks}, we incur an overhead of $\sim 400\%$. This is also in-line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
 This is expected because transitioning to/from sandbox requires a context switch which is relatively more expensive than a regular function call (\ie\code{call} and~\code{ret} instruction).
 
 \noindent\emph{Tainted Pointer Access in~\cregion ($TP_{c}$):}
@@ -161,22 +151,11 @@ As explained in~\sect{subsec:compilerimple}, we need to perform pointer swizzlin
 In addition, our instrumentation also checks at runtime that all tainted pointers are within the sandbox address range before accessing them.
 We measure this additional overhead by comparing tainted pointer access with regular pointer access.
 
-As shown in~\fig{FIXTHIS}, we incur 34\% overhead in accessing tainted pointers in~\cregion.
+As shown in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing tainted pointers in~\cregion.
 Most of this is because of the validation check, which requires executing two additional compare instructions for every memory access.
 
 \subsubsection{Overhead on Dataset}
 \label{subsec:programoverhead}
-
-\aravind{Arun, Fix Figure 8 and Remove Figure 6.}
-
-\aravind{Arun, Fix Figure 9 and Remove Figure 10.}
-
-\begin{figure}[h!]
-\includegraphics[width=1.0\linewidth]{images/microbenchmark.png}
-\caption{\systemname Micro-Benchmarks}
-\label{fig:microbenchmarks}
-\end{figure}
-
 \input{figures/runtimechart}
 
 \input{figures/memoryoverhead}
@@ -209,46 +188,9 @@ Most of this is because of the validation check, which requires executing two ad
 %34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
 %\myparagraph{Result:}
 %Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
-\begin{figure*}[t]
-\includegraphics[width=1.0\linewidth]{images/program_memory_benchmark.png}
-\caption{Memory benchmarking of ~\systemname.}
-\label{fig:memory}
-\end{figure*}
 
+\systemname is evaluated on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Consequently, each of the conversions for the six programs follows a varied approach. 
 
-\begin{table*}[htb]
-  \centering
-  \begin{tabular}{|p{2.6 cm }|p{1.6 cm}|p{1.9cm}|p{1.7cm}|p{2cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}
-    \hline
-    \textbf{Task} & \textbf{ProFTPD} & \textbf{MicroHTTPD} & \textbf{UFTPD} & \textbf{LibPNG} & \textbf{Tiny Bignum} & \textbf{parsons (wasm)} & \textbf{parsons (tainted) }\\
-    \hline
-     \textbf{Pointers Annotated} & 6 & 139 & 146 & 248 & 69 & 364 & 378 \\
-     \textbf{Lines Sandboxed} & 0 & 650 & 90 & 0 & 30 & 800 & 0  \\
-     \textbf{CVEs fixed} & CVE-2010-4221 & CVE-2013-7039 & CVE-2020-14149, CVE-2020-5204 & CVE-2018-144550 & - & - & -  \\
-     \textbf{Time To Port} & 1 Day & 2 Days & 2 Days & 3 Days & 4 Hours & 1 Day & 2 Days \\
-    \hline
-  \end{tabular}
-  \caption{Conversion Efforts}
-\end{table*}
-
-
-\subsection{Program Benchmarks}
-\myparagraph{Overview}
-We evaluate \systemname on the basis of conversion efforts and performance on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Consequently, each of the conversions for the six programs follows a varied approach. 
-
-\myparagraph{Observations}
-Our evaluation of \systemname on six programs yields the following results inferred from Figure ~\ref{fig:runtime} and Figure ~\ref{fig:memory}:
-\begin{itemize}
-  \item Run-time Overhead is proportional to the extent of 
-annotated pointers and sandboxed code.
-  \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
-  \item Marshalling data might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout the program.
-  \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
-  \item Conversion style and extent dictate the converted program's conversion efforts and is modest at a couple of days. 
-  \item Annotating unsafe variables with tainted pointers is more cost-effective than sandboxing the entire function, given the function is assured to be control-flow safe.  
-\end{itemize}
-
-\liyi{results?}
 \subsubsection{\textbf{ProFTPD}}
 \systemname changes for ProFTPD were limited in extent and aimed at the exact changes required to encapsulate CVE-2010-4221. We mark the user input to the unsafe function "pr\_netio\_telnet\_gets()" as tainted (\_TPtr<char>) and propagate its tainted-ness to its callers and callees enclosed within its defined scope.
 
@@ -265,6 +207,17 @@ For evaluation, we manually write a script for 3 Tests that each trigger "quote 
 Although, \systemname-UFTPD consists of modest changes in annotations and sandboxed code, observed overhead is significantly less at 10\% due to the less performance intensive sandboxed code and FTP-protocol overshadowed overhead from \systemname instrumentation and sandbox.     
 
 
+\subsubsection{\textbf{Results}}
+Our evaluation of \systemname on six programs yields the following results:
+\begin{itemize}
+  \item Run-time Overhead is proportional to the extent of 
+annotated pointers and sandboxed code.
+  \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
+  \item Marshalling data might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout the program.
+  \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
+  \item Conversion style and extent dictate the converted program's conversion efforts and is modest at a couple of days. 
+  \item Annotating unsafe variables with tainted pointers is more cost-effective than sandboxing the entire function, given the function is assured to be control-flow safe.  
+\end{itemize}
 % 
 %\leo{The following is extremely
 %  weak. ``Most of them'', were there any that weren't? Which ones? For
