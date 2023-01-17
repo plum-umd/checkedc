@@ -137,7 +137,7 @@ All memory access in a sandbox goes through additional verification by the sandb
 We perform 100K memory access (read and write) in a loop, measure the time inside the sandbox, and compare it with the time executed as a regular program.
 
 Our results (\fig{FIXTHIS}) show that we incur 156.6\% overhead for memory access in the WASM sandbox compared to that in a normal program.
-This is inline with the observations of the recent work~\cite{jangda2019not}.
+This is in line with the observations of the recent work~\cite{jangda2019not}.
 
 \noindent\emph{Sandbox Roundtrip ($SBX_{RT}$):}
 Here, we measure the time it takes to make a round trip between~\cregion and sandbox (\ucregion) compared to a regular function call and return.
@@ -153,7 +153,7 @@ e = clock();
 \end{minted}
 We compare the time with the regular call,~\ie when we place~\code{noop} in~\cregion.
 
-As shown in~\fig{FIXTHIS}, we incur an overhead of $\sim 400\%$. This is also in-line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
+As shown in~\fig{FIXTHIS}, we incur an overhead of $\sim 400\%$. This is also in line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
 This is expected because transitioning to/from sandbox requires a context switch which is relatively more expensive than a regular function call (\ie\code{call} and~\code{ret} instruction).
 
 \noindent\emph{Tainted Pointer Access in~\cregion ($TP_{c}$):}
