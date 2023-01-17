@@ -124,6 +124,9 @@
 %\definecolor{checkcolor}{rgb}{0.0, 0.06, 0.54}
 %\definecolor{checkcolor}{rgb}{0.38, 0.31, 0.86}
 
+\newcommand{\vulprevented}{\textcolor{green}{\faCheckCircle\xspace}}
+\newcommand{\vulisolated}{\textcolor{green}{\faCheckCircleO\xspace}}
+
 \newcommand{\tbl}[1]{Table~\ref{#1}}
 \newcommand{\sect}[1]{Section~\ref{#1}}
 \newcommand{\fig}[1]{Figure~\ref{#1}}
@@ -376,7 +379,7 @@
 
 % eval numbers
 \newcommand{\numprog}{XXX\xspace}
-
+\newcommand{\numcves}{ZZZ\xspace}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %% Note: Authors migrating a paper from PACMPL format to traditional
@@ -474,24 +477,34 @@
   % of Clang, while Checked C's specification is over \leo{X} pages of
   % natural language, reducing confidence in the promised guarantees.
   Spatial memory safety violation is still a major issue for C programs.
-  Checked C is a Microsoft-backed attempt at a solution to this problem
-  which extends C with types and annotations that guarantees spatial
-  memory safety in a backwards compatible manner, while allowing
-  the mix of checked and unchecked code; and provide the guarantee that any spatial memory
-  safety errors can be \emph{blamed} on portions of the program
-  labeled \emph{unchecked}.
-  However, in many cases, users tend not to keep the mix of checked and 
-  unchecked code without rewriting all programs to be spatially safe checked code,
-  which causes many memory safety violations.
-  Here, we present CheckedCBox by merging Checked C with program partitioning mechanism
-  to ensure that spatial safety violations in unchecked code does not affect checked code 
-  and can be resecured by the mechanism, which we named non-crashing property.
-  In addition, we also provide non-exposure guarantee that programs in unchecked code
-  can never learn about important pointers used in checked code.
-  With the formalism, we implement the CheckedCBox based on the WebAssembly sandbox library
-  and show that our implementation not only fulfill the safety guarantees above,
-   but also has a relatively comparable overhead with respect to the Checked C compiler.
-  To the best of our knowledge, this is the first work that combines program partitioning mechanism with C-like programming language.
+Checked C is a safe dialect of C and extends it with types and annotations that guarantee spatial memory safety in a backward compatible manner, allowing the mix of checked pointers and regular (unchecked) pointer types.
+%; and providing the guarantee that the root cause for spatial memory safety errors will be in unchecked code (\emph{noblame therom}).
+However, unchecked code vulnerabilities can violate the checked code's spatial safety guarantees.
+To handle this, we present~\systemname{}, which adds a flexible type directed program partitioning mechanism to Checked C.
+We enhance the~\checkedc type system with~\code{taint} types that enable flexible partitioning of a program into~\cregion and~\ucregion, such that~\ucregion and~\code{taint} types do not affect the spatial safety in~\cregion{}.
+We formalized our type system and proved the non-crashing and non-exposure properties of a well-typed~\systemname program.
+We implemented~\systemname in a configurable manner, which enables us to use existing sandbox mechanisms (\eg WebAssembly) to execute program partitions seamlessly.
+Our evaluation on~\numprog{} shows that~\systemname{} can effectively and efficiently partition programs by preventing~\numcves{} known vulnerabilities.
+
+%  Spatial memory safety violation is still a major issue for C programs.
+%  Checked C is a Microsoft-backed attempt at a solution to this problem
+%  which extends C with types and annotations that guarantees spatial
+%  memory safety in a backwards compatible manner, while allowing
+%  the mix of checked and unchecked code; and provide the guarantee that any spatial memory
+%  safety errors can be \emph{blamed} on portions of the program
+%  labeled \emph{unchecked}.
+%  However, in many cases, users tend not to keep the mix of checked and 
+%  unchecked code without rewriting all programs to be spatially safe checked code,
+%  which causes many memory safety violations.
+%  Here, we present CheckedCBox by merging Checked C with program partitioning mechanism
+%  to ensure that spatial safety violations in unchecked code does not affect checked code 
+%  and can be resecured by the mechanism, which we named non-crashing property.
+%  In addition, we also provide non-exposure guarantee that programs in unchecked code
+%  can never learn about important pointers used in checked code.
+%  With the formalism, we implement the CheckedCBox based on the WebAssembly sandbox library
+%  and show that our implementation not only fulfill the safety guarantees above,
+%   but also has a relatively comparable overhead with respect to the Checked C compiler.
+%  To the best of our knowledge, this is the first work that combines program partitioning mechanism with C-like programming language.
 
 \end{abstract}
 
