@@ -93,6 +93,7 @@ We also had to annotate several intermediate pointers as tainted.
 For~\texttt{TinyBignum} and~\texttt{Parsons}, we followed $CTP$ and marked all input processing routines as tainted and placed them in the sandbox.
 The rest of the non-sandboxed code is annotated completely using~\checkedc types and placed in~\cregion.
 
+We ensured that the partitioned programs retained their expected functionality by verifying using corresponding test suites.
 
 \subsubsection{Conversion Effort}
 The last column shows the number of hours required to partition each application.
@@ -188,6 +189,54 @@ Most of this is because of the validation check, which requires executing two ad
 %34\% in overhead is the result of "Offset To Pointer" conversion and sanity checks for Taintedness inserted by \systemname at every access to the tainted pointer.   
 %\myparagraph{Result:}
 %Although \systemname is shown to require 50\% more time in servicing this request, this delta is made insignificant during deployment where network bandwidth relatively accounts for a bigger metric to the overall performance.
+
+\begin{figure*}[t]
+\includegraphics[width=1.0\linewidth]{images/program_memory_benchmark.png}
+\caption{Memory benchmarking of ~\systemname.}
+\label{fig:memory}
+\end{figure*}
+
+
+\begin{table*}[htb]
+  \centering
+  \begin{tabular}{|p{2.6 cm }|p{1.6 cm}|p{1.9cm}|p{1.7cm}|p{2cm}|p{1.5cm}|p{1.5cm}|p{1.5cm}|}
+    \hline
+    \textbf{Task} & \textbf{ProFTPD} & \textbf{MicroHTTPD} & \textbf{UFTPD} & \textbf{LibPNG} & \textbf{Tiny Bignum} & \textbf{parsons (wasm)} & \textbf{parsons (tainted) }\\
+    \hline
+     \textbf{Pointers Annotated} & 6 & 139 & 146 & 248 & 69 & 364 & 378 \\
+     \textbf{Lines Sandboxed} & 0 & 650 & 90 & 0 & 30 & 800 & 0  \\
+     \textbf{CVEs fixed} & CVE-2010-4221 & CVE-2013-7039 & CVE-2020-14149, CVE-2020-5204 & CVE-2018-144550 & - & - & -  \\
+     \textbf{Time To Port} & 1 Day & 2 Days & 2 Days & 3 Days & 4 Hours & 1 Day & 2 Days \\
+    \hline
+  \end{tabular}
+  \caption{Conversion Efforts}
+\end{table*}
+
+
+\subsection{Security Impact}
+\label{subsec:securityimpact}
+The last column of~\tbl{TODO} shows the list of all spatial safety vulnerabilities in the functions that have tainted types or are isolated in the~\ucregion{}.
+As expected,~\emph{all vulnerabilities} are prevented by~\systemname{}.
+The symbols~\vulprevented{} and~\vulisolated{} indicate whether the vulnerability was detected by our dynamic instrumentation or isolated in the sandbox, respectively.
+This shows that~\systemname{} provides an effective mechanism to prevent spatial safety vulnerabilities.
+
+\aravind{Fix the conversion effort table by the correct symbols}
+
+\subsection{Program Benchmarks}
+\myparagraph{Overview}
+We evaluate \systemname on the basis of conversion efforts and performance on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Consequently, each of the conversions for the six programs follows a varied approach. 
+
+\myparagraph{Observations}
+Our evaluation of \systemname on six programs yields the following results inferred from Figure ~\ref{fig:runtime} and Figure ~\ref{fig:memory}:
+\begin{itemize}
+  \item Run-time Overhead is proportional to the extent of 
+annotated pointers and sandboxed code.
+  \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
+  \item Marshalling data might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout the program.
+  \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
+  \item Conversion style and extent dictate the converted program's conversion efforts and is modest at a couple of days. 
+  \item Annotating unsafe variables with tainted pointers is more cost-effective than sandboxing the entire function, given the function is assured to be control-flow safe.  
+\end{itemize}
 
 \systemname is evaluated on six programs with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code . However, this requires the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. Consequently, each of the conversions for the six programs follows a varied approach. 
 
