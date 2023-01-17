@@ -12,9 +12,8 @@ We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020web
 We also formalize the implementation and show a simulation theorem in \Cref{appx:comp1}.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
-The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (\numcheckmatelines{3028}).
-However, we use a small OCAML program (\numocamllines{680}) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
-\aravind{Arun, please fix the number of lines you changed for clang frontend and ocaml program}
+The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (3028 SLoc).
+However, we use a small OCAML program (680 SLoc) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
 
 \subsubsection{Additional Function Qualifiers}
 \label{subsubsec:addfuncqual}
@@ -26,7 +25,7 @@ Developers should use this qualifier to mark callback functions,~\ie functions i
 The~\sourcerewriter inserts appropriate sandbox dependent mechanisms to enable this (\ref{subsub:gencregion}).
 
 \noindent\emph{\_Mirror}: 
-This qualifier permits copying the corresponding function into both ~\cregion and~\ucregion, which permits the handling of certain simple utility functions that might be called from both regions. For example, ~\code{append_string} in our evaluation of parsons\_wasm has callers from both the regions. 
+This qualifier permits copying the corresponding function into both ~\cregion and~\ucregion, which permits the handling of certain simple utility functions that are called from both regions. For example, ~\code{append_string} in our evaluation of parsons\_wasm has callers from both the regions. 
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 _Mirror int append_string(_TPtr<char> buf,
 const char* appendStr : itype(_Nt_array_ptr<const char>),
@@ -39,13 +38,11 @@ _TPtr<char> buf_start, size_t buf_len) {
 }
 
 \end{minted}
-Qualifying ~\code{append_string} with~\code{_Mirror} duplicates the function in both regions,
-so that calling \code{append_string} permits the avoidance of over-tainting \code{appendStr},
-as \code{appendStr} can be unchecked and checked pointers in $\umode$ and $\cmode$ regions, respectively.
-"\_Mirror" enforces control-flow and data-flow compile-time semantic rules as shown above to assert region locality and exclusivity amongst between both the regions. \liyi{fix the sentence.}
+Qualifying ~\code{append_string} with~\code{_Mirror} duplicates the function in both regions, allowing calls to \code{append_string} with parameter to \code{appendStr} as an unchecked or checked pointer within $\umode$ and $\cmode$ regions, respectively. Consequently complexity from over-tainting is avoided as ~\code {appendStr} need not be tainted in ~\cregion and neither are callbacks required to access ~\code{append_string} from ~\ucregion.   
+"\_Mirror" enforces control-flow and data-flow compile-time semantic rules to ensure all variable and function call dependencies of mirrored functions required for ~\ucregion's compilation are resolved. 
 
 \noindent\emph{\_TLIB}:
-This qualifier relaxes type-checking rules on library functions without memory modification allowing developers to use the function freely in ~\cregion.
+This qualifier relaxes type-checking rules on library functions, allowing developers to use the function freely in ~\cregion.
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 // First, manually check the memory is in tainted region.
 // if yes, then call strncpy.
@@ -63,7 +60,7 @@ const char *__restrict __src, size_t __n); // In the header file
 }
 \end{minted}
 
-Passing tainted pointer \code{t_str} to unqualified ~\code{strncat} above is disallowed without having additional sandboxing for \code{t_str}. If a user ascertains that \code{t_str} has the right buffer size for \code{strncat}, she might label \code{strncat} with \code{\_TLIB}, so that \code{t_str} is treated as an unchecked pointer; such annotation relaxes type-checking for all the arguments to its calls. It is worth noting that \systemname does not enforce any semantics to ensure ~\code{\_TLIB} functions implemented in ~\cregion are non memory-modifying; therefore, using \code{\_TLIB} requires users' awareness of memory address leaks.
+Passing tainted pointer \code{t_str} to unqualified ~\code{strncat} above is disallowed without having additional ~\ucregion implementation for \code{strncat}. If a user ascertains that \code{t_str} has the right buffer size for \code{strncat}, she might label \code{strncat} with \code{\_TLIB}, so that \code{t_str} can be treated as an checked pointer parameter; such annotation relaxes type-checking for all the arguments to its calls. It is worth noting that \systemname does not enforce any semantics to ensure ~\code{\_TLIB} functions implemented in ~\cregion are non memory-modifying; therefore, using \code{\_TLIB} requires users' awareness of memory address leaks.
 
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}
@@ -182,15 +179,13 @@ size_t read_msg(int sock_fd, char* msg,
 \subsection{Compiler}
 \label{subsec:compilerimple}
 The~\systemname compiler includes the type checker (\sect{sec:typechecking}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
-We implemented the compiler (\numcompilerlines{}) on top of the existing~\checkedc compiler.
-\aravind{Arun, please fix the number of changes you made for the compiler}
-
+We implemented the compiler as a clang library (1812K SLoc) on top of the existing~\checkedc compiler.
 Our type checker verifies the constraints (\fig{fig:type-system-1}) and displays violations as errors, enabling developers to make additional annotations.
 For instance, for the code in~\lst{lst:final}, our type checker emits an error saying that ``~\emph{buffer~\code{buff} is tainted, but it is allocated in~\cregion}''.
 Consequently, the developer has to make the following changes to allocate~\code{buff} in the sandbox:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
 - char buff[MAX_MSG_SIZE] _Tainted;
-+ _t_Array_ptr<char> buff: count(MAX_MSG_SIZE)
++ _T_Array_ptr<char> buff: count(MAX_MSG_SIZE)
 +    = sbx_allocate(MAX_MSG_SIZE);
 ...
 + sbx_free(buff)
@@ -206,10 +201,9 @@ _TPtr<int> t = ...
 \end{minted}
 We show the added check in C for clarify. However, our instrumentation works on LLVM IR.
 
-The~\ucregion source files will be compiled with sandbox compiler,~\ie NAMEOFSANDBOXCOMPILER (CITATION).
+The~\ucregion source files will be compiled with sandbox compiler,~\ie WASI-SDK (~\cite{wasi-clang}).
 Given that WASM sandbox uses 32-bit addresses (v/s 64-bit for~
 \cregion), our instrumentation also adds necessary pointer swizzling to have transparent access to composite data types,~\ie~\code{struct}'s with pointers. 
-\aravind{Arun, please fill up the name of the sandbox compiler and add citation.}
 
 \subsection{Balance Assurance and Overhead}
 \label{subsec:otherusecases}

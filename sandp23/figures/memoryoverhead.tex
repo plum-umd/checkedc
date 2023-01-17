@@ -6,6 +6,7 @@
 \begin{axis}  
 [  
     ybar,  
+    ymin=-200, ymax=+200,
     enlargelimits=0.04,  
     ylabel={Memory Overhead (KiB)}, % the ylabel must precede a # symbol.  
     %xlabel={Programs},  
@@ -22,7 +23,7 @@
      nodes near coords, % this command is used to mention the y-axis points on the top of the particular bar.  
     nodes near coords align={vertical},  
     ]  
-\addplot coordinates {(ProFTPD,50) (TinyBigNum,90) (UFTPD, 120) (MicroHTTPD,80) (png2pnm, 60) (pnm2png, 150) (Parsons, 280)};  
+\addplot coordinates {(ProFTPD,82.1) (TinyBigNum,81.1) (UFTPD, 86.3) (MicroHTTPD,82.3) (png2pnm, -102.5) (pnm2png, -51000) (Parsons, 9.8)};  
   
 \end{axis}  
 \end{tikzpicture} 
