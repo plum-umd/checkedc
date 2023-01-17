@@ -52,11 +52,10 @@ This qualifier relaxes type-checking rules on library functions without memory m
 if (!is_mem_in_range(t_str, t_str + n, SBX_LOW(), SBX_HIGH()))
   handle_violation();
 // our type checker ignores this because 
-// the above _TLIB annotation.
+// the _TLIB annotation below.
 strncat(dst, t_str, n);
 \end{minted}
 
-Passing tainted pointer ~\code{t_str} to unqualified ~\code{strncat} above is disallowed by our type-checker as it expects both the pointers to be non-tainted since we are in ~\cregion. If the developer knows that~\code{strncat} accesses only~\code{n} bytes from the source buffer, she would like to directly use ~\code{strncat} with tainted source pointer in ~\cregion, instead of implementing the logic for string concatenation in ~\ucregion or marshalling data between the two regions.  
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{diff}
 - extern char *strncat (char *__restrict __dest,
 + _TLIB extern char *strncat (char *__restrict __dest,
@@ -64,8 +63,7 @@ const char *__restrict __src, size_t __n); // In the header file
 }
 \end{minted}
 
-Consequently, annotating ~\code{strncat} as shown above relaxes type-checking for all the arguments to its calls. However, \systemname does not enforce any semantics to ensure ~\code{\_TLIB} functions implemented in ~\cregion are non memory-modifying, thereby, requiring developers to be careful to while using ~\code{\_TLIB} to prevent memory address leaks.
-
+Passing tainted pointer \code{t_str} to unqualified ~\code{strncat} above is disallowed without having additional sandboxing for \code{t_str}. If a user ascertains that \code{t_str} has the right buffer size for \code{strncat}, she might label \code{strncat} with \code{\_TLIB}, so that \code{t_str} is treated as an unchecked pointer; such annotation relaxes type-checking for all the arguments to its calls. It is worth noting that \systemname does not enforce any semantics to ensure ~\code{\_TLIB} functions implemented in ~\cregion are non memory-modifying; therefore, using \code{\_TLIB} requires users' awareness of memory address leaks.
 
 \subsubsection{Generating~\cregion Source Partition}
 \label{subsub:gencregion}

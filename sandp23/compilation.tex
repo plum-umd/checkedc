@@ -399,7 +399,7 @@ naturally without having to worry about syntactic constraints.
 }
 
 % The two theorems are translation preservation and simulation. We donate $\xrightarrow{c}$ as the transition semantics of CLight.
-\begin{thm}[Simulation ($\sim$)]\label{simulation-thm}
+\begin{thm}\label{simulation-thm}[Simulation ($\sim$)]
 For \lang expressions $e_0$, stacks $\varphi_0$, $\varphi_1$, and heap snapshots $\heap_0$, $\heap_1$, 
 if $\heap_0 \vdash \varphi_0$, $(\varphi_0,\heap_0,e_0)\gg_c (\dot \varphi_0,\dot \heap_0, \dot e_0)$,
 and if there exists some $r_1$ such that $(\varphi_0, \heap_0, e_0)
