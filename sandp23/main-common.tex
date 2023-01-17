@@ -34,6 +34,7 @@
 \usepackage{tikz}
 \usepackage{multirow}
 \usepackage{tikz-network}
+\usepackage{pgfplots}
 \usepackage{fontawesome}
 \usepackage{textcomp}
 \usepackage{mathpartir}
@@ -458,6 +459,41 @@
 % }
 % \author{Leonidas Lampropoulos \and
 % Michael Hicks}
+
+\begin{abstract}
+  % Programs written in C account for a significant portion of code
+  % currently in use, despite its lack of memory safety which has been
+  % the cause of many disastrous vulnerabilities throughout the years.
+  % %
+  % Checked C is a Microsoft-backed attempt at a solution to this problem
+  % which extends C with types and annotations that guarantees spatial
+  % memory safety in a backwards compatible manner, while allowing
+  % the mix of checked and unchecked code.
+  % %
+  % However, Checked C's implementation is a complex beast built on top
+  % of Clang, while Checked C's specification is over \leo{X} pages of
+  % natural language, reducing confidence in the promised guarantees.
+  Spatial memory safety violation is still a major issue for C programs.
+  Checked C is a Microsoft-backed attempt at a solution to this problem
+  which extends C with types and annotations that guarantees spatial
+  memory safety in a backwards compatible manner, while allowing
+  the mix of checked and unchecked code; and provide the guarantee that any spatial memory
+  safety errors can be \emph{blamed} on portions of the program
+  labeled \emph{unchecked}.
+  However, in many cases, users tend not to keep the mix of checked and 
+  unchecked code without rewriting all programs to be spatially safe checked code,
+  which causes many memory safety violations.
+  Here, we present CheckedCBox by merging Checked C with program partitioning mechanism
+  to ensure that spatial safety violations in unchecked code does not affect checked code 
+  and can be resecured by the mechanism, which we named non-crashing property.
+  In addition, we also provide non-exposure guarantee that programs in unchecked code
+  can never learn about important pointers used in checked code.
+  With the formalism, we implement the CheckedCBox based on the WebAssembly sandbox library
+  and show that our implementation not only fulfill the safety guarantees above,
+   but also has a relatively comparable overhead with respect to the Checked C compiler.
+  To the best of our knowledge, this is the first work that combines program partitioning mechanism with C-like programming language.
+
+\end{abstract}
 
 \maketitle
   

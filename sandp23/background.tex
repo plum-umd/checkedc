@@ -69,12 +69,14 @@ Failed checks throw an exception.
 
 \liyi{why we need the following? I suggest we can cut. }
 Oftentimes, inserted checks can be optimized away by LLVM.
-Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
-In such cases, the inserted check can be
-removed as the outer condition $\inlinecode{n<u}$ already ensures that the
-dereference is within bounds.
-Dual~\etal~\cite{duanrefactoring} found essentially no
+For instance, Dual~\etal~\cite{duanrefactoring} found essentially no
 overhead when running Checked C-converted portions of the FreeBSD kernel.
+%Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
+%In such cases, the inserted check can be
+%removed as the outer condition $\inlinecode{n<u}$ already ensures that the
+%dereference is within bounds.
+%Dual~\etal~\cite{duanrefactoring} found essentially no
+%overhead when running Checked C-converted portions of the FreeBSD kernel.
 
 \noindent
 \myparagraph{Backward Compatibility}
