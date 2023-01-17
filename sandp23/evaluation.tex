@@ -101,6 +101,7 @@ We also had to annotate several intermediate pointers as tainted.
 For~\texttt{TinyBignum} and~\texttt{Parsons}, we followed $CTP$ and marked all input processing routines as tainted and placed them in the sandbox.
 The rest of the non-sandboxed code is annotated completely using~\checkedc types and placed in~\cregion.
 
+We ensured that the partitioned programs retained their expected functionality by verifying using corresponding test suites.
 
 \subsubsection{Conversion Effort}
 \aravind{Arun, fix the average hours}
@@ -231,6 +232,15 @@ Most of this is because of the validation check, which requires executing two ad
   \caption{Conversion Efforts}
 \end{table*}
 
+
+\subsection{Security Impact}
+\label{subsec:securityimpact}
+The last column of~\tbl{TODO} shows the list of all spatial safety vulnerabilities in the functions that have tainted types or are isolated in the~\ucregion{}.
+As expected,~\emph{all vulnerabilities} are prevented by~\systemname{}.
+The symbols~\vulprevented{} and~\vulisolated{} indicate whether the vulnerability was detected by our dynamic instrumentation or isolated in the sandbox, respectively.
+This shows that~\systemname{} provides an effective mechanism to prevent spatial safety vulnerabilities.
+
+\aravind{Fix the conversion effort table by the correct symbols}
 
 \subsection{Program Benchmarks}
 \myparagraph{Overview}
