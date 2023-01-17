@@ -9,7 +9,7 @@
     enlargelimits=0.04,  
     ylabel={Runtime Overhead (\%)}, % the ylabel must precede a # symbol.  
     %xlabel={Micro-Benchmark Tests},  
-    symbolic x coords={Memory Access in SBX, Indirect Calls, Pointer Access}, % these are the specification of coordinates on the x-axis.  
+    symbolic x coords={Memory Access in SBX, SBX Roundtrip, Tainted-ptr Access}, % these are the specification of coordinates on the x-axis.  
     xtick=data,  
     bar width=10pt,
     width=7cm,
@@ -22,7 +22,7 @@
      nodes near coords, % this command is used to mention the y-axis points on the top of the particular bar.  
     nodes near coords align={vertical},  
     ]  
-\addplot coordinates {(Memory Access in SBX,156) (Indirect Calls, 398) (Pointer Access, 34.16)};  
+\addplot coordinates {(Memory Access in SBX,156) (SBX Roundtrip, 398) (Tainted-ptr Access, 34.16)};  
   
 \end{axis}  
 \end{tikzpicture} 
