@@ -6,18 +6,18 @@
 \begin{axis}  
 [  
     ybar,  
-    enlargelimits=0.04,  
+    enlargelimits=0.12,  
     ylabel={Runtime Overhead (\%)}, % the ylabel must precede a # symbol.  
     %xlabel={Micro-Benchmark Tests},  
     symbolic x coords={Memory Access in SBX, SBX Roundtrip, Tainted-ptr Access}, % these are the specification of coordinates on the x-axis.  
     xtick=data,  
-    bar width=10pt,
-    width=7cm,
+    bar width=8pt,
+    width=6cm,
     x tick label/.append style={font=\tiny, rotate=30},
     y tick label/.append style={font=\tiny},
     axis background/.style={fill=gray!10},
     x label style={at={(axis description cs:0.5,-0.1)},anchor=north, font=\footnotesize},
-    xlabel={tests},
+    xlabel={},
     ylabel style={font=\footnotesize},
      nodes near coords, % this command is used to mention the y-axis points on the top of the particular bar.  
     nodes near coords align={vertical},  
@@ -38,18 +38,18 @@
 \begin{axis}  
 [  
     ybar,  
-    enlargelimits=0.04,  
+    enlargelimits=0.12,  
     ylabel={Runtime Overhead (\%)}, % the ylabel must precede a # symbol.  
     %xlabel={Programs},  
     symbolic x coords={ProFTPD, TinyBigNum, UFTPD, MicroHTTPD, png2pnm, pnm2png, Parsons}, % these are the specification of coordinates on the x-axis.  
     xtick=data,  
-    bar width=10pt,
-    width=7cm,
+    bar width=8pt,
+    width=6cm,
     x tick label/.append style={font=\tiny, rotate=30},
     y tick label/.append style={font=\tiny},
     axis background/.style={fill=gray!10},
     x label style={at={(axis description cs:0.5,-0.1)},anchor=north, font=\footnotesize},
-    xlabel={Programs},
+    xlabel={},
     ylabel style={font=\footnotesize},
      nodes near coords, % this command is used to mention the y-axis points on the top of the particular bar.  
     nodes near coords align={vertical},  
