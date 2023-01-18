@@ -9,7 +9,7 @@ size_t read_msg(int sock_fd, char *msg,
 
 int process_req1(_T_Array_ptr<char> msg :
                  count(m_l), size_t m_l) 
-                 __tainted {
+                 _Tainted {
 
  int rc = -1, i;
  if (m_l > MIN_SIZE) {

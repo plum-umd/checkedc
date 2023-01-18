@@ -12,7 +12,7 @@ We will present our implementation using WebAssembly (WASM~\cite{bosamiya2020web
 We also formalize the implementation and show a simulation theorem in \Cref{appx:comp1}.
 
 \subsection{\sourcerewriter} \label{subsec:checkmate}
-The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (3028 SLoc).
+The~\sourcerewriter is primarily implemented in C++ as a~\clang frontend tool (3K SLoc).
 However, we use a small OCAML program (680 SLoc) to remove annotations and make the code compilable with the sandbox compiler (\sect{subsubsec:genucregion}).
 
 \subsubsection{Additional Function Qualifiers}
@@ -179,7 +179,7 @@ size_t read_msg(int sock_fd, char* msg,
 \subsection{Compiler}
 \label{subsec:compilerimple}
 The~\systemname compiler includes the type checker (\sect{sec:typechecking}) and necessary instrumentation to handle tainted pointers (\ie from sandbox) and perform runtime checks.
-We implemented the compiler as a clang library (1812K SLoc) on top of the existing~\checkedc compiler.
+We implemented the compiler as a clang library (1.8K SLoc) on top of the existing~\checkedc compiler.
 Our type checker verifies the constraints (\fig{fig:type-system-1}) and displays violations as errors, enabling developers to make additional annotations.
 For instance, for the code in~\lst{lst:final}, our type checker emits an error saying that ``~\emph{buffer~\code{buff} is tainted, but it is allocated in~\cregion}''.
 Consequently, the developer has to make the following changes to allocate~\code{buff} in the sandbox:

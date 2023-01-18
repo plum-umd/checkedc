@@ -1,10 +1,10 @@
 \section{Limitations and Future Work}
 \label{sec:limitations}
-Despite the effectiveness of~\systemname{}, it has the following limitations:
+Despite the effectiveness of~\systemname{}, it has limitations:
 
 \noindent\textbf{Sandbox Dependency:} \systemname{} assumes the availability of a sandbox and consequently inherits all the limitations of the corresponding sandbox.~\eg Programs should be compilable with the sandbox compiler.
 Also, as shown in~\sect{subsec:programoverhead}, the performance of the partitioned applications mainly depends on the sandbox.
-However, our implementation is not dependent on one specific sandbox and can be easily extended to other sandboxes. As part of our future work, we will extend our implementation to other sandboxes.
+However, our implementation is not dependent on one specific sandbox and can be easily extended to other sandboxes. As a future work, we will extend our implementation to other sandboxes.
 
 \noindent\textbf{Annotation Effort:} Currently, all~\code{taint} annotations have to be done manually -- such that these annotations satisfy our type checker rules (\sect{sec:typechecking}).
 This could be tedious based on the complexity of the sandboxed function, its parameter complexity, and its dependency on other functions.
