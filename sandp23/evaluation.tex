@@ -35,16 +35,19 @@ We primarily focus on network servers as they can benefit most from our partitio
 We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
 We selected network servers that we could (with minimal effort) compile with the WASM compiler.
 We also selected a few standalone programs suggested by the ~\checkedc team~\cite{benchmarkcc}, which are good candidates to evaluate modifications to~\checkedc.
-The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset. In our conversion, we re-introduce corrected memory bugs and then perform \systemname annotations on the relevant buggy code. However, this by itself is based on the assumption that the bugs are predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without input on the bug locality. 
+The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset. 
+In our conversion, we re-introduce corrected memory bugs and then perform \systemname annotations on the relevant buggy code.
+However, this is based on the assumption that the bugs are predicted before they are discovered, which is chronologically impossible.
+Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations 
+without input on the bug locality. 
 
 
 \subsection{Experimental Setup}
 \label{experimentalsetup}
-All our experiments are performed on a 6-Core Intel i7-10700H machine with 40 GB of RAM, running Ubuntu 20.04.3 LTS.
-We use WASM as our target sandbox and use a similar configuration as that of the recent work~\cite{rlbox-paper}.
-We use Valgrind's "massif" memory profiler~\cite{seward2008valgrind} to measure the memory usage and consider the peak heap usage of an application as its memory consumption.
-We measure runtime using the difference in elapsed clock cycles using~\code{clock()} API from POSIX's~\code{<time.h>} and linux's ~\code{time} command.
-We perform every measurement ten times and use the average as the final result.
+All experiments are performed on a 6-Core Intel i7-10700H machine with 40 GB of RAM, running Ubuntu 20.04.3 LTS.
+We use WASM as our target sandbox and use a similar configuration as that of the recent work~\cite{rlbox-paper};
+and Valgrind's "massif" memory profiler~\cite{seward2008valgrind} to measure the memory usage and consider the peak heap usage of an application as its memory consumption.
+We measure runtime using the difference in elapsed clock cycles using~\code{clock()} API from POSIX's~\code{<time.h>} and linux's ~\code{time} command, and perform every measurement ten times and use the average as the final result.
 
 %\myparagraph{Benchmarking Methodology}
 %\systemname is evaluated in terms of performance and conversion efforts similar to that of RLBOX \cite{rlbox-paper} by recording run-time and memory overhead incurred by a \systemname in comparison to an unconverted program in generic-C/checked-C. 
@@ -82,28 +85,29 @@ This provides partial spatial safety by ensuring that any spatial violation invo
 We partitioned each program in our dataset using one of the above three methods.
 
 Our goal is to isolate risky input processing routines from the application code.
-We manually analyzed the source code of each application to identify which functions handle the input data and how.
-We also looked into previously reported vulnerabilities to identify risky input processing routined.
-We picked one of the above methods to partition based on how the input data is processed.
-Table ~\ref{table:conversioneffort} shows the summary of our partitioning of the dataset.
-For~\texttt{ProFTPD}, we use $T_{Pr}$ method and mark the input data as trained, and consequently, five other pointers need to be marked as tainted according to the type rules. This resulted in a total of 6 pointer annotations. There is no code in~\ucregion as used $T_{Pr}$ method and used only tainted pointers.
-We followed the same approach for~\texttt{LibPNG} (\texttt{png2pnm} and~\texttt{pnm2png}). However, in this case, we had to annotate a lot more pointers (248) because of the complex nature of~\texttt{libPNG}'s internal structures.
+We manually analyze each application's source code to identify which functions handle the input data and how.
+We also look into previously reported vulnerabilities to identify risky input processing routines.
+We picke one of the above methods to partition based on how the input data is processed.
+Table ~\ref{table:conversioneffort} is a summary of our dataset partitioning.
+For~\texttt{ProFTPD}, $T_{Pr}$ method is used and the input data is marked as tainted.
+Consequently, five other pointers need to be marked as tainted according to the type rules. This results in a total of 6 pointer annotations. There is no code in~\ucregion as used $T_{Pr}$ method with only tainted pointers being used.
+We follow the same approach for~\texttt{LibPNG} (\texttt{png2pnm} and~\texttt{pnm2png}). However, in this case, we have to annotate much more pointers (248) due to the complicated \texttt{libPNG}'s internal structures.
 
-For~\texttt{MicroHTTPD} and~\texttt{UFTPD}, we used $TP$ method and marked all of their direct input handled methods as tainted and consequently moved to the sandbox.
-We also had to annotate several intermediate pointers as tainted.
-For~\texttt{TinyBignum} and~\texttt{Parsons}, we followed $CTP$ and marked all input processing routines as tainted and placed them in the sandbox.
+For~\texttt{MicroHTTPD} and~\texttt{UFTPD}, $TP$ method is used and we mark all of the direct input handled methods as tainted, which are consequently moved to the sandbox, with annotating several intermediate pointers as tainted.
+For~\texttt{TinyBignum} and~\texttt{Parsons},
+we follow $CTP$ and mark all input processing routines as tainted and place them in the sandbox.
 The rest of the non-sandboxed code is annotated completely using~\checkedc types and placed in~\cregion.
 
 We ensured that the partitioned programs retained their expected functionality by verifying using corresponding test suites.
 
 \subsubsection{Conversion Effort}
-The last column shows the number of hours required to partition each application.
-On average, it takes $\sim$ 3.5 hours for each application. However, the exact time depends on the complexity of the code and pointers used in an application.
-Although the absolute time is high, partitioning is just a one-time effort for each application.
+The second last column shows the hour numbers for partitioning applications.
+On average, it takes $\sim$ 3.5 hours for each partitioning. However, the exact time depends on the complexity of the application and the pointer usage.
+Although the absolute time is high, partitioning is a one-time effort for each application.
 We start by annotating functions and then iteratively fixing type-checker errors.
-Most of the time (80\%) in all applications is spent just running the type-checker.
-The type-checker stops at the first error without giving information about all the other variable that needs to be fixed. 
-For instance, in the following code:
+Most of the time (80\%) is spent on running the type-checker.
+The type-checker stops at the first error without giving information about other variables that needs to be fixed. 
+For an instance, in the following code:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 _TPtr<int> y = ...; 
 int *z;
@@ -111,50 +115,51 @@ int *x;
 |\textcolor{red}{\faRemove}| z = y;
 x = z;
 \end{minted}
-The type-checker displays an error only at the first assignment.
+The type-checker displays an error only for the first assignment.
 However, to correctly fix it, we need to annotate both~\code{x} and~\code{y}.
 If $N$ pointers need to be annotated, then in the worst case, we might have to run the type-checker $N$ times, annotating one additional pointer in every run.
-We plan to fix this in our future work and make the type-checker display all the affected pointer variables instead of just the type errors.
+We plan to fix this in our future work by making the conversion procedure automatic.
+%make the type-checker display all the affected pointer variables instead of just the type errors.
 
 \subsection{Performance Overhead}
 Recent work~\cite{jangda2019not} shows that code executed as part of WASM sandbox incurs significant runtime overhead,~\ie$\sim$200\%.
-To better understand our runtime overhead, we first perform micro benchmarking of additional sandbox-related operations involved in~\systemname{}.
+To better understand our runtime overhead, we first perform micro benchmarking of additional sandbox-related operations in~\systemname{}.
 
 \subsubsection{Micro-Benchmarking}
-The figure ~\ref{fig:microbenchmarks} shows the results of our micro-benchmarking.
+\Cref{fig:microbenchmarks} shows our micro-benchmarking result.
 We measure the following operations as part of this:
 
 \noindent\emph{Memory access in WASM Sandbox ($SBX_{m}$):} 
-All memory access in a sandbox goes through additional verification by the sandbox runtime resulting in runtime overhead.
-We perform 100K memory access (read and write) in a loop, measure the time inside the sandbox, and compare it with the time executed as a regular program.
-
-Our results (~\fig{fig:microbenchmarks}) show that we incur 156.6\% overhead for memory access in the WASM sandbox compared to that in a normal program.
+All memory accesses in a sandbox need additional verification by the sandbox runtime, which results in runtime overhead.
+We perform 100K memory accesses (read and write) in a loop, measure the time inside the sandbox, and compare it with the time executed as a regular program.
+%
+The results (~\fig{fig:microbenchmarks}) show that we incur 156.6\% overhead for memory accesses in the WASM sandbox compared to that in a normal program.
 This is inline with the observations of the recent work~\cite{jangda2019not}.
 
 \noindent\emph{Sandbox Roundtrip ($SBX_{RT}$):}
-Here, we measure the time it takes to make a round trip between~\cregion and sandbox (\ucregion) compared to a regular function call and return.
-We create a no-op function as shown below:
+We measure the time to make a round trip between~\cregion and sandbox (\ucregion) compared to a regular function call and return.
+We create a no-op function below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 void noop() { return; }
 \end{minted}
-We place this~\code{noop} function in the sandbox and measure the time it takes to call and return from it:
+We place this~\code{noop} function in the sandbox and measure the time to call and return from it:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 s = clock();
 sandbox_noop();
 e = clock();
 \end{minted}
-We compare the time with the regular call,~\ie when we place~\code{noop} in~\cregion.
+We compare the time with a regular call when \code{noop} is in~\cregion.
 
-As shown in ~\fig{fig:microbenchmarks}, we incur an overhead of $\sim 400\%$. This is also in-line with the performance numbers reported by prior works~\cite{jangda2019not, rlbox-paper}.
-This is expected because transitioning to/from sandbox requires a context switch which is relatively more expensive than a regular function call (\ie\code{call} and~\code{ret} instruction).
+As shown in ~\fig{fig:microbenchmarks}, we incur an overhead of $\sim 400\%$. This is also inline with the performance reported by prior works~\cite{jangda2019not, rlbox-paper}.
+This is expected because transitions to/from sandbox require context switches which are more expensive than regular function calls (\ie\code{call} and~\code{ret} instructions).
 
 \noindent\emph{Tainted Pointer Access in~\cregion ($TP_{c}$):}
 As explained in~\sect{subsec:compilerimple}, we need to perform pointer swizzling to convert the sandbox-specific representation of tainted pointers to raw addresses.
 In addition, our instrumentation also checks at runtime that all tainted pointers are within the sandbox address range before accessing them.
-We measure this additional overhead by comparing tainted pointer access with regular pointer access.
+We measure this additional overhead by comparing tainted pointer accesses with regular pointer accesses.
 
-As shown in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing tainted pointers in~\cregion.
-Most of this is because of the validation check, which requires executing two additional compare instructions for every memory access.
+As in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing tainted pointers in~\cregion,
+ due to additional validation checks, which require executing two compare instructions for every memory access.
 
 
 %\subsection{Micro-Benchmarks}
