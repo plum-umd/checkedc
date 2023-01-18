@@ -29,7 +29,6 @@ We evaluate~\systemname in terms of the following three aspects:
 %We further go on to evaluate \systemname on six real-world programs pertaining to diversified domains to evaluate real-world run-time and memory performance.
 
 \subsection{Dataset}
-\input{tables/datasettable}
 Network-facing programs such as servers directly interact with external input, often process complex data types, and are more susceptible to security issues.
 We primarily focus on network servers as they can benefit most from our partitioning approach.
 We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
@@ -76,7 +75,8 @@ This is needed for data isolation-only cases, where the developer might want to 
 As explained in~\sect{subsec:compilerimple}, all access through tainted pointers will be dynamically checked to ensure that every access is within sandbox.
 This provides partial spatial safety by ensuring that any spatial violation involving tainted pointer cannot affect~\cregion.
 
-\input{tables/conversioneffort} 
+\input{tables/datasettable}
+%\input{tables/conversioneffort} 
 \subsubsection{Conversion Methodology}
 We partitioned each program in our dataset using one of the above three methods.
 
