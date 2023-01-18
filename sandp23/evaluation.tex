@@ -202,21 +202,35 @@ For~\texttt{ProFTPD}, we used only tainted pointers without code in the sandbox 
 Consequently, the overhead is less than 4.2\%.
 For~\texttt{UFTPD} and~\texttt{MicroHTTPD}, we sandboxed only request handlers (relatively small)
 that parse messages and return the actions that need to be performed.
-The server only invokes these handlers on particular requests resulting in less transitions interacting with the sandbox.
-As expected, the overhead is also little in these cases.
+The server only invokes these handlers on particular requests resulting in less transitions with the sandbox.
+As expected, the overhead is also less in these cases.
 For~\texttt{TinyBigNum} and~\texttt{Parsons}, the overhead is high because of the relatively large amount of code in sandbox region.
 In both applications, we place the frequently used parsing functions in the sandbox 
 resulting in a lot of sandbox transitions with most of them in a loop.
 The case is slightly different in~\texttt{pnm2png} and~\texttt{png2pnm},
 where we made the entire~\code{png} structure tainted, 
 which resulted in dynamic checks every time when the~\code{png} struct is accessed.
-The result indicates a higher overhead than the non-sandboxing cases but much less overhead than the heavy sandboxing cases.
-In summary:
-\begin{itemize}
-  \item Runtime overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
-  \item Using tainted pointers with compiler generated dynamic checks is preferred than placing code in sandbox.
-  \item Different C to \systemname conversion methods affect the overhead performance, which is our major future work.
-\end{itemize}
+In summary, our results indicate that the runtime overhead largely depends on the sandbox.
+
+\noindent\textbf{Overhead of only~\systemname{}.}
+To verify the impact of the sandbox on the overall program runtime, we perform a NO-OP sandbox experiment.
+Our goal is to measure the runtime overhead introduced ONLY by~\systemname{}.
+We perform this experiment by skipping sandboxing.
+Specifically, we run the completely annotated program as a regular application without any partitioning.
+However, we compile the annotated program with~\systemname compiler, which will add the relevant runtime checks (\sect{subsec:compilerimple}).
+We modify the instrumentation on~\code{taint}ed pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
+
+The~\fig{XXX} shows the runtime overhead. The overhead is negligible in all cases.
+This shows that~\systemname{} fundamentally has the least overhead.
+\aravind{Arun, we should do this experiment. This should be fairly easy.}
+
+%The result indicates a higher overhead than the non-sandboxing cases but much less overhead than the heavy sandboxing cases.
+%In summary:
+%\begin{itemize}
+%  \item Runtime overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
+%  \item Using tainted pointers with compiler generated dynamic checks is preferred than placing code in sandbox.
+%  \item Different C to \systemname conversion methods affect the overhead performance, which is our major future work.
+%\end{itemize}
 
 \subsubsection{Memory Overhead}
 All programs have a constant memory overhead ($\sim$81 KB) mainly for sandbox and a few variables related to creating sandbox and other helper functions.
