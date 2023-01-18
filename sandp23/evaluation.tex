@@ -191,7 +191,7 @@ As shown in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing taint
 \label{subsec:programoverhead}
 \input{figures/runtimechart}
 
-\input{figures/memoryoverhead}
+%\input{figures/memoryoverhead}
 The~\fig{fig:runtimeoverhead} shows the overhead of the partitioned programs.
 It is interesting to see a lot of variance in the runtime overhead.
 Our analysis shows that the runtime overhead is proportional to the execution time spent in the sandbox and the number of transitions between~\cregion and the sandbox.
@@ -210,6 +210,11 @@ In summary:
   \item Run-time Overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
   \item Tainting heavily used pointers leads to high overhead.
 \end{itemize}
+
+\subsubsection{Memory Overhead}
+All programs have a constant memory overhead ($\sim$81 KB) mainly for sandbox and a few variables related to creating sandbox and other helper functions.
+However, similar to the original~\checkedc,~\systemname{} itself doesn't add any memory overhead.
+This is expected because, similar to~\checkedc types, ~\code{taint}ed pointers also do not have metadata and have the same runtime representation as regular pointers.
 
 %ProFTPD's run-time overhead is expected as our conversion was small and strictly encapsulates CVE-2010-4221.
 %Since UFTPD's test-suite lacks coverage for some of the \systemname changes, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" on a 4.0K file, following which, we record overhead as described in ~\ref{experimentalsetup}.
