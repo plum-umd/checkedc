@@ -66,11 +66,12 @@ inserted check will confirm that prior to dereference
 $\inlinecode{a} \leq \alpha < \inlinecode{a + sizeof(int)} \!\times\!
 \inlinecode{u}$.
 Failed checks throw an exception.
+Oftentimes, inserted checks can be optimized away by LLVM resulting in almost no runtime overhead~\cite{duanrefactoring}.
 
-\liyi{why we need the following? I suggest we can cut. }
-Oftentimes, inserted checks can be optimized away by LLVM.
-For instance, Dual~\etal~\cite{duanrefactoring} found essentially no
-overhead when running Checked C-converted portions of the FreeBSD kernel.
+%\liyi{why we need the following? I suggest we can cut. }
+%Oftentimes, inserted checks can be optimized away by LLVM~\cite{duanrefactoring}.
+%For instance, Dual~\etal~\cite{duanrefactoring} found essentially no
+%overhead when running Checked C-converted portions of the FreeBSD kernel.
 %Consider the above code to be enclosed in another condition, such as,~\inlinecode{if (n<u) if (n>0) a[n-1] =}.
 %In such cases, the inserted check can be
 %removed as the outer condition $\inlinecode{n<u}$ already ensures that the
@@ -125,9 +126,12 @@ We provide more details on this in~\apdx{app:convertctocc}.
 \liyi{Does the program too small? Will reviewer complain about the program size? }
 \subsection{No Safety Against Unchecked Code}
 \label{subsec:nosafetyagsintuncheckedcode}
-The spatial safety guarantee~\checkedc provides applies to completely converted programs,~\ie programs that uses only checked types.
-The backward compatibility of~\checkedc helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (\ie checked or safe regions).
-But, these unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}. \lc{I'm confused, does the partially checked program "enjoy spatial memory safety" or not?}
+The spatial safety guarantee~\checkedc provides applies to completely converted programs,~\ie programs that uses~\emph{only} checked types and no regular pointer types.
+A partially annotated program can still enjoy spatial safety but only on those code regions using only Checked pointers (\ie checked or safe regions). For instance, in the below example, there can be no spatial safety violations in the function~\code{func} as it uses only checked pointers.
+However, the other unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+
+%The backward compatibility of~\checkedc helps a partially annotated program to enjoy spatial memory safety on those regions using only Checked pointers (\ie checked or safe regions).
+%But, these unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}. \lc{I'm confused, does the partially checked program "enjoy spatial memory safety" or not?}
 Although the blameless proof exists~\cite{ruef2019achieving, li22checkedc} for~\checkedc, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
 Consider the following example:
 \begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
@@ -140,16 +144,10 @@ int func(array_ptr<char> p : count(5)) {
 str = "he";
 ...
 func(|\textcolor{red}{\faBug}|assume_bounds_cast<char>(str, 5)); 
-...
-char ptr[16];
-...
-len <- derived from user input
-...
-|\textcolor{red}{\faBug}| memcpy(ptr, buff, len); // buffer overflow
 \end{minted}
 Here, the checked function~\inlinecode{func} expected a pointer to a buffer of five elements, but unchecked code violated it and invoked the function (Line 9) with a buffer of 2 elements.
 This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the Checked region, but of course, the blame or the root cause is in the unchecked region (\textcolor{red}{\faBug}).
-Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions (Line 15) can take down the complete program despite having checked regions.
+Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions (\eg buffer overflow) in unchecked regions can take down the complete program despite having checked regions.
 We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions}.
 
 \subsection{Program Partitioning}
