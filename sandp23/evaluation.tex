@@ -35,10 +35,15 @@ We primarily focus on network servers as they can benefit most from our partitio
 We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
 We selected network servers that we could (with minimal effort) compile with the WASM compiler.
 We also selected a few standalone programs suggested by the ~\checkedc team~\cite{benchmarkcc}, which are good candidates to evaluate modifications to~\checkedc.
-\Cref{table:dataset} shows the program selected as part of our evaluation dataset.
+The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset. 
+In our conversion, we re-introduce corrected memory bugs and then perform \systemname annotations on the relevant buggy code.
+However, this is based on the assumption that the bugs are predicted before they are discovered, which is chronologically impossible.
+Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations 
+without input on the bug locality. 
 
 
 \subsection{Experimental Setup}
+\label{experimentalsetup}
 All experiments are performed on a 6-Core Intel i7-10700H machine with 40 GB of RAM, running Ubuntu 20.04.3 LTS.
 We use WASM as our target sandbox and use a similar configuration as that of the recent work~\cite{rlbox-paper};
 and Valgrind's "massif" memory profiler~\cite{seward2008valgrind} to measure the memory usage and consider the peak heap usage of an application as its memory consumption.
@@ -104,7 +109,7 @@ Most of the time (80\%) is spent on running the type-checker.
 The type-checker stops at the first error without giving information about other variables that needs to be fixed. 
 For an instance, in the following code:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-_t_Ptr<int> y = ...; 
+_TPtr<int> y = ...; 
 int *z;
 int *x;
 |\textcolor{red}{\faRemove}| z = y;
@@ -191,33 +196,17 @@ As in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing tainted poi
 \input{figures/runtimechart}
 
 \input{figures/memoryoverhead}
-\systemname is evaluated on six programs on the basis of conversion efforts and performance with the use of a pre-included test suite for each program. We intend to demonstrate \systemname's capability of enforcing spatial safety in all of the scenarios leading to modern memory vulnerabilities by re-introducing corrected memory bugs and then performing \systemname annotations on the relevant buggy code. However, this would require the bugs to be predicted before they are discovered, which is chronologically impossible. Consequently, we also annotate large sections of relevant bug-free code to mimic the developer's intuition on making \systemname annotations without any input on the bug locality. 
 
-\myparagraph{\textbf{ProFTPD}}
-\systemname changes for ProFTPD were limited in extent and aimed at the exact changes required to encapsulate CVE-2010-4221. We mark the user input to the unsafe function "pr\_netio\_telnet\_gets()" as tainted (\_TPtr<char>) and propagate its tainted-ness to its callers and callees enclosed within its defined scope.
+ProFTPD's run-time overhead is expected as our conversion was small and strictly encapsulates CVE-2010-4221.
+Since UFTPD's test-suite lacks coverage for some of the \systemname changes, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" on a 4.0K file, following which, we record overhead as described in ~\ref{experimentalsetup}.
+Run-time overhead for UFTPD is expected as the sandboxed code was less performance intensive and FTP-protocol by itself overshadows \systemname's overhead. 
 
-\myparagraph{Testbench:}
-ProFTPD was evaluated by sampling the time taken to execute its comprehensive test-suite. The delta in run-time between \systemname ProFTPD and its corresponding unconverted version's sample was calculated as a percentage. This percentage was recorded over ten iterations and its median value has been reflected in \Cref{table:dataset}.
-
-\myparagraph{\textbf{UFTPD}}
-\systemname changes for UFTPD were aimed at sandboxing CVE-2020-14149 and CVE-2020-5204. CVE-2020-14149 was recorded as a NULL pointer dereference in the handle\_CWD() which could have led to a DoS in versions before 2.12, thereby, requiring us to sandbox this function. CVE-2020-5204 was recorded as a buffer overflow vulnerability in the handle\_PORT() due to sprintf() which also required us to sandbox this function. Although we could have chosen to only mark the faulty pointers as tainted, we intended to keep our changes more generic.
-
-\myparagraph{Testbench:}
-Since UFTPD's test-suite lacks coverage for some of the \systemname changes, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" request 10 times in a loop. Following this we record an entry for each of these tests as a median of recorded timestamps for 10 executions for \systemname and generic-c versions, following which we record the relative average latency across the three tests between both of these UFTPD versions as a percentage in the table \ref{table:dataset}.    
-
-\myparagraph{Result:}
-Although, \systemname-UFTPD consists of modest changes in annotations and sandboxed code, observed overhead is significantly less at 10\% due to the less performance intensive sandboxed code and FTP-protocol overshadowed overhead from \systemname instrumentation and sandbox.     
-
-
-\subsubsection{\textbf{\systemname Dataset Results}}
-Our evaluation of \systemname on six programs yields the following results:
+Our evaluation of \systemname's performance results on the dataset yields the observations:
 \begin{itemize}
   \item Run-time Overhead is proportional to the extent of 
 annotated pointers and sandboxed code.
-  \item Marshalling can be avoided if Taintedness of a pointer is propagated throughout across all its usages.
-  \item Marshalling data might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout the program.
-  \item Marshalling can be avoided by using \_TLIB function qualifier that allows tainted pointers to be passed as parameters to corresponding non-tainted pointer arguments of library functions that are assured by the developer to not leak tainted addresses.
-  \item Conversion style and extent dictate the converted program's conversion efforts and is modest at a couple of days.   
+  \item Marshalling can be avoided if Taintedness of a pointer is propagated across its data-flow.
+  \item Marshalling might sometimes be relatively cost-effective instead of propagating the taintedness of a pointer throughout its data-flow. 
 \end{itemize}
 
 
@@ -228,9 +217,6 @@ As expected,~\emph{all vulnerabilities} are prevented by~\systemname{}.
 
 The symbols~\vulprevented{} and~\vulisolated{} indicate whether the vulnerability was detected by our dynamic instrumentation or isolated in the sandbox, respectively.
 This shows that~\systemname{} provides an effective mechanism to prevent spatial safety vulnerabilities.
-
-\aravind{Fix the conversion effort table by the correct symbols}
-
 
 % 
 %\leo{The following is extremely
