@@ -210,7 +210,7 @@ resulting in a lot of sandbox transitions with most of them in a loop.
 The case is slightly different in~\texttt{pnm2png} and~\texttt{png2pnm},
 where we made the entire~\code{png} structure tainted, 
 which resulted in dynamic checks every time when the~\code{png} struct is accessed.
-The result indicates a higher overhead than the non-sandboxing cases and less overhead than the heavy sandboxing cases.
+The result indicates a higher overhead than the non-sandboxing cases but much less overhead than the heavy sandboxing cases.
 In summary:
 \begin{itemize}
   \item Runtime overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
