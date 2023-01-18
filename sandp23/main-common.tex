@@ -480,8 +480,8 @@
 Checked C is a safe dialect of C and extends it with checked pointer types and annotations that guarantee spatial memory safety in a backward compatible manner, allowing the mix of checked pointers and regular (unchecked) pointer types.
 %; and providing the guarantee that the root cause for spatial memory safety errors will be in unchecked code (\emph{noblame therom}).
 However, unchecked code vulnerabilities can violate the checked code's spatial safety guarantees.
-To handle this, we present~\systemname{}, which adds a flexible, type directed program partitioning mechanism to Checked C.
-We enhance the~\checkedc type system with~\code{taint} types that enable flexible partitioning of a program into~\cregion and~\ucregion, such that~\ucregion and~\code{taint} types do not affect the spatial safety in~\cregion{}.
+We present~\systemname{}, which adds a flexible, type directed program partitioning mechanism to Checked C,
+by enhancing the~\checkedc type system with~\code{tainted} types that enable flexible partitioning of a program into~\cregion and~\ucregion, such that~\ucregion code does not affect the spatial safety in~\cregion{}.
 We formalize our type system and prove the non-crashing and non-exposure properties of a well-typed~\systemname program.
 We implemented~\systemname in a configurable manner, which enables us to use existing sandbox mechanisms (\eg WebAssembly) to execute program partitions seamlessly.
 Our evaluation on~\numprog{} programs shows that~\systemname{} can effectively and efficiently partition programs by preventing~\numcves{} known vulnerabilities.
