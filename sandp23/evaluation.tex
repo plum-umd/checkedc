@@ -192,29 +192,51 @@ As shown in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing taint
 \input{figures/runtimechart}
 
 %\input{figures/memoryoverhead}
-The~\fig{fig:runtimeoverhead} shows the overhead of the partitioned programs.
-It is interesting to see a lot of variance in the runtime overhead.
-Our analysis shows that the runtime overhead is proportional to the execution time spent in the sandbox and the number of transitions between~\cregion and the sandbox.
-This is expected because of the overhead in sandbox execution, as shown by our micro-benchmarks experiments (\fig{fig:microbenchmarks}).
-The~\tbl{table:conversioneffort} shows the number of lines in the sandbox for each of the partitioned programs.
-For~\texttt{ProFTPD}, we used only tainted pointers with no code in the sandbox, and there were also no transitions to/from the sandbox.
-Consequently, the overhead is very less 4.2\%.
-For~\texttt{UFTPD} and~\texttt{MicroHTTPD}, we partitioned only request handlers (that are relatively small) into the sandbox. These handlers parse the message and return the actions that need to be performed. The server only invokes these handles on particular requests resulting in less number of transitions into the sandbox. As expected, the overhead is also very less in these cases.
-For~\texttt{TinyBigNum} and~\texttt{Parsons}, the overhead is very high because of the relatively large amount of code in sandbox region.
-In both these applications, we place the frequently used parsing functions in the sandbox resulting in a lot of sandbox transitions with most of them in a loop.
-As expected, the overhead is very high.
-The case is slightly different in~\texttt{pnm2png} and~\texttt{png2pnm} where we made the entire~\code{png} structure tainted, which resulted in dynamic checks every time any part of the~\code{png} struct is accessed, resulting in slightly higher overhead.
-In summary:
-\begin{itemize}
-  \item The runtime overhead of the partioned program directly depends on that of the target sandbox.
-  \item Run-time Overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
-  \item Tainting heavily used pointers leads to high overhead.
-\end{itemize}
+The first set of bars in~\Cref{fig:runtimeoverhead} shows the overhead of the partitioned programs.
+%It is interesting to see a lot of variance in the runtime overhead.
+The runtime overhead is proportional to the execution time 
+spent in the sandbox and the number of transitions between~\cregion and the sandbox,
+which coincides with the sandbox execution overhead observation in the micro-benchmarks experiments (\Cref{fig:microbenchmarks}).
+\Cref{table:conversioneffort} shows the numbers of lines in the sandbox for our partitioned programs.
+For~\texttt{ProFTPD}, we used only tainted pointers without code in the sandbox and transitions to/from the sandbox.
+Consequently, the overhead is less than 4.2\%.
+For~\texttt{UFTPD} and~\texttt{MicroHTTPD}, we sandboxed only request handlers (relatively small)
+that parse messages and return the actions that need to be performed.
+The server only invokes these handlers on particular requests resulting in less transitions with the sandbox.
+As expected, the overhead is also less in these cases.
+For~\texttt{TinyBigNum} and~\texttt{Parsons}, the overhead is high because of the relatively large amount of code in sandbox region.
+In both applications, we place the frequently used parsing functions in the sandbox 
+resulting in a lot of sandbox transitions with most of them in a loop.
+The case is slightly different in~\texttt{pnm2png} and~\texttt{png2pnm},
+where we made the entire~\code{png} structure tainted, 
+which resulted in dynamic checks every time when the~\code{png} struct is accessed.
+In summary, our results indicate that the runtime overhead largely depends on the sandbox.
+
+\noindent\textbf{Overhead of only~\systemname{}.}
+To verify the impact of the sandbox on the overall program runtime, we perform a NO-OP sandbox experiment.
+Our goal is to measure the runtime overhead introduced ONLY by~\systemname{}.
+We perform this experiment by skipping sandboxing.
+Specifically, we run the completely annotated program as a regular application without any partitioning.
+However, we compile the annotated program with~\systemname compiler, which will add the relevant runtime checks (\sect{subsec:compilerimple}).
+We modify the instrumentation on~\code{taint}ed pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
+
+The second set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
+This shows that~\systemname{} fundamentally has the least overhead.
+\aravind{Arun, we should do this experiment. This should be fairly easy.}
+
+%The result indicates a higher overhead than the non-sandboxing cases but much less overhead than the heavy sandboxing cases.
+%In summary:
+%\begin{itemize}
+%  \item Runtime overhead is proportional to the extent of annotated pointers, sandboxed code, and transitions between~\cregion and sandbox.
+%  \item Using tainted pointers with compiler generated dynamic checks is preferred than placing code in sandbox.
+%  \item Different C to \systemname conversion methods affect the overhead performance, which is our major future work.
+%\end{itemize}
 
 \subsubsection{Memory Overhead}
 All programs have a constant memory overhead ($\sim$81 KB) mainly for sandbox and a few variables related to creating sandbox and other helper functions.
-However, similar to the original~\checkedc,~\systemname{} itself doesn't add any memory overhead.
-This is expected because, similar to~\checkedc types, ~\code{taint}ed pointers also do not have metadata and have the same runtime representation as regular pointers.
+However, similar to the original~\checkedc,~\systemname{} itself does not add any memory overhead,
+because the compilation of \code{tainted} pointers do not come with any metadata.
+%This is expected because, similar to~\checkedc types, ~\code{taint}ed pointers also do not have metadata and have the same runtime representation as regular pointers.
 
 %ProFTPD's run-time overhead is expected as our conversion was small and strictly encapsulates CVE-2010-4221.
 %Since UFTPD's test-suite lacks coverage for some of the \systemname changes, we manually write a script for 3 Tests that each trigger "quote CWD", "quote PORT", and FTP "get file" on a 4.0K file, following which, we record overhead as described in ~\ref{experimentalsetup}.

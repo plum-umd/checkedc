@@ -6,9 +6,12 @@
 \begin{axis}  
 [  
     ybar,  
+    %ymode=log,
     enlargelimits=0.03,
     enlarge x limits=0.12,
     ylabel={Runtime Overhead (\%)}, % the ylabel must precede a # symbol.  
+     axis x line*=bottom,
+     axis y line*=left,
     %xlabel={Micro-Benchmark Tests},  
     symbolic x coords={Memory Access in SBX, SBX Roundtrip, Tainted-ptr Access}, % these are the specification of coordinates on the x-axis.  
     xtick=data,  
@@ -39,25 +42,35 @@
   
 \begin{axis}  
 [  
-    ybar,  
+    ybar = 0.8,  
     enlargelimits=0.01,  
     enlarge x limits=0.12,
     ylabel={Runtime Overhead (\%)}, % the ylabel must precede a # symbol.  
+     axis x line*=bottom,
+     axis y line*=left,
     %xlabel={Programs},  
     symbolic x coords={ProFTPD, TinyBigNum, UFTPD, MicroHTTPD, png2pnm, pnm2png, Parsons}, % these are the specification of coordinates on the x-axis.  
     xtick=data,  
     bar width=8pt,
-    width=6cm,
+    %legend style={font=\tiny},
+    legend style={font=\tiny, at={(0.7,1.0)}},
+    width=7cm,
+    height=5cm,
     x tick label/.append style={font=\tiny, rotate=30},
     y tick label/.append style={font=\tiny},
     axis background/.style={fill=gray!10},
-    x label style={at={(axis description cs:0.5,-0.1)},anchor=north, font=\footnotesize},
+    x label style={at={(axis description cs:0.5,-0.1)},anchor=north, font=\tiny},
     xlabel={},
     ylabel style={font=\footnotesize},
+    every node near coord/.append style={font=\tiny},
      nodes near coords, % this command is used to mention the y-axis points on the top of the particular bar.  
     nodes near coords align={vertical},  
     ]  
-\addplot coordinates {(ProFTPD,4.2) (TinyBigNum,121.7) (UFTPD, 2.7) (MicroHTTPD,3.8) (png2pnm, 11.47) (pnm2png, 46.5) (Parsons, 267)};  
+\addplot coordinates {(ProFTPD,4.2) (TinyBigNum,121.7) (UFTPD, 2.7) (MicroHTTPD,3.8) (png2pnm, 11.4) (pnm2png, 46.5) (Parsons, 267)};  
+
+\addplot coordinates {(ProFTPD,4) (TinyBigNum,11) (UFTPD, 2.7) (MicroHTTPD,3.8) (png2pnm, 11.4) (pnm2png, 10) (Parsons, 2)};  
+
+\legend{CheckedCBox, CheckedCBox (w NO-OP Sandbox)}
   
 \end{axis}  
 \end{tikzpicture} 

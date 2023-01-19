@@ -178,16 +178,14 @@ $\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 
 For simplicity, we write
 $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean $\tptr{\tarray{0}{b}{\tau}}{\cmode}$,
-so the above examples could be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
+so the above examples could be rewritten as $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 
 \myparagraph{Disallowing Unsafe Types}
 The well-formedness of these types are presented in~\Cref{app:le}.
 It prevents unsafe types from being constructed.
-  Consider the type ~\code{_t_Array_ptr<_Ptr<int>>} which describes a tainted
-  array of checked pointers.
-  This is \emph{illegal} in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region;
-  thus, it is rejected by the well-formedness. 
+  Consider the type ~\code{_t_Array_ptr<_Ptr<int>>}, which describes a tainted array of checked pointers.
+  This is not well-formed in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region when the tainted ($\tmode$) array is used. 
   Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
 %
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
@@ -255,24 +253,23 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \cite{li22checkedc}}, the \texttt{strlen} operation ($\estrlen{x}$),
-memory allocation ($\emalloc{\xi}{\omega}$), 
+memory allocations ($\emalloc{\xi}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$),
 unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
 For example, a dynamic bounds cast
-  { \footnotesize
-    \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
+  { \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
 is formalized as 
-{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \lang. 
+{$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \lang. 
 % 
 
 % 
 We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
-For instance, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer.
-The heap allocation expression $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions (\cregion or \ucregion).
+For example, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents a $\enull$ pointer.
+The heap allocation $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions, $\cmode$ mode pointer in \cregion or $\umode$ and $\tmode$ mode pointers in \ucregion.
 We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
 The $\echeckedtext$ and $\euncheckedtext$ expressions are used to delimit code regions.
-To guarantee the non-exposure property, we extend the \checkedc syntax to be $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$,
-where $\overline{x}$ represents all variables that are allowed to communicate between instructions outside and inside of the block $e$, and cannot contain checked pointers.
+To guarantee the non-exposure property, we extend the \checkedc syntax to include $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$ blocks,
+where $\overline{x}$ represents all variables that are allowed to communicate between instructions outside and inside of the block $e$, and it cannot contain checked pointers.
 $\erettext$ is introduced by the semantics when evaluating a \texttt{let} binding; explained shortly below.
 
 % 
@@ -422,8 +419,9 @@ $
     \inferrule[S-Cast]
               {}
               {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
+  \end{mathpar}
 
-\\\\
+  \begin{mathpar}
     \inferrule[T-Def]
               {\xi \leq m \\\Gamma;\Theta \vdash_m e : \tptr{\tau}{\xi}}
               {\Gamma;\Theta \vdash_m \estar{e} : \tau}
@@ -436,8 +434,9 @@ $
     {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 \quad
     \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+  \end{mathpar}
 
-
+  \begin{mathpar}
     \inferrule[T-Checked]
               {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
                      \\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
@@ -449,8 +448,9 @@ $
               {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
 
     \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+  \end{mathpar}
 
-
+  \begin{mathpar}
 \inferrule[T-Fun]
     {\Gamma;\Theta \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \\
         \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
@@ -459,8 +459,8 @@ $
              \overline{\tau'} \sqsubseteq_{\Theta}
                \overline{\tau}[\overline{e'} / \overline{x}]}
     {\Gamma; \Theta \vdash_m e(\overline{e}) : \tau[\overline{e'} / \overline{x}]}
-
-
+  \end{mathpar}
+  \begin{mathpar}
     \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
         {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
    (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
@@ -508,10 +508,10 @@ variables to Boolean predicates), expression $e$ will have type $\tau$ if evalua
 in context mode $m$, indicating that the code is in $m$ region.
 The operational semantics for \lang is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
-\longrightarrow_m (\varphi',\heap',r)$, as partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{S-}$X$).
+\longrightarrow_m (\varphi',\heap',r)$, as shown in \Cref{fig:c-context}.
  Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
-$\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ heaps), each of which
+$\heap$ is a \emph{heap} that is partitioned into two parts ($\cmode$ and $\umode$ heap regions), each of which
 maps addresses (integer literals) to values $\evalue{n}{\tau}$.
 The complete set of typing rules and special handling of (NT)-arrays are provided in~\Cref{rem-type,sec:rem-semantics}.
 
@@ -544,7 +544,7 @@ it into an \emph{evaluation context} $E$ and a sub-expression $e'$
 (such that replacing the hole $\Box$ in $E$ with $e'$ would yield
 $e$), and then evaluates $e'$ according to the \emph{computation}
   relation $(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$,
-whose rules are given along with type rules in Fig.~\ref{fig:type-system-1}, discussed
+whose rules are given along with type rules in Fig.~\ref{fig:type-system-1} (labeled as \rulelab{S-}$X$), discussed
 shortly.
 The $\mode$ function in Fig.~\ref{fig:c-context}
 determines the context mode, i.e., region, that the expression $e'$ locates based on the context $E$.
@@ -563,7 +563,7 @@ Evaluation contexts $E$ define a standard left-to-right evaluation order.
 In \lang, Context modes $m$ appearing in a type rule determine the code region 
 that permits pointer dereferences and value-assignments, which also depends on the pointer modes.
 We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
-This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can perform such operations in $\cmode$ and $\umode$ regions, respectively.
+This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can only perform such operations in $\cmode$ and $\umode$ regions, respectively.
 %Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
 
 \lang also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
@@ -597,14 +597,14 @@ Type and semantic rules for array types and pointer assignments are given in \Cr
 
 Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereferences, respectively.
 In addition to the no $\enull$ check in $\cmode$ mode pointer dereference,
-any dynamic heap access of a tainted pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to that the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
+any dynamic heap access of a tainted ($\tmode$) pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to that the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
 
 \myparagraph{Unchecked and Checked Blocks}
 The execution of a $\echeckedtext$ or $\euncheckedtext$ block represents 
 the context switching from a $\cmode$ to an $\umode$ region, or vice versa,
 with its type and semantic rules given in \Cref{fig:type-system-1}.
-In this context switching, to guarantee the checked pointer non-exposure property, 
-checked pointers are not allowed to pass through, which is guaranteed by the predicates 
+In this context switching, to guarantee the checked ($\cmode$) pointer non-exposure property, 
+checked pointers are not allowed to go cross different regions, which is guaranteed by the predicates 
 $\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))$ and $\neg\cmode(\tau)$,
 as well as the check that all free variables in the block content $e$ are in $\overline{x}$.
 For example, \code{StringAuth} in \Cref{subsub:gencregion} is a trampoline function that disallows
@@ -628,8 +628,7 @@ Given an expression $e$ of function pointer type
 $\overline{e}$ of types $\overline{\tau'}$,
 % 
 the result of the application will
-be of type $\tau[\overline{e'} / \overline{x}]$ 
-% 
+be of type $\tau[\overline{e'} / \overline{x}]$;
 if for each pair of \(\tau'\) and \(\tau''\) in \(\overline{\tau'}\) and
 $\overline{\tau}[\overline{e'} / \overline{x}]$, \(\tau'\) is a subtype of
 \(\tau''\).
@@ -653,7 +652,7 @@ is the parameter list of variables and their types,
 $\xi$ determines the mode of the function, and $e$ is the
 function body. 
 Similar to \heap, the global function store $\Xi$ is also partitioned into
-two parts ($\cmode$ and $\umode$ stores), each of which
+two parts ($\cmode$ and $\umode$ store regions), each of which
 maps addresses (integer literals) to the function data described above.
 Rule \textsc{S-FunT} defines the tainted version of function call
 with the verification process 
@@ -801,8 +800,8 @@ $\heap'$ and $e'$, such that $(\varphi,\heap,e)
 \longrightarrow_{\umode} (\varphi',\heap',e')$, then $\heap'(\cmode)=\heap(\cmode)$.
 \end{thm}
 
-Using the above theorem, we first show the non-exposure theorem,
-where code in $\umode$ region cannot observe a valid checked pointer address.
+Using the above theorems, we first show the non-exposure theorem,
+where code in $\umode$ region cannot observe a valid checked ($\cmode$) pointer address.
 
 \begin{thm}[Non-Exposure]
 For any \lang program $e$, heap $\heap$, stack
