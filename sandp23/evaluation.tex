@@ -192,7 +192,7 @@ As shown in~\fig{fig:microbenchmarks}, we incur 34\% overhead in accessing taint
 \input{figures/runtimechart}
 
 %\input{figures/memoryoverhead}
-\Cref{fig:runtimeoverhead} shows the overhead of the partitioned programs.
+The first set of bars in~\Cref{fig:runtimeoverhead} shows the overhead of the partitioned programs.
 %It is interesting to see a lot of variance in the runtime overhead.
 The runtime overhead is proportional to the execution time 
 spent in the sandbox and the number of transitions between~\cregion and the sandbox,
@@ -220,7 +220,7 @@ Specifically, we run the completely annotated program as a regular application w
 However, we compile the annotated program with~\systemname compiler, which will add the relevant runtime checks (\sect{subsec:compilerimple}).
 We modify the instrumentation on~\code{taint}ed pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
 
-The~\fig{XXX} shows the runtime overhead. The overhead is negligible in all cases.
+The second set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
 This shows that~\systemname{} fundamentally has the least overhead.
 \aravind{Arun, we should do this experiment. This should be fairly easy.}
 
