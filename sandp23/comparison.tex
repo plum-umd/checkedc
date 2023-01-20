@@ -1,9 +1,9 @@
 \section{Related Work}
 \label{sec:related}
 
-Our work is most closely related to prior formalizations of C(-like)
-languages and program partitioning mechanism 
-that aim at enforcing memory safety.
+%Our work is most closely related to prior formalizations of C(-like)
+%languages and program partitioning mechanism 
+%that aim at enforcing memory safety.
 A number of prior works have looked at formalizing the semantics of C,
 including CompCert~\cite{Blazy2009,leroy:hal-00703441},
 \citet{ellison-rosu-2012-popl}, \citet{Kang:2015:FCM:2813885.2738005},
@@ -13,8 +13,9 @@ spatial safety.
 
 \myparagraph{Spatially Safe C Formalizations}
 %
-Several prior works formalize C-language transformations or C-language
-dialects aiming to ensure spatial safety. 
+Several prior works~\cite{li22checkedc} formalize C-language transformations or C-language
+dialects aiming to ensure spatial safety.
+The difference between these works and \systemname is presented in \Cref{sec:intros,sec:overview}.
 %
 \citet{10.1145/2813885.2737979} extended the formalization
 of \citet{ellison-rosu-2012-popl} to produce a semantics that detects
@@ -38,9 +39,9 @@ with its formalization~\cite{Condit2007} defines its
 semantics directly in terms of compilation.
 None of the above work touches program partitioning and sandbox mechanism. 
 
-The most closely related work is the
-implementation and formalization of \checkedc done by \citet{checkedc}, \citet{machiry2022c}, \citet{ruef18checkedc-incr} and \citet{li22checkedc}.
-The difference between these works and \systemname is listed in \Cref{sec:intros,sec:overview}.
+%The most closely related work is the
+%implementation and formalization of \checkedc done by \citet{checkedc}, \citet{machiry2022c}, %\citet{ruef18checkedc-incr} and \citet{li22checkedc}.
+%The difference between these works and \systemname is listed in \Cref{sec:intros,sec:overview}.
 
 \myparagraph{Program Partitioning Mechanism}
 %
@@ -48,8 +49,8 @@ The unchecked and checked code region separation in \systemname represents an is
 which is typically called program partitioning~\cite{rul2009towards}, and there has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area. Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning. E.g., Given sensitive data in a program, the goal is to partition functions into two parts or partitions based on whether a function can access the sensitive data.
 The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
 The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
-
-\citet{rlbox-paper}, a.k.a RLBox, merged a type checker with a sandbox mechanism to better achieve the programming partitioning mechanism.
+%
+RLBox~\cite{rlbox-paper}, merged a type checker with a sandbox mechanism to better achieve the programming partitioning mechanism.
 They allow tainted pointers to be shared among different code regions. 
 However, the RLBox type system is primarily based on C++ templates, making it hard or impossible to apply directly to C programs.
 Furthermore, their technique has no formal guarantees and can only isolate complete libraries instead of arbitrary functions.

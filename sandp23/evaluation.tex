@@ -140,9 +140,7 @@ void noop() { return; }
 \end{minted}
 We place this~\code{noop} function in the sandbox and measure the time to call and return from it:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\footnotesize]{c}
-s = clock();
-sandbox_noop();
-e = clock();
+s = clock(); sandbox_noop(); e = clock();
 \end{minted}
 We compare the time with a regular call when \code{noop} is in~\cregion.
 
