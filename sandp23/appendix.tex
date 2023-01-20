@@ -508,14 +508,13 @@ typed.
 \quad
     \inferrule[S-Checked]{}{(\varphi,\heap,\echecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
-    \inferrule[S-RetEnd]{}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{\evalue{n'}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n'}{\tau'})}
+    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
 
-        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e})}
+        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
 
     \inferrule[S-AssignNull]{}
       {(\varphi,\heap,\eassign{\evalue{0}{\tptr{\omega}{\xi}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap,\enull)}
 
-    \inferrule[S-RetCon]{ (\varphi[x\mapsto \evalue{n}{\tau}],\heap,e) \longrightarrow (\varphi',\heap',e')}{(\varphi,\heap,\ret{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi'[x\mapsto \varphi(x)],\heap',\ret{x}{\varphi'(x)}{e'})}
 
     \inferrule[S-AssignArrC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
       {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heapup{\cmode}{n}{\evalue{n_1}{\tau_a}},\evalue{n_1}{\tau})}
@@ -627,17 +626,12 @@ Performing such a verification equates to performing a literal type check for a 
 %
 The semantics manages variable scopes using the special $\erettext$
 form. \textsc{S-Let} evaluates to a configuration whose expression is
-$\ret{x}{\evalue{n}{\tau}}{e})$. We keep $\varphi$ unchanged
-and remember $x$ and its new value $\evalue{n}{\tau}$
-in $e$'s scope that is defined by the $\erettext$ operation.
-Every time when evaluation proceeds on $e$ (rule \textsc{S-RetCon}),
-we install the stack value $\evalue{n}{\tau}$ for $x$ in $\varphi$ for the current scope.
-After one-step evaluation is completed, 
-we store $x$'s change in the result $\erettext$ operation $\ret{x}{\varphi'(x)}{e'})$,
-and restore $x$'s outer score value $\varphi(x)$ in $\varphi'$. 
-This procedure continues until $e'$ becomes a literal
-$n\!:\!\tau$, in which case \textsc{S-RetEnd} removes the $\kw{ret}$ frame and returns
-the literal. 
+$\ret{x}{\varphi(x)}{e})$.
+It keeps the old value of $x$ in the stack of $\texttt{ret}$ 
+and updates $x$'s value in $\varphi$ with the new value of the let binding.
+After $e$ is evaluated to a value $\evalue{n}{\tau}$,
+we restore $\varphi$'s value back to the one stored in the stack of $\texttt{ret}$ as $\mu$,
+which is explain in rule \rulelab{S-Ret}.
 
 \subsection{Compilation Formalism}\label{appx:comp1}
 

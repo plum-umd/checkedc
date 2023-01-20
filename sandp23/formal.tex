@@ -375,7 +375,7 @@ $\hspace*{-1.2em}
     \begin{array}{lll}
 r & ::= & e \mid \enull \mid \ebounds\\
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
-&&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid \eif{E}{e}{e}\\[0.2em]
+&&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid\ret{x}{\evalue{n}{\tau}}{E}\mid \eif{E}{e}{e}\\[0.2em]
 &&\mid \ecall{E}{\overline{e}} \mid \ecall{\evalue{n}{\tau}}{\overline{E}} \mid 
 \eunchecked{\overline{x}}{E}
 \mid \echecked{\overline{x}}{E}
