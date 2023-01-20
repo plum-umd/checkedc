@@ -129,7 +129,7 @@ For each such function, we create a corresponding trampoline function that serve
 + }
 \end{minted}
 
-The trampoline function handles the invocations from sandbox (and hence the extra parameter~\code{sandbox}), performs the necessary conversion of pointer arguments, and eventually invokes the callback.
+The trampoline function handles the invocations from sandbox (and hence the extra parameter~\code{sandbox}), performs necessary pointer argument conversion, and eventually invokes the callback.
 
 We also add the code to register this trampoline function with the sandbox. The registration function for WASM sandbox is as shown below:
 \begin{minted}[mathescape, escapeinside=||, fontsize=\tiny]{diff}
@@ -157,7 +157,7 @@ _TPtr<_TPtr<char>(_TPtr<const char> input, size_t len)>StringAuth) {
 \subsubsection{Generating~\ucregion Source Partition}
 \label{subsubsec:genucregion}
 We create~\ucregion partition by first copying all functions and variables marked as~\code{_Tained} and~\code{_Mirror}.
-Next, we convert the partition into regular C by replacing all~\systemname{} tainted types with the corresponding C types.
+Next, we convert the partition into regular C by replacing all tainted types with the corresponding C types.
 \newline
 For instance:~\code{_T_Array_ptr<char>} will be replaced with~\code{char *}.
 

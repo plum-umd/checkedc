@@ -34,7 +34,7 @@ We primarily focus on network servers as they can benefit most from our partitio
 We use WebAssembly (WASM) as our target sandbox. Consequently, we also want any of the selected programs to be compilable with the WASM sandbox.
 We selected network servers that we could (with minimal effort) compile with the WASM compiler.
 We also selected a few standalone programs suggested by the ~\checkedc team~\cite{benchmarkcc}, which are good candidates to evaluate modifications to~\checkedc.
-The~\tbl{table:dataset} shows the program selected as part of our evaluation dataset. 
+\tbl{table:dataset} shows the program selected as part of our evaluation dataset. 
 
 
 \subsection{Experimental Setup}
@@ -222,7 +222,7 @@ We modify the instrumentation on~\code{taint}ed pointers to check for a valid po
 
 The second set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
 This shows that~\systemname{} fundamentally has the least overhead.
-\aravind{Arun, we should do this experiment. This should be fairly easy.}
+%\aravind{Arun, we should do this experiment. This should be fairly easy.}
 
 %The result indicates a higher overhead than the non-sandboxing cases but much less overhead than the heavy sandboxing cases.
 %In summary:
