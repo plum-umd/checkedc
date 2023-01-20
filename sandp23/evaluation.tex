@@ -218,9 +218,9 @@ Our goal is to measure the runtime overhead introduced ONLY by~\systemname{}.
 We perform this experiment by skipping sandboxing.
 Specifically, we run the completely annotated program as a regular application without any partitioning.
 However, we compile the annotated program with~\systemname compiler, which will add the relevant runtime checks (\sect{subsec:compilerimple}).
-We modify the instrumentation on~\code{taint}ed pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
+We modify the instrumentation on~\code{tainted} pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
 
-The second set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
+The marked \textcolor{red}{red} set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
 This shows that~\systemname{} fundamentally has the least overhead.
 %\aravind{Arun, we should do this experiment. This should be fairly easy.}
 
