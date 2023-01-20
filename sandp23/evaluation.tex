@@ -220,8 +220,15 @@ Specifically, we run the completely annotated program as a regular application w
 However, we compile the annotated program with~\systemname compiler, which will add the relevant runtime checks (\sect{subsec:compilerimple}).
 We modify the instrumentation on~\code{taint}ed pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
 
-Our evaluation of ~\systemname{} with NO-OP Sandbox was performed on two programs with the largest overheads in our dataset. With parsons, we see an average run-time overhead of 1.94\% as is expected as parsons (($T_{Pr}$)) gave us an overhead of only 9\%. With TinyBigNum, we see an overhead of 54.7\%, and is expected referring to the figure ~\ref{fig:microbenchmarks}, as TinyBigNum is pointer intensive with pointer operations inside nested loops.     
-This shows that~\systemname{} fundamentally has the least overhead.
+We performed our experiment on~\texttt{Persons} and~\texttt{TinyBigNum}, the two programs with the largest overheads in our dataset.
+As expected, the runtime overhead of~\texttt{Persons} is 1.94\% -- which shows that the sandbox is the main contributor to the overhead.
+For~\texttt{TinyBigNum}, the overhead is a bit higher at 54.7\%, our analysis shows that the overhead is because we tainted the main input buffer, which is processed in loops.
+This leads to additional checking for every loop iteration resulting in higher overhead.
+Another reason is that in the current implementation, our instrumentation is performed at the end after all optimization passes; thus, none of the instrumentation is optimized.
+We plan to move our instrumentation before the optimization passes and exploit them to optimize further and decrease the runtime overhead. 
+
+%Our evaluation of~\systemname{} with NO-OP Sandbox was performed on two programs with the largest overheads in our dataset. With parsons, we see an average run-time overhead of 1.94\% as is expected as parsons (($T_{Pr}$)) gave us an overhead of only 9\%. With TinyBigNum, we see an overhead of 54.7\%, and is expected referring to the figure ~\ref{fig:microbenchmarks}, as TinyBigNum is pointer intensive with pointer operations inside nested loops.     
+%This shows that~\systemname{} fundamentally has the least overhead.
 %The second set of bars in~\fig{fig:runtimeoverhead} shows the runtime overhead. The overhead is negligible in all cases.
 %This shows that~\systemname{} fundamentally has the least overhead.
 %We modify the instrumentation on~\code{tainted} pointers to check for a valid pointer (instead of within sandbox bounds) -- this will add the same amount of checks as in sandboxing case, but the comparison values will be different.
