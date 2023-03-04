@@ -57,6 +57,12 @@ Inductive mode : Type :=
   | Tainted : mode
   | Unchecked : mode.
 
+Definition mode_eq (m1 m2:mode) :=
+  match m1 with Checked => match m2 with Checked => true | _ => false end
+              | Tainted => match m2 with Tainted => true | _ => false end
+              | Unchecked => match m2 with Unchecked => true | _ => false end
+   end.
+
 (** Types, <<w>>, are either a word type, [TNat, TPtr], a struct type,
     [TStruct], or an array type, [TArray]. Struct types must be annotated with a
     struct identifier.  Array types are annotated with their lower-bound,
@@ -1424,7 +1430,8 @@ Inductive expression : Type :=
   | EVar : var -> expression
   | EStrlen : var -> expression
   | ECall : expression -> list expression -> expression
-  | ERet : var -> Z* type -> expression -> expression (* return new value, old value and the type. *)
+  | ERet : var -> option (Z* type) -> expression -> expression (* return new value, old value and the type. *)
+  | ERm : mode -> expression -> expression (* trans mode. *)
   | EDynCast : type -> expression -> expression
   | ELet : var -> expression -> expression -> expression
   | EMalloc : mode -> type -> expression
@@ -1438,19 +1445,23 @@ Inductive expression : Type :=
   | EIfPtrEq : expression -> expression -> expression -> expression -> expression (* if e1 = e2 then e3 else e4. *)
   | EIfPtrLt : expression -> expression -> expression -> expression -> expression (* if e1 < e2 then e3 else e4. *)
 *)
-  | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *)
-  | EUnchecked : list var -> type -> expression -> expression
-  | Echecked : list var -> type -> expression -> expression.
+  | EIf : expression -> expression -> expression -> expression (* if e1 then e2 else e3. *).
 
 Definition funElem : Type := (list (var * type) * type * expression).
 
+Module Heap := Map.Make Z_as_OT.
 
-Definition FEnv : Type := mode -> Z -> option funElem. (* first Z is a permission and second z is address *)
+Definition heap : Type := Heap.t (Z * type).
+Definition real_heap : Type := mode -> heap.
+
+Definition fenv : Type := Heap.t funElem.
+Definition real_fenv : Type := mode -> fenv * Z.
 
 (* Parameter fenv : FEnv. *)
 
+(*
 Definition Ffield : Type := Z -> option Z.
-
+*)
 (*
 Inductive gen_sub_bound : bn_env -> bound -> bound -> bn_env -> Prop :=
     gen_sub_num : forall env n, gen_sub_bound env (Num n) (Num n) env
@@ -1547,8 +1558,9 @@ Definition is_array_ptr (t:type) : Prop :=
   end.
 
 
-Definition simple_option (D : structdef) (a: (Z*type)) :=
-  match a with  (v,t) => word_type t /\ type_wf D Checked t /\ simple_type t
+Definition simple_option (D : structdef) (a: option (Z*type)) :=
+  match a with Some (v,t) => word_type t /\ type_wf D Checked t /\ simple_type t
+            | _ => False
   end.
 
 
@@ -1582,7 +1594,9 @@ Fixpoint freeVars (e : expression) :=
           | EVar x => [x]
           | EStrlen x => [x]
           | ECall e1 el => freeVars e1 ++ (fold_right (fun b a => freeVars b ++ a) [] el)
-          | ERet x (n,t) e => set_diff Nat.eq_dec (freeTypeVars t ++ freeVars e) [x]
+          | ERet x (Some (n,t)) e => set_diff Nat.eq_dec (freeTypeVars t ++ freeVars e) [x]
+          | ERet x None e => freeVars e
+          | ERm m e => freeVars e
           | EDynCast t e => freeTypeVars t ++ freeVars e
           | ELet x e1 e2 => (freeVars e1) ++ set_diff Nat.eq_dec (freeVars e2) [x] 
           | EMalloc m t => freeTypeVars t
@@ -1593,8 +1607,6 @@ Fixpoint freeVars (e : expression) :=
           | EAssign e1 e2 => freeVars e1 ++ freeVars e2
           | EIfDef x e1 e2 => [x] ++ freeVars e1 ++ freeVars e2
           | EIf e1 e2 e3 => freeVars e1 ++ freeVars e2 ++ freeVars e3
-          | EUnchecked vl t e => freeVars e
-          | Echecked vl t e => freeVars e
 end.
 
 Definition list_sub (l1 l2:list var) := (forall x, In x l1 -> In x l2).
@@ -1642,14 +1654,9 @@ Inductive literal : expression -> Prop :=
 *)
 
 
-Module Heap := Map.Make Z_as_OT.
-
-Definition heap : Type := Heap.t (Z * type).
-
 (** Real Heaps, [R], consist of 2 heaps tha  t represents (checked * tainted)
     heaps
  *)
-Definition real_heap : Type := heap * heap.
 
 Section allocation.
   Import ListNotations.
@@ -1732,6 +1739,8 @@ Inductive result : Type :=
 Inductive ctxt : Type :=
   | CHole : ctxt
   | CLet : var -> ctxt -> expression -> ctxt
+  | CRet : var -> option (Z * type) -> ctxt -> ctxt
+  | CRm : mode -> ctxt -> ctxt
   | CCall : ctxt -> list expression -> ctxt
   | CPlusL : ctxt -> expression -> ctxt
   | CPlusR : Z -> type -> ctxt -> ctxt
@@ -1747,14 +1756,14 @@ Inductive ctxt : Type :=
   | CIfLtL : ctxt -> expression -> expression -> expression -> ctxt
   | CIfLtR : expression -> ctxt -> expression -> expression -> ctxt
 *)
-  | CIf : ctxt -> expression -> expression -> ctxt
-  | CUnchecked : list var -> type -> ctxt -> ctxt
-  | Cchecked : list var -> type -> ctxt -> ctxt.
+  | CIf : ctxt -> expression -> expression -> ctxt.
 
 Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   match E with
   | CHole => e
   | CLet x E' e' => ELet x (in_hole e E') e'
+  | CRet x vt E => ERet x vt (in_hole e E) 
+  | CRm m E => ERm m (in_hole e E) 
   | CCall E' es => ECall (in_hole e E') es
   | CPlusL E' e' => EPlus (in_hole e E') e'
   | CPlusR n t E' => EPlus (ELit n t) (in_hole e E')
@@ -1771,11 +1780,9 @@ Fixpoint in_hole (e : expression) (E : ctxt) : expression :=
   | CIfLtL E' e1 e2 e3 => EIfPtrLt (in_hole e E') e1 e2 e3
   | CIfLtR e1 E' e2 e3 => EIfPtrLt e1 (in_hole e E') e2 e3
 *)
-  | CUnchecked vl t E' => EUnchecked vl t (in_hole e E')
-  | Cchecked vl t E' => Echecked vl t (in_hole e E')
   end.
 
-(* the top mode is always checked mode. *)
+(* the top mode is always checked mode. 
 Fixpoint mode_of' (E : ctxt) (m:mode) : mode :=
   match E with
   | CHole => m
@@ -1796,16 +1803,16 @@ Fixpoint mode_of' (E : ctxt) (m:mode) : mode :=
   | CIfLtL E' e1 e2 e3 => mode_of E'
   | CIfLtR e1 E' e2 e3 => mode_of E'
 *)
-  | CUnchecked vl t E' => mode_of' E' Unchecked
-  | Cchecked vl t E' => mode_of' E' Checked
   end.
 Definition mode_of (E: ctxt) := mode_of' E Checked.
-
+*)
 
 Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   match E_outer with
   | CHole => E_inner
   | CLet x E' e' => CLet x (compose E' E_inner) e'
+  | CRet x vt E' => CRet x vt (compose E' E_inner) 
+  | CRm m E' => CRm m (compose E' E_inner) 
   | CCall E' e' => CCall (compose E' E_inner) e'
   | CPlusL E' e' => CPlusL (compose E' E_inner) e'
   | CPlusR n t E' => CPlusR n t (compose E' E_inner)
@@ -1823,8 +1830,6 @@ Fixpoint compose (E_outer : ctxt) (E_inner : ctxt) : ctxt :=
   | CIfLtL E' e1 e2 e3 => CIfLtL (compose E' E_inner) e1 e2 e3
   | CIfLtR e1 E' e2 e3 => CIfLtR e1 (compose E' E_inner) e2 e3
 *)
-  | CUnchecked vl t E' => CUnchecked vl t (compose E' E_inner)
-  | Cchecked vl t E' => Cchecked vl t (compose E' E_inner)
   end.
 
 Inductive expr_wf (D : structdef) : mode -> expression -> Prop :=
@@ -1842,6 +1847,7 @@ Inductive expr_wf (D : structdef) : mode -> expression -> Prop :=
       (forall e, In e el -> (exists n t, e = ELit n t) \/ (exists y, e = EVar y)) ->
       expr_wf D m (ECall xe el)
   | WFRet : forall m x old e, simple_option D (old) -> expr_wf D m e -> expr_wf D m (ERet x old e)
+  | WFRm : forall m m' e, expr_wf D m e -> expr_wf D m (ERm m' e)
   | WFEDynCast : forall m t e,
      is_array_ptr t -> type_wf D m t -> expr_wf D m e -> expr_wf D m (EDynCast t e)
   | WFELet : forall m x e1 e2,
@@ -1891,17 +1897,7 @@ Inductive expr_wf (D : structdef) : mode -> expression -> Prop :=
   | WFEAssign : forall m e1 e2,
       expr_wf D m e1 ->
       expr_wf D m e2 ->
-      expr_wf D m (EAssign e1 e2)
-  | WFEUnchecked : forall m tvl t e,
-      word_type t ->
-      type_wf D Unchecked t ->
-      expr_wf D Unchecked e ->
-      expr_wf D m (EUnchecked tvl t e)
-  | WFEchecked : forall m tvl t e,
-      word_type t ->
-      type_wf D Unchecked t ->
-      expr_wf D Checked e ->
-      expr_wf D m (Echecked tvl t e).
+      expr_wf D m (EAssign e1 e2).
 
 Lemma hole_is_id : forall e,
     in_hole e CHole = e.
@@ -1918,6 +1914,7 @@ Proof.
   induction E_outer; try reflexivity; try (simpl; rewrite IHE_outer; reflexivity).
 Qed.
 
+(*
 Lemma expr_wf_in_hole : forall E D m m' e, mode_of' E m = m' -> expr_wf D m (in_hole e E) -> expr_wf D m' e.
 Proof.
  induction E; intros; unfold mode_of in *; simpl in *; try easy.
@@ -1936,7 +1933,7 @@ Proof.
  inv H0. apply IHE with (m' :=  (mode_of' E Unchecked)) in H7; try easy.
  inv H0. apply IHE with (m' :=  (mode_of' E Checked)) in H7; try easy.
 Qed.
-
+*)
 (*
 Lemma compose_unchecked : forall m E_outer E_inner,
     mode_of (compose E_outer E_inner) Checked = mode_of E_inner Checked.
@@ -2283,10 +2280,12 @@ Definition is_fun_type (t:type) :=
              | _ => False
    end.
 
-Definition tfun_prop (F: FEnv) (n:Z) (t:type) :=
-   match t with TPtr Checked (TFun yl t ts) => F Checked n <> None
-              | TPtr m (TFun _  _ _) => F m n <> None
-              | _ => True end.
+Definition tfun_prop (F: real_fenv) (n:Z) (t:type) :=
+   match t with TPtr m (TFun yl t ts) => 
+    match (F m) with (fenv,b) => (n <= b -> Heap.In n fenv)
+   end
+         | _ => True
+   end.
 
 Definition get_xl (tvl: list (var*type)) := (fold_right (fun b a => match (snd b) with TNat => (fst b)::a |_ => a end) [] tvl).
 
@@ -2409,7 +2408,7 @@ Definition nt_array_prop (H:heap) (n:Z) (t:type) :=
 
 
 (** Typing of literals on Checked heaps *)
-Inductive well_typed_lit_checked (D : structdef) (F: FEnv) H
+Inductive well_typed_lit_checked (D : structdef) (F: real_fenv) H
   : scope -> Z -> type -> Prop :=
 | TyLitInt_C : forall s n,
     well_typed_lit_checked D F H s n TNat
@@ -2419,7 +2418,7 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) H
 | TyLitZero_C : forall s t,
     well_typed_lit_checked D F H s 0 t
 | TyLitFun_C : forall s n xl t ts tvl e ta,
-     F Checked n = Some (tvl,ta,e) ->
+     n < (snd (F Checked)) -> Heap.MapsTo n (tvl,ta,e) (fst (F Checked)) ->
      @subtype empty_theta (get_fun_type Checked tvl ta) (TPtr Checked (TFun xl t ts)) ->
     well_typed_lit_checked D F H s n (TPtr Checked (TFun xl t ts))
 | TyLitRec_C : forall s n w t,
@@ -2443,7 +2442,7 @@ Inductive well_typed_lit_checked (D : structdef) (F: FEnv) H
 #[export] Hint Constructors well_typed_lit_checked : ty.
 *)
 
-
+(*
 Lemma well_typed_lit_c_ind' :
   forall (D : structdef) (F: FEnv) (H : heap) (P : scope -> Z -> type -> Prop),
     (forall (s : scope) (n : Z), P s n TNat) ->
@@ -2503,9 +2502,10 @@ Proof.
                                        end)
             end).
 Qed.
+*)
 
 (** Typing of literals on Tainted heaps *)
-Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
+Inductive well_typed_lit_tainted (D : structdef) (F: real_fenv) H
   : scope -> Z -> type -> Prop :=
 | TyLitInt_T : forall s n,
     well_typed_lit_tainted D F H s n TNat
@@ -2514,7 +2514,7 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
 | TyLitZero_T : forall s t,
     well_typed_lit_tainted D F H s 0 t
 | TyLitFun_T : forall s n xl t ts tvl e ta,
-    F Tainted n = Some (tvl,ta,e) ->
+     n < (snd (F Tainted)) -> Heap.MapsTo n (tvl,ta,e) (fst (F Tainted)) ->
      subtype empty_theta (get_fun_type Tainted tvl ta) (TPtr Tainted (TFun xl t ts)) ->
     well_typed_lit_tainted D F H s n (TPtr Tainted (TFun xl t ts))
 | TyLitRec_T : forall s n w t,
@@ -2534,7 +2534,7 @@ Inductive well_typed_lit_tainted (D : structdef) (F: FEnv) H
             well_typed_lit_tainted D F H (scope_set_add n (TPtr Tainted w) sc) n' t') ->
     well_typed_lit_tainted D F H sc n (TPtr Tainted t).
 
-
+(*
 Lemma well_typed_lit_u_ind' :
   forall (D : structdef) (F: FEnv) (H : heap) (P : scope -> Z -> type -> Prop),
     (forall (s : scope) (n : Z), P s n TNat) ->
@@ -2594,6 +2594,7 @@ Proof.
                                        end)
             end).
 Qed.
+*)
 (*
 #[export] Hint Constructors well_typed_lit_tainted : ty.
 *)
@@ -2628,171 +2629,132 @@ Definition mem : Type := stack * real_heap.
 
 Create HintDb sem.
 
+
 Definition inject_ret (x:var) (v1:Z * type) (e:result) :=
-  match e with RExpr ea => RExpr (ERet x v1 ea)
+  match e with RExpr ea => RExpr (ERet x (Some v1) ea)
             | a => a
  end.
+
+Definition mode_leq (m1 m2 :mode) : Prop :=
+   (m2 = Checked -> m1 <> Unchecked) /\ (m2 = Unchecked -> (m1 <> Checked)).
+
+Definition update_mode_heap (H:real_heap) (m:mode) (n:Z) (v:Z * type) :=
+   (fun ma => if mode_eq ma m then (Heap.add n v (H ma)) else H ma).
+
+Definition up_heap (H:real_heap) (m:mode) (H1:heap) :=
+   (fun ma => if mode_eq ma m then H1 else H ma).
+
+Inductive next_mode_of : mode -> expression -> mode -> Prop :=
+   call_mode : forall m x m' xl ta ts el, next_mode_of m ((ECall (ELit x (TPtr m' (TFun xl ta ts))) el)) m'
+  | other_mode : forall m m' v t, next_mode_of m (ERm m' (ELit v t)) m'.
 
 (** The single-step reduction relation, [H; e ~> H'; r]. *)
 Inductive step
   (D : structdef)
-  (F: FEnv)
-  : mem -> expression -> mem -> result -> Prop :=
-| SVar : forall s R x v t,
+  (F: real_fenv)
+  : mode -> mem -> expression -> mem -> result -> Prop :=
+| SVar : forall m s R x v t,
     (Stack.MapsTo x (v,t) s) ->
-    step D F
+    step D F m
       (s, R) (EVar x)
-      (s, R) (RExpr (ELit v t))
-| StrlenChecked : forall s H1 H2 x n n' l h t t1,
+     (s, R) (RExpr (ELit v t))
+| Strlen : forall m m' s H x n n' l h t t1,
     h > 0 -> l <= 0 -> 0 <= n' ->
-    (Stack.MapsTo x (n,(TPtr Checked (TNTArray (Num l) (Num h) t))) s) ->
+    m <> Unchecked ->
+    snd (F m') <= n ->
+    (Stack.MapsTo x (n,(TPtr m' (TNTArray (Num l) (Num h) t))) s) ->
     (forall i ,
         n <= i < n+n' ->
-        (exists n1, Heap.MapsTo i (n1,t1) H1 /\ n1 <> 0)) ->
-    Heap.MapsTo (n+n') (0,t1) H1 ->
-    step D F
-      (s, (H1,H2)) (EStrlen x)
-      ((change_strlen_stack s x Checked t l n n' h), (H1,H2))
+        (exists n1, Heap.MapsTo i (n1,t1) (H m') /\ n1 <> 0)) ->
+    Heap.MapsTo (n+n') (0,t1) (H m') ->
+    step D F m
+      (s, H) (EStrlen x)
+      ((change_strlen_stack s x m' t l n n' h), H)
       (RExpr (ELit n' TNat))
-| StrlenTainted : forall s H1 H2 x n n' l h t t1,
-    h > 0 -> l <= 0 -> 0 <= n' ->
-    (Stack.MapsTo x (n,(TPtr Tainted (TNTArray (Num l) (Num h) t))) s) ->
-    (forall i ,
-        n <= i < n+n' ->
-        (exists n1,
-            Heap.MapsTo i (n1,t1) H2 /\ n1 <> 0
-            /\ well_typed_lit_tainted D F H2 empty_scope n1 t1)) ->
-    Heap.MapsTo (n+n') (0,t1) H2 ->
-    step D F
-      (s, (H1,H2)) (EStrlen x)
-      ((change_strlen_stack s x Tainted t l n n' h), (H1,H2))
-      (RExpr (ELit n' TNat))
-| StrlenTaintedFailed : forall s H1 H2 x n l h t,
-    h > 0 -> l <= 0 -> n > 0 ->
-    (Stack.MapsTo x (n,(TPtr Tainted (TNTArray (Num l) (Num h) t))) s) ->
-    ~ (well_typed_lit_tainted D F H2 empty_scope n
-         (TPtr Tainted (TNTArray (Num l) (Num h) t))) ->
-    step D F (s, (H1,H2)) (EStrlen x) (s, (H1,H2)) RNull
 
-| StrlenUnChecked : forall s H1 H2 x n n' t t1,
+| StrlenUnChecked : forall s m' H x n n' t t1,
     0 <= n' ->
-    (Stack.MapsTo x (n,(TPtr Unchecked t)) s) ->
+    snd (F m') <= n ->
+    mode_leq m' Unchecked ->
+    (Stack.MapsTo x (n,(TPtr m' t)) s) ->
     (forall i ,
-        n <= i < n+n' -> (exists n1, Heap.MapsTo i (n1,t1) H2 /\ n1 <> 0)) ->
-    Heap.MapsTo (n+n') (0,t1) H2 ->
-    step D F
-      (s, (H1,H2)) (EStrlen x)
-      (s, (H1,H2)) (RExpr (ELit n' TNat))
+        n <= i < n+n' -> (exists n1, Heap.MapsTo i (n1,t1) (H m') /\ n1 <> 0)) ->
+    Heap.MapsTo (n+n') (0,t1) (H m') ->
+    step D F Unchecked
+      (s, H) (EStrlen x)
+      (s, H) (RExpr (ELit n' TNat))
 
-| StrlenHighOOB : forall s R m x n t l h,
+| StrlenHighOOB : forall m m' s R x n t l h,
     h <= 0 -> 
-    (Stack.MapsTo x (n,(TPtr m (TNTArray l (Num h) t))) s) ->
-    step D F
+    (Stack.MapsTo x (n,(TPtr m' (TNTArray l (Num h) t))) s) ->
+    step D F m
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenLowOOB : forall s R m x n t l h,
+| StrlenLowOOB : forall m m' s R x n t l h,
     l > 0 -> 
-    (Stack.MapsTo x (n,(TPtr m (TNTArray (Num l) h t))) s) ->
-    step D F
+    (Stack.MapsTo x (n,(TPtr m' (TNTArray (Num l) h t))) s) ->
+    step D F m
       (s, R) (EStrlen x) (s, R) RBounds
-| StrlenNull : forall s R m x t n l h,
+| StrlenNull : forall m m' s R x t n l h,
     n <= 0 ->
-    (Stack.MapsTo x (n,(TPtr m (TNTArray l h t))) s) ->
-    step D F
+    (Stack.MapsTo x (n,(TPtr m' (TNTArray l h t))) s) ->
+    step D F m
       (s, R) (EStrlen x)
       (s, R) RNull
 
-| SCallChecked : forall s R x ta ts el t tvl e ea ta' xl,
-    F Checked x = Some (tvl,t,e) ->
+| SCallChecked : forall m m' s R x ta ts el t tvl e ea ta' xl,
+    m <> Unchecked -> 0 <= x < snd (F m') -> 
+    Heap.MapsTo x (tvl,t,e) (fst (F m')) ->
     @eval_el s el tvl (get_xl tvl) e t ea ta' ->
    (* subtype D empty_theta (TPtr Checked (TFun (Num n) [] ta' ts')) (TPtr Checked (TFun (Num n) [] ta ts)) -> *)
-    step D F
-      (s, R) (ECall (ELit x (TPtr Checked (TFun xl ta ts))) el)
-      (s, R) (RExpr ea)
-(*
-| SCallCheckedType : forall s R x ta ts ta' ts' el t tvl e ea n,
-    n = -1 ->
-    F n x = Some (tvl,t,e,Checked) ->
-    @eval_el s el tvl t (ECast t e) ea (ts',ta') ->
-    ~ subtype D empty_theta (TPtr Checked (TFun (Num n) [] ta' ts')) (TPtr Checked (TFun (Num n) [] ta ts)) ->
-    step D F
-      (s, R) (ECall (ELit x (TPtr Checked (TFun (Num n) [] ta ts))) el)
-      (s, R) RBounds
-*)
-| SCallNull : forall m s R x ta ts el xl,
-    m <> Unchecked ->
-    F m x = None ->
-    step D F
-      (s, R) (ECall (ELit x (TPtr m (TFun xl ta ts))) el)
-      (s, R) RNull
-| SCallTainted : forall s H1 H2 x ta ts el t tvl e ea ta' xl,
-    F Tainted x = Some (tvl,t,e) ->
-    @eval_el s el tvl (get_xl tvl) e t ea ta' ->
-    well_typed_lit_tainted D F H2 empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
-    step D F
-      (s, (H1, H2)) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el)
-      (s, (H1, H2)) (RExpr ea)
+    step D F m
+      (s, R) (ECall (ELit x (TPtr m' (TFun xl ta ts))) el)
+      (s, R) (RExpr (ERm m' ea))
 
-| SCallTaintedType : forall s R x ta ts el t tvl e xl,
-    F Tainted x = Some (tvl,t,e) ->
-    ~ well_typed_lit_tainted D F (snd R) empty_scope x (TPtr Tainted (TFun xl ta ts)) ->
-    step D F
-      (s, R) (ECall (ELit x (TPtr Tainted (TFun xl ta ts))) el)
-      (s, R) RBounds
-
-| SCallUnchecked : forall s R x ta ts el t tvl e ea ta' xl,
-    F Unchecked x = Some (tvl,t,e) ->
+| SCallUnchecked : forall m' s R x ta ts el t tvl e ea ta' xl,
+     0 <= x < snd (F m') -> mode_leq m' Unchecked ->
+    Heap.MapsTo x (tvl,t,e) (fst (F m')) ->
     @eval_el s el tvl (get_xl tvl) e t ea ta' ->
-    step D F
-      (s, R) (ECall (ELit x (TPtr Unchecked (TFun xl ta ts))) el)
+    step D F Unchecked
+      (s, R) (ECall (ELit x (TPtr m' (TFun xl ta ts))) el)
       (s, R) (RExpr ea)
 
-| SLet : forall s R x n t e t',
+| SLet : forall m s R x n t e t',
     eval_type_bound s t t' ->
-    step D F
+    step D F m
       (s, R) (ELet x (ELit n t) e)
       (s,  R)
-      (RExpr (ERet x (n,t') e))
+      (RExpr (ERet x (Some (n,t')) e))
 
-| SRetSome : forall s R s' R' x nb tb nb' tb' a' ta' e re,
-    Stack.MapsTo x (a',ta') s ->
-    Stack.MapsTo x (nb',tb') s' ->
-    step D F (Stack.add x (nb,tb) s, R) e (s',R') re ->
-    step D F
-      (s, R) (ERet x (nb,tb) e)
-      (Stack.add x (a',ta') s', R') (inject_ret x (nb',tb') re)
-| SRetNone : forall s R s' R' x nb tb nb' tb' e re,
-    ~ Stack.In x s ->
-    Stack.MapsTo x (nb',tb') s' ->
-    step D F (Stack.add x (nb,tb) s,R) e (s',R') re ->
-    step D F
-      (s, R)
-      (ERet x (nb,tb) e)
-      (Stack.remove x s', R') (inject_ret x (nb',tb') re)
-| SRetEnd : forall s R x n t nb tb,
-    step D F
-      (s, R)
-      (ERet x (nb,tb) (ELit n t)) (s,R) (RExpr (ELit n t))
-| SPlusChecked : forall s R n1 t1 n2,
+  | SRetSome : forall m s H x a ta n t, 
+          step D F m (s,H) (ERet x (Some (a,ta)) (ELit n t))
+                  ((Stack.add x (a,ta) s),H) (RExpr (ELit n t))
+
+  | SRetNone : forall m s H x n t, 
+          step D F m (s,H) (ERet x None (ELit n t))
+                  ((Stack.remove x s),H) (RExpr (ELit n t))
+
+| SPlusChecked : forall m s R n1 t1 n2,
     n1 > 0 -> is_check_array_ptr t1 ->
-    step D F
+    step D F m
       (s, R) (EPlus (ELit n1 t1) (ELit n2 TNat))
       (s, R) (RExpr (ELit (n1 + n2) (sub_type_bound t1 n2)))
-| SPlus : forall s R t1 n1 n2,
+| SPlus : forall m s R t1 n1 n2,
     ~ is_check_array_ptr t1 ->
-    step D F
+    step D F m
       (s, R) (EPlus (ELit n1 t1) (ELit n2 TNat))
       (s, R) (RExpr (ELit (n1 + n2) t1))
-| SPlusNull : forall s R n1 t n2,
+| SPlusNull : forall m s R n1 t n2,
     n1 <= 0 -> is_check_array_ptr t ->
-    step D F
+    step D F m
       (s, R) (EPlus (ELit n1 t) (ELit n2 (TNat)))
       (s, R) RNull
-| SCast : forall s R t n t' t'',
+| SCast : forall m s R t n t' t'',
     eval_type_bound s t t'' ->
-    step D F
+    step D F m
       (s, R) (ECast t (ELit n t'))
       (s, R) (RExpr (ELit n t''))
 
+(*
 | SCastNotArray : forall s R x y t l h w n m t',
     eval_type_bound s (TPtr m (TArray x y t)) (TPtr m (TArray (Num l) (Num h) w)) ->
     ~ is_array_ptr (TPtr m t') -> 
@@ -2885,38 +2847,35 @@ Inductive step
     h <= l ->
     step D F (s, R) (EDynCast t (ELit n t')) (s, R) RBounds
 
-| SDerefChecked : forall s H1 H2 n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr Checked t) t2 ->
-    Heap.MapsTo n (n1, t1) H1 ->
+*)
+
+| SDeref : forall m m' s H n n1 t1 t t2 tv,
+    m <> Unchecked -> mode_leq m' m -> snd (F m') <= n ->
+    eval_type_bound s (TPtr m' t) t2 ->
+    Heap.MapsTo n (n1, t1) (H m') ->
     (forall l h t',
         t2 = TPtr Checked (TArray (Num l) (Num h) t') -> l <= 0 < h) ->
     (forall l h t',
         t2 = TPtr Checked (TNTArray (Num l) (Num h) t') -> l <= 0 < h) ->
     @get_root D t2 tv ->
-    step D F
-      (s, (H1,H2)) (EDeref (ELit n (TPtr Checked t)))
-      (s, (H1,H2)) (RExpr (ELit n1 tv))
-| SDerefTainted : forall s H1 H2 n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr Tainted t) t2 ->
-    Heap.MapsTo n (n1, t1) H2 ->
-    well_typed_lit_tainted D F H2 empty_scope n1 t1 ->
+    step D F m
+      (s, H) (EDeref (ELit n (TPtr Checked t)))
+      (s, H) (RExpr (ELit n1 tv))
+| SDerefUnchecked : forall m s H n n1 t1 t t2 tv,
+    mode_leq m Unchecked -> snd (F m) <= n ->
+    eval_type_bound s (TPtr m t) t2 ->
+    Heap.MapsTo n (n1, t1) (H m) ->
     (forall l h t',
         t2 = TPtr Tainted (TArray (Num l) (Num h) t') -> l <= 0 < h) ->
     (forall l h t',
         t2 = TPtr Tainted (TNTArray (Num l) (Num h) t') -> l <= 0 < h) ->
     @get_root D t2 tv ->
-    step D F
-      (s, (H1,H2)) (EDeref (ELit n (TPtr Tainted t)))
-      (s, (H1,H2)) (RExpr (ELit n1 tv))
-| SDerefNone : forall s H1 H2 m n n1 t1 t t2 tv,
-    eval_type_bound s (TPtr m t) t2 -> m <> Unchecked ->
-    Heap.MapsTo n (n1, t1) H2 ->
-    @get_root D t2 tv ->
-    step D F
-      (s, (H1,H2)) (EDeref (ELit n (TPtr m t))) (s, (H1,H2)) RNull
-
+    step D F Unchecked
+      (s, H) (EDeref (ELit n (TPtr m t)))
+      (s, H) (RExpr (ELit n1 tv))
 (* Add two rules for when pm = None. *)
 
+(*
 | SDerefUnChecked : forall s H1 H2 m n n1 t1 t t2 tv,
     eval_type_bound s (TPtr m t) t2 ->
     Heap.MapsTo n (n1, t1) H2 ->
@@ -2938,29 +2897,27 @@ Inductive step
 | SDerefNull : forall s R t n,
     n <= 0 ->
     step D F (s, R) (EDeref (ELit n (TPtr Checked t))) (s, R) RNull
-| SAssignChecked : forall s H1 H2 n t na ta tv n1 t1 tv',
-    Heap.MapsTo n (na,ta) H1 ->
-    eval_type_bound s (TPtr Checked t) tv ->
+*)
+| SAssignChecked : forall m m' s H n t na ta tv n1 t1 tv',
+    m <> Unchecked -> mode_leq m' m -> snd (F m') <= n ->
+    Heap.MapsTo n (na,ta) (H m') ->
+    eval_type_bound s (TPtr m' t) tv ->
     (forall l h t',
         tv = TPtr Checked (TArray (Num l) (Num h) t') -> l <= n < h) ->
     (forall l h t',
         tv = TPtr Checked (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
     @get_root D tv tv' ->
-    step D F
-      (s, (H1,H2))  (EAssign (ELit n (TPtr Checked t)) (ELit n1 t1))
-      (s, (Heap.add n (n1, ta) H1, H2)) (RExpr (ELit n1 tv'))
-| SAssignTainted : forall s H1 H2 n t na ta tv n1 t1 tv',
-    Heap.MapsTo n (na,ta) H2 ->
-    well_typed_lit_tainted D F H2 empty_scope na ta ->
+    step D F m
+      (s, H)  (EAssign (ELit n (TPtr m' t)) (ELit n1 t1))
+      (s, update_mode_heap H m' n (n1, ta)) (RExpr (ELit n1 tv'))
+| SAssignUnchecked : forall m' s H n t na ta tv n1 t1 tv',
+    mode_leq m' Unchecked -> snd (F m') <= n ->
+    Heap.MapsTo n (na,ta) (H m') ->
     eval_type_bound s (TPtr Tainted t) tv ->
-    (forall l h t',
-        tv = TPtr Tainted (TArray (Num l) (Num h) t') -> l <= n < h) ->
-    (forall l h t',
-        tv = TPtr Tainted (TNTArray (Num l) (Num h) t') -> l <= n < h) ->
     @get_root D tv tv' ->
-    step D F
-      (s, (H1,H2))  (EAssign (ELit n (TPtr Tainted t)) (ELit n1 t1))
-      (s, (Heap.add n (n1, ta) H1,H2)) (RExpr (ELit n1 tv'))
+    step D F Unchecked
+      (s, H)  (EAssign (ELit n (TPtr Tainted t)) (ELit n1 t1))
+      (s, update_mode_heap H m' n (n1, ta)) (RExpr (ELit n1 tv'))
 (*
   | SAssignNone : forall s H1 H2 m n pm t na ta tv n1 t1 tv',
       Heap.MapsTo n (na,ta) H2 -> m <> Unchecked -> pm = None ->
@@ -2971,14 +2928,7 @@ Inductive step
          s (Heap.add n (n1, ta) H1,H2) RNull
  *)
 (* Add two rules for RNull / RBound SAssign. *)
-
-| SAssignUnChecked : forall s H1 H2 m n t na ta tv n1 t1 tv',
-    Heap.MapsTo n (na,ta) H2 -> m <> Checked ->
-    eval_type_bound s (TPtr m t) tv ->
-    @get_root D tv tv' ->
-    step D F
-      (s, (H1,H2))  (EAssign (ELit n (TPtr m t)) (ELit n1 t1))
-      (s, (H1,Heap.add n (n1, ta) H2)) (RExpr (ELit n1 tv'))
+(*
 | SAssignHighOOB : forall s R n t t' n1 t1 h,
      h <= n ->
     eval_type_bound s t t' ->
@@ -2998,6 +2948,7 @@ Inductive step
      eval_type_bound s t tv ->
      step D F
        (s, R) (EAssign (ELit n1 t) (ELit n t')) (s, R) RNull
+
 | SFieldAddrChecked : forall s R n t (fi : field) n0 t0 T fs i fi ti,
     n > 0 ->
     t = TPtr Checked (TStruct T) ->
@@ -3048,18 +2999,21 @@ Inductive step
     step D F
       (s, R) (EFieldAddr (ELit n t) fi)
       (s, R) (RExpr (ELit n0 t0))
-| SMallocChecked : forall s H1 H2 w w' H1' n1,
+*)
+| SMallocChecked : forall m m' s H w w' H1' n1,
+    m <> Unchecked -> 
     eval_type_bound s w w' -> malloc_bound w' ->
-    allocate D H1 w' = Some (n1, H1') ->
-    step D F
-      (s, (H1,H2)) (EMalloc Checked w)
-      (s, (H1',H2)) (RExpr (ELit n1 (TPtr Checked w')))
-| SMallocUnChecked : forall s H1 H2 m w w' H2' n1,
-    eval_type_bound s w w' -> malloc_bound w' -> m <> Checked ->
-    allocate D H2 w' = Some (n1, H2') ->
-    step D F
-      (s, (H1,H2)) (EMalloc m w)
-      (s, (H1, H2')) (RExpr (ELit n1 (TPtr m w')))
+    allocate D (H m') w' = Some (n1, H1') ->
+    step D F m
+      (s, H) (EMalloc Checked w)
+      (s, up_heap H m' H1') (RExpr (ELit n1 (TPtr Checked w')))
+| SMallocUnChecked : forall s H m w w' H1' n1,
+    eval_type_bound s w w' -> malloc_bound w' -> mode_leq m Unchecked ->
+    allocate D (H m) w' = Some (n1, H1') ->
+    step D F Unchecked
+      (s, H) (EMalloc m w)
+      (s, up_heap H m H1') (RExpr (ELit n1 (TPtr m w')))
+(*
 | SMallocHighOOB : forall s R m w t' h l,
     h <= l ->
     eval_type_bound s w t' ->
@@ -3095,6 +3049,7 @@ Inductive step
     step D F (s, R) (EDeref (ELit n t)) (s, R) (RExpr (ELit n1 t1)) ->
     n1 <> 0 -> (NTHit s x) ->
     step D F (s, R) (EIfDef x e1 e2) (add_nt_one s x, R) (RExpr e1)
+
 | SIfDefFalse : forall s R x n t e1 e2 t1,
     Stack.MapsTo x (n,t) s ->
     step D F (s, R) (EDeref (ELit n t)) (s, R) (RExpr (ELit 0 t1)) ->
@@ -3104,11 +3059,12 @@ Inductive step
     ~ is_rexpr r
     -> step D F (s, R) (EDeref (ELit n t)) (s, R) r
     -> step D F (s, R) (EIfDef x e1 e2) (s, R) r
-| SIfTrue : forall s R n t e1 e2,
+*)
+| SIfTrue : forall m s R n t e1 e2,
     n <> 0 ->
-    step D F (s, R) (EIf (ELit n t) e1 e2) (s, R) (RExpr e1)
-| SIfFalse : forall s R t e1 e2,
-    step D F
+    step D F m (s, R) (EIf (ELit n t) e1 e2) (s, R) (RExpr e1)
+| SIfFalse : forall m s R t e1 e2,
+    step D F m
       (s, R) (EIf (ELit 0 t) e1 e2)
       (s, R) (RExpr e2).
 (*
@@ -3541,8 +3497,7 @@ Fixpoint get_nat_vars (l : list (var * type)) : list var :=
 Definition fun_mode_eq (m1 m2 :mode) : Prop :=
    (m2 = Checked /\ m1 = Checked) \/ (m2 = Unchecked /\ (m1 <> Checked)).
 
-Definition mode_leq (m1 m2 :mode) : Prop :=
-   (m2 = Checked -> m1 <> Unchecked) /\ (m2 = Unchecked -> (m1 <> Checked)).
+
 
 (** [mode_comp m1 m2]: variable mode [m1] is compatible in region mode [m2]*)
 Inductive mode_comp : mode -> mode -> Prop :=
