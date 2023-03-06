@@ -1,0 +1,148 @@
+\section{Introduction}
+Vulnerabilities due to memory corruption, especially spatial memory corruptions, are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe} despite a large body of work that tries
+to prevent them~\cite{song2019sanitizing}.
+Vulnerabilities due to memory corruption, especially spatial memory corruptions, are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe} despite a large body of work that tries
+to prevent them~\cite{song2019sanitizing}.
+One way to handle this is to convert these programs into safe languages such as Java. However, it requires considerable development effort. Furthermore, the performance overhead prohibits them from being used in performance-critical settings such as Operating Systems.
+
+With the increased support for high-performant safe system languages such as Rust and Go, we can have tools that convert C to a memory-safe language, e.g., Rust, a promising memory-safe systems
+language~\cite{rustlang}. Unfortunately, Rust is too different from C to constitute a practical target~\cite{zeng2019identifying}, at least for now: the (best of breed) \texttt{c2rust} tool~\cite{c2rust,c2rusttalk} transliterates C to \emph{unsafe, non-idiomatic} Rust, and recent
+work~\cite{emre2021c2rust} is able to take only small steps to close the safety gap and still requires considerable work from developers.
+
+There are other retrofitting techniques such as CCured~\cite{necula2005ccured},
+Softbound~\cite{nagarakatte2009softbound}, Low Fat
+pointers~\cite{duck2016heap}, and Address Sanitizer
+(ASAN)~\cite{serebryany2012addresssanitizer} aim to enforce spatial safety
+automatically~\emph{without any developer effort}, by analyzing a C program and compiling it to include
+run-time safety checks. Unfortunately, the resulting run-time overhead is too high
+for deployment (between 60\%-200\%), especially in low-powered IoT devices where the usage of C-based system software (e.g., FreeRTOS) is still rampant.
+~\fig{fig:memprotections} shows the summary of these existing approaches.
+
+\input{figures/existingmem}
+
+\emph{Checked C}~\cite{tarditi2018checked} as a
+practical target to which to convert legacy/active C code. 
+Checked C
+extends C with \emph{checked pointer
+  types} which are restricted by the compiler to spatially safe uses (temporal safety is underway~\cite{checkedc:temporal}).
+Such pointers have one of three possible types, \ptrT{T}, \arrT{T},
+or~\ntarrT{T} (\ptr, \arr, and \ntarr{} for short), representing a
+pointer to a single element, array of elements, or null-terminated
+array of elements of type $T$, respectively. The latter two have an
+associated \emph{bounds annotation}; e.g., a declaration \arrT{int}
+\code{p} : \code{count(n)} says that \code{p} is a pointer to an \code{int} array
+whose size is \code{n}.
+%
+Checked C's Clang/LLVM-based compiler represents checked
+pointers as system-level memory words, i.e., without
+``fattening'' metadata, ensuring backward compatibility.
+The compiler uses these bounds annotations to add dynamic checks prior to
+checked pointer accesses, to prevent spatial safety violations.
+These run-time checks can often be proved redundant and removed by LLVM, yielding good performance.
+%, and leverages LLVM to optimize away run-time
+%checks, yielding good performance.
+%
+Tarditi et al.~\cite{tarditi2018checked} reported average
+run-time overheads of 8.6\% on a small benchmark suite, and
+\cite{duanrefactoring} found essentially no overhead when running
+Checked C-converted portions of the FreeBSD kernel.
+
+However, converting existing C programs to Checked C requires considerable effort~\cite{duanrefactoring}. 
+Recently, Machiry et al. developed 3C~\cite{machiry2022c} that tries to automatically convert a program to Checked C by adding appropriate pointer annotations.
+However, as described in 3C, complete automated conversion is infeasible and consequently requires the developer to convert some code regions manually.
+Thanks to the backward compatibility of Checked C, the partially annotated program still enjoys the benefits of spatial memory safety on those regions using only Checked pointers (i.e., checked or safe regions).
+But, the unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+%
+Although the blameless proof exists~\cite{ruef2019achieving}, it does not state that spatial safety violations cannot happen in Checked regions but rather states that Checked regions~\emph{cannot be blamed for any spatial safety violations}.
+For instance, a checked function expects a pointer to a buffer of five elements, but an unchecked region can call this function with a pointer to a buffer of three elements. This results in a spatial safety violation in the Checked region, but of course, the blame or the root cause is in the unchecked region.
+Furthermore, since checked and unchecked regions execute in the same address space, spatial memory corruptions in unchecked regions can take down the complete program despite having checked regions.
+We need an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions.
+Such an isolation mechanism should have low/no overhead and be backward compatible (i.e., pointers should have no additional metadata), preserving the advantages of Checked C.
+
+In this work, we propose~\systemname, an isolation mechanism that enables unchecked regions or, in general, any arbitrary set of functions to be executed in an isolated address space (\ucregion).
+So that checked regions can still enjoy true spatial memory safety even in the presence of unchecked or unsafe regions.
+\systemname extends Checked c using~\textbf{tainted} (\taintt) types, representing the code and data that belong to the~\ucregion.
+
+\noindent
+\textbf{Automated Partitioning.} A pointer (checked or unchecked) can be marked as tainted; similarly, a function can be marked as tainted.
+Along with enforcing spatial safety constraints of checked tainted pointers, the~\systemname compiler will bundle all the tainted types (functions and pointers) so that they remain in an isolated sandbox (\ucregion), and non-tainted types will remain in the process address space (\cregion).
+
+\noindent
+\textbf{Memory Access Restrictions.} The functions in the~\ucregion can only access tainted pointers, i.e., memory within the corresponding sandbox region.
+However, the functions in~\cregion have no-such restrictions and can access both c- and uc-region's memory.
+Similarly, the functions in~\cregion can invoke any function in~\ucregion but not the other way around, except for call-back functions, which we will discuss later.
+
+\noindent
+\textbf{Marshaling free communication.} As functions in the~\ucregion can only access tainted types,~\cregion functions should use tainted types to pass pointer arguments to~\ucregion functions. 
+We avoid marshaling as all tainted buffers (i.e., regions pointed by tainted pointers) are allocated in~\ucregion and thus can be accessed in both c- and uc-region.
+
+\noindent
+\textbf{Additional checks.} Although memory isolation prevents direct violations,~\ucregion code can still affect~\cregion through tainted pointers by confused deputy attacks.
+However, our compiler avoids these attacks by ensuring, either statically or through dynamic checks, that tainted pointers in~\cregion can only point to~\ucregion address space, and our type system enforces that tainted pointers cannot be assigned to non-tainted pointers.
+
+\iffalse
+Recently, Narayan et al. proposed RLBox, which enables sandboxing libraries by making data- and control-flow at the sandbox interface explicit, using types.
+Specifically, RLBox defines a tainted type (\code{tainted<...>}), which is a C++ template class and can be used to have any type tainted (e.g.,~\code{tainted<int>},~\code{tainted<float*>}, etc).
+The tainted types represent values or pointers to buffers that can be accessed from a sandbox.
+The program or unsandboxed code can use only tainted type variables to communicate (i.e., parameters and return values) with sandboxed functions.
+Although RLBox provides a practical technique for sandboxing libraries, it has the following drawbacks:
+\begin{itemize}
+\item\textbf{Marshalling Cost.} Any non-scalar value (e.g., a pointer to a struct) that need to be passed to a sandboxed function should be first copied into a tainted buffer (\emph{marshalling}). Then the corresponding tainted value (i.e., tainted pointer) should be passed to the sandboxed function.
+This can lead to considerable overhead for large objects.
+\item\textbf{Developer Written Sanitization.} The unsandboxed code can access tainted type variables only through certain special (i.e., sanitization) routines.
+This forces developers to sanitize every value that comes from sandboxed library functions.
+However, the correctness of the sanitization is entrusted to the developer.
+Consequently, any mistake in sanitization methods can still lead to vulnerabilities.
+\item\textbf{Library Level Sandboxing.} The unit of sandboxing in RLBox is the whole library. However, we want to sandbox a set of functions in a program.
+\end{itemize}
+\fi
+
+% How to highlighgt code in minted
+% highlightlines={1-3}, highlightcolor=red
+\ignore{
+\begin{listing}[t!]
+  \begin{tabular}{c c}
+    \begin{minipage}[b]{.22\textwidth}
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/orig1.c}
+    \end{minipage} &
+    \begin{minipage}[b]{.22\textwidth}
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/orig2.c}
+    \end{minipage} \\
+   (a) Original C code & (b) After initial conversion.\\
+  \end{tabular}
+\caption{(Contrived) Example demonstrating various phases of.}
+\label{lst:comb}
+\end{listing}
+
+\begin{listing}[t!]
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/firstrun.c}
+\caption{(Contrived) Example demonstrating various phases of.}
+\label{lst:initialconv}
+\end{listing}
+
+\begin{listing}[t!]
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/humanannotations.c}
+\caption{(Contrived) Example demonstrating various phases of.}
+\label{lst:humantaint}
+\end{listing}
+
+\begin{listing}[t!]
+\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/humanadjustments.c}
+\caption{(Contrived) Example demonstrating various phases of.}
+\label{lst:humanadjust}
+\end{listing}
+}
+
+
+
+
+%\input{figures/taintedsplit}
+
+
+
+
+%\begin{listing*}[t!]
+%\inputminted[linenos, mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/originalprogram.c}
+%\caption{Simple server example.}
+%\label{lst:comb}
+%\end{listing*}

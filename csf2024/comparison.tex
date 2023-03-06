@@ -1,0 +1,238 @@
+\section{Related Work}
+\label{sec:related}
+
+%Our work is most closely related to prior formalizations of C(-like)
+%languages and program partitioning mechanism 
+%that aim at enforcing memory safety.
+A number of prior works have looked at formalizing the semantics of C,
+including CompCert~\cite{Blazy2009,leroy:hal-00703441},
+\citet{ellison-rosu-2012-popl}, \citet{Kang:2015:FCM:2813885.2738005},
+and \citet{10.1145/2980983.2908081, Memarian:2019:ECS:3302515.3290380},
+but they are not directly concerned with enforcing
+spatial safety.
+
+\myparagraph{Spatially Safe C Formalizations}
+%
+Several prior works~\cite{li22checkedc} formalize C-language transformations or C-language
+dialects aiming to ensure spatial safety.
+The difference between these works and \systemname is presented in \Cref{sec:intros,sec:overview}.
+%
+\citet{10.1145/2813885.2737979} extended the formalization
+of \citet{ellison-rosu-2012-popl} to produce a semantics that detects
+violations of spatial safety (and other forms of undefinedness) 
+by focusing on bug finding, not compiling programs to use this semantics.
+
+CCured~\cite{Necula2005} and Softbound~\cite{softbound} implement
+spatially safe semantics for normal C via program transformation. Like
+\lang, both systems' operational semantics annotate pointers with
+their bounds. CCured's equivalent of array pointers are compiled to be
+``fat,'' while SoftBound compiles bounds metadata to a separate
+hashtable, thus retaining binary compatibility at higher checking
+cost. \systemname uses static type information to enable bounds checks
+without need of pointer-attached metadata.
+Cyclone \cite{Jim2002,GrossmanMJHWC02} is a C dialect that aims to
+ensure memory safety; its pointer types are similar to
+CCured and its formalization~\cite{GrossmanMJHWC02} focuses on ensuring temporal safety. 
+Deputy~\cite{Feng2006,Condit2007}
+is another safe-C dialect that aims to avoid fat pointers,
+with its formalization~\cite{Condit2007} defines its
+semantics directly in terms of compilation.
+None of the above work touches program partitioning and sandbox mechanism. 
+
+%The most closely related work is the
+%implementation and formalization of \checkedc done by \citet{checkedc}, \citet{machiry2022c}, %\citet{ruef18checkedc-incr} and \citet{li22checkedc}.
+%The difference between these works and \systemname is listed in \Cref{sec:intros,sec:overview}.
+
+\myparagraph{Program Partitioning Mechanism}
+%
+The unchecked and checked code region separation in \systemname represents an isolation mechanism to ensure that code executed as part of unchecked regions does not violate the safety guarantees in checked regions,
+which is typically called program partitioning~\cite{rul2009towards}, and there has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area. Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning. E.g., Given sensitive data in a program, the goal is to partition functions into two parts or partitions based on whether a function can access the sensitive data.
+The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
+The overhead of state-of-the-art approaches~\cite{lind2017glamdring, liu2017ptrsplit} is prohibitive and varies from 37\%-163\%.
+%
+RLBox~\cite{rlbox-paper}, merged a type checker with a sandbox mechanism to better achieve the programming partitioning mechanism.
+They allow tainted pointers to be shared among different code regions. 
+However, the RLBox type system is primarily based on C++ templates, making it hard or impossible to apply directly to C programs.
+Furthermore, their technique has no formal guarantees and can only isolate complete libraries instead of arbitrary functions.
+\systemname is a generic formally verified system that enables partitioning arbitrary functions with stronger guarantees.
+
+%\citet{rlbox-paper}, a.k.a RLBox, merged a type checker with a sandbox mechanism to better achieve the programming partitioning hechanism.
+%They allow tainted pointers to be shared among different code regions. There are several differences between their work with \systemname.
+%
+%\begin{itemize}
+%\item There is no RLBox formalism.
+%\item RLBox implements program partition without spatial safety guarantee, while \systemname provides the non-crashing guarantee.
+%\item RLBox's type system is based on C++ templates, which might contain potential unknown faulty.
+%\item RLBox only provides program partition for third party library functions, while \systemname can context-switch between checked and unchecked code regions for arbitrary functions.
+%\item RLBox has no non-exposure guarantee, a checked pointer might leak its pointer address in a untrust third party library function, while \systemname ensures that checked pointers cannot be leaked to unchecked code regions.
+%\end{itemize}
+
+% \item Lee \textsf{et al.} \cite{Lee:2017:TUB:3140587.3062343} proposed
+%   a math model for defining some undefinedness in LLVM. Mainly,  they
+%   provided a model in C to support the
+%   $\mathtt{inttoptr}$/$\mathtt{ptrtoint}$ casting operations and
+%   enabled the correctness proofs of many LLVM optimizations that rely
+%   on certain memory provenance model features that the previous
+%   CompCert model is not able to provide. \mwh{not related}
+% \item CompCert is a verified
+%   compiler for C. They do not have a type system for spatial safety. 
+% \item Kang \textsf{et al.} \cite{Kang:2015:FCM:2813885.2738005} proposes a C memory model that supports integer-pointer casts.
+% \item Ellison and Rosu \cite{ellison-rosu-2012-popl} defined a relatively complete C semantics with a simplified version of CompCert's model. They mainly focus on defining single-threaded front-end syntatic semantics.
+
+
+% \begin{itemize}
+% \item Lee \textsf{et al.} proposed a novel LLVM memory model including a data layout and memory pointer provenance model \cite{Lee:2018:RHO:3288538.3276495}. This model proposes an algorithm to guarantee the pointer provenance property in a high-level math model. Unlike our Check-C model, they do not have a concrete plan to apply spatial safety for the whole system. 
+% % \item Memarian \textsf{et al.} \cite{Memarian:2019:ECS:3302515.3290380} provided two pointer provenance models for C/C++ languages and reconciled the ISO C standard. Similar to Lee \textsf{et al.}'s work, Memarian \textsf{et al.} focused on creating better pointer provenance models for C instead of investigating different C instruction behaviors through a concrete abstract machine. Without great effort, it is unclear how to build an abstract machine to support all LLVM IR instructions based on their model.
+% \item Li \textsf{et al.} proposes a relatively complete semantics of LLVM \cite{DBLP:conf/ictac/LiG21}. The semantics focuses on defining a complete single-threaded/multi-threaded executable semantics of LLVM based on designing an abstract machine.
+% % \item Memarian \textsf{et al.} \cite{10.1145/2980983.2908081} proposes a de Facto model for C to define some undefinedness in C in a relatively small math model.
+%  \item Hathhorn \textsf{et al.} \cite{10.1145/2813885.2737979} identifies undefined behaviors in C and come up with a semantics to reject undefined programs.
+% % \item Softbound \cite{10.1145/1543135.1542504} proposes a static type checking system for guaranteeing spatial safety, but they do not have a formal framework. They do not deal with null-terminated pointers.
+% % \item CETS \cite{10.1145/1837855.1806657} is a static analysis tool for guaranteeing temporal safety, and they have formally defined their operational semantics and proved that the framework works for guaranteeing temporal safety, but not for spatial safety.
+% \end{itemize}
+
+% \myparagraph{Formal Language Design}
+%  
+% \mwh{TODO: lambdaJS, other stuff that does randomized testing? Maybe
+%   not much to say here. No more than 1 para}
+
+% systems attempt to overcome the limitations of
+% fat pointers by storing the bounds information in a separate metadata
+% space~\cite{Nagarakatte2009,mpx} or within unused bits in 64-bit
+% pointers~\cite{Kwon:2013:LPC:2508859.2516713} (though this approach is
+% unsound~\cite{gil18hole}). These approaches can add substantial
+% overhead; e.g., Softbound's overhead for spatial safety checking is
+% 67\%.
+ 
+% \myparagraph{Security mitigations}
+% There are extensive researches toward addressing the lack of spatial memory safety in C/C++ automatically.
+% One approach is to attempt to prevent an attacker from exploiting a memory vulnerability.
+% Approaches deployed in practice include stack canaries
+% \cite{Steffen1992}, address space layout randomization (ASLR)
+% \cite{PaX2003}, data-execution prevention (DEP), and control-flow
+% integrity (CFI) \cite{Abadi2005}.
+% Purify~\cite{Hastings1992} is a software allowing users to detect potential memory leaks and errors.
+% These defenses have led to an escalating
+% series of measures and counter-measures by attackers and defenders
+% \cite{Szekeres:2013:SEW:2497621.2498101}. These approaches do not
+% prevent data modification or data disclosure attacks, and they can be
+% defeated by determined attackers who use those attacks. By contrast,
+% enforcing spatial memory safety in the semantics level avoids these issues. 
+
+% \myparagraph{Migratory Typing}
+% %
+% Checked C is closely related to work supporting migratory
+% typing~\cite{tobinhochstadt_et_al:LIPIcs:2017:7120} (aka gradual 
+% typing~\cite{siek06}). In this scheme, 
+% portions of a program for a dynamically typed language
+% can be annotated with static
+% types. For Checked C, legacy C in the \code{unchecked} blocks
+% plays the role of the dynamically typed
+% language and checked regions play the role of statically typed
+% portions. In migratory typing, one typically proves that a fully
+% annotated program is statically type-safe.
+% Mixed programs are given a semantics that checks static types at boundary
+% crossings~\cite{matthews07}, e.g., calling a statically typed
+% function from dynamically typed code might induce a dynamic check, where
+% the passed-in argument has the specified type. When a function is
+% passed as an argument, this check must be deferred until the function
+% is called. The delay prompted research on proving the blame theorem: Even
+% if a failure were to occur within static code, it could be blamed on
+% bogus values provided by dynamic code~\cite{wadler09}. 
+% This semantics is, however, slow~\cite{Takikawa:2016:SGT:2837614.2837630}, so many
+% languages opt for what \citet{Greenman:2018:STS:3243631.3236766} term the
+% \textbf{erasure semantics}: No checks are added and no notion of blame
+% is proved, i.e., failures in statically typed code are not formally
+% connected to errors in dynamic code. \checkedc also has erasure
+% semantics, but Theorem~\ref{thm:blame} is able to lay the blame theorem with the
+% code in \code{unchecked} blocks.
+
+% \myparagraph{Rust}
+% %
+% Rust~\cite{Matsakis:2014:RL:2663171.2663188} is a programming
+% language, like C, that supports zero-cost abstractions, but like
+% \checkedc, aims to be safe. Rust programs may have designated
+% \textbf{unsafe} blocks in which certain rules are relaxed, potentially
+% allowing run-time failures. 
+% There are two major differences between \checkedc and Rust/RustBelt~\cite{Jung:2017:RSF:3177123.3158154}.
+% The obvious difference is that RustBelt does not have the formal semantics for many operations that \checkedc supports,
+% such as the operations for null-terminated pointers and dependent functions.
+% In addition, they do not have a subtyping system, like the \checkedc one, so that Rust/RustBelt do not allow many programs that \checkedc allows, such as the example programs in Sec.~\ref{sec:overview}.
+
+% The less obvious difference is related to the unsafe code.
+% As with \checkedc, the question is how to
+% reason about the safety of a program that contains any amount of
+% unsafe code. The RustBelt project~\cite{Jung:2017:RSF:3177123.3158154}
+% proposes to use a semantic~\cite{milner78polymorphism}, rather than
+% syntactic~\cite{wright94syntactic}, account of soundness, in which (1)
+% types are given meaning according to what terms inhabit them; (2) type
+% rules are sound when interpreted semantically; and (3) semantic well
+% typing implies safe execution. With this approach, unsafe code can be
+% (manually) proved to inhabit the semantic interpretation of its type, in which case
+% its use by type-checked code will be safe.
+% \checkedc can be viewed as complementary to that of RustBelt, perhaps
+% constituting the first step in mixed-language safety assurance. In
+% particular, we employ a simple, syntactic proof that checked code is
+% safe and unchecked code can always be blamed for a failure---no proof
+% about any particular unsafe code is required. Stronger assurance that
+% programs are safe despite using mixed code could employ the (more involved
+% and labor-intensive) RustBelt approach. 
+
+% \ignore{
+
+
+% Other work that might be relavent but for guaranteeing temporal safety, I have recorded some of them in the related work if they are relavent to spatial safety, but I might missed some.
+
+% Purify operates on binaries, but only ensures the safety of heap-allocated objects.
+
+% Safe C ensures complete temporal safety by using fat-pointers.
+
+% MSCC uses a fat-pointer approach for handling the spatial and temporal safeties regarding stack/heap pointers. According to the experiment in MSCC, it is supposed to be faster than CCured, but it seems that they are in the same level or CCured might be faster in some cases according to.
+
+% Fail-Safe C is an updated version of Safe C, and it maintains complete compatibility with ANSI C but incurs significant runtime overhead.
+
+% Cyclone is a new dialect designed to minimise the changes required to port over C programs. Cyclone’s region-based memory management system provides a foundation for solving the temporal safety issues for stack pointers in Checked-C. The only difference between the Cyclone’s region-based system and the Checked-C will be time when dangling pointers cause errors. Dangling pointers should be banned at the time when they are used to access memory. If a program contains a function call with a stack pointer that is created and returned to the upper level function call and it is never used to access memory, the program should be considered as valid. 
+
+
+% Here are several ideas of using metadata instead of fat-pointers, I (Liyi) think they are basically another form of fat-pointer approaches:
+
+% Patil and Fischer address the spatial and temporal safeties by maintaining disjoint metadata and performing checks in a separate “shadow process,” but this requires an additional CPU.
+
+% MemSafe provides a framework for checking spatial and temporal memory safety at runtime. 
+% Their work is based on transferring an original C program to an updated CFG-based program with extra metadata. These metadata has similar functionality as fat pointer and there are extra
+% checks allowing them to place extra checks during the program execution. For each pointer, the updated CFG stores information about all possible values of the pointer through possible aliasing. The efficiency of MemSafe can be as effective as CCured.
+
+% Write integrity testing -- similar to regional memory management. The so-called colored memory space is essentially giving regional flags to different pointers, and then check if these pointers have potential security threats.
+
+% The following approaches require hardware support:
+
+% Clause et al. describe an efficient technique for detecting memory errors, but it requires custom hardware.
+
+% Dhurjati and Adve describe a technique based on the Electric Fence [11] malloc debugger: Their system assigns a unique virtual page to every dynamically allocated object and relies on hardware page protection to detect dangling pointer dereferences.
+
+
+% There are also few static approaches to the temporal safety in C. However, they are not complete and a lot of them are not even sound. There are four kinds of static approach methods: model checking, abstract interpretation, pattern matching, and pointer analysis. 
+
+% Model Checking. CBMC is a bounded model checker that reasons about all the program paths for C/C++ programs as constraints that can be solved by an SMT solver. When used in finding UAF bugs, CBMC is sound (in a bounded manner) and highly precise but scales only to small programs whose “sizes are restricted” (according to its user manual).
+
+% Thomas Ball and Sriram K. Rajamani developed a model checking framework (C2bp) for checking Temporal Safety Properties in C. The framework allows pointer analysis by using a pointer aliasing algorithm. The problem is that it only deals with small programs, and the pointer aliasing algorithm only detects a small part of aliasing pointers.
+
+% MOPS (MOdel checking Program for Security Properties) makes use of the model checking technique to check for violation of security rules, that are defined as temporal safety properties. As for program representation, MOPS models the program in the form of Push Down Automaton (PDA), that contains all the possible execution paths. Push Down Automata are used as tools to analyze procedural sequential programs, and more specifically those having recursive procedures. As for automata, they are according to Schneider used in the objective of specifying security policies that can be enforced by mechanisms. MOPS makes use of this approach to model security properties in the form of Finite State Automata (FSA), that dictate the order of security-relevant operations sequence. The modularity of security properties was also proposed by MOPS; this approach allows the decomposition of complex security properties into simpler and reusable basic security properties that are easy to model and to extend (such as role based access). MOPS verifies that the security properties are properly respected in all the execution paths of the analyzed program, making use of the model checking on the PDA, and checks if risky states are reachable within the PDA. MOPS does not know that a pointer is an alias of another, so the property is not sound for this program.
+
+% Abstract Interpretation. Clang Static Analyzer is an abstract interpreter for analyzing C/C++ programs. It adopts a highly unsound model by analyzing only a small subset of the program paths in order to achieve scalability and precision. To scale for large codebases with few false alarms, Clang limits its UAF-bug-finding ability by performing an intraprocedural analysis (with inlining). In general, such tools refrain from reporting too many false alarms, but at the expense of missing many UAF bugs.
+
+% Pattern Matching. Coccinelle is a pattern-based tool for analyzing and certifying C programs. Coccinelle can find UAF bugs based on some patterns given. Due to the lack of the points-to information, Coccinelle can be both fairly unsound and imprecise but is highly scalable (due to its pattern-matching nature).
+
+% Pointer Analysis. Supa is a state-of-the-art demand-driven pointer analysis that is field-, flow- and context-sensitive but path- insensitive for C programs. When used in finding UAF bugs, Supa can be regarded as reasoning about all the program paths with an extremely coarse abstraction, in order to achieve soundness and scalability.
+
+% Yan et al. develops a Spatio-Temporal context reduction technique for  doing pointer-analysis for detecting use-after-free vulnerabilities, which are essentially temporal safety. They mainly focus on the heap pointer allocation-free detection to  check if a pointer is used after the free function call for the memory field the pointer points to. The technique is based on static analysis. The main idea is still based on intraprocedural control flow analysis. It relies on context sensitive reduction technique to reduce the search function calling path spaces for analyzing pointer aliasing.  The context sensitivity and their pointer analysis algorithm is applied in a state-of-the-art manner. The information for the algorithm of search pointer aliasing reduces the calling context path, while the context path information enhances the efficiency of the algorithm.  However, the technique is not complete. It will ban a large number of valid C programs due to false use-after-free vulnerabilities.
+
+% It seems that they might not detect the use-after-free error in this case. In addition, the work does not handle stack pointer use-after-free vulnerabilities.
+
+% ASAP: As Static As Possible memory management -- use data flow analysis, garbage collection and region memory management tools to ensure the security safety of C programs by static analysis. In order to guarantee the use-after-free, it requires the program written in a special way: in a linearly typed program, each value must be used exactly once. It does not include examples of dealing with stack pointers. It shows that in a pointer management world, a C program temporal safety cannot be fully analyzed by only static analysis.
+
+% Jia-Ju Bai et al. develops a static method to detect use-after-free bugs in Linux device drivers. It is a UAF bug in the concurrent system. The basic algorithm is simple. It first goes through each single-threaded code to collect a read/write set storing point-to information. The information collection is through traditional intraprocedural CFG analysis. Then, it uses a trace analysis tool to discover UAF bugs. This is achievable only in dealing with linux device drivers, since usually, these drivers are simple and the concurrency is very formulated.  I believe if we apply the same process in dealing with C, the method will not be sound.
+
+% Industrial tools:
+
+% There are also some industrial level tools for static checking bugs in C. However, they are either not able to check UAF bugs or they only use heuristics to check very small sets of UAF bugs. They include CppCheck, Clang Core, Clang Alpha, CodeSonar, Facebook Infer,  Splint standard, Splint weak. For example, CodeSonar state-based checkers do not check temporal safety. They require insertion of extra code in order for the tool to check if a supposed deadcode will be reached or not. Coverity is a dataflow analysis tool that relies on inter-procedural analysis techniques. The analysis is neither sound nor complete, that is, there may be both defects which are not reported and there may be false alarms. Coverity Prevent implements an incremental analysis which means that the system automatically infers what parts of the source code that have to be re-analyzed after the code has been modified. This typically reduces the analysis time substantially, but may of course imply a complete re-analysis in the worst case. Klocwork does similar things to Coverity and Coverity Prevent.
+% }

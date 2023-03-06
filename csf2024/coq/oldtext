@@ -1,0 +1,3663 @@
+
+(*
+Lemma heapWArg :
+  forall D S H H' env e t,
+    well_typed_arg D S H env e t ->
+    @heap_consistent D H' H ->
+    well_typed_arg D S H' env e t.
+Proof.
+  intros D S H H' env es tvl WT HC.
+  induction WT; intros; eauto.
+  eapply ArgLit.
+  assumption.
+  unfold heap_consistent in HC.
+  inv H1. econstructor. apply H4.
+  apply HC. assumption.
+  apply H2. assumption.
+  eapply ArgVar.
+  apply H0. apply H1. apply H2. assumption.
+Qed.
+
+Lemma heapWArgs :
+  forall D S H H' env es tvl,
+    well_typed_args D H S env es tvl ->
+    @heap_consistent D H' H ->
+    well_typed_args D H' S env es tvl.
+Proof.
+  intros D S H H' env es tvl WT HC.
+  induction WT; intros; eauto.
+  apply args_empty.
+  eapply args_many.
+  assumption. eapply heapWArg.
+  apply H1. assumption.
+  apply H2. assumption.
+Qed.  
+
+Lemma heapWF :
+  forall D F S H H' env m e t,
+    @well_typed D F S H env m e t ->
+    @heap_consistent D H' H ->
+    @well_typed D F S H' env m e t.
+Proof.
+  intros D F S H H' env m e t WT HC.
+  induction WT; intros; eauto.
+  apply TyLit.
+  assumption.
+  unfold heap_consistent in HC.
+  inv H1. econstructor. apply H2.
+  apply HC. assumption.
+  eapply TyCall.
+  apply H0.
+  eapply heapWArgs.
+  apply H1. assumption. apply H2. apply H3.
+Qed.  
+
+Hint Resolve heapWF : Preservation.
+
+Lemma length_nth : forall {A} (l : list A) (k : nat),
+    0 <= Z.of_nat(k) < Z.of_nat(length l) -> exists n, nth_error l k = Some n.
+Proof.
+  intros A l; induction l; intros k Hyp; simpl in *.
+  - lia.
+  - destruct k; simpl.
+    + exists a; eauto.
+    + assert (H: 0 <= Z.of_nat(k) < Z.of_nat(S k)). {split.
+      *lia. 
+      *zify. lia. }
+     destruct H. assert (H2: Z.of_nat(k) < Z.of_nat (length l)). {zify. lia. }
+     assert (H3: 0 <= Z.of_nat(k) < Z.of_nat (length l)). {split; assumption. }
+     apply (IHl k H3).
+Qed.      
+
+Lemma nth_length : forall {A} (l : list A) (k : nat) n,
+    nth_error l k = Some n -> 0 <= Z.of_nat(k) < Z.of_nat(length l).
+Proof.
+  intros A l; induction l; intros k n Hyp; simpl in *.
+  - apply nth_error_In in Hyp; inv Hyp.
+  - destruct k; simpl in *.
+    +zify. lia.
+    + edestruct IHl; eauto. zify.
+      lia.
+Qed.
+
+Require Import Coq.Program.Equality.
+  
+Lemma heap_wf_maps_nonzero : forall D H n v, heap_wf D H -> Heap.MapsTo n v H -> n <> 0.
+Proof.
+  intros D H n v Hwf HMap.
+  destruct (Hwf n) as [ _ HIn ]. 
+  destruct n; eauto.
+    -exfalso. destruct HIn; try eexists; eauto; 
+     inversion H0.
+    -zify. lia.
+    -zify. lia.
+Qed.
+
+Lemma cardinal_not_in :
+  forall D H, heap_wf D H -> ~ Heap.In (Z.of_nat(Heap.cardinal H) + 1) H.
+Proof.
+  intros D H Hwf Contra.
+  destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [H1 H2].
+  specialize (H2 Contra).
+  lia.
+Qed.
+
+
+Lemma well_typed_preserved : forall D H t, heap_wf D H ->
+  @heap_consistent D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, t) H) H.
+Proof.
+  intros D H t0 Hwf n t HT.
+  induction HT using well_typed_lit_ind'; pose proof (cardinal_not_in D H Hwf); eauto.
+  eapply TyLitC; eauto.
+  intros k HK.  
+  destruct (H1 k HK) as [n' [t' [HNth [HMap HWT]]]].
+  exists n'. exists t'.
+  repeat split; eauto.
+  + apply Heap.add_2; eauto.
+    destruct (Hwf (n+k)) as [ _ HIn ].
+    destruct HIn; try eexists; eauto.
+    lia.
+  + inv HWT; eauto.
+Qed.
+
+
+  
+Lemma heap_add_preserves_wf : forall D H n v, heap_wf D H ->
+  heap_wf D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (n, v) H).
+Proof.
+  intros D H n v Hwf.
+  split; intros; simpl; eauto.
+  * rewrite cardinal_plus_one in H0.
+    - assert (Hyp: 0 < addr <= Z.of_nat(Heap.cardinal H) \/ addr = Z.of_nat(Heap.cardinal H) + 1). {zify. lia. } 
+      inv Hyp.
+      + destruct (Hwf addr) as [ HIn _ ].
+        specialize (HIn H1).
+        inv HIn. exists x.
+        apply Heap.add_2; eauto.
+        lia.
+      + eexists; eapply Heap.add_1; eauto.
+    - intros Contra.
+      destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [? ?].
+      specialize (H2 Contra).
+      lia.
+  * apply HeapFacts.add_in_iff in H0.
+    inv H0.
+    - rewrite cardinal_plus_one; try (zify; lia).
+      intro Contra.
+      destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [? ?].
+      specialize (H1 Contra).
+      lia.
+    - rewrite cardinal_plus_one.
+      + destruct (Hwf addr) as [_ H2]; specialize (H2 H1); zify; lia.
+      + intro Contra.
+        destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [H2 H3].
+        specialize (H3 Contra).
+        lia.
+Qed.
+
+Lemma backwards_consistency :
+  forall D H' H v,
+    @heap_consistent D H' (Heap.add (Z.of_nat(Heap.cardinal H) + 1) v H) ->
+    heap_wf D H ->
+    @heap_consistent D H' H.
+Proof.
+  intros D H' H v HC Hwf.
+  intros n t HWT.
+  eapply HC; eauto.
+  induction HWT using well_typed_lit_ind'; pose proof (cardinal_not_in D H Hwf); eauto.
+  eapply TyLitC; eauto.
+  intros k HK.
+  destruct (H1 k HK) as [n' [t' [HN [HM HW]]]].
+  exists n'. exists t'.
+  repeat split; eauto.
+  - apply Heap.add_2; eauto.
+    intro Contra.
+    destruct (Hwf (n + k)) as [ _ Hyp ].
+    destruct Hyp; [eexists; eauto | lia].
+  - inv HW; eauto.
+Qed.
+      
+Lemma fold_preserves_consistency : forall l D H ptr, heap_wf D H ->
+  let (_, H') :=
+      fold_left
+        (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+        l
+        (Z.of_nat(Heap.cardinal H), H) in
+  Some ((Z.of_nat(Heap.cardinal H) + 1), H') = Some (ptr, H') ->
+  @heap_consistent D H' H.
+Proof.
+  intro l; induction l; intros; simpl; eauto.
+  assert (Hwf : heap_wf D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H))
+    by (apply heap_add_preserves_wf; auto).
+  specialize (IHl D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H) (ptr + 1) Hwf).
+  remember (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H) as H1.
+
+  
+  Set Printing All.
+  remember ((fun (acc : prod Z heap) (t : type) =>
+             match acc return (prod Z heap) with
+             | pair sizeAcc heapAcc =>
+                 @pair Z (Heap.t (prod Z type)) (sizeAcc + 1)
+                   (@Heap.add (prod Z type) (sizeAcc + 1) 
+                      (@pair Z type 0 t) heapAcc)
+             end)) as fold_fun.
+  Unset Printing All.
+  clear Heqfold_fun. 
+  assert (Z.of_nat(Heap.cardinal H1) = (Z.of_nat(Heap.cardinal H) + 1)).
+  {
+    subst; apply cardinal_plus_one; eauto.
+    intro Contra. 
+    destruct (H0 (Z.of_nat(Heap.cardinal H) + 1)) as [H1 H2].
+    specialize (H2 Contra).
+    lia.
+  } 
+  rewrite H2 in IHl.
+
+  assert (HEq:
+      (  fold_left fold_fun l
+            (@pair Z heap (Z.of_nat(Heap.cardinal H) + 1) H1) ) =
+      (    @fold_left (prod Z heap) type fold_fun l
+                      (@pair Z (Heap.t (prod Z type)) (Z.of_nat(Heap.cardinal H) + 1) H1))
+    ). {zify. eauto. }
+
+
+  rewrite HEq in IHl.
+
+
+  match goal with
+  | |- (match ?X with _ => _ end) => destruct X
+  end.
+  intro Hyp.
+  inv Hyp.
+   
+  assert (Z.of_nat(Heap.cardinal H) + 1 + 1 = Z.of_nat((Heap.cardinal H + 1)) + 1) by (zify; lia).
+  rewrite H1 in IHl.
+
+  specialize (IHl eq_refl).
+
+
+  eapply backwards_consistency; eauto.
+Qed.
+
+
+  
+(* This could probably be merged with the previous one *)
+Lemma fold_summary : forall l D H ptr,
+  heap_wf D H ->
+  let (_, H') :=
+      fold_left
+        (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+        l
+        (Z.of_nat(Heap.cardinal  H), H) in
+  Some (Z.of_nat(Heap.cardinal  H)+ 1, H') = Some (ptr, H') ->
+  heap_wf D H' /\
+  ptr = Z.of_nat(Heap.cardinal  H) + 1 /\
+  (Heap.cardinal  H') = ((Heap.cardinal H) + length l)%nat /\
+  (forall (k : nat) v,
+      (0 <= k < (length l))%nat -> nth_error l k = Some v ->
+               Heap.MapsTo (Z.of_nat(Heap.cardinal  H) + 1 + Z.of_nat(k)) (0,v) H') /\
+  forall x v, Heap.MapsTo x v H -> Heap.MapsTo x v H'.                                               
+Proof.
+  intro l; induction l; simpl; intros D H ptr Hwf.
+  - intros Eq. inv Eq; repeat (split; eauto).
+    intros k v Contra _.
+    inv Contra.
+    inv H1.
+  - remember 
+      (fun (acc : prod Z heap) (t : type) =>
+         match acc return (prod Z heap) with
+         | pair sizeAcc heapAcc =>
+           @pair Z (Heap.t (prod Z type)) (sizeAcc + 1)
+                 (@Heap.add (prod Z type) (sizeAcc + 1)
+                            (@pair Z type 0 t) heapAcc)
+         end) as fold_fun.
+    clear Heqfold_fun.
+
+    assert (Hwf' : heap_wf D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H))
+      by (apply heap_add_preserves_wf; eauto).
+    specialize (IHl D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H) (ptr + 1) Hwf').
+
+    
+    remember (Heap.add (Z.of_nat(Heap.cardinal H) +1) (0, a) H) as H1.
+
+    assert (Z.of_nat(Heap.cardinal H1) = Z.of_nat(Heap.cardinal H) + 1).
+    {
+      subst; apply cardinal_plus_one; eauto.
+      intro Contra.
+      destruct (Hwf (Z.of_nat(Heap.cardinal H) + 1)) as [H1 H2].
+      specialize (H2 Contra).
+      lia.
+    } 
+    rewrite H0 in IHl.
+
+    assert (HEq:
+        (  @fold_left (prod Z heap) type fold_fun l
+              (@pair Z heap ((Z.of_nat(@Heap.cardinal (prod Z type) H)) + 1) H1) ) =
+        (    @fold_left (prod Z heap) type fold_fun l
+                        (@pair Z (Heap.t (prod Z type)) (Z.of_nat(@Heap.cardinal (prod Z type) H) + 1) H1))
+      ) by auto.
+   
+    rewrite HEq in IHl.
+
+  Set Printing All.
+
+  remember (
+    @fold_left (prod Z heap) type fold_fun l
+               (@pair Z (Heap.t (prod Z type)) ( Z.of_nat(@Heap.cardinal (prod Z type) H) + 1) H1)
+    ) as fold_call.
+
+  Unset Printing All.
+
+  clear Heqfold_call.
+  destruct fold_call.
+  intro Hyp.
+  inv Hyp.
+
+  assert (Z.of_nat(Heap.cardinal H) + 1 + 1 = ((Z.of_nat(Heap.cardinal H)) + 1) + 1) by lia.
+  (*rewrite H1 in IHl.*)
+  destruct (IHl eq_refl) as [hwf [Card [Card' [HField HMap]]]].
+
+  repeat (split; eauto).
+  + lia.
+  + intros k v Hk HF.
+    destruct k.
+    * simpl in *.
+      inv HF.
+      specialize (HMap (Z.of_nat(Heap.cardinal H) + 1) (0,v)).
+      rewrite Z.add_0_r.
+      eapply HMap.
+      apply Heap.add_1; eauto.
+    * simpl in *.
+      assert (HS: (Z.of_nat(Heap.cardinal H) + 1 + Z.pos (Pos.of_succ_nat k)) = (Z.of_nat(Heap.cardinal H) + 1 + 1 + Z.of_nat(k))). {
+      zify. lia. }
+      rewrite HS.
+      apply HField; eauto.
+      lia.
+  + intros x v HM.
+    eapply HMap.
+    apply Heap.add_2; eauto.
+    intro Contra.
+    destruct (Hwf x) as [_ Contra'].
+    destruct Contra'; [eexists; eauto | ].
+    lia.
+Qed.
+
+Print length_nth.
+
+Lemma Zlength_nth : forall {A} (l : list A) (z : Z),
+0 <= z < Z.of_nat(length l) -> exists n, nth_error l (Z.to_nat z) = Some n.
+Proof.
+intros. destruct z.
+  -apply (length_nth l (Z.to_nat 0) H).
+  -assert (H1: Z.of_nat (Z.to_nat (Z.pos p)) = (Z.pos p)).
+    {destruct (Z.pos p) eqn:P; inv P.
+      +simpl. rewrite positive_nat_Z. reflexivity. }
+   rewrite <- H1 in H. apply (length_nth l (Z.to_nat (Z.pos p)) H).
+  -exfalso. inv H. apply H0. simpl. reflexivity.
+Qed.
+
+
+(* allocation preservation. *)
+Lemma alloc_correct : forall w D F S env H ptr H',
+    simple_type w ->
+    allocate D H w = Some (ptr, H') ->
+    structdef_wf D ->
+    heap_wf D H ->
+    @heap_consistent D H' H /\
+    @well_typed D F S H' env Checked (ELit ptr (TPtr Checked w)) (TPtr Checked w) /\
+    heap_wf D H'.
+Proof.
+  intros w D F S env H ptr H' Wb Alloc HSd HWf.
+  unfold allocate in *.
+  unfold allocate_meta in *.
+  unfold bind in *; simpl in *.
+  destruct w; simpl in *; eauto; inv Alloc; simpl in *; eauto.
+  - split; [| split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      apply well_type_bound_in_ptr. apply well_type_bound_in_nat.
+      eapply WTStack. apply cast_type_bound_ptr. apply cast_type_bound_nat.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by lia; subst; clear HK.
+      exists 0. exists TNat.
+      repeat split; eauto.
+      apply Heap.add_1; eauto. lia.
+    * apply heap_add_preserves_wf; auto.
+  - split; [ | split].
+    * apply well_typed_preserved; eauto.
+    * apply TyLit; eauto.
+      apply (simple_type_well_bound env) in Wb.
+      apply well_type_bound_in_ptr. assumption.
+      eapply WTStack. apply cast_type_bound_ptr.
+      apply (simple_type_means_cast_same). assumption.
+      eapply TyLitC; simpl; eauto.
+      intros k HK.
+      simpl in HK.
+      assert (k = 0) by lia; subst; clear HK.
+      exists 0. exists (TPtr m w).
+      repeat split; eauto.
+      apply Heap.add_1; eauto. lia.
+    * apply heap_add_preserves_wf; auto.
+  - split.
+
+    *unfold allocate in H1.
+      unfold allocate_meta_no_bounds, allocate_meta in H1.
+      destruct (StructDef.find s D) eqn:Find; simpl in *; try congruence.
+
+      remember (Fields.elements f) as l.
+
+      pose proof (fold_preserves_consistency (map snd l) D H ptr HWf).
+      
+      remember (fold_left
+            (fun (acc : Z * heap) (t : type) =>
+             let (sizeAcc, heapAcc) := acc in (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+            (map snd l) (Z.of_nat(Heap.cardinal H), H)) as p.
+      
+      destruct p.
+      clear Heqp.      
+      inv H1.
+      eauto.
+    
+    * unfold allocate_meta_no_bounds, allocate_meta in H1.
+
+      simpl in *.
+      destruct (StructDef.find s D) eqn:Find; try congruence.
+
+      pose proof (fold_summary (map snd (Fields.elements f)) D H ptr HWf) as Hyp.
+
+      remember
+        (fold_left
+           (fun (acc : Z * heap) (t : type) =>
+            let (sizeAcc, heapAcc) := acc in
+            (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+           (map snd (Fields.elements (elt:=type) f))
+           (Z.of_nat(Heap.cardinal H), H)) as p.
+      destruct p as [z h].
+      clear Heqp.
+      inv H1.
+
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      split; auto.
+      constructor.
+      apply (simple_type_well_bound env) in Wb.
+      apply well_type_bound_in_ptr. assumption.
+      eapply WTStack. apply cast_type_bound_ptr.
+      apply cast_type_bound_struct.
+      eapply TyLitC; simpl in *; eauto; [ rewrite Find | ]; eauto.
+      intros k HK.
+      apply StructDef.find_2 in Find.
+      remember Find as Fwf; clear HeqFwf.
+      apply HSd in Fwf.
+
+      assert (HOrd: 0 < Z.of_nat(Heap.cardinal H) + 1 + k <= Z.of_nat(Heap.cardinal H')) by lia.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      apply Hyp in HOrd.
+      destruct HOrd as [[n' t'] HM'].
+      (*This bit is very annoying, quite a bit of converting back and forth
+        between ints and nats. This could definately be more automated DP*)
+      exists n'. exists t'.
+      rewrite Z.sub_0_r in *.
+      destruct (Zlength_nth (map snd (Fields.elements f)) k HK) as [x Hnth].
+      assert (HK': (0 <= (Z.to_nat k) < (length (map snd (Fields.elements (elt:=type) f))))%nat). {
+        destruct k.
+          +zify. simpl. lia.
+          +simpl. zify. lia.
+          +exfalso. inv HK. apply H0. simpl. reflexivity. }
+      specialize (HF (Z.to_nat k) x HK' Hnth).
+      assert (K0 : k = Z.of_nat (Z.to_nat k)). {
+      destruct k.
+        +simpl. reflexivity.
+        +simpl. zify. reflexivity.
+        +inv HK. exfalso. apply H0. simpl. reflexivity. }
+      rewrite <- K0 in HF.
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      repeat (split; eauto).
+  - split.
+    * destruct b. destruct b0.
+
+      remember (Zreplicate (z0 - z) w) as l.
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+
+      remember (fold_left
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+         l
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      
+      destruct p as (n1, h). (*n0 already used???*)
+      clear Heqp.
+      destruct z; inv H1.
+      apply H0; eauto.
+      inv Wb. inv Wb.
+    * destruct b. destruct b0.
+
+      remember (Zreplicate (z0 - z) w) as l.
+
+      pose proof (fold_summary l D H ptr HWf) as Hyp.
+      remember
+        (fold_left
+          (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+          (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      destruct p.
+      clear Heqp.
+      inv H1.
+
+      destruct z; inv H2; eauto.
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      
+      split; auto.
+      constructor.
+      apply (simple_type_well_bound env) in Wb.
+      apply well_type_bound_in_ptr. assumption.
+      eapply WTStack. apply cast_type_bound_ptr.
+      apply (simple_type_means_cast_same). assumption.
+      eapply TyLitC; simpl in *; eauto.
+      intros k HK.
+      simpl in *.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      rewrite Z.sub_0_r in *.
+
+      remember (Heap.cardinal H ) as c.
+      remember (Heap.cardinal H') as c'.
+      
+      assert (HOrd : 0 < Z.of_nat c + 1 + k <= Z.of_nat c')
+        by (zify; lia).
+      
+      destruct Hyp as [HIn Useless].
+      destruct (HIn HOrd) as [[n' t'] HM'].
+
+      destruct HK as [HP1 HP2].
+
+      destruct z0 as [ | p | ?]; simpl in *; [ lia | | lia].
+      rewrite replicate_length in *.
+
+      destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
+      { rewrite replicate_length ; zify; split; try lia. }
+       (* (*This should go through with omega but it doesn't*)
+        assert (Hk : Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. apply HP1. simpl. reflexivity. }
+        rewrite Hk. assumption.
+      } *)
+
+      rewrite Z.sub_0_r in *.
+      
+      rewrite Hnth.
+      remember Hnth as Hyp; clear HeqHyp.
+      apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+      exists n'; exists t.
+      split; [ reflexivity | ].
+
+      specialize (HF (Z.to_nat k) t).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat). {
+        split; zify; (try lia).
+        (* destruct k; simpl; zify; lia.*)
+      }
+
+      specialize (HF HF1 Hyp).
+
+      assert (HId: Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. lia.
+          + exfalso. zify. lia. }
+      rewrite HId in HF.
+      
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      split; auto.
+      inv Wb. inv Wb.
+  - split.
+    * destruct b. destruct b0.
+
+      remember (Zreplicate (z0 - z + 1) w) as l.
+      pose proof (fold_preserves_consistency l D H ptr HWf) as H0.
+
+      remember (fold_left
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+         l
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      
+      destruct p as (n1, h). (*n0 already used???*)
+      clear Heqp.
+      destruct z; inv H1.
+      apply H0; eauto.
+      inv Wb. inv Wb.
+    * destruct b. destruct b0.
+
+      remember (Zreplicate (z0 - z + 1) w) as l.
+
+      pose proof (fold_summary l D H ptr HWf) as Hyp.
+      remember
+        (fold_left
+          (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+          (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      destruct p.
+      clear Heqp.
+      inv H1.
+
+      destruct z; inv H2; eauto.
+      destruct Hyp as [H'wf  [Card1 [Card2 [HF HM]]]]; eauto.
+
+      
+      split; auto.
+      constructor.
+      apply (simple_type_well_bound env) in Wb.
+      apply well_type_bound_in_ptr. assumption.
+      eapply WTStack. apply cast_type_bound_ptr.
+      apply (simple_type_means_cast_same). assumption.
+      eapply TyLitC; simpl in *; eauto.
+      intros k HK.
+      simpl in *.
+      pose proof (H'wf (Z.of_nat(Heap.cardinal H) + 1 + k)) as Hyp.
+      rewrite Z.sub_0_r in *.
+
+      remember (Heap.cardinal H ) as c.
+      remember (Heap.cardinal H') as c'.
+      
+      assert (HOrd : 0 < Z.of_nat c + 1 + k <= Z.of_nat c')
+        by (zify; lia).
+      
+      destruct Hyp as [HIn Useless].
+      destruct (HIn HOrd) as [[n' t'] HM'].
+
+      destruct HK as [HP1 HP2].
+
+      destruct (z0+1) as [ | p | ?]; simpl in *; [ lia | | lia].
+      rewrite replicate_length in *.
+
+      destruct (length_nth (replicate (Pos.to_nat p) w) (Z.to_nat k)) as [t Hnth].
+      { rewrite replicate_length ; zify; split; try lia. }
+       (* (*This should go through with omega but it doesn't*)
+        assert (Hk : Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. omega.
+          + exfalso. zify. apply HP1. simpl. reflexivity. }
+        rewrite Hk. assumption.
+      } *)
+
+      rewrite Z.sub_0_r in *.
+      
+      rewrite Hnth.
+      remember Hnth as Hyp; clear HeqHyp.
+      apply replicate_nth in Hnth. rewrite Hnth in *; clear Hnth.
+        
+      exists n'; exists t.
+      split; [ reflexivity | ].
+
+      specialize (HF (Z.to_nat k) t).
+      assert (HF1 : (0 <= Z.to_nat k < Pos.to_nat p)%nat). {
+        split; zify; (try lia).
+        (* destruct k; simpl; zify; lia.*)
+      }
+
+      specialize (HF HF1 Hyp).
+
+      assert (HId: Z.of_nat (Z.to_nat k) = k). {
+        destruct k; simpl.
+          + reflexivity.
+          + zify. lia.
+          + exfalso. zify. lia. }
+      rewrite HId in HF.
+      
+      pose proof (HeapFacts.MapsTo_fun HM' HF) as Eq.
+      inv Eq.
+      split; auto.
+      inv Wb. inv Wb.
+Qed.
+
+
+
+Definition env_wt (D : structdef) (env:env) := forall x t, Env.MapsTo x t env
+            -> word_type t /\ type_wf D t. 
+
+Lemma subtype_word_type_1 : forall D t t', subtype D t t' -> word_type t -> word_type t'.
+Proof.
+  intros.
+  inv H. assumption.
+  1-8:constructor.
+Qed.
+
+Lemma get_root_word_type : forall m t t', get_root (TPtr m t) t' -> word_type t -> word_type t'.
+Proof.
+  intros.
+  inv H. assumption. inv H0. inv H0.
+Qed.
+
+Lemma get_root_type_wf : forall D m t t', get_root (TPtr m t) t' -> type_wf D t -> type_wf D t'.
+Proof.
+  intros.
+  inv H. assumption. inv H0. assumption.
+  inv H0. assumption.
+Qed.
+
+Lemma get_root_simple_type : forall m t t', get_root (TPtr m t) t' -> simple_type t -> simple_type t'.
+Proof.
+  intros.
+  inv H. assumption. inv H0. assumption.
+  inv H0. assumption.
+Qed.
+
+
+
+Lemma subtype_type_wf_1 : forall D t t', subtype D t t' -> type_wf D t' -> type_wf D t.
+Proof.
+  intros.
+  inv H. assumption.
+  inv H0. inv H4. constructor. assumption.
+  inv H0.
+  constructor. constructor.
+  assumption. assumption.
+  inv H0.
+  constructor. constructor.
+  assumption. assumption.
+  inv H0. inv H3.
+  constructor. constructor.
+  1-2:assumption.
+  inv H0. inv H3.
+  constructor. constructor.
+  assumption. assumption.
+  inv H0. inv H3.
+  constructor. constructor.
+  assumption. assumption.
+  constructor. constructor.
+  exists fs. assumption.
+  constructor. constructor.
+  exists fs. assumption.
+Qed.
+
+Lemma type_eq_word_type_1 :  forall S t t', type_eq S t t' -> word_type t' -> word_type t.
+Proof.
+  intros.
+  inv H. assumption.
+  inv H0. inv H2. constructor.
+  inv H2. constructor.
+  inv H0. inv H2. constructor.
+  inv H2. constructor.
+Qed.
+
+Lemma cast_word_type_1 : forall s t t', cast_type_bound s t t' -> word_type t' -> word_type t.
+Proof.
+  intros.
+  induction H0. inv H. constructor.
+  inv H. constructor.
+Qed.
+
+
+Lemma cast_type_wf_1 : forall D s t t', cast_type_bound s t t' -> type_wf D t' -> type_wf D t.
+Proof.
+ intros. generalize dependent t. induction t'.
+ intros. inv H. constructor.
+ intros. inv H. constructor. apply IHt'. inv H0. assumption.
+ assumption.
+ intros. inv H. constructor.
+ inv H0. destruct H1. exists x. assumption.
+ intros. inv H.
+ constructor. inv H0. eapply cast_word_type_1. apply H7. assumption.
+ apply IHt'. inv H0. assumption. assumption.
+ intros. inv H.
+ constructor. inv H0. eapply cast_word_type_1. apply H7. assumption.
+ apply IHt'. inv H0. assumption. assumption.
+Qed.
+
+Lemma type_eq_type_wf : forall D S t t', type_eq S t t' -> type_wf D t' -> type_wf D t.
+Proof.
+  intros.
+  inv H0.
+  inv H. constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H. constructor. assumption.
+  inv H2.
+  constructor.
+  eapply cast_type_wf.
+  apply H5. assumption.
+  inv H2.
+  constructor.
+  eapply cast_type_wf_1.
+  apply H4.
+  assumption.
+  inv H.
+  constructor.
+  easy.
+  inv H2.
+  constructor.
+  easy.
+  inv H2.
+  constructor.
+  easy.
+  inv H.
+  constructor. easy. easy.
+  inv H3.
+  constructor.
+  eapply cast_word_type. apply H9. assumption. 
+  eapply cast_type_wf. apply H9. assumption.
+  inv H3.
+  constructor.
+  eapply cast_word_type_1. apply H9. assumption. 
+  eapply cast_type_wf_1. apply H9. assumption.
+  inv H.
+  constructor. assumption. assumption.
+  inv H3. constructor.
+  eapply cast_word_type. apply H9. assumption. 
+  eapply cast_type_wf. apply H9. assumption.
+  inv H3. constructor.
+  eapply cast_word_type_1. apply H9. assumption. 
+  eapply cast_type_wf_1. apply H9. assumption.
+Qed.
+
+Lemma type_eq_type_wf_1 : forall D S t t', type_eq S t t' -> type_wf D t -> type_wf D t'.
+Proof.
+  intros.
+  inv H0.
+  inv H. constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H. constructor. assumption.
+  inv H2.
+  constructor.
+  eapply cast_type_wf_1.
+  apply H4. assumption.
+  inv H2.
+  constructor.
+  eapply cast_type_wf.
+  apply H5.
+  assumption.
+  inv H.
+  constructor.
+  easy.
+  inv H2.
+  constructor.
+  easy.
+  inv H2.
+  constructor.
+  easy.
+  inv H.
+  constructor. easy. easy.
+  inv H3.
+  constructor.
+  eapply cast_word_type_1. apply H9. assumption. 
+  eapply cast_type_wf_1. apply H9. assumption.
+  inv H3.
+  constructor.
+  eapply cast_word_type. apply H9. assumption. 
+  eapply cast_type_wf. apply H9. assumption.
+  inv H.
+  constructor. assumption. assumption.
+  inv H3. constructor.
+  eapply cast_word_type_1. apply H9. assumption. 
+  eapply cast_type_wf_1. apply H9. assumption.
+  inv H3. constructor.
+  eapply cast_word_type. apply H9. assumption. 
+  eapply cast_type_wf. apply H9. assumption.
+Qed.
+
+Lemma meet_type_word_type_1 : forall D s t t1 t2, meet_type D s t t1 t2 -> word_type t -> word_type t2.
+Proof.
+  intros. inv H0. inv H.
+  inv H0. constructor.
+  inv H0. inv H2. inv H1. constructor.
+  inv H0. constructor.
+  inv H0. inv H2. inv H1.
+  constructor.
+  inv H. inv H0.
+  1 - 9: constructor.
+  inv H0. inv H2. inv H1.
+  constructor.
+  inv H1.
+  constructor.
+  inv H1.
+  constructor.
+  inv H1.
+  constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H1. constructor.
+  inv H0. 1 - 9 : constructor.
+  inv H0.
+  apply ptr_subtype_equiv in H2.
+  destruct H2. subst.
+  inv H1. constructor.
+Qed.
+
+Lemma meet_type_type_wf : forall D s t t1 t2, meet_type D s t t1 t2 
+                                -> type_wf D t -> type_wf D t1 -> type_wf D t2.
+Proof.
+  intros. inv H. assumption.
+  assumption.
+  assumption.
+  assumption.
+Qed.
+
+Lemma subtype_well_type : forall D H env t t' n,
+@well_typed_lit D H env n t ->
+subtype D t t' ->
+@well_typed_lit D H env n t'.
+Proof.
+  intros. induction H0. 
+  - inv H1. eauto.
+  - assert (exists t, t' = (TPtr Unchecked t)) by (inv H1; eauto).
+    destruct H0. rewrite H0. eauto.
+  - eauto.
+  - specialize (subtype_trans D t t' Checked w H2 H1) as eq1.
+
+    assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
+    destruct H3. rewrite H3 in *.
+    eapply TyLitRec; eauto.
+  - assert (exists t0, t' = (TPtr Checked t0)) by (inv H1; eauto).
+    unfold allocate_meta in H0.
+    induction w.
+    * inv H1.
+      ++ eapply TyLitC; eauto. 
+      ++ inv H7. inv H9. eapply TyLitC; eauto.
+      unfold allocate_meta. eauto.
+      intros.
+      assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
+      destruct H5.
+      assert ((Zreplicate (l - h0) TNat) = []).
+      unfold Zreplicate. 
+      destruct (l - h0). easy.
+      specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
+      rewrite H8 in H1. simpl in H1. lia.
+
+      rewrite H5 in *.
+      unfold Zreplicate in *. simpl in *.
+      assert (k = h0) by lia. subst. simpl.
+      inv H0. simpl in *.
+      destruct (H2 0). lia.
+      destruct H0. 
+      destruct H0. destruct H8.
+      assert (l = 1) by lia.
+      assert (h0 = 0) by lia.
+      subst.
+      exists x. exists x0.
+      split. easy. split. easy.
+      inv H0. apply TyLitInt.
+    * inv H1. 
+      ++ eapply TyLitC; eauto.
+      ++ inv H7. inv H9. eapply TyLitC; eauto. 
+      unfold allocate_meta. eauto.
+      intros.
+      assert (l - h0 <= 0 \/ l - h0 = 1) by lia.
+      destruct H5.
+      assert ((Zreplicate (l - h0) (TPtr m w)) = []).
+      unfold Zreplicate. 
+      destruct (l - h0). easy.
+      specialize (Pos2Z.is_pos p) as eq1. contradiction. easy.
+      rewrite H8 in H1. simpl in H1. lia.
+      rewrite H5 in *.
+      unfold Zreplicate in *. simpl in *.
+      assert (k = h0) by lia. subst. simpl.
+      inv H0. simpl in *.
+      destruct (H2 0). lia.
+      destruct H0. 
+      destruct H0. destruct H8.
+      assert (l = 1) by lia.
+      assert (h0 = 0) by lia.
+      subst.
+      exists x. exists x0.
+      split. easy. split. easy.
+      inv H0.
+      destruct (Z.eq_dec x n).
+      subst.
+      destruct m.
+      eapply TyLitRec.
+      apply set_add_intro2. reflexivity.
+      apply SubTyOne.
+      inv H9. apply TyLitU.
+      apply TyLitZero.
+      eapply (TyLitRec).
+
+    * inv H1. eapply TyLitC; eauto.
+     
+      eapply TyLitC; eauto.
+      unfold allocate_meta; eauto.
+      simpl in H0. destruct (StructDef.find (elt:=fields) s D) eqn:Hf.
+      + inv H0. rewrite map_length in H2.
+        assert (StructDef.MapsTo s f D) by (eapply find_implies_mapsto; eauto).
+        assert (f = fs) by (eapply StructDefFacts.MapsTo_fun; eauto). 
+        rewrite H1 in *.
+        assert (((length (Fields.elements (elt:=type) fs)) >= 1)%nat) by (eapply fields_implies_length; eauto).
+        intros. simpl in H5.
+        destruct (H2 k). zify. lia.
+        exists x. exists TNat.
+        assert (k = 0) by (destruct k; inv H5; eauto; exfalso; zify; lia).
+        rewrite H9 in *. simpl. split; eauto.
+        destruct H7. destruct H7.
+        simpl in H7. 
+        rewrite <- (element_implies_element s fs D TNat H0 H8) in H7.
+        inv H7. destruct H10.
+        split. assumption. eauto.
+      + inv H0. 
+    * clear IHw. inv H0.
+    * 
+      inv H1. clear H3. 
+        + eapply TyLitC; eauto.
+        + clear H3.
+          eapply TyLitC.
+
+
+          unfold allocate_meta; eauto.
+          intros. 
+          assert (Hmin : (h' - l') > 0).
+          {
+                destruct (h' - l'); zify; (try omega); simpl in *; inv H0;
+                exfalso; rewrite Z.add_0_r in *; omega.
+          }
+          assert (Hpos : exists p, h' - l' = Z.pos p).
+          {
+           destruct (h' - l'); zify; (try omega).
+           exists p; eauto.
+          }
+          assert ((z0 - z) >= (h' - l')) by omega.
+          assert ((length (Zreplicate (z0 - z) w) >= (length (Zreplicate (h' - l') w)))%nat).
+          {
+            destruct (z0 - z).
+            * simpl. destruct (h' - l'); simpl; eauto. exfalso. zify; omega.
+            * simpl. rewrite replicate_length. destruct (h' - l');
+              simpl; eauto; (try omega). rewrite replicate_length; zify; omega.
+            * exfalso; zify; omega.
+          }
+          destruct (H2 k).
+          split. 
+            ** omega.
+            ** (* relies on the fact that h' - l' must be greater than 0*)
+              destruct Hpos as [p Hpos].
+              assert (h' > l') by omega.
+              assert (psuc : exists n, Pos.to_nat p = S n) by (eapply pos_succ; eauto).
+              (*very convoluted*)
+              destruct (z0 - z)eqn:Hz.
+              ++ exfalso; omega.
+              ++ rewrite Hpos in *. simpl in *.
+                 rewrite replicate_length in *.
+                 assert (Hp : Z.of_nat (Pos.to_nat p) = Z.pos p).
+                 {
+                  destruct psuc as [n0 psuc]. rewrite psuc.
+                  zify; omega.
+                 } clear psuc.
+                 assert (psuc: exists n, Pos.to_nat p0 = S n) by eapply pos_succ; eauto.
+                 assert (Hp0 : Z.of_nat (Pos.to_nat p0) = Z.pos p0).
+                 {
+                  destruct psuc as [n0 psuc]. rewrite psuc.
+                  zify; omega.
+                 }
+                 rewrite Hp0. rewrite <- Hz. 
+                 assert (z + (z0 - z) = z0) by omega.
+                 rewrite H5. rewrite Hp in H0.
+                 rewrite <- Hpos in H0.
+                 assert (l' + (h' - l') = h') by omega.
+                 rewrite H6 in H0. omega.
+              ++ exfalso; zify; omega.
+          ** exists x. exists w.
+             split.
+             ++ destruct Hpos as [p Hpos]. rewrite Hpos.
+                simpl. 
+                assert (exists n, Pos.to_nat p = S n) by (eapply pos_succ; eauto).
+                destruct H5. rewrite H5. simpl.
+                destruct (k - l')eqn:Hk; simpl; eauto.
+               -- Search nth_error.
+             ++ destruct H4.
+                destruct H4 as [? [? ?]].
+                rewrite H7 in *. 
+                split; eauto. 
+                assert (well_typed_lit D H
+               (set_add eq_dec_nt (n, TPtr Checked (TArray l' h' w))
+               (set_add eq_dec_nt
+               (n, TPtr Checked (TArray z z0 w))
+                s)) x w) by (eapply scope_weakening; eauto).
+                assert (set_equal (set_add eq_dec_nt (n, TPtr Checked (TArray l' h' w))
+          (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w)) s))
+              (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w))
+               (set_add eq_dec_nt
+               (n, TPtr Checked (TArray l' h' w))
+                s))).
+                { eapply set_equal_add_add; eauto. instantiate (1:=s). unfold set_equal.
+                  intros; split; intros; assumption. } 
+                assert (well_typed_lit D H
+               (set_add eq_dec_nt (n, TPtr Checked (TArray z z0 w))
+               (set_add eq_dec_nt
+               (n, TPtr Checked (TArray l' h' w))
+                s)) x w). 
+               { eapply scope_replacement; eauto. } 
+Qed.
+
+(* If a term is typed checked, then its returned expression has a word type. *)
+Lemma well_typed_word_type_wf :
+   forall D F S H env m e t,
+          structdef_wf D ->
+          expr_wf D F e -> 
+         env_wt D env ->
+         fun_typed D F S H ->
+         @well_typed D F S H env m e t  -> word_type t /\ type_wf D t.
+Proof.
+  intros.
+  induction H4; eauto.
+  inv H1. easy.
+  apply H3 in H4.
+  destruct H4. destruct H8.
+  split.
+  apply subtype_word_type_1 in H7. eapply type_eq_word_type_1.
+  apply H6. assumption. assumption.
+  apply subtype_type_wf in H7.
+  eapply type_eq_type_wf. apply H6.
+  assumption. assumption.
+  split. constructor. constructor.
+  inv H1.
+  specialize (IHwell_typed1 H6 H2) as eq1.
+  assert (env_wt D (Env.add x t1 env0)).
+  unfold env_wt in *.
+  intros.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  apply Env.mapsto_add1 in H1.
+  subst. assumption.
+  apply Env.add_3 in H1.
+  specialize (H2 x0 t0 H1) as eq2.
+  easy. lia.
+  specialize (IHwell_typed2 H8 H1) as eq2. easy.
+  split. constructor. constructor.
+  inv H1.
+  split. constructor. constructor.
+  unfold structdef_wf in H0.
+  apply H0 in H5.
+  unfold fields_wf in H5.
+  apply H5 in H6.
+  easy.
+  inv H1.
+  split. constructor. constructor. easy.
+  apply IHwell_typed.
+  inv H1. assumption. assumption.
+  inv H1. easy.
+  inv H1.
+  easy.
+  inv H1.
+  split. easy. easy.
+  inv H1.
+  split. easy.
+  constructor. constructor.
+  inv H11. inv H8.
+  easy.
+  inv H11. inv H8. easy.
+  inv H1. easy.
+  inv H1.
+  specialize (IHwell_typed H9 H2).
+  destruct H6.
+  destruct IHwell_typed.
+  destruct H1. subst.
+  split. easy.
+  assert (type_wf D (TPtr m' t')).
+  eapply subtype_type_wf. apply H5.
+  assumption. inv H10. assumption.
+  destruct H1.
+  destruct H1. subst.
+  easy.
+  destruct H1. subst.
+  easy.
+  split.
+  eapply type_eq_word_type. apply H6.
+  assumption.
+  inv H1.
+  specialize (IHwell_typed1 H10 H2) as eq1.
+  destruct eq1. inv H8.
+  eapply type_eq_type_wf_1.
+  apply H6. assumption. 
+  split.
+  eapply type_eq_word_type. apply H6.
+  assumption.
+  inv H1.
+  specialize (IHwell_typed1 H11 H2) as eq1.
+  destruct eq1. inv H9. inv H13.
+  eapply type_eq_type_wf_1.
+  apply H6. assumption. 
+  split.
+  eapply type_eq_word_type. apply H6.
+  assumption.
+  inv H1.
+  specialize (IHwell_typed1 H11 H2) as eq1.
+  destruct eq1. inv H9. inv H13.
+  eapply type_eq_type_wf_1.
+  apply H6. assumption. 
+  split. 
+  eapply subtype_word_type_1.
+  apply H7. assumption.
+  eapply subtype_type_wf.
+  apply H7. assumption.
+  split. 
+  eapply subtype_word_type_1.
+  apply H7. assumption.
+  eapply subtype_type_wf.
+  apply H7. assumption.
+  inv H1.
+  specialize (IHwell_typed1 H11 H2) as eq1.
+  specialize (IHwell_typed2 H13 H2) as eq2.
+  destruct eq1. destruct eq2.
+  split.
+  eapply meet_type_word_type_1. apply H7.
+  assumption.
+  eapply meet_type_type_wf.
+  apply H7.
+  assumption. assumption.
+Qed.
+
+Lemma in_map_snd : forall (l : list (Fields.key*type)) t,
+                In t (map snd l) -> (exists x, In (x,t) l).
+Proof.
+  intros.
+  induction l. inv H.
+  simpl in *.
+  destruct H.
+  destruct a. exists k. simpl in H. subst. left. easy.
+  apply IHl in H.
+  destruct H.
+  exists x. right. easy.
+Qed.
+
+Axiom field_eq : Equivalence (Fields.eq_key_elt (elt:=type)).
+
+Lemma replicate_in : forall n (w t:type), In t (replicate n w) -> t = w.
+Proof.
+ induction n.
+ simpl. intros. inv H.
+ simpl. intros. destruct H. easy.
+ apply IHn in H. easy.
+Qed.
+
+Lemma allocate_meta_wt : forall D w n tl, 
+          structdef_wf D -> type_wf D w -> simple_type w 
+            -> allocate_meta D w = Some (n, tl) ->
+                      (forall t, In t tl -> word_type t /\ type_wf D t /\ simple_type t).
+Proof.
+   intros. unfold allocate_meta in H2.
+   destruct w. inv H2.
+   inv H3.
+   split. easy. split. easy. easy.
+   inv H2.
+   inv H2. inv H3.
+   split. easy. split. constructor. inv H0. easy. easy.
+   inv H2.
+   destruct ((StructDef.find (elt:=fields) s D)) eqn:eq1.
+   inv H2.
+   apply in_map_snd in H3.
+   destruct H3.
+   apply (@In_InA (Fields.key*type) (Fields.eq_key_elt (elt:=type))) in H2.
+   apply Fields.elements_2 in H2.
+   unfold structdef_wf in H.
+   apply StructDef.find_2 in eq1.
+   apply H in eq1.
+   apply eq1 in H2. easy.
+   apply field_eq.
+   inv H2. inv H1.
+   inv H2.
+   unfold Zreplicate in H3.
+   destruct (h - n). inv H3.
+   apply replicate_in in H3.
+   subst.
+   inv H0. easy.
+   inv H3.
+   inv H1.
+   inv H2.
+   unfold Zreplicate in H3.
+   destruct (h - n + 1). inv H3.
+   apply replicate_in in H3.
+   subst.
+   inv H0. easy.
+   inv H3.
+Qed.
+
+Lemma heap_add_preserves_wt : forall D H n v, heap_wt D H ->
+  word_type v -> type_wf D v -> simple_type v ->
+  heap_wt D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (n, v) H).
+Proof.
+  intros D H n v WT Twf ST Hwf.
+  unfold heap_wt in *.
+  intros.
+  destruct (Z.eq_dec x (Z.of_nat (Heap.cardinal (elt:=Z * type) H) + 1)).
+  subst.
+  apply Heap.mapsto_add1 in H0. inv H0.
+  easy.
+  apply Heap.add_3 in H0. apply WT in H0.
+  easy. lia.
+Qed.
+
+
+Lemma allocate_wt_aux : forall l D H ptr, 
+   heap_wf D H -> 
+   heap_wt D H ->
+   (forall t, In t l -> word_type t /\ type_wf D t /\ simple_type t) ->
+  let (_, H') :=
+      fold_left
+        (fun (acc : Z * heap) (t : type) =>
+           let (sizeAcc, heapAcc) := acc in
+           (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc))
+        l
+        (Z.of_nat(Heap.cardinal H), H) in
+  Some ((Z.of_nat(Heap.cardinal H) + 1), H') = Some (ptr, H') ->
+  heap_wt D H'.
+Proof.
+  intro l; induction l; intros; simpl; eauto.
+  assert (Hwt : heap_wt D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H)).
+  specialize (H2 a). assert (a = a \/ In a l). left. easy.
+  apply H2 in H3.
+  apply heap_add_preserves_wt. assumption. 1-3:easy.
+  assert (Hwf : heap_wf D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H))
+     by (apply heap_add_preserves_wf; eauto).
+  assert ((forall t : type,
+       In t l -> word_type t /\ type_wf D t /\ simple_type t)).
+  intros. simpl in H2.
+  assert (a = t \/ In t l). right. assumption. apply H2 in H4. easy.
+  specialize (IHl D (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H) (ptr + 1) Hwf Hwt H3).
+  remember (Heap.add (Z.of_nat(Heap.cardinal H) + 1) (0, a) H) as H5.
+
+  Set Printing All.
+  remember ((fun (acc : prod Z heap) (t : type) =>
+             match acc return (prod Z heap) with
+             | pair sizeAcc heapAcc =>
+                 @pair Z (Heap.t (prod Z type)) (sizeAcc + 1)
+                   (@Heap.add (prod Z type) (sizeAcc + 1) 
+                      (@pair Z type 0 t) heapAcc)
+             end)) as fold_fun.
+  Unset Printing All.
+  clear Heqfold_fun. 
+
+  assert (Z.of_nat(Heap.cardinal H5) = (Z.of_nat(Heap.cardinal H) + 1)).
+  {
+    subst; apply cardinal_plus_one; eauto.
+    intro Contra. 
+    destruct (H0 (Z.of_nat(Heap.cardinal H) + 1)) as [H7 H8].
+    specialize (H8 Contra).
+    lia.
+  } 
+  rewrite H4 in IHl.
+
+  assert (HEq:
+      (  fold_left fold_fun l
+            (@pair Z heap (Z.of_nat(Heap.cardinal H) + 1) H5) ) =
+      (    @fold_left (prod Z heap) type fold_fun l
+                      (@pair Z (Heap.t (prod Z type)) (Z.of_nat(Heap.cardinal H) + 1) H5))
+    ). {zify. eauto. }
+
+
+  rewrite HEq in IHl.
+
+
+  match goal with
+  | |- (match ?X with _ => _ end) => destruct X
+  end.
+  intro Hyp.
+  inv Hyp.
+   
+  assert (Z.of_nat(Heap.cardinal H) + 1 + 1 = Z.of_nat((Heap.cardinal H + 1)) + 1) by (zify; lia).
+  rewrite H5 in IHl.
+
+  specialize (IHl eq_refl).
+  assumption.
+Qed.
+
+Lemma allocate_wt : forall D H w n H',    
+         heap_wf D H -> 
+         heap_wt D H -> 
+          structdef_wf D -> type_wf D w -> simple_type w ->
+                 allocate D H w = Some (n, H') -> heap_wt D H'.
+Proof.
+ intros. unfold allocate in H5.
+ destruct (allocate_meta D w) eqn:eq1.
+ destruct p.
+ specialize (allocate_meta_wt D w z l H2 H3 H4 eq1) as eq2.
+ destruct z.
+ clear eq1.
+ Check allocate_wt_aux.
+ 
+ pose proof (allocate_wt_aux l D H n H0 H1 eq2).
+
+ remember (fold_left
+         (fun (acc : Z * heap) (t : type) =>
+          let (sizeAcc, heapAcc) := acc in
+          (sizeAcc + 1, Heap.add (sizeAcc + 1) (0, t) heapAcc)) l
+         (Z.of_nat (Heap.cardinal (elt:=Z * type) H), H)) as p.
+      
+ destruct p.
+ clear Heqp.      
+ inv H5.
+ eauto. inv H5. inv H5. inv H5.
+Qed.
+
+Lemma heapWT : forall D F S S' H H' env m e t r,
+     heap_wf D H -> 
+     structdef_wf D ->
+     expr_wf D F e -> 
+     env_wt D env ->
+     fun_typed D F S H ->
+    @well_typed D F S H env m e t ->
+     heap_wt D H -> step D F S H e S' H' r -> heap_wt D H'.
+Proof.
+  intros D F S S' H H' env m e t r Hwf Wsd Wexp Wenv Wfun WT Hwt HS.
+  induction HS; eauto.
+  unfold heap_wt in *.
+  subst.
+  intros.
+  destruct (Z.eq_dec x n).
+  subst.
+  apply Heap.mapsto_add1 in H5.
+  inv H5.
+  inv WT.
+  inv Wexp.
+  specialize (well_typed_word_type_wf D F s H env m 
+               (ELit n t0) (TPtr m' t2) Wsd H11 Wenv Wfun H10) as eq1.
+  inv H10. 
+  inv H1.
+  assert (word_type t').
+  eapply cast_word_type. apply H14. assumption.
+  assert (type_wf D t').
+  eapply cast_type_wf.
+  apply H14.
+  destruct eq1. inv H6. assumption.
+  assert (simple_type t').
+  apply cast_means_simple_type in H14. assumption.
+  split. eapply get_root_word_type. apply H4. assumption.
+  split. eapply get_root_type_wf. apply H4. assumption.
+  eapply get_root_simple_type. apply H4. assumption.
+  inv Wexp.
+  specialize (well_typed_word_type_wf D F s H env m 
+               (ELit n t0) (TPtr m' (TArray l h t2)) Wsd H12 Wenv Wfun H11) as eq1.
+  inv H11. 
+  inv H1. inv H15.
+  assert (word_type t'1).
+  eapply cast_word_type. apply H21. assumption.
+  assert (type_wf D t'1).
+  eapply cast_type_wf.
+  apply H21.
+  destruct eq1. inv H6. inv H17. assumption.
+  assert (simple_type t'1).
+  apply cast_means_simple_type in H21. assumption.
+  split. inv H4. inv H23. assumption.
+  split. inv H4. inv H23. assumption.
+  inv H4. inv H23. assumption.
+  inv Wexp.
+  specialize (well_typed_word_type_wf D F s H env m 
+               (ELit n t0) (TPtr m' (TNTArray l h t2)) Wsd H12 Wenv Wfun H11) as eq1.
+  inv H11. 
+  inv H1. inv H15.
+  assert (word_type t'1).
+  eapply cast_word_type. apply H21. assumption.
+  assert (type_wf D t'1).
+  eapply cast_type_wf.
+  apply H21.
+  destruct eq1. inv H6. inv H17. assumption.
+  assert (simple_type t'1).
+  apply cast_means_simple_type in H21. assumption.
+  split. inv H4. inv H23. assumption.
+  split. inv H4. inv H23. assumption.
+  inv H4. inv H23. assumption.
+  apply Heap.add_3 in H5.
+  apply Hwt in H5. easy. lia.
+  inv Wexp.
+  assert (type_wf D w'). 
+  eapply cast_type_wf. apply H0. assumption.
+  assert (simple_type w').
+  eapply cast_means_simple_type. apply H0. 
+  apply (allocate_wt D H w' n1 H' Hwf Hwt Wsd H3 H5 H2).
+Qed.  
+
+Hint Resolve heapWT : Preservation.
+
+
+
+Ltac maps_to_fun :=
+  match goal with
+  | [ H1 : Heap.MapsTo ?X (?V1, ?T1) ?H 
+    , H2 : Heap.MapsTo ?X (?V2, ?T2) ?H
+      |- _ ] =>
+    let H := fresh "Eq" in     
+    assert (H : (V1,T1) = (V2, T2)) by (eapply HeapFacts.MapsTo_fun; eauto);
+    inv H
+  | _ => idtac
+  end.
+
+Ltac solve_map :=
+  match goal with
+  | [ |- Heap.MapsTo ?x ?T (Heap.add ?x ?T _) ] => apply Heap.add_1; auto
+  | _ => idtac
+  end.
+
+
+
+Lemma HeapUpd:
+  Suppose H(i) = n^T and G |- n'^T' : T' under heap H.
+  If H' = H[i |--> k^T] and G |- k^T : T under H' then G |- n'^T' under heap H'
+  (In short: H' |- H)
+Proof.
+  The proof is by induction on G |- n'^T' : T' under H.
+  Case T-Int and T-VConst apply as before
+  Case T-PtrC
+    G |- n'^(ptr^c W) under H
+    where
+      types(D,W) = T0,...,T(j-1)
+      G,n'^(ptr^c W) |-m H(n'+x) : Tx for 0 <= x < j under H
+    We want to prove
+      G,n'^(ptr^c W) |-m H'(n'+x) : Tx for 0 <= x < j under H'
+    Two cases
+      n'+x == i: So H'(i) = k^T and we are given G |- k^T under H'. Follows by weakening
+      n'+x != i. So H'(i) = H(i) and the result follows by induction.
+
+
+Definition set_equal (s1 s2 : scope) :=
+  forall x, set_In x s1 <-> set_In x s2.
+
+Lemma set_equal_add (s1 s2 : scope) (v : Z * type) :
+  set_equal s1 s2 -> 
+  set_equal (set_add eq_dec_nt v s1) (set_add eq_dec_nt v s2).
+Proof.  
+  intros Eq x.
+  split; intros.
+  - destruct (eq_dec_nt x v).
+    + subst; apply set_add_intro2; auto.
+    + apply set_add_intro1; auto.
+      apply set_add_elim2 in H; eauto.
+      apply Eq; auto.
+  - destruct (eq_dec_nt x v).
+    + subst; apply set_add_intro2; auto.
+    + apply set_add_intro1; auto.
+      apply set_add_elim2 in H; eauto.
+      apply Eq; auto.
+Qed.      
+
+Lemma scope_replacement :
+  forall D H s n t,
+    @well_typed_lit D H s n t ->
+  (forall s', 
+    set_equal s s' ->
+    @well_typed_lit D H s' n t).
+Proof.
+  intros D H ss n t HWT.
+  induction HWT using well_typed_lit_ind'; eauto.
+  - (* Replacement, TyRec *)
+    intros s' HEq.
+    econstructor; eauto; eapply HEq; eauto.
+  - (* Replacement, TyLitC *)
+    intros s' Heq.
+    eapply TyLitC; eauto.
+    intros k Hk.
+    destruct (H1 k Hk) as [n' [t' [HNth [HMap [HWt1 HRepl]]]]].
+    exists n'. exists t'.
+    repeat (split; eauto).
+    eapply HRepl; eauto.
+    apply set_equal_add; auto.
+Qed.
+
+Lemma set_equal_add_add (s1 s2 : scope) (v1 v2 : Z * type) :
+  set_equal s1 s2 -> 
+  set_equal (set_add eq_dec_nt v1 (set_add eq_dec_nt v2 s1))
+            (set_add eq_dec_nt v2 (set_add eq_dec_nt v1 s1)).
+Proof.  
+  intros Eq x.
+  split; intros;
+    destruct (eq_dec_nt x v1); destruct (eq_dec_nt x v2); subst;
+      try solve [apply set_add_intro2; auto];
+      try solve [apply set_add_intro1; auto;
+                 apply set_add_intro2; auto];
+    (do 2 (apply set_add_intro1; auto);
+     do 2 (apply set_add_elim2 in H; auto)).
+Qed.
+
+Lemma set_equal_refl (s : scope) : set_equal s s.
+  intros x; split; auto.
+Qed.
+
+Lemma scope_weakening :
+  forall D H s n t,
+    @well_typed_lit D H s n t ->
+  forall x,
+    @well_typed_lit D H (set_add eq_dec_nt x s) n t.
+Proof.
+  intros D H ss n t HWT.
+  induction HWT using well_typed_lit_ind'; eauto.
+  - (* Weakening, TyRec *)
+    intros x.
+    econstructor.
+    apply set_add_intro1; eauto.
+  - (* Weakening, TyLitC *)
+    intros x.
+    eapply TyLitC; eauto.
+    intros k Hk.
+    destruct (H1 k Hk) as [n' [t' [HNth [HMap [HWt1 HWeak]]]]].
+    exists n'. exists t'.
+    repeat (split; eauto).
+    eapply scope_replacement; [eapply HWeak; eauto |].
+    eapply set_equal_add_add; eauto.
+    eapply set_equal_refl; eauto.
+Qed.
+
+Lemma set_equal_add_cons :
+  forall x y s,
+      set_equal (x :: set_add eq_dec_nt y s)
+                (set_add eq_dec_nt y (x :: s)).
+Proof.
+  intros x y s z; split; intros H;
+  destruct (eq_dec_nt z y); destruct (eq_dec_nt z x);
+    subst; try congruence.
+  - apply set_add_intro2; auto.
+  - apply set_add_intro2; auto.
+  - apply set_add_intro1; left; auto.
+  - inv H; try congruence.
+    apply set_add_elim in H0.
+    inv H0; try congruence.
+    apply set_add_intro1; auto.
+    right; auto.
+  - left; auto. 
+  - right; apply set_add_intro2; auto.
+  - left; auto.
+  - apply set_add_elim in H.
+    inv H; try congruence.
+    inv H0; try congruence.
+    right; apply set_add_intro1; auto.
+Qed.
+
+Lemma scope_weakening_cons :
+  forall D H n t s,
+    @well_typed_lit D H s n t ->
+  forall x, @well_typed_lit D H (x :: s) n t.
+Proof.
+  intros D H n t s HWT.
+  induction HWT using well_typed_lit_ind'; eauto; intros x.
+  - econstructor.
+    right; eauto.
+  - eapply TyLitC; eauto.
+    intros k Hk.
+    destruct (H1 k Hk) as [n' [t' [HNth [HMap [HWt1 HWeak]]]]].
+    exists n'. exists t'.
+    repeat (split; eauto).
+    eapply scope_replacement; [eapply (HWeak x); eauto |].
+    apply set_equal_add_cons.
+Qed.
+
+Corollary scope_weakening' :
+  forall D H n t,
+    @well_typed_lit D H empty_scope n t ->
+  forall s, @well_typed_lit D H s n t.
+Proof.  
+  intros D H n t HWT s.
+  induction s; auto.
+  apply scope_weakening_cons; auto.
+Qed.  
+  
+  (*
+Lemma scope_wf_heap_consistent_weakening :
+  forall s D H x v T v',
+    Heap.MapsTo x (v,T) H ->
+    scope_wf D H s -> scope_wf D (Heap.add x (v',T) H) s.
+Proof.
+  intros s D H x v T v' HMap HSwf.
+  intros x' t' HS.
+  destruct (HSwf x' t'); eauto.
+  destruct (Nat.eq_dec x x').
+  - subst; maps_to_fun.
+    exists v'.
+    eapply Heap.add_1; eauto.
+  - exists x0.
+    eapply Heap.add_2; eauto.
+Qed.
+
+Hint Resolve scope_wf_heap_consistent_weakening.
+ *)
+     
+Lemma HeapUpd : forall D i n T H k,
+  Heap.MapsTo i (n,T) H ->
+  @well_typed_lit D (Heap.add i (k,T) H) empty_scope k T ->
+  @heap_consistent D (Heap.add i (k,T) H) H.
+Proof.
+  intros D i n T H k HMap Hwtk n' t' HWT.
+  induction HWT using well_typed_lit_ind'; eauto.
+  (* T-PtrC *)
+  eapply TyLitC; eauto.
+  intros x Hx.
+  destruct (H1 x Hx) as [n' [t' [HNth [HMap' [HWt1 HWt2]]]]].
+  destruct (Z.eq_dec (n0+x) i).
+  - exists k. exists t'.
+    subst. maps_to_fun.
+    repeat (split; eauto).
+    + apply Heap.add_1; eauto.
+    + apply scope_weakening; eauto.
+  - exists n'. exists t'.
+    repeat (split; eauto).
+      + apply Heap.add_2; eauto.
+      + eapply HWt2.
+        eapply scope_weakening; eauto.
+Qed.
+
+Hint Constructors value.
+
+Lemma types_are_not_infinite :
+  forall w, TPtr Checked w = w -> False.
+Proof.
+  induction w; intros; try congruence.
+Qed.
+
+(* Custom remove to avoid NoDup? *)
+Fixpoint set_remove_all v (x : scope) := 
+    match x with
+    | nil => empty_scope
+    | v' :: vs => if eq_dec_nt v v' then
+                    set_remove_all v vs
+                  else
+                    v' :: set_remove_all v vs
+    end.
+
+Lemma set_remove_all_intro : forall a b l,
+    set_In a l -> a <> b -> set_In a (set_remove_all b l).
+Proof.
+  intros a b l.
+  induction l; intros; simpl.
+  - inv H.
+  - destruct (eq_dec_nt b a0).
+    + subst.
+      inv H; try congruence.
+      eapply IHl; eauto.
+    + destruct (eq_dec_nt a a0).
+      * subst; left; auto.
+      * inv H; try congruence.
+        simpl.
+        right.
+        eauto.
+Qed.
+
+Lemma set_remove_all_elim1:
+  forall a b l, set_In a (set_remove_all b l) -> a <> b.
+Proof.  
+  intros; induction l.
+  - inv H.
+  - intro Contra; subst.
+    simpl in H.
+    destruct (eq_dec_nt b a0).
+    + subst.
+      apply IHl; eauto.
+    + simpl in *.
+      inv H; try congruence.
+      eapply IHl; eauto.
+Qed.
+
+Lemma set_remove_all_elim2:
+  forall a b l, set_In a (set_remove_all b l) -> set_In a l.
+Proof.
+  intros; induction l.
+  - inv H.
+  - simpl in H.
+    destruct (eq_dec_nt b a0).
+    + subst.
+      right; apply IHl; eauto.
+    + simpl in *.
+      inv H.
+      * left; auto.
+      * right; eapply IHl; eauto.
+Qed.
+  
+Lemma set_equal_add_remove (s : scope) (v1 v2 : Z * type) :
+  v1 <> v2 ->
+  set_equal (set_add eq_dec_nt v1 (set_remove_all v2 s))
+            (set_remove_all v2 (set_add eq_dec_nt v1 s)).
+Proof.
+  intros H x.
+  split; intro In.
+  * destruct (eq_dec_nt x v1); destruct (eq_dec_nt x v2); try congruence; subst;
+      unfold not in *.
+    - apply set_remove_all_intro; eauto.
+      apply set_add_intro2; auto.
+    - apply set_add_elim in In; destruct In; try congruence.
+      eapply set_remove_all_elim1 in H0.
+      congruence.
+    - apply set_remove_all_intro; eauto.
+      apply set_add_elim in In; destruct In; try congruence.
+      apply set_remove_all_elim2 in H0.
+      apply set_add_intro1; auto.
+  * destruct (eq_dec_nt x v1); destruct (eq_dec_nt x v2); try congruence; subst.
+    - apply set_add_intro2; auto.
+    - apply set_remove_all_elim1 in In.
+      try congruence.
+    - apply set_remove_all_elim2 in In.
+      apply set_add_elim in In.
+      inv In; try congruence.
+      apply set_add_intro1; auto.
+      apply set_remove_all_intro; eauto.
+Qed.      
+
+Lemma set_remove_add :
+  forall x s, set_equal (set_remove_all x (set_add eq_dec_nt x s)) (set_remove_all x s).
+Proof.
+  intros x s y; split; intros H; destruct (eq_dec_nt x y); subst; eauto.
+  - apply set_remove_all_elim1 in H; congruence.
+  - apply set_remove_all_elim2 in H.
+    apply set_add_elim in H.
+    inv H; try congruence.
+    apply set_remove_all_intro; auto.
+  - apply set_remove_all_elim1 in H; congruence.
+  - apply set_remove_all_intro; auto.
+    apply set_remove_all_elim2 in H.
+    apply set_add_intro1; auto.
+Qed.
+
+Lemma set_equal_symmetry : forall (s1 s2 : scope),
+    set_equal s1 s2 -> set_equal s2 s1.
+Proof.  
+  intros s1 s2 Eq x; split; intro H;
+  apply Eq; auto.
+Qed.  
+  
+Lemma scope_swap :
+  forall D H x y s N T,
+    @well_typed_lit D H (set_remove_all x (set_add eq_dec_nt y s)) N T ->
+    @well_typed_lit D H (set_add eq_dec_nt y (set_remove_all x s)) N T.
+Proof.
+  intros D H x y s N T HWT.
+  destruct (eq_dec_nt x y).
+  - subst.
+    pose proof (set_remove_add y s).
+    apply scope_replacement with (s' := set_remove_all y s) in HWT; auto.
+    apply scope_weakening; auto.
+  - assert (Neq: y <> x) by auto.
+    pose proof (set_equal_add_remove s y x Neq) as Hyp.
+    eapply scope_replacement.
+    + eapply HWT.
+    + apply set_equal_symmetry.
+      auto.
+Qed.
+
+
+
+
+Lemma scope_strengthening :
+  forall D H n tn s,
+    @well_typed_lit D H s n tn ->
+    heap_wf D H ->
+    forall m tm,
+      @well_typed_lit D H empty_scope m tm ->
+      @well_typed_lit D H (set_remove_all (m, tm) s) n tn.
+Proof.
+  intros D H n' t s HWT.
+  remember HWT as Backup; clear HeqBackup.
+  induction HWT using well_typed_lit_ind';
+  (* intros HHwf m HMap HSetIn HWT; eauto. *)
+    intros HHwf m tm Hwt; eauto.
+  - destruct (Z.eq_dec n m).
+    + subst.
+      destruct (type_eq_dec tm (TPtr Checked w)).
+      * subst. 
+        apply scope_weakening'; eauto.
+      * econstructor; eauto.
+        apply set_remove_all_intro; eauto.
+        intro Contra; inv Contra. eauto.
+    + econstructor.
+      apply set_remove_all_intro; eauto.
+      congruence.
+  - eapply TyLitC; eauto.
+    intros k Hk.
+    destruct (H1 k Hk) as [N [T [HNth [HMap' [Hwt' IH]]]]].
+
+    exists N; exists T; eauto.
+    repeat (split; eauto).
+
+    specialize (IH Hwt' HHwf m tm Hwt).
+    apply scope_swap; auto.
+Qed.
+
+
+Lemma preservation_fieldaddr : forall (D : structdef) H n T (fs : fields),
+  @well_typed_lit D H empty_scope n (TPtr Checked (TStruct T)) ->
+  forall i fi ti,
+  n <> 0 ->
+  StructDef.MapsTo T fs D ->
+  Fields.MapsTo fi ti fs ->
+  nth_error (Fields.this fs) i = Some (fi, ti) ->
+  heap_wf D H ->
+  structdef_wf D ->
+  fields_wf D fs ->
+  word_type ti ->
+  @well_typed_lit D H empty_scope (n + (Z.of_nat i)) (TPtr Checked ti).
+Proof.
+  intros D H n T fs HWT.
+  inversion HWT;
+  intros i fi ti Hn HS HF Hnth Hhwf HDwf Hfwf Hwt; eauto.
+  - exfalso ; eauto.
+  - destruct (H4  (Z.of_nat i)) as [N' [T' [HNth [HMap HWT']]]]; subst.
+    + inv H1.
+      simpl in H2.
+      destruct (StructDef.find T D) eqn:Find; try congruence.
+      inv H2.
+      rewrite map_length.
+      apply StructDef.find_2 in Find.
+      assert (f = fs).
+      { eapply StructDefFacts.MapsTo_fun; eauto. }
+      subst.
+      apply nth_length in Hnth.
+      rewrite <- Fields.cardinal_1.
+      eauto.
+    + inv H1.
+      simpl in *.
+      destruct (@StructDef.find _ T D) eqn:Find; try congruence.
+      inv H2.
+
+      apply StructDef.find_2 in Find.
+      assert (f = fs).
+      { eapply StructDefFacts.MapsTo_fun; eauto. }
+      subst.
+
+      eapply map_nth_error with (f := snd) in Hnth.
+      assert (Hyp: Fields.this fs = Fields.elements fs) by auto.
+      rewrite Hyp in Hnth.
+
+      (* I hate these types... *)
+      assert (
+          Hnth' : @eq (option type)
+                      (@nth_error type
+              (@map (prod Fields.key type) type (@snd Fields.key type)
+                 (@Fields.elements type fs)) i)
+           (@Some type (@snd nat type (@pair Fields.key type fi ti)))
+        ) by auto.
+      assert (Hi : (Z.to_nat (Z.of_nat i)) = i). {
+        destruct i.
+          +simpl. reflexivity.
+          +simpl. zify. lia. }
+      simpl in *.
+      rewrite Z.sub_0_r in *. rewrite Hi in HNth.
+      rewrite <- HNth in Hnth'.
+      inv Hnth'.
+      inv Hwt.
+      * eapply TyLitC; simpl in *; eauto.
+        intros k Hk; simpl in *.
+        assert (k = 0) by lia; subst.
+        exists N'. exists TNat.
+        repeat (split; eauto).
+        rewrite Z.add_0_r; eauto.
+      * unfold fields_wf in Hfwf.
+        apply Hfwf in HF. destruct HF. destruct H1.
+        eapply TyLitC; simpl in *; eauto.
+        intros k Hk; simpl in *.
+        assert (k = 0) by lia; subst.
+        exists N'. exists (TPtr m w).
+        repeat (split; eauto).
+        rewrite Z.add_0_r; eauto.
+
+        assert (HEmpty : empty_scope = set_remove_all (n, TPtr Checked (TStruct T))
+                                             ((n, TPtr Checked (TStruct T)) :: nil)).
+        { unfold set_remove_all.
+          destruct (eq_dec_nt (n, TPtr Checked (TStruct T)) (n, TPtr Checked (TStruct T))); auto.
+          congruence.
+        }
+
+        eapply scope_strengthening in HWT'; eauto.
+        rewrite <- HEmpty in HWT'.
+        apply scope_weakening_cons.
+        auto.
+
+Qed.
+
+(*
+
+Def: H' |- H iff for all i
+  H(i) = n^T such that . |- n^T : T under H implies
+  H'(i) = n'^T such that . |- n'^T : T under H'.
+
+Lemma PtrUpdA:
+  Suppose H(i) = n^T and G |- n'^T' : T' under heap H.
+  Then H' = H[i |--> k^T] implies that G,k^T |- n'^T' under heap H'
+    when T = ptr^c W (i.e., it's a checked pointer type)
+Proof
+  Proof by induction on G |- n'^T' : T' under heap H.
+  Case T-Int: Then T'=int and G,k^T |- n'^int under heap H' by T-Int
+  Case T-VConst: Then G,k^T |- n'^T' under heap H' by T-VConst as well (since n'^T' \in G)
+  Case T-PtrC: Three cases:
+    n'^T' = k^T. Follows from T-VConst
+    Otherwise
+      T' = ptr^c W'
+      types(D,W') = T0,...,T(j-1)
+      G,n'^(ptr^c W') |-m H(n'+x) : Tx for 0 <= x < j under H
+    We want to show
+      G,n'^(ptr^c W'),k^T |-m H(n'+x) : Tx for 0 <= x < j under H'
+    When n'+x != i then the result follows from T-Int, T-VConst, or T-PtrC and induction.
+    When n'+x = i it follows by H-Visited, since H'(i) = k^T and k^T \in G,k^T
+      (and H(i) = n^T --- that is the old and new value had the same annotation)
+*)
+
+Lemma PtrUpdA :
+  forall D H s n' T',
+    @well_typed_lit D H s n' T' ->
+    forall i k m w,
+      Heap.MapsTo i (m,TPtr Checked w) H ->
+      @well_typed_lit D (Heap.add i (k,TPtr Checked w) H) (set_add eq_dec_nt (k,TPtr Checked w) s) n' T'.
+Proof.
+  intros D H s n' T' HWT'.
+  remember HWT' as Backup; clear HeqBackup.
+  induction HWT' using well_typed_lit_ind'; eauto;
+    intros i k m T HMap.
+  - econstructor.
+    apply set_add_intro; eauto.
+  - eapply TyLitC; eauto.
+    intros x Hx.
+    destruct (H1 x Hx) as [N' [T' [HNth [HMap' [HWT'' IH]]]]].
+    destruct (Z.eq_dec (n + x) i).
+    + subst.
+      maps_to_fun.
+      exists k; exists (TPtr Checked T); eauto.
+      repeat (split; eauto).
+      * apply Heap.add_1; eauto.
+      * eapply TyLitRec; auto.
+        apply set_add_intro1;
+        apply set_add_intro2; auto. 
+    + exists N'; exists T'; eauto.
+      repeat (split; eauto).
+      * apply Heap.add_2; auto.
+      * eapply scope_replacement; eauto.
+        eapply set_equal_add_add; eauto.
+        eapply set_equal_refl.
+Qed.
+        (*
+Lemma A: If G |- n^T : T where T = Ptr^c W such that W is an array
+or word type, then G |- H(n) : T' where types(D,W) = T',...
+Proof by induction on G |- n^T.
+We have G,n^T |- H(n) : T' by inversion on H-PtrC. Consider the
+derivation of this, and let k^T' = H(n).
+  H-Int: Then G |- k^Int : Int as well
+  H-Visited: There are two cases:
+   k^T' \in G: In that case G |- k^T' : T' by H-Visited
+   k^T' = n^T: In this case we can simply reuse the derivation we were
+   given, i.e., G |- n^T : T.
+ H-PtrC: Holds by induction.
+
+
+
+Corollary PtrUpd:
+  Suppose H(i) = n^T and G |- n'^T : T under heap H.
+  Then H' = H[i |--> n'^T] implies that G |- n'^T under heap H'
+Proof.
+  If T is not a checked pointer it follows directly (same logic is PtrUpdA)
+  Else by inversion we have
+      T = ptr^c W 
+      types(D,W) = T0,...,T(j-1)
+      G,n'^(ptr^c W) |-m H(n'+k) : Tk for 0 <= k < j under H
+    We want to prove
+      G,n'^(ptr^c W) |-m H'(n'+k) : Tk for 0 <= k < j under H'
+    Two cases
+      n'+k == i. Then H'(i) = n'^T. The result follows from T-VConst.
+      n'+k != i. Then H'(n'+k) = H(n'+k) = n''^Tk.
+        By Lemma A we have G |-m H(n'+k) : Tk for 0 <= k < j under H
+        By PtrUpdA we have G, n'^(ptr^c W) |-m H'(n'+k) : Tk for 0 <= k < j under H'
+
+ *)
+
+
+
+
+Lemma PtrUpd : forall i n T H D n',
+    heap_wf D H ->
+    simple_type T ->
+    Heap.MapsTo i (n, T) H ->
+    @well_typed_lit D H empty_scope n' T ->
+    @well_typed_lit D (Heap.add i (n',T) H) empty_scope n' T.
+Proof.
+  intros i n T H D n' Hwf HSimple HMap HWT.
+  remember HWT as Backup; clear HeqBackup.
+  inv HWT; eauto.
+  eapply TyLitC; eauto.
+  intros x Hx.
+  destruct (H1 x Hx) as [x' [Tx [HNth [HMap' HWt1]]]].
+
+  destruct (Z.eq_dec (n'+x) i).
+  - subst.
+    maps_to_fun.
+    exists n'. exists (TPtr Checked w).
+    repeat (split; eauto).
+    + solve_map.
+    + eapply TyLitRec; eauto.
+      apply set_add_intro2; auto. 
+  - exists x'. exists Tx.
+    repeat (split; eauto).
+    + eapply Heap.add_2; eauto.
+    + eapply PtrUpdA; eauto.
+
+      assert (HEmpty : empty_scope = set_remove_all (n', TPtr Checked w)
+                                                    ((n', TPtr Checked w) :: nil)).
+      {
+        unfold set_remove_all.
+        destruct (eq_dec_nt (n', TPtr Checked w) (n', TPtr Checked w)); auto.
+        congruence.
+      } 
+
+      rewrite HEmpty.
+      eapply scope_strengthening; eauto.
+Qed.
+
+Lemma well_typed_heap_in : forall n D H w,
+  heap_wf D H ->
+  Heap.In n H ->
+  word_type w ->
+  @well_typed_lit D H empty_scope n (TPtr Checked w) ->
+  exists x, Heap.MapsTo n (x, w) H.
+Proof.
+  intros n D H w Hwf HIn Hwt HWT.
+  inv HWT.
+  - destruct (Hwf 0) as [_ Contra].
+    apply Contra in HIn.
+    lia.
+  - inv H3. 
+  - inv Hwt; simpl in *; inv H1.
+    + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      *simpl. lia.
+      *
+      rewrite Z.add_0_r in HMap.
+      inv HNth.
+      exists n'; eauto.
+    + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      *simpl. lia.
+      *rewrite Z.add_0_r in HMap.
+       inv HNth.
+       exists n'; eauto.
+Qed.
+
+Lemma well_typed_heap_in_array : forall n D H l h w,
+  heap_wf D H ->
+  Heap.In n H ->
+  h > 0 ->
+  l <= 0 ->
+  @well_typed_lit D H empty_scope n (TPtr Checked (TArray (Num l) (Num h) w)) ->
+  exists x, Heap.MapsTo n (x, w) H.
+Proof.
+  intros n D H l h w Hwf HIn Hl Hh HWT.
+  inv HWT.
+  - destruct (Hwf 0) as [_ Contra].
+    apply Contra in HIn.
+    lia.
+  - inv H3.
+  - inv H1.
+    destruct l.
+    + destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      * simpl. destruct h; inv Hl. simpl.
+        assert (Hyp : exists s, Pos.to_nat(p) = S s).
+        { apply pos_succ. }
+        inv Hyp.
+        rewrite replicate_length.
+        simpl. lia.
+      * rewrite Z.sub_0_r in *.
+        inv HNth.
+        exists n'; eauto.
+        assert (H3 : t' = w). {
+          destruct h; inv Hl. inv H1. 
+          assert (HP: exists s, Pos.to_nat(p) = S s) by apply pos_succ.
+          inv HP.
+          rewrite H0 in H2. simpl in H2. inv H2. reflexivity.
+        }
+        rewrite <- H3. rewrite Z.add_0_r in *. assumption.
+    + zify; lia.
+    + assert (H1: (h - (Z.neg p)) > 0) by (zify; lia).
+      assert (H2: exists n, (h - (Z.neg p)) = Z.pos n). {
+        destruct (h - (Z.neg p)); inv H1. exists p0. reflexivity.
+      }
+      destruct H2 as [pos Hpos].
+      assert (Hpos': exists n, Pos.to_nat pos = S n) by apply pos_succ.
+      destruct Hpos' as [N HN].
+      destruct (H4 0) as [n' [t' [HNth [HMap HWT]]]]; auto.
+      rewrite Hpos. simpl. rewrite HN.
+      rewrite replicate_length.
+      simpl. split.
+        * zify. lia.
+        * rewrite Z.pos_sub_gt. 
+          { zify. lia. }
+          { zify. lia. }
+        * rewrite Z.add_0_r in HMap.
+          rewrite Hpos in HNth. simpl in HNth.
+          rewrite HN in HNth. 
+          assert (w = t').
+              {
+                eapply replicate_nth; eauto.
+              }
+              subst w.
+          exists n'. assumption.
+Qed.
+
+Lemma add_one_not_change :
+   forall x0 s,
+      (forall x v t, Stack.MapsTo x (v,t) (add_nt_one s x0) -> simple_type t)
+     -> (forall x v t, Stack.MapsTo x (v,t) s -> simple_type t).
+Proof.
+  intros.
+  destruct (var_eq_dec x x0). subst.
+  destruct t. apply SPTNat.
+  destruct t. apply SPTPtr. apply SPTNat.
+  apply (H x0 v (TPtr m (TPtr m0 t))).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v,TPtr m (TPtr m0 t)) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s). destruct p.
+  inv eq1. assumption. inv eq1.
+  apply SPTPtr. apply SPTStruct.
+  apply (H x0 v (TPtr m (TArray b b0 t))).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v, TPtr m (TArray b b0 t)) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s). destruct p.
+  inv eq1. assumption. inv eq1.
+  destruct b0.
+  assert (Stack.MapsTo x0
+        (v, TPtr m (TNTArray b (Num (z + 1)) t))
+        (add_nt_one s x0)).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v, TPtr m (TNTArray b (Num z) t)) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s).
+  inv eq1.
+  apply Stack.add_1. reflexivity. inv eq1.
+  apply H in H1.
+  inv H1. inv H3.
+  apply SPTPtr. apply SPTNTArray. assumption.
+  assert (Stack.MapsTo x0
+        (v, TPtr m (TNTArray b (Var v0 (z + 1)) t))
+        (add_nt_one s x0)).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v, TPtr m (TNTArray b (Var v0 z) t)) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s).
+  inv eq1.
+  apply Stack.add_1. reflexivity. inv eq1.
+  apply H in H1.
+  inv H1. inv H3.
+  apply SPTStruct.
+  apply (H x0 v (TArray b b0 t)).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v, TArray b b0 t) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s).
+  inv eq1. assumption. inv eq1.
+  apply (H x0 v (TNTArray b b0 t)).
+  unfold add_nt_one.
+  specialize (@Stack.find_1 (Z * type)s x0 (v, TNTArray b b0 t) H0) as eq1.
+  destruct (Stack.find (elt:=Z * type) x0 s).
+  inv eq1. assumption. inv eq1.
+  apply (H x v t).
+  unfold add_nt_one.
+  destruct (Stack.find (elt:=Z * type) x0 s). destruct p.
+  destruct t0.
+  assumption.
+  destruct t0. 1 - 4 : assumption.
+  destruct b0.
+  apply Stack.add_2. lia. assumption.
+  apply Stack.add_2. lia. assumption.
+  1 - 4 : assumption.
+Qed.
+
+(*
+Lemma simple_type_step : forall D H s e s' H' r, (forall x v t, Stack.MapsTo x (v,t) s -> simple_type t)
+                                    -> step D s H e s' H' r -> (forall x v t, Stack.MapsTo x (v,t) s' -> simple_type t).
+Proof.
+  intros. induction H1; eauto.
+  destruct (var_eq_dec x x0).
+  rewrite e0 in H2.
+  apply Stack.mapsto_add1 in H2.
+  injection H2. intros.
+  subst.
+  apply cast_means_simple_type in H1. assumption.
+  apply Stack.add_3 in H2.
+  apply (H0 x v). assumption. lia.
+  specialize (add_one_not_change x0 s H0 x v t) as eq1.
+  apply eq1. assumption.
+Qed.
+*)
+
+Lemma well_bound_grow_env :
+    forall env x v b, well_bound_in env b -> well_bound_in (Env.add x v env) b.
+Proof.
+   intros. induction b.
+   apply well_bound_in_num.
+   apply well_bound_in_var.
+   inv H. inv H2.
+   destruct (var_eq_dec x v0).
+   unfold Env.In,Env.Raw.PX.In.
+   exists v. apply Env.add_1. assumption.
+   unfold Env.In,Env.Raw.PX.In.
+   exists x0.
+   apply Env.add_2. assumption. assumption.
+Qed.
+
+Lemma well_type_bound_grow_env :
+    forall env x v t, well_type_bound_in env t -> well_type_bound_in (Env.add x v env) t.
+Proof.
+   intros. induction t.
+   apply well_type_bound_in_nat.
+   apply well_type_bound_in_ptr.
+   apply IHt. inv H. assumption.
+   apply well_type_bound_in_struct.
+   apply well_type_bound_in_array.
+   apply well_bound_grow_env. inv H. assumption.
+   apply well_bound_grow_env. inv H. assumption.
+   inv H. apply IHt. assumption.
+   apply well_type_bound_in_ntarray.
+   apply well_bound_grow_env. inv H. assumption.
+   apply well_bound_grow_env. inv H. assumption.
+   inv H. apply IHt. assumption.
+Qed.
+
+Lemma cast_bound_well_type : forall D F S H m env v t t', cast_type_bound S t t'
+                 -> @well_typed D F S H env m (ELit v t) t -> @well_typed D F S H env m (ELit v t') t'.
+Proof.
+  intros. inv H1. apply TyLit.
+  apply cast_means_simple_type in H0.
+  apply (simple_type_well_bound env0) in H0.
+  assumption. remember empty_scope as scope.
+  eapply WTStack. apply (simple_type_means_cast_same).
+  apply cast_means_simple_type in H0. assumption.
+  inv H8.
+  apply (cast_type_bound_same S t t' t'0) in H0.
+  subst. apply cast_means_simple_type in H1.
+  remember empty_scope as sc.
+  induction H2 using well_typed_lit_ind'.
+  apply TyLitInt.
+  apply TyLitU.
+  apply TyLitZero.
+  subst. inv H0.
+  eapply TyLitC;eauto.
+    intros k Hk.
+    destruct (H2 k Hk) as [N [T [HNth [HMap' [Hwt' IH]]]]].
+    exists N. exists T.
+    easy.
+  assumption.
+Qed.
+
+   
+Inductive env_consistent : env -> env -> Prop :=
+  |Env_refl : forall e,
+      env_consistent e e
+  |Env_add : forall e x t,
+      ~ Env.In x e ->
+      env_consistent (Env.add x t e) e.
+
+Definition ty_ssa_stack (S:stack) (e:expression) 
+            := exists l, (forall x,  Stack.In x S -> In x l) /\ (exists l', ty_ssa l e l').
+
+Definition stack_grow (D: structdef) (S S' : stack) :=
+     (forall x v t, Stack.MapsTo x (v,t) S
+              -> (exists t', (subtype D t' t) /\ Stack.MapsTo x (v,t') S')).
+
+
+Lemma stack_grow_prop : forall D F S H S' H' e e', 
+           ty_ssa_stack S e
+          -> step D F S H e S' H' (RExpr e') -> stack_grow D S S'.
+Proof.
+ intros.
+ specialize (ty_ssa_preserve' D S H S' H' e e' H0 H1) as eq1.
+ remember (RExpr e') as e1.
+ unfold stack_grow. intros.
+ induction H1.
+ exists t. split. constructor. easy.
+ unfold change_strlen_stack in *.
+ destruct ( n' - n <=? h) eqn:eq2.
+ exists t. split. constructor. easy.
+ assert (~ (n' - n <= h)).
+ specialize (Z.leb_le (n' - n) h) as eq3.
+ apply not_true_iff_false in eq2.
+ intros R.
+ apply eq3 in R. rewrite R in eq2. contradiction.
+ assert (h < n' - n) by lia.
+ destruct (Nat.eq_dec x x0).
+ subst.
+ apply Stack.find_1 in H2. rewrite H1 in H2. inv H2.
+ exists (TPtr m (TNTArray l (Num (n' - v)) t0)).
+ split. 
+ apply SubTyNtSubsume.
+ destruct l.
+ constructor. lia. constructor. lia.
+ constructor. lia.
+ apply Stack.add_1. lia.
+ exists t.
+ split. constructor.
+ apply Stack.add_2. lia. assumption.
+ 1 - 36 : exists t; split; try constructor; try easy.
+ unfold ty_ssa_stack in H0.
+ destruct H0. destruct H0.
+ destruct H3.
+ inv H3.
+ destruct (Nat.eq_dec x x0).
+ subst.
+ assert (In x0 x1).
+ apply H0.
+ unfold Stack.In,Stack.Raw.PX.In.
+ exists (v,t). assumption.
+ contradiction.
+ exists t. split. constructor.
+ apply Stack.add_2. lia. assumption.
+ 1 - 5 : exists t; split; try constructor; try easy.
+Qed.
+
+Lemma stack_grow_cast_same : forall D S S' b b', stack_grow D S S' ->
+              cast_bound S b = Some b' -> cast_bound S' b = Some b'.
+Proof.
+  intros. unfold cast_bound in *.
+  destruct b. assumption.
+  destruct (Stack.find (elt:=Z * type) v S) eqn:eq1. destruct p.
+  unfold stack_grow in H.
+  apply Stack.find_2 in eq1. apply H in eq1.
+  destruct eq1. destruct H1.
+  apply Stack.find_1 in H2.
+  destruct (Stack.find (elt:=Z * type) v S') eqn:eq2. destruct p.
+  inv H2. assumption. inv H2. inv H0.
+Qed.
+
+Lemma stack_grow_cast_type_same : forall D S S' t t', stack_grow D S S' ->
+              cast_type_bound S t t' -> cast_type_bound S' t t'.
+Proof.
+  intros.
+  induction H0. apply cast_type_bound_nat.
+  apply cast_type_bound_ptr. apply IHcast_type_bound.
+  apply cast_type_bound_array.
+  apply (stack_grow_cast_same D S). assumption.
+  assumption.
+  apply (stack_grow_cast_same D S). assumption.
+  assumption.
+  assumption.
+  apply cast_type_bound_ntarray.
+  apply (stack_grow_cast_same D S). assumption.
+  assumption.
+  apply (stack_grow_cast_same D S). assumption.
+  assumption.
+  assumption.
+  apply cast_type_bound_struct.
+Qed.
+
+Lemma cast_type_well_typed_lit :
+    forall D s H v t t', cast_type_bound s t t' -> 
+      well_type_lit_stack D s H empty_scope v t -> 
+       well_type_lit_stack D s H empty_scope v t'.
+Proof. 
+ intros. 
+ inv H1.
+ apply (cast_type_bound_same s t t' t'0) in H0.
+ subst. eapply WTStack. apply (simple_type_means_cast_same).
+ apply (cast_means_simple_type) in H2. assumption.
+ assumption. assumption.
+Qed.
+
+Lemma stack_grow_well_typed_lit :
+    forall D s s' H v t,
+     stack_grow D s s' -> 
+      well_type_lit_stack D s H empty_scope v t -> 
+       well_type_lit_stack D s' H empty_scope v t.
+Proof. 
+ intros D s s' H v t Hgrow HWT.
+ inv HWT.
+ eapply WTStack.
+ apply (stack_grow_cast_type_same D s).
+ assumption. apply H0.
+ assumption.
+Qed.
+
+Lemma stack_grow_type_eq :
+   forall D s s' t t', stack_grow D s s' -> 
+         type_eq s t t' -> type_eq s' t t'.
+Proof.
+ intros.
+ induction H0.
+ constructor.
+ apply type_eq_left. apply H0.
+ apply (stack_grow_cast_type_same D s). assumption. assumption.
+ apply type_eq_right. apply H0.
+ apply (stack_grow_cast_type_same D s). assumption. assumption.
+Qed.
+
+Lemma stack_grow_meet_type :
+  forall D s s' t t1 t2, stack_grow D s s' 
+         -> meet_type D s t t1 t2 -> meet_type D s' t t1 t2.    
+Proof.
+  intros. 
+  induction H0; eauto.
+  apply meet_type_front_1. assumption.
+  eapply meet_type_front_2.
+  apply (stack_grow_cast_type_same D s s').
+  assumption. apply H0.
+  apply (stack_grow_cast_type_same D s s').
+  assumption. apply H1.
+  apply H2.
+  apply meet_type_end_1. assumption.
+  eapply meet_type_end_2.
+  apply (stack_grow_cast_type_same D s s').
+  assumption. apply H0.
+  apply (stack_grow_cast_type_same D s s').
+  assumption. apply H1.
+  apply H2.
+Qed.
+
+Lemma stack_grow_well_typed :
+    forall D F s s' H env m e t,
+     stack_grow D s s' -> 
+      @well_typed D F s H env m e t -> 
+       @well_typed D F s' H env m e t.
+Proof. 
+ intros D F s s' H env m e t Hgrow Hwf.
+ induction Hwf;eauto.
+ constructor. assumption.
+ apply (stack_grow_well_typed_lit D s s').
+ assumption. assumption.
+ eapply TyCall. apply H0.
+ eapply TyCast2. 
+ apply (stack_grow_type_eq D s s') in H0.
+ apply H0. assumption.
+ assumption.
+ apply IHHwf.
+ eapply TyCast3. 
+ apply (stack_grow_type_eq D s s') in H0.
+ apply H0. assumption.
+ assumption.
+ apply IHHwf.
+ eapply TyCast4. 
+ apply (stack_grow_type_eq D s s') in H0.
+ apply H0. assumption.
+ assumption.
+ apply IHHwf.
+ eapply TyAssign1.
+ apply H0. assumption.
+ apply (stack_grow_type_eq D s s'). assumption.
+ assumption. apply IHHwf1.
+ apply IHHwf2.
+ assumption.
+ eapply TyAssign2.
+ apply H0. assumption. 
+ apply (stack_grow_type_eq D s s'); assumption.
+ apply IHHwf1.
+ apply IHHwf2.
+ assumption.
+ eapply TyAssign3.
+ apply H0. assumption. 
+ apply (stack_grow_type_eq D s s'); assumption.
+ apply IHHwf1.
+ apply IHHwf2.
+ assumption.
+ eapply TyIndexAssign1. assumption. assumption.
+ apply IHHwf1.
+ apply (stack_grow_type_eq D s s'); assumption.
+ apply IHHwf2. apply IHHwf3. assumption.
+ eapply TyIndexAssign2. assumption. assumption.
+ apply IHHwf1.
+ apply (stack_grow_type_eq D s s'); assumption.
+ apply IHHwf2. apply IHHwf3. assumption.
+ eapply TyIf.
+ apply H0. apply H1. easy.
+ apply IHHwf1. apply IHHwf2.
+ apply (stack_grow_meet_type D s s'); assumption.
+ assumption.
+Qed.
+
+Lemma subtype_simple : forall D t t', subtype D t t'
+                 -> simple_type t' -> simple_type t.
+Proof.
+  intros. 
+  induction H. assumption.
+  inv H0. inv H4.
+  constructor. assumption.
+  inv H1. inv H2. constructor. constructor. inv H0. assumption.
+  inv H1. inv H2. constructor. constructor. inv H0. assumption.
+  inv H0. inv H3. inv H. inv H1. constructor. apply SPTArray. assumption.
+  inv H0. inv H3. inv H. inv H1. constructor. apply SPTNTArray. assumption.
+  inv H0. inv H3. inv H. inv H1. constructor. apply SPTNTArray. assumption.
+  constructor. constructor.
+  constructor. constructor.
+Qed.
+
+
+Lemma env_sym : forall env env', @Env.Equal type env env' -> @Env.Equal type env' env.
+Proof.
+ intros. unfold Env.Equal in *.
+ intros.  rewrite H. reflexivity.
+Qed.
+
+Lemma well_typed_grow : forall D F S H env m e t x t',
+    ~ Env.In x env ->
+    @well_typed D F S H env m e t ->
+    @well_typed D F S H (Env.add x t' env) m e t.
+Proof.
+  intros.
+  induction H1; eauto 20.
+  apply weakening.
+  eauto.
+  apply TyVar. apply weakening_type_bound. assumption.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  unfold Env.In,Env.Raw.PX.In in H0.
+  destruct H0.
+  exists t. assumption.
+  apply Env.add_2. lia. assumption.
+  eapply TyCall. apply H1.
+  eapply TyStrlen.
+  apply weakening_type_bound.
+  apply H1.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  unfold Env.In,Env.Raw.PX.In in H0.
+  destruct H0.
+  exists (TPtr m (TNTArray h l t)). assumption.
+  apply Env.add_2. lia. assumption.
+  eapply TyLet.
+  apply IHwell_typed1. assumption.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  eapply equiv_env_wt.
+  assert (Env.Equal (Env.add x t1 (Env.add x t' env0)) (Env.add x t1 env0)).
+  apply env_shadow. apply env_sym in H1. apply H1.
+  assumption.
+  eapply equiv_env_wt.
+  assert (Env.Equal (Env.add x t' (Env.add x0 t1 env0)) (Env.add x0 t1 (Env.add x t' env0))).
+  apply env_neq_commute.
+  unfold Env.E.eq. lia. apply H1.
+  apply IHwell_typed2.
+  unfold Env.In,Env.Raw.PX.In in *.
+  intros R. destruct R.
+  apply Env.add_3 in H1.
+  destruct H0.
+  exists x1. assumption.
+  lia.
+  eapply TyMalloc.
+  apply weakening_type_bound. assumption.
+  eapply TyCast1; eauto.
+  apply weakening_type_bound. assumption.
+  eapply TyCast2; eauto.
+  apply weakening_type_bound. assumption.
+  eapply TyCast3; eauto.
+  apply weakening_type_bound. assumption.
+  eapply TyCast4; eauto.
+  apply weakening_type_bound. assumption.
+  eapply TyIf; eauto.
+  destruct (Nat.eq_dec x x0).
+  subst.
+  unfold Env.In,Env.Raw.PX.In in *.
+  destruct H0.
+  exists t.
+  assumption.
+  apply Env.add_2.
+  lia.
+  assumption.
+Qed.
+
+
+Lemma well_bound_in_subst : forall env x t1 t2 b,
+                          well_bound_in (Env.add x t1 env) b
+                                -> well_bound_in (Env.add x t2 env) b.
+Proof.
+ intros. remember (Env.add x t1 env0) as env1.
+ remember (Env.add x t2 env0) as env2.
+ induction H;subst;eauto.
+ apply well_bound_in_num.
+ apply well_bound_in_var.
+ unfold Env.In,Env.Raw.PX.In in *.
+ destruct (Nat.eq_dec x x0).
+ subst.
+ exists t2.
+ apply Env.add_1. reflexivity.
+ destruct H.
+ apply Env.add_3 in H.
+ exists x1.
+ apply Env.add_2. lia.
+ assumption. lia.
+Qed.
+
+Definition ty_ssa_env (S:env) (e:expression) 
+            := exists l, (forall x,  Env.In x S -> In x l) /\ (exists l', ty_ssa l e l').
+
+Lemma well_type_bound_in_subst : forall env x t1 t2 t,
+                          well_type_bound_in (Env.add x t1 env) t
+                                -> well_type_bound_in (Env.add x t2 env) t.
+Proof.
+  intros. remember (Env.add x t1 env0) as env1.
+  remember (Env.add x t2 env0) as env2.
+  induction H;subst;eauto.
+  apply well_type_bound_in_nat.
+  apply well_type_bound_in_ptr.
+  apply IHwell_type_bound_in. reflexivity.
+  apply well_type_bound_in_struct.
+  apply well_type_bound_in_array.
+  eapply well_bound_in_subst. apply H.
+  eapply well_bound_in_subst. apply H0.
+  apply IHwell_type_bound_in. reflexivity.
+  apply well_type_bound_in_ntarray.
+  eapply well_bound_in_subst. apply H.
+  eapply well_bound_in_subst. apply H0.
+  apply IHwell_type_bound_in. reflexivity.
+Qed.
+
+Lemma ty_ssa_env_let_r : forall s x e e1 t,
+         ty_ssa_env s (ELet x e e1) -> ty_ssa_env (Env.add x t s) e1.
+Proof.
+  intros. unfold ty_ssa_env in *.
+  destruct H. destruct H.
+  destruct H0.
+  inv H0.
+  exists S'.
+  specialize (ty_ssa_grow (x::x0) e S' H7) as eq1.
+  unfold list_subset in eq1.
+  split. intros.
+  destruct (Nat.eq_dec x2 x).
+  subst.
+  assert (In x (x::x0)) by apply in_eq.
+  apply eq1 in H1. assumption.
+  unfold Env.In,Env.Raw.PX.In in H0.
+  destruct H0.
+  apply Env.add_3 in H0.
+  assert (Env.In x2 s).
+  unfold Env.In,Env.Raw.PX.In. exists x3. assumption.
+  apply H in H1.
+  assert (In x2 (x::x0)). apply in_cons. assumption.
+  apply eq1 in H2. assumption. lia.
+  exists x1. assumption.
+Qed.
+
+Lemma ty_ssa_env_eq : forall s1 s2 e,
+        Env.Equal s1 s2 -> ty_ssa_env s1 e -> ty_ssa_env s2 e.
+Proof.
+  intros. 
+  unfold ty_ssa_env in *.
+  destruct H0.
+  unfold Env.Equal in H.
+  exists x.
+  split. intros.
+  unfold Env.In,Env.Raw.PX.In in H1.
+  destruct H1.
+  apply Env.find_1 in H1.
+  rewrite <- H in H1.
+  apply Env.find_2 in H1.
+  destruct H0. apply H0.
+  unfold Env.In,Env.Raw.PX.In.
+  exists x1. assumption.
+  destruct H0.
+  destruct H1.
+  exists x0. assumption.
+Qed.
+
+Definition env_match D S (env env' : env) : Prop :=
+   (forall x t, (Env.MapsTo x t env -> (Env.MapsTo x t env'
+                   \/ (exists t' t'', cast_type_bound S t t' /\ subtype D t'' t' /\ Env.MapsTo x t'' env'))))
+   /\ (forall x, Env.In x env' -> Env.In x env).
+
+Lemma env_match_refl : forall D S env, env_match D S env env.
+Proof.
+  intros. unfold env_match.
+  intros. split. intros. left. assumption.
+  intros. assumption.
+Qed.
+
+Lemma env_match_ty_ssa : forall D S env1 env2 e,
+        env_match D S env1 env2 -> ty_ssa_env env1 e -> ty_ssa_env env2 e.
+Proof.
+  intros. 
+  unfold ty_ssa_env in *.
+  unfold env_match in H.
+  destruct H0. destruct H0.
+  destruct H1.
+  destruct H.
+  assert (forall x0 : Env.key, Env.In (elt:=type) x0 env2 -> In x0 x).
+  intros.
+  apply H0.
+  apply H2. assumption.
+  exists x.
+  split.
+  easy.
+  exists x0. assumption.
+Qed.
+
+Lemma env_match_grow : forall D S env env' x t, env_match D S env env' -> 
+               env_match D S (Env.add x t env) (Env.add x t env').
+Proof.
+  unfold env_match in *.
+  split. intros.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  apply Env.mapsto_add1 in H0.
+  subst.
+  left. apply Env.add_1. reflexivity.
+  apply Env.add_3 in H0.
+  apply H in H0.
+  destruct H0.
+  left. apply Env.add_2.
+  lia. assumption.
+  destruct H0.
+  destruct H0.
+  right.
+  exists x1. exists x2.
+  split. destruct H0. eauto.
+  split. destruct H0. destruct H1. assumption.
+  apply Env.add_2. lia.
+  destruct H0. destruct H1.
+  assumption. lia.
+  intros.
+  destruct H.
+  unfold Env.In,Env.Raw.PX.In in *.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  exists t. apply Env.add_1. reflexivity.
+  destruct H0.
+  apply Env.add_3 in H0.
+  specialize (H1 x0) as eq1.
+  assert ((exists e : type, Env.Raw.PX.MapsTo x0 e (Env.this env'))).
+  exists x1. assumption.
+  apply eq1 in H2.
+  destruct H2.
+  exists x2.
+  apply Env.add_2.
+  lia. assumption. lia.
+Qed.
+
+Lemma env_match_grow_1 : forall D S env env' x t t' t'', env_match D S env env' -> 
+              cast_type_bound S t t' -> subtype D t'' t' ->
+               env_match D S (Env.add x t env) (Env.add x t'' env').
+Proof.
+  unfold env_match in *.
+  split. intros.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  apply Env.mapsto_add1 in H2.
+  subst.
+  right.
+  exists t'. exists t''.
+  split. assumption.
+  split. assumption.
+  apply Env.add_1. reflexivity.
+  apply Env.add_3 in H2.
+  destruct H.
+  apply H in H2.
+  destruct H2.
+  left. apply Env.add_2. lia. assumption.
+  destruct H2. destruct H2. destruct H2. destruct H4.
+  right.
+  exists x1. exists x2.
+  split. assumption. split. assumption. 
+  apply Env.add_2. lia. assumption. lia.
+  intros.
+  destruct H.
+  unfold Env.In,Env.Raw.PX.In in *.
+  destruct (Nat.eq_dec x0 x).
+  subst.
+  exists t. apply Env.add_1. reflexivity.
+  destruct H2.
+  apply Env.add_3 in H2.
+  specialize (H3 x0) as eq1.
+  assert ((exists e : type, Env.Raw.PX.MapsTo x0 e (Env.this env'))).
+  exists x1. assumption.
+  apply eq1 in H4.
+  destruct H4.
+  exists x2.
+  apply Env.add_2.
+  lia. assumption. lia.
+Qed.
+
+Lemma well_bound_match : forall D S env env' b, 
+    env_match D S env env' ->
+    well_bound_in env b -> well_bound_in env' b.
+Proof.
+  intros. induction H0.
+  apply well_bound_in_num.
+  apply well_bound_in_var.
+  unfold env_match in *.
+  destruct H.
+  unfold Env.In,Env.Raw.PX.In in *.
+  destruct H0.
+  apply H in H0.
+  destruct H0.
+  exists x0. assumption.
+  destruct H0. destruct H0.
+  destruct H0. destruct H2.
+  exists x2. assumption.
+Qed.
+
+Lemma well_type_bound_match : forall D S env env' t,
+     env_match D S env env' ->
+    well_type_bound_in env t -> well_type_bound_in env' t.
+Proof.
+ intros.
+ induction H0;eauto.
+ apply well_type_bound_in_nat.
+ apply well_type_bound_in_ptr.
+ apply IHwell_type_bound_in.
+ assumption.
+ apply well_type_bound_in_struct.
+ apply well_type_bound_in_array.
+ apply (well_bound_match D S env0). assumption.
+ assumption.
+ apply (well_bound_match D S env0). assumption.
+ assumption.
+ apply IHwell_type_bound_in. assumption.
+ apply well_type_bound_in_ntarray.
+ apply (well_bound_match D S env0). assumption.
+ assumption.
+ apply (well_bound_match D S env0). assumption.
+ assumption.
+ apply IHwell_type_bound_in. assumption.
+Qed.
+
+Lemma well_typed_match : forall D F S H env env' m e t,
+    (env_match D S env env') -> 
+     @well_typed D F S H env m e t ->
+     ( @well_typed D F S H env' m e t \/ (exists t' t'' , cast_type_bound S t t'
+          /\ subtype D t'' t' /\ @well_typed D F S H env' m e t'')).
+Proof.
+  intros.
+  generalize dependent env'.
+  induction H1;eauto.
+  intros.
+  - left. apply TyLit.
+  apply (well_type_bound_match D S env0). assumption. assumption.
+  assumption.
+  - intros.
+  unfold env_match in H2.
+  destruct H2.
+  apply H2 in H1.
+  destruct H1.
+  left. apply TyVar.
+  apply (well_type_bound_match D S env0).
+  unfold env_match. eauto.
+  assumption.
+  assumption.
+  right.
+  destruct H1. destruct H1.
+  exists x0. exists x1.
+  destruct H1. destruct H4.
+  split. assumption. split. assumption.
+  apply TyVar.
+  apply cast_means_simple_type in H1.
+  apply subtype_simple in H4.
+  apply simple_type_well_bound. assumption.
+  assumption. assumption.
+  - auto.
+  - intros. 
+  assert (eq1 := H2).
+  unfold env_match in H2.
+  destruct H2.
+  apply H2 in H1.
+  destruct H1.
+  left.
+  eapply TyStrlen.
+  apply (well_type_bound_match D S env0).
+  assumption.
+  apply H0.
+  apply H1.
+  destruct H1. destruct H1. destruct H1. destruct H4.
+  left.
+  specialize (cast_means_simple_type S (TPtr m (TNTArray h l t)) x0 H1) as eq2.
+  inv H1. inv H9.
+  specialize (subtype_ntarray D x1 m l' h' t'0 H4) as eq3.
+  destruct eq3.  destruct H1. subst.
+  apply subtype_simple_left in H4.
+  eapply TyStrlen.
+  apply (simple_type_well_bound env') in H4.
+  apply H4.
+  apply H5. assumption.
+  - intros.
+  assert (eq1 := H0).
+  apply IHwell_typed1 in H0.
+  destruct H0.
+  assert (env_match D S (Env.add x t1 env0) (Env.add x t1 env')).
+  apply env_match_grow. assumption.
+  apply IHwell_typed2 in H1.
+  destruct H1.
+  left. eapply TyLet.
+  apply H0. apply H1.
+  destruct H1. destruct H1. destruct H1.
+  destruct H2.
+  right. 
+  exists x0. exists x1.
+  split. assumption. split. assumption.
+  eapply TyLet.
+  apply H0.
+  apply H3.
+  destruct H0. destruct H0. destruct H0.
+  destruct H1.
+  assert (env_match D S (Env.add x t1 env0) (Env.add x x1 env')).
+  eapply env_match_grow_1. apply eq1.
+  apply H0. apply H1.
+  apply IHwell_typed2 in H3.
+  destruct H3.
+  left. eapply TyLet.
+  apply H2.
+  apply H3.
+  destruct H3. destruct H3. destruct H3. destruct H4.
+  right. exists x2. exists x3.
+  split. assumption. split. assumption.
+  eapply TyLet.
+  apply H2.
+  assumption.
+  - intros.
+  assert (eq1:= H0).
+  apply IHwell_typed1 in H0.
+  apply IHwell_typed2 in eq1.
+  destruct H0.
+  destruct eq1.
+  left. apply TyPlus. assumption. assumption.
+  destruct H1. destruct H1. destruct H1. destruct H2.
+  inv H1. inv H2.
+  left. apply TyPlus. assumption. assumption.
+  destruct H0. destruct H0. destruct H0. destruct H1.
+  destruct eq1. 
+  inv H0. inv H1.
+  left. apply TyPlus. assumption. assumption.
+  destruct H3. destruct H3. destruct H3. destruct H4.
+  inv H0. inv H1. inv H3. inv H4.
+  left. apply TyPlus. assumption. assumption.
+  - intros. 
+  apply IHwell_typed in H4.
+  destruct H4.
+  left. eapply TyFieldAddr.
+  apply H4. apply H0. apply H2.
+  apply H3.
+  destruct H4. destruct H4. destruct H4. destruct H5.
+  inv H4. inv H10. inv H5.
+  left. eapply TyFieldAddr.
+  apply H6. apply H0. apply H2.
+  apply H3.
+  - intros.
+  left.
+  apply TyMalloc.
+  eapply well_type_bound_match. apply H1.
+  assumption.
+  - intros. 
+  apply IHwell_typed in H0.
+  destruct H0.
+  left. apply TyUnchecked.
+  assumption.
+  destruct H0. destruct H0. destruct H0.
+  destruct H2.
+  right.
+  exists x. exists x0.
+  split. assumption. split. assumption.
+  apply TyUnchecked.
+  assumption.
+  - intros.
+  assert (eq1 := H3).
+  apply IHwell_typed in H3.
+  destruct H3.
+  left. eapply TyCast1.
+  eapply well_type_bound_match. apply eq1.
+  apply H0.
+  assumption.
+  apply H3.
+  destruct H3. destruct H3. destruct H3.
+  destruct H4.
+  left.
+  eapply TyCast1.
+  eapply well_type_bound_match. apply eq1.
+  assumption.
+  assumption.
+  apply H5.
+  - intros.
+  assert (eq1 := H3).
+  apply IHwell_typed in H3.
+  destruct H3.
+  left.
+  eapply TyCast2. apply H0.
+  eapply well_type_bound_match. apply eq1.
+  assumption.
+  apply H3.
+  destruct H3. destruct H3. destruct H3.
+  destruct H4.
+  specialize (cast_means_simple_type S (TPtr Checked (TArray u v t')) x0 H3) as eq2.
+  inv H3.
+  inv H9.
+  specialize (subtype_array D x1 Checked l' h' t'1 H4) as eq3.
+  destruct eq3. destruct H3. subst.
+  apply subtype_simple_left in H4.
+  left.
+  eapply TyCast2.
+  assert (type_eq S t t'1).
+  inv H0.
+  apply type_eq_right.
+  apply (cast_means_simple_type S t'). assumption. assumption.
+  apply (cast_type_bound_same S t' t t'1) in H12.
+  subst. apply type_eq_refl. assumption.
+  specialize (simple_type_means_cast_same S t' H3) as eq3.
+  apply (cast_type_bound_same S t' t' t'1) in H12.
+  subst.
+  apply type_eq_right.
+  assumption. assumption. assumption.
+  apply H3.
+  eapply well_type_bound_match.
+  apply eq1. assumption. apply H5.
+  assumption.
+  - intros.
+  assert (eq1 := H3).
+  apply IHwell_typed in H3.
+  destruct H3.
+  left.
+  eapply TyCast3. apply H0.
+  eapply well_type_bound_match. apply eq1.
+  assumption.
+  apply H3.
+  destruct H3. destruct H3. destruct H3.
+  destruct H4.
+  specialize (cast_means_simple_type S (TPtr Checked (TNTArray u v t')) x0 H3) as eq2.
+  inv H3.
+  inv H9.
+  specialize (subtype_ntarray D x1 Checked l' h' t'1 H4) as eq3.
+  destruct eq3. destruct H3. subst.
+  apply subtype_simple_left in H4.
+  left.
+  eapply TyCast3.
+  assert (type_eq S t t'1).
+  inv H0.
+  apply type_eq_right.
+  apply (cast_means_simple_type S t'). assumption. assumption.
+  apply (cast_type_bound_same S t' t t'1) in H12.
+  subst. apply type_eq_refl. assumption.
+  specialize (simple_type_means_cast_same S t' H3) as eq3.
+  apply (cast_type_bound_same S t' t' t'1) in H12.
+  subst.
+  apply type_eq_right.
+  assumption. assumption. assumption.
+  apply H3.
+  eapply well_type_bound_match.
+  apply eq1. assumption. apply H5.
+  assumption.
+  - intros.
+  assert (eq1 := H3).
+  apply IHwell_typed in H3.
+  destruct H3.
+  left.
+  eapply TyCast4. apply H0.
+  eapply well_type_bound_match. apply eq1.
+  assumption.
+  apply H3.
+  destruct H3. destruct H3. destruct H3.
+  destruct H4.
+  specialize (cast_means_simple_type S (TPtr Checked (TNTArray u v t')) x0 H3) as eq2.
+  inv H3.
+  inv H9.
+  specialize (subtype_ntarray D x1 Checked l' h' t'1 H4) as eq3.
+  destruct eq3. destruct H3. subst.
+  apply subtype_simple_left in H4.
+  left.
+  eapply TyCast4.
+  assert (type_eq S t t'1).
+  inv H0.
+  apply type_eq_right.
+  apply (cast_means_simple_type S t'). assumption. assumption.
+  apply (cast_type_bound_same S t' t t'1) in H12.
+  subst. apply type_eq_refl. assumption.
+  specialize (simple_type_means_cast_same S t' H3) as eq3.
+  apply (cast_type_bound_same S t' t' t'1) in H12.
+  subst.
+  apply type_eq_right.
+  assumption. assumption. assumption.
+  apply H3.
+  eapply well_type_bound_match.
+  apply eq1. assumption. apply H5.
+  assumption.
+  - intros. 
+  assert (eq1 := H4).
+  apply IHwell_typed in H4.
+  destruct H4.
+  left. eapply TyDeref.
+  apply H4.
+  apply H0.
+  eauto.
+  apply H3.
+  destruct H4. destruct H4. destruct H4.
+  destruct H5.
+  destruct H2. destruct H2.
+  inv H0. inv H4. inv H5.
+  right. exists t'0. exists t'0.
+  split. assumption.
+  split. constructor.
+  eapply TyDeref.
+  apply H6.
+  apply SubTyRefl.
+  left. split. eapply cast_word_type.
+  apply H9. apply H2. reflexivity. assumption.
+  inv H9. inv H2. inv H9. inv H2.
+  inv H9.
+  left. 
+  eapply TyDeref.
+  apply H6.
+  eapply SubTyStructArrayField.
+  apply H8. assumption.
+  left. easy. assumption.
+  inv H2. inv H2.
+  inv H4. inv H9. inv H5.
+  left. eapply TyDeref.
+  apply H6.
+  eapply SubTyStructArrayField.
+  apply H11. assumption.
+  left. easy. assumption.
+  destruct H2. destruct H2. destruct H7.
+  inv H0.
+  inv H4. inv H10.
+  inv H5.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. left.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H13. assumption.
+  eapply cast_type_wf. apply H13. assumption.
+  assumption.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. left.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H13. assumption.
+  eapply cast_type_wf. apply H13. assumption.
+  assumption.
+  inv H4.
+  inv H11. inv H5. inv H10.
+  right. 
+  exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. left.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H16. assumption.
+  eapply cast_type_wf. apply H16. assumption.
+  assumption.
+  inv H10.
+  right. 
+  exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. left.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H16. assumption.
+  eapply cast_type_wf. apply H16. assumption.
+  assumption. inv H10. inv H10.
+  destruct H2. destruct H7. subst.
+  inv H0.
+  inv H4. inv H10.
+  inv H5.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. right.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H13. assumption.
+  eapply cast_type_wf. apply H13. assumption.
+  assumption.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. right.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H13. assumption.
+  eapply cast_type_wf. apply H13. assumption.
+  assumption.
+  inv H4.
+  inv H10. inv H5.
+  right. 
+  exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. right.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H15. assumption.
+  eapply cast_type_wf. apply H15. assumption.
+  assumption.
+  right. 
+  exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyDeref. apply H6.
+  apply SubTyRefl.
+  right. right.
+  split. reflexivity.
+  split. eapply cast_word_type.
+  apply H15. assumption.
+  eapply cast_type_wf. apply H15. assumption.
+  assumption.
+  - intros.
+  assert (eq1 := H4).
+  assert (eq2 := H4).
+  apply IHwell_typed1 in H4.
+  apply IHwell_typed2 in eq1.
+  destruct H4.
+  destruct eq1.
+  left. eapply TyIndex1.
+  assumption. assumption.
+  apply H4. apply H2.
+  apply H5. assumption.
+  destruct H5. destruct H5.
+  destruct H5. destruct H6.
+  inv H5. inv H6.
+  left. eapply TyIndex1.
+  assumption. assumption.
+  apply H4. reflexivity.
+  assumption. assumption.
+  destruct H4. destruct H4. destruct H4.
+  destruct H5. subst.
+  inv H4. inv H9.
+  specialize (cast_means_simple_type S t' t'1 H12) as eqa.
+  inv H5.
+  destruct eq1.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex1.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H2. assumption.
+  destruct H2. destruct H2. 
+  destruct H2. destruct H4.
+  inv H2. inv H4.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex1.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  destruct eq1.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex1.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H2. assumption.
+  destruct H2. destruct H2. 
+  destruct H2. destruct H4.
+  inv H2. inv H4.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex1.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  - intros.
+  assert (eq1 := H4).
+  assert (eq2 := H4).
+  apply IHwell_typed1 in H4.
+  apply IHwell_typed2 in eq1.
+  destruct H4.
+  destruct eq1.
+  left. eapply TyIndex2.
+  assumption. assumption.
+  apply H4. apply H2.
+  apply H5. assumption.
+  destruct H5. destruct H5.
+  destruct H5. destruct H6.
+  inv H5. inv H6.
+  left. eapply TyIndex2.
+  assumption. assumption.
+  apply H4. reflexivity.
+  assumption. assumption.
+  destruct H4. destruct H4. destruct H4.
+  destruct H5. subst.
+  inv H4. inv H9.
+  specialize (cast_means_simple_type S t' t'1 H12) as eqa.
+  inv H5.
+  destruct eq1.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H2. assumption.
+  destruct H2. destruct H2. 
+  destruct H2. destruct H4.
+  inv H2. inv H4.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  destruct eq1.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H2. assumption.
+  destruct H2. destruct H2. 
+  destruct H2. destruct H4.
+  inv H2. inv H4.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  - intros. 
+  assert (eq1 := H4).
+  assert (eq2 := H4).
+  apply IHwell_typed1 in H4.
+  apply IHwell_typed2 in eq1.
+  destruct H4. destruct eq1.
+  left. 
+  eapply TyAssign1.
+  apply H0.
+  apply H1.
+  apply H2.
+  assumption. assumption. assumption.
+  destruct H5. destruct H5.
+  destruct H5. destruct H6.
+  inv H1. apply type_eq_tnat in H2. subst.
+  inv H5. inv H6.
+  left. eapply TyAssign1.
+  apply H0. constructor. constructor.
+  assumption. assumption. assumption.
+  assert (eq3 := H2).
+  inv H2. inv H5.
+  inv H6.
+  inv H0.
+  subst.
+  right. 
+  exists (TPtr m0 t').
+  exists (TPtr m0 x).
+  split. constructor. assumption.
+  split. apply H6.
+  inv H0.
+  assert (
+  eapply TyAssign1.
+  apply H0. constructor.
+  apply type_eq_right.
+  constructor. apply (cast_means_simple_type S w).
+  assumption. constructor.
+  assumption.
+  assumption.
+  assumption.
+  assumption.
+  constructor.
+  apply H3. apply H4.
+  apply H0. apply H1.
+  assumption.
+  destruct H4. destruct H4.
+  destruct H4. destruct H5.
+
+
+  intros.
+  assert (eq1 := H5).
+  apply IHwell_typed1 in H5.
+  apply IHwell_typed2 in eq1.
+  destruct H5.
+  destruct eq1.
+  left. eapply TyIf.
+  apply H1. eauto.
+  apply H5. apply H6. apply H3.
+  assumption.
+  destruct H6. destruct H6. destruct H6.
+  destruct H7.
+Qed.
+
+
+Lemma well_typed_subtype : forall D F S H env m e t x t1 t2 t3,
+    @well_typed D F S H (Env.add x t1 env) m e t ->
+     cast_type_bound S t1 t2 ->
+     subtype D t3 t2 ->
+    (exists env', env_match D S env env' /\
+    (@well_typed D F S H (Env.add x t3 env') m e t \/ 
+       (exists t' t'' , cast_type_bound S t t'
+          /\ subtype D t'' t' /\ @well_typed D F S H (Env.add x t3 env') m e t''))).
+Proof.
+  intros.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  destruct eq1.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H2. assumption.
+  destruct H2. destruct H2. 
+  destruct H2. destruct H4.
+  inv H2. inv H4.
+  right. exists t'1. exists t'1.
+  split. assumption. split. constructor.
+  eapply TyIndex2.
+  eapply cast_word_type. apply H12. assumption.
+  eapply cast_type_wf. apply H12. assumption.
+  apply H6. reflexivity. apply H5. assumption.
+  - intros. 
+  assert (eq1 := H4).
+  assert (eq2 := H4).
+  apply IHwell_typed1 in H4.
+  apply IHwell_typed2 in eq1.
+  destruct H4. destruct eq1.
+  left. 
+  eapply TyAssign1.
+  apply H0.
+  apply H1.
+  apply H2.
+  assumption. assumption. assumption.
+  destruct H5. destruct H5.
+  destruct H5. destruct H6.
+  inv H1. apply type_eq_tnat in H2. subst.
+  inv H5. inv H6.
+  left. eapply TyAssign1.
+  apply H0. constructor. constructor.
+  assumption. assumption. assumption.
+  assert (eq3 := H2).
+  inv H2. inv H5.
+  inv H6.
+  inv H0.
+  subst.
+  right. 
+  exists (TPtr m0 t').
+  exists (TPtr m0 x).
+  split. constructor. assumption.
+  split. apply H6.
+  inv H0.
+  assert (
+  eapply TyAssign1.
+  apply H0. constructor.
+  apply type_eq_right.
+  constructor. apply (cast_means_simple_type S w).
+  assumption. constructor.
+  assumption.
+  assumption.
+  assumption.
+  assumption.
+  constructor.
+  apply H3. apply H4.
+  apply H0. apply H1.
+  assumption.
+  destruct H4. destruct H4.
+  destruct H4. destruct H5.
+  intros.
+  assert (eq1 := H5).
+  apply IHwell_typed1 in H5.
+  apply IHwell_typed2 in eq1.
+  destruct H5.
+  destruct eq1.
+  left. eapply TyIf.
+  apply H1. eauto.
+  apply H5. apply H6. apply H3.
+  assumption.
+  destruct H6. destruct H6. destruct H6.
+  destruct H7.
+Qed.
+
+(* ty_ssa properties. *)
+Lemma ty_ssa_stack_small_let : forall s e x e1,
+         ty_ssa_stack s (ELet x e e1) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  inv H0.
+  exists ((x :: x0)).
+  split. intros.
+  apply H in H0.
+  apply in_cons. assumption.
+  exists S'. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_plus_l : forall s e e1,
+         ty_ssa_stack s (EPlus e e1) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  inv H0.
+  exists x.
+  split. intros.
+  apply H in H0. assumption.
+  exists S'. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_plus_r : forall s v t e,
+         ty_ssa_stack s (EPlus (ELit v t) e) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  inv H0. inv H4.
+  exists S'. eauto.
+Qed.
+
+Lemma ty_ssa_stack_small_efield : forall s e f,
+         ty_ssa_stack s (EFieldAddr e f) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  exists x.
+  split. intros.
+  apply H in H1. assumption.
+  exists x0. inv H0. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_cast : forall s t e,
+         ty_ssa_stack s (ECast t e) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  exists x.
+  split. intros.
+  apply H in H1. assumption.
+  exists x0. inv H0. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_deref : forall s e,
+         ty_ssa_stack s (EDeref e) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  exists x.
+  split. intros.
+  apply H in H1. assumption.
+  exists x0. inv H0. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_assign_l : forall s e e1,
+         ty_ssa_stack s (EAssign e e1) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  exists x.
+  split. intros.
+  apply H in H1. assumption.
+  inv H0.
+  exists S'. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_assign_r : forall s v t e,
+         ty_ssa_stack s (EAssign (ELit v t) e) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0. inv H0. inv H4.
+  exists S'.
+  split. intros. apply H.
+  assumption.
+  exists x0. assumption.
+Qed.
+
+Lemma ty_ssa_stack_small_unchecked : forall s e,
+         ty_ssa_stack s (EUnchecked e) -> ty_ssa_stack s e.
+Proof.
+  intros. unfold ty_ssa_stack in *.
+  destruct H. destruct H.
+  destruct H0.
+  exists x.
+  split. intros.
+  apply H in H1. assumption.
+  exists x0. inv H0. assumption.
+Qed.
+*)

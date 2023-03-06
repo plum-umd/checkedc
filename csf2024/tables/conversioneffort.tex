@@ -1,0 +1,20 @@
+{
+\tiny
+\begin{table}[]
+\begin{tabular}{c|c|c|c|r|c}
+\toprule
+\textbf{Program} & \textbf{\begin{tabular}[c]{@{}c@{}}Partition\\ Methodology\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}Pointers\\ Annotated\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}Lines in\\ \ucregion \\ (Sandbox)\end{tabular}} & \multicolumn{1}{c|}{\textbf{\begin{tabular}[c]{@{}c@{}}Time\\ Taken\\ (hours)\end{tabular}}} & \textbf{\begin{tabular}[c]{@{}c@{}}CVEs\\ Prevented\end{tabular}} \\ 
+\midrule
+\rowcolor{black!15} ProFTPD          &     $TP$                                                                     &       6                                                                &                                                                     N/A &                                                                                      1        & CVE-2010-4221 (\vulprevented{})                                                           \\ %\hline
+png2pnm          & \multirow{2}{*}{$TP$}                                                        & \multirow{2}{*}{248}                                                     & \multirow{2}{*}{N/A}                                                    & \multirow{2}{*}{}                                                                            & \multirow{2}{*}{CVE-2018-144550 (\vulprevented{})}                                             \\ %\cline{1-1}
+pnm2png          &                                                                          &                                                                       &                                                                      &                                                     8                                         &                                                                   \\ %\hline
+\rowcolor{black!15} MicroHTTPD       &     $TP$                                                                     &          139                                                             &                                                                     450 &                                                                                       3       &                    N/A                                               \\ %\hline
+UFTPD             &        $T_{Pr}$                                                                  &  146                                                                     &                                                                     90 &                                                           3                                   & \begin{tabular}[c]{@{}c@{}}CVE-2020-14149 (\vulprevented{}) \\ CVE-2020-5204 (\vulisolated{})\end{tabular}             \\ %\hline
+\rowcolor{black!15} TinyBigNum       &      $CTP$                                                                    &   69                                                                    &                                                                     30 &                                                                                        2      &                             N/A                                      \\ %\hline
+Parsons          &     $CTP$                                                                     &      364                                                                 &                                                                     800 &                                                      5                                        &                                                  N/A                 \\ 
+\bottomrule
+\end{tabular}
+\caption{Summary of Conversion Efforts \& Security Impact.}
+\label{table:conversioneffort}
+\end{table}
+}

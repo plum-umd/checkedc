@@ -3083,39 +3083,38 @@ Inductive step
 (** ** Reduction *)
 Inductive reduce
   (D : structdef)
-  (F : FEnv) (cm: mode)
-  : mem -> expression -> mode -> mem -> result -> Prop :=
-  | RSExp : forall M e m M' e' E,
-      step D F M e M' (RExpr e') ->
-      m = mode_of' (E) cm ->
+  (F : real_fenv)
+  : mode -> mem -> expression -> mode -> mem -> result -> Prop :=
+  | RSExp : forall M e cm m M' e' E,
+      step D F cm M e M' (RExpr e') ->
+      next_mode_of cm e m ->
       reduce D F cm
         M (in_hole e E)
         m
         M' (RExpr (in_hole e' E))
-  | RSHaltNull : forall M e m M' E,
-      step D F M e M' RNull ->
-      m = mode_of' (E) cm ->
+  | RSHaltNull : forall M e cm M' E,
+      step D F cm M e M' RNull ->
       reduce D F cm
         M (in_hole e E)
-        m
+        cm
         M' RNull
-  | RSHaltBounds : forall M e m M' E,
-      step D F M e M' RBounds ->
-      m = mode_of' (E) cm ->
+  | RSHaltBounds : forall M e cm M' E,
+      step D F cm M e M' RBounds ->
       reduce D F cm
         M (in_hole e E)
-        m
+        cm
         M' RBounds
-  | RUnChecked: forall M l t t' e E,
+  | RUnChecked: forall cm M t t' e E,
       eval_type_bound (fst M) t t' ->
-      reduce D F cm
-        M (in_hole (EUnchecked l t e) E)
-        Unchecked
+      next_mode_of Unchecked (ERm cm e) cm ->
+      reduce D F Unchecked
+        M (in_hole (ERm cm e) E)
+        cm
         M (RExpr (in_hole (ELit 0 t') E)). (* rep*)
 
 #[export] Hint Constructors reduce : sem.
 
-Definition reduces (D : structdef) (F:FEnv) (cm: mode) (M : mem) (e : expression) (m:mode): Prop :=
+Definition reduces (D : structdef) (F:real_fenv) (cm: mode) (M : mem) (e : expression) (m:mode): Prop :=
   exists (M' : mem) (r : result), reduce D F cm M e m M' r.
 
 #[export] Hint Unfold reduces : sem.
@@ -3231,23 +3230,22 @@ Admitted.
 
 
 (* well_typed definition. *)
-Inductive well_typed_arg (D: structdef) (F:FEnv) (R : real_heap) (Q: theta)
+Inductive well_typed_arg (D: structdef) (F:real_fenv) (R : real_heap) (Q: theta)
   (env:env) : mode -> expression -> type -> Prop :=
-| ArgLitChecked : forall n t t',
-    simple_type t' ->
-    well_typed_lit_checked D F (fst R) empty_scope n t' ->
-    eq_subtype Q t' t ->
-    well_typed_arg D F R Q env Checked (ELit n t') t
-| ArgLitUnchecked : forall m n t t',
-    ~ is_checked t' ->
-    simple_type t' ->
+| ArgLitChecked : forall m n t t',
+    simple_type t' -> m <> Unchecked ->
+    well_typed_lit_checked D F (R m) empty_scope n t' ->
     eq_subtype Q t' t ->
     well_typed_arg D F R Q env m (ELit n t') t
+| ArgLitUnchecked : forall n t t',
+    simple_type t' ->
+    eq_subtype Q t' t ->
+    well_typed_arg D F R Q env Unchecked (ELit n t') t
 | ArgVar : forall m x t t',
     Env.MapsTo x t' env ->
     eq_subtype Q t' t ->
     well_typed_arg D F R Q env m (EVar x) t.
-Inductive well_typed_args {D: structdef} {U:FEnv} {H : real_heap} {Q:theta} :
+Inductive well_typed_args {D: structdef} {U:real_fenv} {H : real_heap} {Q:theta} :
   env -> mode -> list expression -> list (type) -> list var -> type -> type -> Prop :=
 | args_empty : forall env m ta, well_typed_args env m [] [] [] ta ta
 
@@ -3520,30 +3518,39 @@ Definition is_off_zero (b:bound) :=
 (* The CoreChkC Type System. *)
 Section Typing. 
   Variable D : structdef.
-  Variable F : FEnv.
+  Variable F : real_fenv.
   Variable H : real_heap.
   Inductive well_typed
     : env -> theta -> mode -> expression -> type -> Prop :=
   | TyLitChecked : forall env Q n t,
       is_checked t ->
       simple_type t ->
-      well_typed_lit_checked D F (fst H) empty_scope n t ->
+      well_typed_lit_checked D F (H Checked) empty_scope n t ->
       well_typed env Q Checked (ELit n t) t
+(*
   | TyLitTainted : forall env Q m n t,
       ~ is_checked t ->
       simple_type t ->
       well_typed env Q m (ELit n t) t
+*)
   | TyVar : forall env Q m x t t',
       Env.MapsTo x t env ->
       subtype_core Q t t' ->
       well_typed env Q m (EVar x) t'
 
   | TyCall : forall env Q m m' es x xl ts t ta,
-      mode_leq m' m ->
+      mode_leq m' m -> m <> Unchecked ->
       Forall (fun e => env_wf e env) es ->
       well_typed env Q m x (TPtr m' (TFun xl t ts)) ->
       @well_typed_args D F H Q env m es ts xl t ta ->
       well_typed env Q m (ECall x es) ta
+
+  | TyCallUnchecked : forall env Q m' es x xl ts t ta,
+      mode_leq m' Unchecked ->
+      Forall (fun e => env_wf e env) es ->
+      well_typed env Q Unchecked x (TPtr m' (TFun xl t ts)) ->
+      @well_typed_args D F H Q env Unchecked es ts xl t ta ->
+      well_typed env Q Unchecked (ECall x es) ta
 
   (*
   | TyCallHeap : forall env U Q pm m m' es x tvl t,
@@ -3592,14 +3599,15 @@ Section Typing.
   | TyRetTNat : forall env Q m x na e t,
       ~ Theta.In x Q ->
       well_typed (Env.add x TNat env) (Theta.add x (NumEq (Num na)) Q) m e t ->
-      well_typed env Q m (ERet x (na,TNat) e) (subst_type t x (Num na))
+      well_typed env Q m (ERet x (Some (na,TNat)) e) (subst_type t x (Num na))
 
   | TyRetChecked : forall env Q x na ta e t,
       ~ Theta.In x Q ->
       simple_type (TPtr Checked ta) ->
-      well_typed_lit_checked D F (fst H) empty_scope na (TPtr Checked ta) ->
+      well_typed_lit_checked D F (H Checked) empty_scope na (TPtr Checked ta) ->
       well_typed (Env.add x (TPtr Checked ta) env) Q Checked e t ->
-      well_typed env Q Checked (ERet x (na,TPtr Checked ta) e) t
+      well_typed env Q Checked (ERet x (Some (na,TPtr Checked ta)) e) t
+
 
   | TyRet : forall env Q m m' x na ta e t,
       ~ Theta.In x Q ->
@@ -3607,7 +3615,7 @@ Section Typing.
       mode_leq m' m ->
       simple_type (TPtr m' ta) ->
       well_typed (Env.add x (TPtr m' ta) env) Q m e t ->
-      well_typed env Q m (ERet x (na,TPtr m' ta) e) t
+      well_typed env Q m (ERet x (Some (na,TPtr m' ta)) e) t
 
   | TyPlus : forall env Q m e1 e2,
       well_typed env Q m e1 (TNat) ->
@@ -3628,6 +3636,7 @@ Section Typing.
       well_type_bound_in env w ->
       well_typed env Q m (EMalloc m' w) (TPtr m' w)
 
+(*
   | TyUnchecked : forall env Q m vl t t' e,
       list_sub (freeVars e) vl ->
       well_typed env Q Unchecked e t' ->
@@ -3643,7 +3652,7 @@ Section Typing.
       Forall (fun x => forall t, Env.MapsTo x t env -> is_tainted t) vl ->
       is_tainted t ->
       well_typed env Q m (Echecked vl t e) t
-
+*)
 
   | TyCast1 : forall env Q t e t',
       well_type_bound_in env t ->
@@ -3749,6 +3758,7 @@ Section Typing.
       mode_leq m' m ->
       well_typed env Q m (EAssign (EPlus e1 e2) e3) t
 
+(*
   | TyIfDef : forall env Q m m' x t t1 e1 e2 t2,
       Env.MapsTo x t env ->
       subtype Q t (TPtr m' t1) ->
@@ -3765,7 +3775,7 @@ Section Typing.
       -> well_typed env Q m e2 t2 ->
       (m' = Unchecked -> m = Unchecked) ->
       well_typed env Q m (EIfDef x e1 e2) t2
-
+*)
 
   | TyIf : forall env Q m e1 e2 e3 t2,
       well_typed env Q m e1 TNat ->
