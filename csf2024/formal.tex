@@ -56,26 +56,20 @@
 \end{array}
 \\[0.5em]
 \begin{array}{llcllcl}
-\text{Context Mode:} & m & ::= & \cmode \mid \umode \\
-\text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\
-\text{Bound:} & b & ::= & n \mid x \plus n \\
-              & \bvar & ::= & (b,b) \\
+\text{Context Mode:} & m & ::= & \cmode \mid \umode \\[0.2em]
+\text{Memory Mode:} & \xi & ::= & m \mid \tmodered \\[0.2em]
+\text{Bound:} & b & ::= & n \mid x \plus n \\[0.2em]
+              & \bvar & ::= & (b,b) \\[0.2em]
   
-     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{ \xi}
-\\
-\text{Type Flag:}&\kappa &::=& nt \mid \cdot
-\\
-\text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau} \mid \tfun{\overline{x}}{\overline{\tau}}{\tau}
-\\
+     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{\xi}
+\\[0.2em]
+\text{Type:}&\omega &::=& \tau \mid \tarrayb{\bvar}{\tau} \mid \textcolor{red}{\tfun{\overline{x}}{\overline{\tau}}{\tau}}
+\\[0.2em]
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \edyncast{\tau}{e}
-\mid \ret{x}{\evalue{n}{\tau}}{e}
-  \\
-&&\mid& \estrlen{x} \mid \emalloc{\xi}{\omega} \mid\estar{e}\mid\eassign{e}{e}  \\
-&&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e} \mid \ecall{e}{\overline{e}}
-\\
-&&\mid&\eunchecked{\overline{x}}{e}
-\mid \echecked{\overline{x}}{e}
+\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e}
+  \\[0.2em]
+&&\mid& \estar{e}\mid\eassign{e}{e} \mid \textcolor{red}{\emalloc{\xi}{\omega}} \\[0.2em]
+&&\mid&\eif{e}{e}{e} \mid  \elet{x}{e}{e} \mid \textcolor{red}{\ecall{e}{\overline{e}}}
 \end{array}
     \end{array}
   \]
@@ -83,7 +77,36 @@
   \label{fig:checkc-syn}
 \end{figure}
 
-\ignore{
+\begin{figure}
+{
+\begin{center}
+\includegraphics[width=0.35\textwidth]{memory.png}
+\end{center}
+}
+\caption{
+    \systemname separate heap layouts
+}
+  \label{fig:checkc-memory}
+\end{figure}
+
+\begin{figure}
+{
+  \small \centering
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\diagbox{\text{Context}}{\text{Memory}}
+& $\texttt{malloc}$ & $\estar{e}$ & $\eassign{e}{e}$ & $\ecall{e}{\overline{e}}$\\[0.1em]
+\hline
+\cmode&$\cmodenor$,$\tmodenor$ & $\cmodenor$,$\tmodenor$ & $\cmodenor$,$\tmodenor$ & $\cmodefun$,$\tmodefun$\\[0.1em]
+\hline
+\umode&$\umode$ & $\tmodenor$,$\umode$ & $\tmodenor$,$\umode$ & $\tmodefun$,$\umode$\\[0.1em]
+\hline
+    \end{tabular}
+}
+  \caption{Permitted Memory Modes in Context Regions}
+  \label{fig:checkc-mode}
+\end{figure}
+
 \begin{figure}[t]
 {\small
   \begin{mathpar}
@@ -91,23 +114,23 @@
   \inferrule[]
   {}
   {m \vdash \tint}
-
+\qquad
   \inferrule[]
   {\xi \wedge m\vdash \tau \\ \xi \le m}
-  {m \vdash \tptr{\tallarrayb{\bvar}{\tau}}{\xi}}
-
+  {m \vdash \tptr{\tarrayb{\bvar}{\tau}}{\xi}}
+\qquad
   \inferrule[]
   {\xi \wedge m \vdash \tau\\ \xi \le m}
   {m \vdash \tptr{\tau}{\xi}}
 
   \inferrule[]
-  {\xi \wedge m \vdash \tau\\ \xi \le m \\\\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
+  {\forall \tau'\in \overline{\tau}\cup\{\tau\}\,.\,\xi \wedge m \vdash \tau'\\ \xi \le m \\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
   {m \vdash \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi})}
   \end{mathpar}
 }
 {\footnotesize
 \[
-\begin{array}{l} 
+\begin{array}{c} 
 \tmode \wedge \cmode = \umode \qquad \xi \wedge \umode = \umode
 \qquad \cmode \wedge m = m 
 \qquad  m_1 \wedge m_2 = m_2 \wedge m_1
@@ -119,7 +142,6 @@
  \caption{Well-formedness for Types}
 \label{fig:wftypes}
 \end{figure}
-}
 
 %% \dvh{I don't understand the variable grammar.  What is $T$?  What is $\eta$?  I think $\cmode$ and $\umode$ should be in tt font.}
 %% \liyi{T and $\eta$ can be moved to the appendix, they are useful only for struct types.}
@@ -134,63 +156,68 @@
 %   Coq file?}
 % \liyi{The detailed explanation is in the appendix.}
 
-This section describes the formal core model of~\systemname,
-named~\lang.
+This section describes \systemname's formal core model, \lang.
 We present its syntax, semantics, type system,
-as well as \lang’s meta-theories, including the type soundness, non-exposure, and non-crashing theorems.
+as well as \lang’s meta-theories, including the non-exposure, type soundness, and non-crashing theorems.
 
 %This section describes the formal core model of \systemname, named
 %\lang, making precise its syntax, semantics, type system, and compilation. It also
 %develops \lang's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
 
 \subsection{Syntax}\label{sec:syntax}
-\Cref{fig:checkc-syn} shows the syntax of~\lang.
+\Cref{fig:checkc-syn} shows the syntax of~\lang, with marked red items being new added features different from the \checkedc model \cite{li22checkedc}.
 
-\myparagraph{Type Syntax}
-At a high level, we classify types as word-size value, multi-word
-value, or function types. A word-size value can be either an integer or pointer.
+\myparagraph{Types}
+%
+\systemname and \checkedc are similar in terms of type syntax, except for function types.
+We classify types as word-size value, multi-word
+value, or newly introduced function types (explained shortly below). A word-size value can be either an integer or pointer.
 Every pointer type ($\tptr{\omega}{\xi}$) includes a
-pointer mode annotation ($\xi$, the difference between context and pointer modes
-is introduced shortly below) that is either checked (\cmode), tainted (\tmode),
-or unchecked (\umode), and a type ($\omega$) denoting the valid value type it is pointed to.
+memory mode (explained shortly below), and a type ($\omega$) denoting the valid value type it is pointed to.
 A multi-word value type ($ \tallarrayb{\bvar}{\tau}$) that ranges over 
-arrays and null-terminated arrays is constructed by the type of elements in the
-array ($\tau$), an array bound ($\bvar$) comprised of an upper and
-lower bound on the size of the array ($(b_l,b_h)$), and an array flag ($\kappa$).
+arrays is constructed by the type of elements in the
+array ($\tau$), a bound ($\bvar$) comprised of an upper and
+lower bound on the size of the array $(b_l,b_h)$, and a flag ($\kappa$).
 Bounds $b$ are
 limited to integer literals $n$ and expressions $x + n$.
-Whether an array pointer is null terminated or not is determined by annotation
-$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
-otherwise (we elide $\cdot$ when writing types).
-An example representation of an array and null-terminated array in~\lang is shown below:
+An example representation of an array in~\lang is shown below:
 % 
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
 $\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
-\\[0.2em]
-$\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
-&\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
 \end{array}
 \end{array}
 \]
 
 For simplicity, we write
 $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean $\tptr{\tarray{0}{b}{\tau}}{\cmode}$,
-so the above examples could be rewritten as $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
-$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
+so the above examples could be rewritten as $\tptr{\tarrayb{n}{\tau}}{\tmode}$.
+There are other syntactic categories for modeling null-terminated array and \code{struct} types in \Cref{app:main}.
 
-\myparagraph{Disallowing Unsafe Types}
-The well-formedness of these types are presented in~\Cref{app:le}.
-It prevents unsafe types from being constructed.
-  Consider the type ~\code{_t_Array_ptr<_Ptr<int>>}, which describes a tainted array of checked pointers.
-  This is not well-formed in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region when the tainted ($\tmode$) array is used. 
-  Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
+\myparagraph{Modes and Well-formed Types}
 %
+In \systemname, we divide \checkedc modes to context and memory modes.
+In terms of program contexts, modes refer to the partition of a program into checked (\cmode) and unchecked (\umode) regions,
+as the context modes in \Cref{fig:checkc-syn}. In terms of pointers, memory modes classify the partitioned memory ranges that particular pointers point to, either checked (\cmode), tainted (\tmode), or unchecked (\umode) memory ranges.
+More specifically, we partition each of the above ranges to a sub-range (subscripted with $\texttt{f}$) storing static function code data, and a sub-range (subscripted with $\texttt{n}$) storing normal heap data,
+so function pointers and heap pointers point to different sub-ranges conceptually.
+Different operations in different context regions are allowed to access different pointer modes, shown in \Cref{fig:checkc-mode}.
+A \texttt{malloc} operation in \cmode region produces a pointer accessing $\cmodenor$ or $\tmodenor$ memory range, while a \texttt{malloc} in \umode region produces a $\umode$ range pointer.
+Function calls ($\ecall{e}{\overline{e}}$) in \cmode region are allowed to access $\cmodefun$ or $\tmodefun$ range pointers,
+while calls in \umode region are permitted to access $\umode$ range pointers.
+
+\systemname nested pointers also has well-formedness type restrictions in~\Cref{fig:wftypes},
+to prevent unsafe pointers, which might leak \cmode mode pointer address to \umode regions, from being constructed.
+Consider the pointer type ~\code{_t_Array_ptr<_Ptr<int>>}, which describes a tainted array of checked pointers.
+This is not well-formed in~\lang because it potentially exposes the checked pointer addresses in a $\umode$ region (a violation of the non-exposure property in \Cref{sec:theorem}), when the tainted ($\tmode$) array is used. 
+  Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
+
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
 where $\overline{x}$ represents a list of \tint{} type variables that bind type variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
+{\small
 \[\hspace*{-0.5em}
 \begin{array}{l}
 $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
@@ -199,87 +226,29 @@ $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
 \Leftrightarrow\; $\tptr{(\tfun{n}{\tint \times \tntarrayptr{0}{n}{\tau_2}{\tmode} \times \tntarrayptr{0}{n}{\tau_1}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
-The function type also has well-formed requirements (\Cref{app:le}), which disallows nesting checked pointers inside tainted pointers.
-Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+}
+The function type also has well-formed requirements (\Cref{fig:wftypes}), which disallows nesting checked pointers inside tainted pointers. Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 
-%The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
-%There are two type notions in \lang.  Types $\tau$ classify
-%word-sized values including integers and pointers, while types
-%$\omega$ classify multi-word values such as arrays, null-terminated
-%arrays, functions, and single-word-size values. 
-%Pointer types ($\tptr{\omega}{\xi}$) include a pointer mode annotation 
-%($\xi$, the difference between context and pointer modes is introduced shortly below)
-%that is either checked (\cmode), tainted (\tmode), or unchecked (\umode),
-%and a type ($\omega$) denoting valid values that can be pointed to.
-%Array types include both the type of
-%elements ($\tau$) and a bound ($\bvar$) comprised of an upper and
-%lower bound on the size of the array ($(b_l,b_h)$). Bounds $b$ are
-%limited to integer literals $n$ and expressions $x + n$.
-%Whether an array pointer is null terminated or not is determined by annotation
-%$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
-%otherwise (we elide $\cdot$ when writing types).
-%
-%\lang{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
-%reflect its dependent function declarations,
-%where $\overline{x}$ represents
-%a list of \tint{} type variables in a dependent function header
-%that bind bound variables appearing in $\overline{\tau}$ and $\tau$.
-%We have a well-formed requirement for a function type;
-%that is, all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
-%Here is the
-%corresponding \systemname syntax for these types:
-%\[\hspace*{-0.5em}
-%\begin{array}{l}
-%\begin{array}{rcl}
-%$\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
-%&\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
-%\\[0.2em]
-%$\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
-%&\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
-%\end{array}
-%\\[0.2em]
-%$\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{),}$\\
-%\qquad\qquad$\code{_NT_Array_ptr<}$\tau$\code{>)>: count(}$n$\code{))>}$
-%\\[0.2em]
-%\Leftrightarrow\;\; $\tptr{(\tfun{n}{ \tntarrayptr{0}{n}{\tau}{\tmode} \times \tntarrayptr{0}{n}{\tau}{\tmode}}{\tint})}{\tmode}$
-%\end{array}
-%\]
-%As a convention we write $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean
-%$\tptr{\tarray{0}{b}{\tau}}{\cmode}$, so the firs two examples above could
-%be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
-%$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 \myparagraph{Expressions}
 \lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
- static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \cite{li22checkedc}}, the \texttt{strlen} operation ($\estrlen{x}$),
+ static casts ($\ecast{\tau}{e}$),
 memory allocations ($\emalloc{\xi}{\omega}$), 
-function calls ($\ecall{e}{\overline{e}}$),
-unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
-For example, a dynamic bounds cast
-  { \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
-is formalized as 
-{$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \lang. 
-% 
-
-% 
+function calls ($\ecall{e}{\overline{e}}$).
 We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
 For example, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents a $\enull$ pointer.
-The heap allocation $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in different regions, $\cmode$ mode pointer in \cregion or $\umode$ and $\tmode$ mode pointers in \ucregion.
-We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-The $\echeckedtext$ and $\euncheckedtext$ expressions are used to delimit code regions.
-To guarantee the non-exposure property, we extend the \checkedc syntax to include $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$ blocks,
-where $\overline{x}$ represents all variables that are allowed to communicate between instructions outside and inside of the block $e$, and it cannot contain checked pointers.
-$\erettext$ is introduced by the semantics when evaluating a \texttt{let} binding; explained shortly below.
 
-% 
+Compared with \checkedc, \lang's \texttt{malloc} operation includes a mode $\xi$ to model the allocations of pointers with different modes; $e$ in a function call $\ecall{e}{\overline{e}}$ represents a function pointer whose pointer mode indicates the memory range the function text locates, as well as the context-switch of context regions, explained shortly in \Cref{sec:typechecking}.
+
 \lang{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example,
-loops can be encoded as recursive function calls. \code{struct}s are
-not included in~\fig{fig:checkc-syn} for space reasons, but they are
-supported as shown in~\cite{li22checkedc}.
+loops can be encoded as recursive function calls. 
+More operations, such as \code{struct}s are given in \Cref{app:main}.
+\ignore{
 C-style \code{union}s have no safe typing in \checkedc, so we omit them.
 Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
+}
 
 %\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
 % addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 

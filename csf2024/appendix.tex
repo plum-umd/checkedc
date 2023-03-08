@@ -936,44 +936,44 @@ upper bound to \code{n}.
 Here, we first show some Well-formedness and consistency definitions that are required in \Cref{sec:theorem}, and then show the simulation theorem for the \lang compiler.
 Type soundness relies on several \emph{well-formedness}:
 
-\begin{definition}[Type Environment Well-formedness]\label{type-wellformed}
+\begin{defi}[Type Environment Well-formedness]\label{type-wellformed}
 A type environment $\Gamma$ is well-formed if every variable mentioned as type bounds in $\Gamma$ are bounded by $\tint$ typed variables in $\Gamma$.
-\end{definition}
+\end{defi}
 
-\begin{definition}[Heap Well-formedness]
+\begin{defi}[Heap Well-formedness]
 For every $m$, A heap $\heap$ is well-formed if (i) $\heap(m,0)$ is undefined, and
 (ii) for all $\evalue{n}{\tau}$ in the range of $\heap(m)$, type $\tau$
 contains no free variables. 
-\end{definition}
+\end{defi}
 
-\begin{definition}[Stack Well-formedness]
+\begin{defi}[Stack Well-formedness]
 A stack snapshot $\varphi$ is well-formed if
 for all $\evalue{n}{\tau}$ in the range of $\varphi$, type $\tau$
 contains no free variables. 
-\end{definition}
+\end{defi}
 
 We also need to introduce a notion of
 \emph{consistency}, relating heap environments before and after a
 reduction step, and type environments, predicate sets, and stack
 snapshots together.
 
-\begin{definition}[Stack Consistency]
+\begin{defi}[Stack Consistency]
 A type environment $\Gamma$, variable predicate set $\Theta$, and
 stack snapshot $\varphi$ are consistent---written $\Gamma;\Theta\vdash
 \varphi$---if for every variable $x$, $\Theta(x)$ is defined implies
 $\Gamma(x) = \tau$ for some $\tau$ and 
 $\varphi(x) =\evalue{n}{\tau'}$ for some $n,\tau'$ where $\tau' \sqsubseteq_{\Theta} \tau$. 
-\end{definition}
+\end{defi}
 
-\begin{definition}[Checked Stack-Heap Consistency]
+\begin{defi}[Checked Stack-Heap Consistency]
 A stack snapshot $\varphi$ is consistent with heap $\heap$---written $\heap \vdash \varphi$---if
 for every variable $x$, $\varphi(x)= \evalue{n}{\tau}$ with $\mode(\tau)=\cmode$ implies $\emptyset;\heap(\cmode);\emptyset \vdash_{\cmode} n:\tau$.
-\end{definition}
+\end{defi}
 
-\begin{definition}[Checked Heap-Heap Consistency]
+\begin{defi}[Checked Heap-Heap Consistency]
 A heap $\heap'$ is consistent with $\heap$---written $\heap \triangleright \heap'$---if
 for every constant $n$, $\emptyset;\heap;\emptyset \vdash_{\cmode} n:\tau$ implies $\emptyset;\heap';\emptyset \vdash_{\cmode} n:\tau$.
-\end{definition}
+\end{defi}
 
 We formalize both the compilation procedure and the simulation
 theorem in the PLT Redex model we developed for \lang (see Sec.~\ref{sec:syntax}),
