@@ -239,137 +239,389 @@ function calls ($\ecall{e}{\overline{e}}$).
 We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
 For example, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents a $\enull$ pointer.
 
-Compared with \checkedc, \lang's \texttt{malloc} operation includes a mode $\xi$ to model the allocations of pointers with different modes; $e$ in a function call $\ecall{e}{\overline{e}}$ represents a function pointer whose pointer mode indicates the memory range the function text locates, as well as the context-switch of context regions, explained shortly in \Cref{sec:typechecking}.
+Compared with \checkedc, \lang's \texttt{malloc} operation includes a mode $\xi$ to model the allocations of pointers with different modes; $e$ in a function call $\ecall{e}{\overline{e}}$ represents a function pointer whose pointer mode indicates the memory range the function text locates, as well as the context-switch of context regions, explained shortly in \Cref{sec:semantics}.
 
 \lang{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example,
 loops can be encoded as recursive function calls. 
 More operations, such as \code{struct}s are given in \Cref{app:main}.
-\ignore{
-C-style \code{union}s have no safe typing in \checkedc, so we omit them.
-Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
-}
 
-%\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
-% addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 
-%dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}},
-%the \texttt{strlen} operation ($\estrlen{x}$),
-%pointer dereference and assignment ($\estar{e}$)
-%and ($\eassign{e_1}{e_2}$), resp.),
-%let binding ($\elet{x}{e_1}{e_2}$),
-%conditionals ($\eif{e}{e_1}{e_2}$),
-%memory allocation ($\emalloc{\xi}{\omega}$), 
-%function calls ($\ecall{e}{\overline{e}}$),
-%unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecked{\overline{x}}{e}$).
-%% \review{III.A.: the "dynamic cast" terminology may be briefly confused for C++'s
-%%   RTTI-based dynamic cast feature}
-%% \mwh{Added reference back to Section 2-B}
-%Integer literals $n$ are annotated with a type $\tau$ which can be either
-%$\tint$, or $\tptr{\omega}{\xi}$ in the case $n$ is being used as 
-%a heap address (this is useful for the semantics);
-%$\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents the $\enull$ pointer, as usual. 
-%The $\texttt{strlen}$ expression operates on variables $x$
-%rather than arbitrary expressions to simplify managing
-%bounds information in the type system; the more general case can be
-%encoded with a \code{let}. We use a less verbose syntax for dynamic bounds
-%casts; e.g., the following %
-%
-%\noindent
-%{\footnotesize
-%\code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{, count(}$n$\code{))}
-%}
-%becomes 
-%{\footnotesize$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$}
-%. 
-%
-%Compared to the former \checkedc model \cite{li22checkedc},
-%there are four differences.
-%First, the \systemname type annotations have well-formed restrictions for maintaining non-exposure.
-%Mainly, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, $\xi_2\le \xi_1$.
-%It is worth noting that pointer modes are a three point partial order ($\le$),
-%where $\tmode$ is the infimum, and $\xi\wedge m$ is a special meet operation that projects pointer modes onto context modes,
-%such that $\tmode$ is projected as $\umode$.
-%Second, $\emalloc{\xi}{\omega}$ includes a mode flag
-%$\xi$ for allocating different pointers in different heaps.
-%We disallow $\omega$ to be a function type ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$).
-%Third, the first expression $e$ in a function call ($\ecall{e}{\overline{e}}$) represents a function pointer.
-%Fourth, $\echeckedtext$ blocks are added to the system, 
-%which permits the nested context-switching between $\echeckedtext$ (represented by context mode $\cmode$)
-%and $\euncheckedtext$ (represented by context mode $\umode$) code regions.
-%One example usage of the nested context-switching is the checked function callbacks inside 
-%an unsafe region in \Cref{lst:humanadjust} and \Cref{lst:humantaint}.
-%To guarantee the non-exposure safety,
-% we extend the $\echeckedtext$ and $\euncheckedtext$ block syntax to be 
-%$\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$:
-%$\overline{x}$ restricts all free variables appearing in $e$, and they cannot be checked pointers.
-%
-%\lang aims to be simple enough to work with, but powerful enough to
-%encode realistic \systemname idioms. For example, mutable local
-%variables can be encoded as immutable locals that point to the heap;
-%the use of \code{&} can be simulated with \code{malloc};
-%and loops can be encoded as recursive function calls. \code{struct}s are
-%not in Fig.~\ref{fig:checkc-syn} for space reasons, but they are
-%actually in our model, and developed in
-%\iftr
-%Appendix~\ref{appx:struct}.
-%\else
-%the supplemental report~\cite{checkedc-tech-report}.
-%\fi
-%C-style \code{union}s have no safe typing
-%in \checkedc, so we omit them.
-
-% \mwh{NOTE: COULD WORK THE FOLLOWING INTO THE ABOVE DESCRIPTION OF
-%   POINTERS: Array and NT-array types have two relative bounds, whose structures
-% can be either an integer or a variable plus an integer. For example,
-% if we have the expression
-% $x\texttt{=}\emalloc{\tarrayb{(0,10)}{\tint}}$, $x$ then has the type
-% $\tptr{\tarrayb{10}{\tint}}{\cmode}$, which represents an array
-% pointer of size $10$. The bounds ($(b_l,b_h)$ in
-% $\evalue{p}{\tptr{\tarrayb{(b_l,b_h)}{\tau}}{m}}$) indicate relative
-% offsets from this pointer of the accessible memory, i.e., $p+b_l$ and
-% $p+b_h$. As such, a pointer can only be directly dereferenced if 0 is
-% included within the annotated range.  If following the $\emalloctext$
-% operation, we execute $*(x-1)$ and $*(x\plus 10)$. The two expressions
-% are not valid, because the type of the two expressions $(x-1)$ and
-% $(x\plus 10)$ are $\tarrayptr{1}{11}{\tint}{\cmode}$ and
-% $\tarrayptr{-10}{0}{\tint}{\cmode}$ and $0$ in these two cases are not
-% in the ranges: $[1,11)$ and $[-10,0)$. Thus, in order for a $\cmode$
-% pointer with type $\tarrayptr{b_l}{b_h}{\tint}{\cmode}$ to be
-% accessible in \checkedc, $0$ must be in the range of $[b_l,b_h)$.}
+\subsection{Semantics}\label{sec:semantics}
 
 \begin{figure}
 {\small
 $\hspace*{-1.2em}
     \begin{array}{l}
     \begin{array}{lll}
-r & ::= & e \mid \enull \mid \ebounds\\
-E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
-&&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid\ret{x}{\evalue{n}{\tau}}{E}\mid \eif{E}{e}{e}\\[0.2em]
-&&\mid \ecall{E}{\overline{e}} \mid \ecall{\evalue{n}{\tau}}{\overline{E}} \mid 
-\eunchecked{\overline{x}}{E}
-\mid \echecked{\overline{x}}{E}
-
-
+\mu & ::= & \evalue{n}{\tau} \mid \bot\\[0.1em]
+e & ::= & \ldots \mid \ret{x}{\mu}{e} \mid \textcolor{red}{\toa{m}{e}}\\[0.1em]
+r & ::= & e \mid \enull \mid \ebounds\\[0.1em]
+E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}
+\mid\eassign{\evalue{n}{\tau}}{E}\\[0.1em]
+&\mid& \eif{E}{e}{e}\mid \elet{x}{E}{e}\mid\ret{x}{\mu}{E}\\[0.1em]
+&\mid& \textcolor{red}{\ecall{E}{\overline{e}}} \mid \textcolor{red}{\ecall{\evalue{n}{\tau}}{\overline{E}}}
+\mid \textcolor{red}{\toa{m}{E}}\\[0.1em]
+\overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
 \end{array}
 \\ \\
     \end{array} 
 $
   \begin{mathpar}
-    \inferrule{ m=\mode(E) \\
+    \inferrule[S-Frame]{ m=\mode(E) \\
       e=E[e'] \\
       (\varphi,\heap,e') \longrightarrow (\varphi',\heap',e'')}
     {(\varphi,\heap,e)\longrightarrow_{m} (\varphi',\heap',E[e''])}
 
-    \inferrule{ \umode=\mode(E) \\
-      e=E[e'] \\
-      \tau=\type(e')}
-    {(\varphi,\heap,e)\longrightarrow_{\umode} (\varphi,\heap,E[\evalue{0}{\tau}])}
+\textcolor{red}{
+    \inferrule[S-Random]{ \umode=\mode(E) \\ \tau=\type(e)}
+    {(\varphi,\heap,E[e])\longrightarrow_{\umode} (\varphi,\heap,E[\evalue{0}{\tau}])}
+}
 
   \end{mathpar}
 }
   \caption{\lang Semantics: Evaluation}
   \label{fig:c-context}
 \end{figure}
+
+The operational semantics for \lang is defined as a small-step
+transition relation with the judgment $ (\varphi,\heap,e)_m
+\longrightarrow (\varphi',\heap',r)_{m'}$. Here, $\varphi$ is a
+\emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
+$\heap$ is a \emph{heap} mapping addresses (integer literals) to
+values $\evalue{n}{\tau}$; for both we ensure
+$\fv(\tau)=\emptyset$.
+While heap bindings can change, stack bindings are immutable---once
+variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
+be updated; we can model mutable stack variables as pointers into the
+mutable heap.
+As mentioned, value $\evalue{0}{\tau}$
+represents a $\enull$ pointer when $\tau$ is a pointer type;
+correspondingly, $\heap(0)$ should always be undefined.
+The relation steps to a \emph{result} $r$,
+which is either an expression or a $\enull$ or $\ebounds$ failure,
+representing a null-pointer dereference or out-of-bounds access,
+respectively. Such failures are a \emph{good} outcome; stuck states
+(non-value expressions that cannot transition to a result $r$)
+characterize undefined behavior.
+%
+Context modes $m$ and $m'$ indicate the current and next context regions that $e$ resides.
+
+The rules for the main operational semantics
+judgment---\emph{evaluation}---are given as the two rules in Fig.~\ref{fig:c-context}.
+The first rule takes an expression $e$, decomposes
+it into an \emph{evaluation context} $E$ and a sub-expression $e'$
+(such that replacing the hole $\Box$ in $E$ with $e'$ would yield
+$e$), and then evaluates $e'$ according to the \emph{computation}
+  relation $(\varphi,\heap,e') \longrightarrow_m (\varphi,\heap,e'')$,
+whose rules are given in Fig.~\ref{fig:semantics}, discussed
+shortly. 
+
+in contrast to \checkedc formalism \cite{li22checkedc},
+every transition \lang step requires the current context mode $m$ as an input, and the calculation of the next context mode $m'$ based  by the $\nexta$ function in Fig.~\ref{fig:c-context}, which takes $m$ and the context $E$ as inputs.
+The context form $\ecall{(\evalue{n}{\tptr{\tau}{\xi}})}{\overline{e},\Box})$ indicates that the next 
+
+In \Cref{lst:humantaint}, the function call \code{handle_request} is in $\umode$ region since it is inside an unchecked function \code{server_loop}.
+The second rule describes the exception handling 
+for possible crashing behaviors in $\umode$ regions.
+Operations in $\umode$ region can non-deterministically crash
+and the \systemname sandbox mechanism recovers
+the program to a safe point ($\evalue{0}{\tau}$)
+and continues with the existing program state.
+Evaluation contexts $E$ define a standard left-to-right evaluation order. 
+
+
+% \review{the special case raises questions, e.g. why is this syntax-driven and
+%   not type-driven? }
+% \liyi{This describes the semantic transition rules. We are using context evaluation framework to define the transition rules as the $E$ definition in Fig.3. like $\frac{x \Rightarrow y}{x+z \Rightarrow y + z}$, I don't know how type-driven can help us define translation rules.  }
+% \mwh{Don't follow the above. I don't see this ``context transition
+%   rule'' anywhere, and I'm not sure how it would fire, if we had it.}
+% \liyi{The comment seems to confuse the meaning of the text about the if-then-else rules. Making the rule specific will help. }
+The $\mode$ function
+determines the mode when evaluating $e'$ based on the context $E$:
+if the $\Box$ occurs within $(\eunchecked{E'})$ inside $E$, then the mode is
+$\umode$; otherwise, it is $\cmode$. Evaluation contexts $E$ define a
+standard left-to-right evaluation order. (We explain the
+$\ret{x}{\mu}{e}$ syntax shortly.)
+% For a term $e$, $C$ is a context if any
+% only if it contains a $\Box$ hole term in one of the subterm position
+% in $e$. $\Box$ indicates the break point where we split $e$ into $C$
+% and a subterm $e'$ such that $C[e'] = e$.  For a function call
+% $\ecall{f}{\overline{e}}$, a valid context ($\overline{C}$) is defined
+% as any one of the elements in the list $\overline{e}$ being a
+% context. We show a rule of the upper level \checkedc semantics. The
+% rule splits a term $e$ into a context $C$ and redex $e'$.  If subterm
+% $e'$ is transitioned to $e_a$, $C[e']$ is transitioned to
+% $C[e_a]$.
+
+\begin{DIFnomarkup}
+\begin{figure*}[t]
+{\small
+  \begin{mathpar}
+        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+        \inferrule[S-DefNTArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h]}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+
+
+    \inferrule[S-AssignArr]{\heap(n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
+      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+
+    \inferrule[S-Cast]
+              {}
+              {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
+
+  \inferrule[S-DynCast]{
+\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{m})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{m} \\ n_l' \le n_l\ \\ n_h \le n_h'}
+    { (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{m}}}) \longrightarrow (\varphi',\heap',\evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau_b}{m}})}
+
+
+ \inferrule[S-DynCastBound]{\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{\cmode})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{\cmode} \\ n_l' > n_l \vee n_h > n_h'}{ (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{\cmode}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{\cmode}}}) 
+ \longrightarrow (\varphi',\heap',\ebounds)}
+
+        \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
+
+    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
+
+
+    \inferrule[S-Fun]{ \Xi(f) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
+        {(\varphi,\heap,\ecall{f}{{\evalue{\overline{n}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
+
+     % \inferrule[S-IfNTF]{\varphi(x)=\evalue{n}{\tau} \\ \heap(n)=0}
+     %      {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
+      \inferrule[S-StrWiden]{
+         \varphi(x) = \evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{\cmode}}\\ 0 \in [n_l,n_h] \\ n_a > n_h
+\\ \heap(n+n_a) = 0 
+\\\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
+    {(\varphi,\heap,\estrlen{x}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tarrayptr{n_l}{n_a}{\tau}{\cmode}}],\heap,\evalue{n_a}{\tint})}
+
+     \inferrule[S-IfNTT]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{0}{\tau}{\cmode}} \\ \heap(n)\neq 0}
+    {(\varphi,\heap,\eif{*x}{e_1}{e_2}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tntarrayptr{n_l}{1}{\tau}{\cmode}}],\heap,e_1)}
+
+ % \inferrule[S-IfNTNot]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(n)\neq 0\\ 0 < n_h}
+ %            {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
+
+\end{mathpar}
+}
+% {\footnotesize
+% \begin{center}
+% $
+% \begin{array}{l}
+% \tau[\overline{n} / \overline{x}]\texttt{(with types }\evalue{\overline{x}}{\overline{\tau}}\texttt{)}\triangleq \forall n_i\in\overline{n}\;x_i\in\overline{x}\;\tau_i\in\overline{\tau}\;.\;\tau_i = \tint \Rightarrow \tau[n_i / x_i]\\[0.2em]
+% \mathtt{let}\;\overline{x}=\overline{e}\;\mathtt{in}...\triangleq \mathtt{let}\;x_0=e_0\;\mathtt{in}\;\mathtt{let}\;x_1=e_1\;\mathtt{in}...
+% \end{array}
+% $
+% \end{center}
+% }
+\caption{\lang Semantics: Computation (Selected Rules)}
+\label{fig:semantics}
+\end{figure*}
+\end{DIFnomarkup}
+
+% \review{Fig4: it was hard to tell which cases were stuck states, or could reduce
+%   owing to a rule that was not shown}
+% \mwh{Stuck states are those where the expression is a non-value and
+%   not $\enull$ or $\ebounds$. Updated III-B and III-D.}
+% \review{Fig4: can the rules be presented in the same order they were introduced in
+%   the paper?}
+% \liyi{ Reordered }
+
+% \review{Fig4: S-FUN: $\vec\tau_a$ seems unused; why?}
+% \liyi{the list of $\tau_a$ is a list of input argument types. These
+%   are used during type checking, but not during evaluation (as is
+%   typical).} 
+
+% LEO: This has an overfull line...?
+\begin{figure}[t]
+{\small
+{\captionsetup[lstlisting]{margin = 8 mm}
+  \begin{lstlisting}[xleftmargin=8 mm]
+nt_array_ptr<char> safe_strcat
+   (nt_array_ptr<char> dst : count(n),
+    nt_array_ptr<char> src : count(0), int n) {
+  int x = strlen(dst);
+  int y = strlen(src);
+  nt_array_ptr<char> c : count(n) =
+    dyn_bounds_cast
+           <nt_array_ptr<char>>(dst,count(n));
+    // sets c == dst with bound n (not x)
+  if (x+y < n) {
+    for (int i = 0; i < y; ++i)
+      *(c+x+i) = *(src+i);
+    *(c+x+y) = '\0';
+    return dst;
+  }
+  return null;
+}
+  \end{lstlisting}
+}
+}
+\caption{Implementation of safe \code{strcat}}
+\label{fig:strcat-ex}
+\end{figure}
+
+Fig.~\ref{fig:semantics} shows selected rules for the computation
+relation; we explain them with the help of the example in
+Fig.~\ref{fig:strcat-ex},
+  which defines a 
+  safe version of \code{strcat} (using actual Checked C syntax).  The
+  function takes a target 
+  pointer \code{dst} of capacity \code{n}, where the first null
+  character (determined by \code{strlen}) is at index \code{x} where
+  $0 \leq $\code{x}$ \leq n$. It concatenates the \code{src} buffer to
+  the end of \code{dst} as long as \code{dst} has sufficient space.
+
+% Below, we introduce low-level transition semantics for some case operations. The design of the low-level individual operation semantics is carefully engineered to perform match our compiler's behavior, such as correctly characterizing the bound widening behaviors for NT-array pointers, even though it is written in terms of fat-pointer formalization.
+
+\myparagraph{Pointer accesses}
+%
+The rules for dereference and assignment operations---\textsc{S-Def},
+\textsc{S-DefNull}, \textsc{S-DefNTArray}, and
+\textsc{S-AssignArr}---illustrate how the semantics checks bounds.
+Rule \textsc{S-DefNull} transitions attempted null-pointer
+dereferences to $\enull$, whereas \textsc{S-Def} dereferences a
+non-null (single) pointer.
+  When $\enull$ is returned by the
+computation relation, the evaluation relation halts the entire
+evaluation with $\enull$ (using a rule not shown in Fig.~\ref{fig:c-context}); it
+does likewise when $\ebounds$ is returned (see below).
+
+% \review{- on page 6, section IIIC, paragraph "Pointer Access" mentions that checked pointers cannot be dereferenced in unchecked blocks - this looks funny, shouldn't it be the other way around? The Coq code contains the hypothesis m'=Unchecked -> m Unchecked in various rules of definition well-typed (BoundCheckedC, line 669; rule TyDeref in the code seems closest to the figure's T-DefArr and T-Def in the appendix, although it's a bit concerning that there's no 1-to-1 correspondence of the rules in the code and the paper).
+% }
+% \liyi{Yeah. It is another typo. It should be the other way around.  }
+
+\textsc{S-AssignArr} assigns to an array as long as 0 (the point of
+dereference) is within the bounds designated by the pointer's annotation
+and strictly less than the upper bound. For the assignment rule,
+arrays are treated uniformly whether they are null-terminated or not
+($\kappa$ can be $\cdot$ or $nt$)---the semantics does not search past
+the current position for a null terminator. The program
+can widen the bounds as needed, if they currently precede the null
+terminator: \textsc{S-DefNTArray}, which dereferences an NT array
+pointer, allows an upper bound of $0$, since the program may read, but
+not write, the null terminator. A separate rule (not shown) handles
+normal arrays.
+
+\myparagraph{Casts}
+%
+Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
+by \textsc{S-Cast}. In a type-correct program, such casts are
+confirmed safe by the type system. To evaluate a cast, the rule
+updates the type annotation on $n$. Before doing so, it must
+``evaluate'' any variables that occur in $\tau$ according to their
+bindings in $\varphi$. For example, if $\tau$ was
+$\tarrayptr{0}{x+3}{\tint}{\cmode}$, then $\varphi(\tau)$ would
+produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+
+Dynamic casts are accounted for by \textsc{S-DynCast} and
+\textsc{S-DynCastBound}. In a type-correct program, such casts are
+assumed correct by the type system, and later confirmed by the
+semantics. As such, a dynamic cast will cause a $\ebounds$ failure if
+the cast-to type is incompatible with the type of the target pointer,
+as per the $n_l' > n_l \vee n_h > n_h'$ condition in
+\textsc{S-DynCastBound}. An example use of dynamic casts is given on
+line~7 in Fig.~\ref{fig:strcat-ex}. The values of \code{x} and
+\code{n} might not be known statically, so the type system cannot
+confirm that \code{x <= n}; the dynamic cast assumes this inequality
+holds, but then checks it at run-time.
+
+\myparagraph{Binding and Function Calls}
+%
+The semantics handles variable scopes using the special $\erettext$
+form. \textsc{S-Let} evaluates to a configuration whose stack
+is $\varphi$ extended with a binding for $x$, and whose expression is
+$\ret{x}{\varphi(x)}{e})$ which remembers $x$ was previously bound to
+$\varphi(x)$; if it had no previous binding, $\varphi(x) =
+\bot$. Evaluation proceeds on $e$ until it becomes a literal
+$n\!:\!\tau$, in which case \textsc{S-Ret} restores the saved
+binding (or $\bot$) in the new stack, and evaluates to
+$n\!:\!\tau$. 
+
+Function calls are handled by \textsc{S-Fun}. Recall that array
+bounds in types may refer to in-scope variables; e.g., parameter
+\code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
+2-3 in Fig.~\ref{fig:strcat-ex}. A call to function $f$ causes $f$'s
+definition to be retrieved from $\Xi$,
+% LEO: This is the first occurence of \Xi. It is explained,
+% but reads a bit awkward as it's unclear this is its "introduction"
+which maps function names to
+forms $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e$, where
+$\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
+is the parameter list of variables and their types, and $e$ is the
+function body. The call is expanded into a \texttt{let} which binds
+parameter variables $\overline{x}$ to the actual arguments
+$\overline{n}$, but annotated with the parameter types
+$\overline{\tau}$ (this will be safe for type-correct programs). The
+function body $e$ is wrapped in a static cast
+$(\tau[\overline{n} / \overline{x}])$ which is the function's return
+type but with any parameter variables $\overline{x}$ appearing in that
+type substituted with the call's actual arguments $\overline{n}$. To
+see why this is needed, suppose that \code{safe_strcat} in
+Fig.~\ref{fig:strcat-ex} is defined to return a
+\code{nt_array_ptr<int>:count(n)} typed term, and assume that we
+perform a \code{safe_strcat} function call as
+\code{x=safe_strcat(a,b,10)}. After the evaluation of \code{safe_strcat}, the
+function returns a value with type \code{nt_array_ptr<int>:count(10)}
+because we substitute bound variable \code{n} in the 
+defined return type with \code{10} from the function call's
+argument list.
+Note that the \textsc{S-Fun} rule replaces the
+  annotations $\overline{\tau_a}$ with
+  $\overline{\tau}$ (after instantiation) from the function's
+  signature. Using $\overline{\tau_a}$ when executing the body of
+the function has no impact on the soundness of \lang, but will violate
+Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
+
+\myparagraph{Bounds Widening}
+%
+Bounds widening occurs when branching on a dereference of a NT array
+pointer, or when performing $\estrlentext$. The latter is most useful
+when assigned to a local variable so that subsequent code can use the
+result, e.g., $e$ in $\elet{x}{\estrlen{y}}{e}$.  Lines 4 and 5 in
+Fig.~\ref{fig:strcat-ex} are examples. 
+The widened upper bound
+precipitated by $\estrlen{y}$ is extended beyond the lifetime of $x$, as long as $y$ is live.
+% Even if $x$ returns, if $y$'s upper bound keeps the widened bound that is caused by $\estrlen{y}$.
+For example, \code{x}'s scope in line 4 at runtime is
+the whole function body in \code{safe_strcat} because the lifetime of the pointer \code{dst} is in the function body.
+% Allowing widening to persist
+% outside the scope is sound, % but would precipitate the need for
+% % fat pointers during compilation, which we want to avoid.
+% and we take this approach to give more precise run-time behavior. We
+% show in Sec.~\ref{sec:compilation}
+This is different from the \checkedc specification, 
+which only allows bound widening to happen within the scope of \code{x}, and restoring old bound values once \code{x} dies.
+We allow widening to persist outside the scope at run-time as long as
+we are within the stack frame, and we show
+this does not necessarily require the use of fat pointers in
+Sec.~\ref{sec:compilation}.
+
+Rule \textsc{S-StrWiden} implements $\estrlentext$ widening. The
+predicate
+$\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i)
+= \evalue{n_i}{\tau_i} \wedge n_i \neq 0))$ aims to find a position
+$n+n_a$ in the NT array that stores a null character, where no
+character as indexes between $n$ and $n+n_a$ contains one. (This rule
+handles the case when $n_a > n_h$, the $n_a \le n_h$ case is handled
+by a normal $\estrlentext$ rule; see 
+\iftr
+Appendix~\ref{sec:rem-semantics}.)
+\else
+the supplemental report~\cite{checkedc-tech-report}.)
+\fi
+
+Rule \textsc{S-IfNTT} performs bounds widening on $x$ when the
+dereference $\estar{x}$ is not at the null terminator, but the
+pointer's upper bound is 0 (i.e., it's at the end of its known
+range). $x$'s upper bound is incremented to 1, and this count persists
+as long as $x$ is live.  For example, \code{s}'s increment (lines
+5--8) is live until the return of the function in
+Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
+\code{s}'s upper bound is properly extended. %  For this rule and
+
 
 \subsection{Typing and Semantics}
 \label{sec:typechecking}
