@@ -259,7 +259,7 @@ r & ::= & e \mid \enull \mid \ebounds\\[0.1em]
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}
 \mid\eassign{\evalue{n}{\tau}}{E}\\[0.1em]
 &\mid& \eif{E}{e}{e}\mid \elet{x}{E}{e}\mid\ret{x}{\mu}{E}\\[0.1em]
-&\mid& \textcolor{red}{\ecall{E}{\overline{e}}} \mid \textcolor{red}{\ecall{\evalue{n}{\tau}}{\overline{E}}}
+&\mid& \textcolor{red}{\ecall{E}{\overline{e}}} \mid \textcolor{red}{\ecall{(\evalue{n}{\tau})}{\overline{E}}}
 \mid \textcolor{red}{\toa{m}{E}}\\[0.1em]
 \overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
 \end{array}
@@ -283,9 +283,10 @@ $
   \label{fig:c-context}
 \end{figure}
 
+
 The operational semantics for \lang is defined as a small-step
-transition relation with the judgment $ (\varphi,\heap,e)_m
-\longrightarrow (\varphi',\heap',r)_{m'}$. Here, $\varphi$ is a
+transition relation with the judgment $ (\varphi,\heap,e)
+\longrightarrow_m (\varphi',\heap',r)$. Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
 $\heap$ is a \emph{heap} mapping addresses (integer literals) to
 values $\evalue{n}{\tau}$; for both we ensure
@@ -304,54 +305,37 @@ respectively. Such failures are a \emph{good} outcome; stuck states
 (non-value expressions that cannot transition to a result $r$)
 characterize undefined behavior.
 %
-Context modes $m$ and $m'$ indicate the current and next context regions that $e$ resides.
+The context mode $m$ indicates whether the
+stepped redex within $e$ was in a checked ($\cmode$) or
+unchecked ($\umode$) region.
 
 The rules for the main operational semantics
-judgment---\emph{evaluation}---are given as the two rules in Fig.~\ref{fig:c-context}.
+judgment---\emph{evaluation}---are given at the bottom of
+Fig.~\ref{fig:c-context}.
 The first rule takes an expression $e$, decomposes
 it into an \emph{evaluation context} $E$ and a sub-expression $e'$
 (such that replacing the hole $\Box$ in $E$ with $e'$ would yield
 $e$), and then evaluates $e'$ according to the \emph{computation}
-  relation $(\varphi,\heap,e') \longrightarrow_m (\varphi,\heap,e'')$,
+  relation $(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$,
 whose rules are given in Fig.~\ref{fig:semantics}, discussed
-shortly. 
+shortly. Compared with \checkedc, we add three marked red contexts in \Cref{fig:c-context}.
+$\ecall{E}{\overline{e}}$ and $\ecall{(\evalue{n}{\tau})}{\overline{E}}$ are the contexts for function calls,
+since every call requires a function pointer having the address $n$ here,
+while the \checkedc formalism's function call takes a global function variable name \cite{li22checkedc}.
+$\toa{m}{E}$ is the context form of mode switching expression $\toa{m}{e}$.
 
-in contrast to \checkedc formalism \cite{li22checkedc},
-every transition \lang step requires the current context mode $m$ as an input, and the calculation of the next context mode $m'$ based  by the $\nexta$ function in Fig.~\ref{fig:c-context}, which takes $m$ and the context $E$ as inputs.
-The context form $\ecall{(\evalue{n}{\tptr{\tau}{\xi}})}{\overline{e},\Box})$ indicates that the next 
-
-In \Cref{lst:humantaint}, the function call \code{handle_request} is in $\umode$ region since it is inside an unchecked function \code{server_loop}.
-The second rule describes the exception handling 
-for possible crashing behaviors in $\umode$ regions.
-Operations in $\umode$ region can non-deterministically crash
-and the \systemname sandbox mechanism recovers
-the program to a safe point ($\evalue{0}{\tau}$)
-and continues with the existing program state.
-Evaluation contexts $E$ define a standard left-to-right evaluation order. 
-
-
-% \review{the special case raises questions, e.g. why is this syntax-driven and
-%   not type-driven? }
-% \liyi{This describes the semantic transition rules. We are using context evaluation framework to define the transition rules as the $E$ definition in Fig.3. like $\frac{x \Rightarrow y}{x+z \Rightarrow y + z}$, I don't know how type-driven can help us define translation rules.  }
-% \mwh{Don't follow the above. I don't see this ``context transition
-%   rule'' anywhere, and I'm not sure how it would fire, if we had it.}
-% \liyi{The comment seems to confuse the meaning of the text about the if-then-else rules. Making the rule specific will help. }
 The $\mode$ function
 determines the mode when evaluating $e'$ based on the context $E$:
-if the $\Box$ occurs within $(\eunchecked{E'})$ inside $E$, then the mode is
+if the $\Box$ occurs within $\toa{m}{E'}$ inside $E$ and $E'$ does not contain another $\totext$ expression, then the mode is
 $\umode$; otherwise, it is $\cmode$. Evaluation contexts $E$ define a
-standard left-to-right evaluation order. (We explain the
-$\ret{x}{\mu}{e}$ syntax shortly.)
-% For a term $e$, $C$ is a context if any
-% only if it contains a $\Box$ hole term in one of the subterm position
-% in $e$. $\Box$ indicates the break point where we split $e$ into $C$
-% and a subterm $e'$ such that $C[e'] = e$.  For a function call
-% $\ecall{f}{\overline{e}}$, a valid context ($\overline{C}$) is defined
-% as any one of the elements in the list $\overline{e}$ being a
-% context. We show a rule of the upper level \checkedc semantics. The
-% rule splits a term $e$ into a context $C$ and redex $e'$.  If subterm
-% $e'$ is transitioned to $e_a$, $C[e']$ is transitioned to
-% $C[e_a]$.
+standard left-to-right evaluation order.
+Two expressions $\ret{x}{\mu}{e}$ and $\toa{m}{e}$, which does not appear in source program syntax in \Cref{fig:checkc-syn}, are introduced in evaluating programs. The former is used for remembers $x$ was previously bound to
+$\varphi(x)$ in a $\elettext$ binding, which is described in \citet{li22checkedc} and \Cref{app:main}.
+The latter ($\toa{m}{e}$) is a new $\lang$ syntax for switching the context mode in $e$ as $m$, which is generated when a function is called; explained shortly below.
+
+The second rule in \Cref{fig:c-context} is newly introduced in \lang, to help the proof of the non-crashing theorem.
+In any given time, executing a unchecked region might non-deterministically cause the program to crash. We assume that there is a recovery mechanism for recover every such crashing, only in unchecked regions, to an initial state $\evalue{0}{\tau}$;
+thus, non-crashing shows that every unchecked region crashing does not affect the program evaluation in the checked regions.
 
 \begin{DIFnomarkup}
 \begin{figure*}[t]

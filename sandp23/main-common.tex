@@ -8,20 +8,30 @@
 %\makeatother
 %
 %\IEEEpeerreviewmaketitle
-
+\newif\iftr\trtrue
+\trfalse
 \PassOptionsToPackage{table}{xcolor}
 
-\documentclass[sigconf,review,anonymous]{acmart}
+ \documentclass[conference,compsoc]{IEEEtran}
 
-\fancyhf{} % Remove fancy page headers 
-\fancyhead[C]{Anonymous submission \#9999 to ACM CCS 2023} % TODO: replace 9999 with your paper number
-\fancyfoot[C]{\thepage}
+\makeatletter
+\def\endthebibliography{%
+  \def\@noitemerr{\@latex@warning{Empty `thebibliography' environment}}%
+  \endlist
+}
+\makeatother
 
-\setcopyright{none} % No copyright notice required for submissions
-\acmConference[Anonymous Submission to ACM CCS 2023]{ACM Conference on Computer and Communications Security}{}{}
-\acmYear{2023}
+\IEEEpeerreviewmaketitle
 
-\settopmatter{printacmref=false, printccs=true, printfolios=true} % We want page numbers on submissions
+%\fancyhf{} % Remove fancy page headers 
+%\fancyhead[C]{Anonymous submission \#9999 to ACM CCS 2023} % TODO: replace 9999 with your paper number
+%\fancyfoot[C]{\thepage}
+
+%\setcopyright{none} % No copyright notice required for submissions
+%\acmConference[Anonymous Submission to ACM CCS 2023]{ACM Conference on Computer and Communications Security}{}{}
+%\acmYear{2023}
+
+%\settopmatter{printacmref=false, printccs=true, printfolios=true} % We want page numbers on submissions
 
 %\usepackage{filecontents}
 %\usepackage[noadjust]{cite}
@@ -63,7 +73,7 @@
 \usetikzlibrary{chains,fit,shapes,positioning,calc,arrows.meta,shapes.arrows}
 \usepackage{xspace}
 \usemintedstyle{emacs}
-%\usepackage[numbers]{natbib}
+\usepackage[numbers]{natbib}
 %\bibliographystyle{plainnat}
 %\bibliographystyle{IEEEtran}
 
@@ -272,6 +282,8 @@
 
 \newcommand{\emalloc}[2]{\ensuremath{\kw{malloc}({#1},{#2})}}
 \newcommand{\emalloctext}{\ensuremath{\kw{malloc}}}
+\newcommand{\efree}[1]{\ensuremath{\kw{free}({#1})}}
+\newcommand{\efreetext}{\ensuremath{\kw{free}}}
 \newcommand{\ecall}[2]{\ensuremath{{#1}({#2})}}
 \newcommand{\elcall}[3]{\ensuremath{{(#1,#2)}({#3})}}
 
@@ -363,7 +375,7 @@
 \newcommand{\ewidenstrlen}[5]{\ensuremath{#5 = ~ \vdash_{widenstr}#1, #2, #3, #4}}
 \newcommand{\ewidenderef}[4]{\ensuremath{#4 = ~ \vdash_{widenderef}#1, #2, #3}}
 \newcommand{\eleq}[2]{\ensuremath{#1 \leq #2}}
-\newcommand{\systemname}{\textsc{CheckedCBox}\xspace}
+\newcommand{\systemname}{\textsc{TypeFlexer}\xspace}
 \newcommand{\threec}{\textsc{3C}\xspace}
 \newcommand{\sourcerewriter}{\textsc{CheckMate}\xspace}
 \newcommand{\clang}{\textsc{Clang}\xspace}
@@ -463,6 +475,26 @@
 % }
 % \author{Leonidas Lampropoulos \and
 % Michael Hicks}
+\author{Arunkumar Bhattar, Liyi Li$^\dagger$,  Le Chang$^\dagger$,  Mingwei Zhu$^\dagger$, Jason Ruo Liao$^\dagger$, and  Aravind Machiry\\
+  Purdue University $\quad\quad ~^\dagger$University of Maryland}
+  
+%            David Van Horn (University of Maryland, College Park)
+%            Michael W. Hicks (University of Maryland, College Park)
+
+%   \IEEEauthorblockN{1\textsuperscript{st} Leonidas Lampropoulos}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{University of Maryland}\\
+% llampro@cs.umd.edu}
+% \and
+% \IEEEauthorblockN{1\textsuperscript{st} Michael Hicks}
+% \IEEEauthorblockA{\textit{Department of Computer Science} \\
+% \textit{University of Maryland}\\
+% mwh@cs.umd.edu}
+% }
+% \author{Leonidas Lampropoulos \and
+% Michael Hicks}
+
+\maketitle
 
 \begin{abstract}
   % Programs written in C account for a significant portion of code
@@ -508,8 +540,6 @@ Our evaluation on~\numprog{} programs shows that~\systemname{} can effectively a
 %  To the best of our knowledge, this is the first work that combines program partitioning mechanism with C-like programming language.
 
 \end{abstract}
-
-\maketitle
   
 \input{introduction}
 
@@ -587,15 +617,13 @@ Our evaluation on~\numprog{} programs shows that~\systemname{} can effectively a
 %%Text of appendix \ldots
 \begin{small}
 %\balance
-\bibliographystyle{ACM-Reference-Format}
+\bibliographystyle{plainnat}
 \bibliography{IEEEabrv,paper,sources}
 %%%%%%%%%%%%%%%%%%% Appendix %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \end{small}
 
 %\iftr
 \newpage
-\clearpage
-
 \appendix
 \input{appendix}
 %\fi

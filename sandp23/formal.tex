@@ -25,14 +25,14 @@
 %   \begin{center}
 %     \includegraphics[height=6in]{syntax.pdf}
 %   \end{center}
-%   \caption{\lang: Syntax}
+%   \caption{\systemname: Syntax}
 % \end{figure}
 
 % \begin{figure}
 %   \begin{center}
 %     \includegraphics[height=6in]{types.pdf}
 %   \end{center}
-%   \caption{\lang: Typing}
+%   \caption{\systemname: Typing}
 % \end{figure}
 % }
 % \liyi{main text begins here. }
@@ -60,26 +60,20 @@
 \text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\
 \text{Bound:} & b & ::= & n \mid x \plus n \\
               & \bvar & ::= & (b,b) \\
-  
      \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{ \xi}
 \\
-\text{Type Flag:}&\kappa &::=& nt \mid \cdot
-\\
-\text{Type:}&\omega &::=& \tau \mid \tallarrayb{\bvar}{\tau} \mid \tfun{\overline{x}}{\overline{\tau}}{\tau}
+\text{Type:}&\omega &::=& \tau \mid \tarrayb{\bvar}{\tau}
 \\
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \edyncast{\tau}{e}
-\mid \ret{x}{\evalue{n}{\tau}}{e}
+\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid\estar{e}\mid\eassign{e}{e}
   \\
-&&\mid& \estrlen{x} \mid \emalloc{\xi}{\omega} \mid\estar{e}\mid\eassign{e}{e}  \\
-&&\mid& \elet{x}{e}{e} \mid \eif{e}{e}{e} \mid \ecall{e}{\overline{e}}
-\\
-&&\mid&\eunchecked{\overline{x}}{e}
-\mid \echecked{\overline{x}}{e}
+&&\mid& \emalloc{\xi}{\omega} \mid \efree{e} \mid \elet{x}{e}{e}   \\
+&&\mid& \ret{x}{\evalue{n}{\tau}}{e} \mid \eif{e}{e}{e} \\
+&&\mid&\eunchecked{\overline{x}}{e} \mid \echecked{\overline{x}}{e}
 \end{array}
     \end{array}
   \]
-  \caption{\lang Syntax}
+  \caption{\systemname Syntax}
   \label{fig:checkc-syn}
 \end{figure}
 
@@ -134,17 +128,16 @@
 %   Coq file?}
 % \liyi{The detailed explanation is in the appendix.}
 
-This section describes the formal core model of~\systemname,
-named~\lang.
+This section describes the formal core model of~\systemname.
 We present its syntax, semantics, type system,
-as well as \lang’s meta-theories, including the type soundness, non-exposure, and non-crashing theorems.
+as well as \systemname’s meta-theories, including the type soundness and non-exposure theorems.
 
 %This section describes the formal core model of \systemname, named
-%\lang, making precise its syntax, semantics, type system, and compilation. It also
-%develops \lang's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
+%\systemname, making precise its syntax, semantics, type system, and compilation. It also
+%develops \systemname's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
 
 \subsection{Syntax}\label{sec:syntax}
-\Cref{fig:checkc-syn} shows the syntax of~\lang.
+\Cref{fig:checkc-syn} shows the syntax of~\systemname.
 
 \myparagraph{Type Syntax}
 At a high level, we classify types as word-size value, multi-word
@@ -162,16 +155,13 @@ limited to integer literals $n$ and expressions $x + n$.
 Whether an array pointer is null terminated or not is determined by annotation
 $\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
 otherwise (we elide $\cdot$ when writing types).
-An example representation of an array and null-terminated array in~\lang is shown below:
+An example representation of an array and null-terminated array in~\systemname is shown below:
 % 
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
 $\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
-\\[0.2em]
-$\code{_NT_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
-&\Leftrightarrow& \tntarrayptr{0}{n}{\tau}{\cmode}
 \end{array}
 \end{array}
 \]
@@ -185,7 +175,7 @@ $\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 The well-formedness of these types are presented in~\Cref{app:le}.
 It prevents unsafe types from being constructed.
   Consider the type ~\code{_t_Array_ptr<_Ptr<int>>}, which describes a tainted array of checked pointers.
-  This is not well-formed in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region when the tainted ($\tmode$) array is used. 
+  This is not well-formed in~\systemname{} because it potentially exposes the checked pointer addresses in a $\umode$ region when the tainted ($\tmode$) array is used. 
   Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
 %
 Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
@@ -202,8 +192,8 @@ $\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
 The function type also has well-formed requirements (\Cref{app:le}), which disallows nesting checked pointers inside tainted pointers.
 Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 
-%The \lang syntax of is given in Fig.~\ref{fig:checkc-syn}.
-%There are two type notions in \lang.  Types $\tau$ classify
+%The \systemname syntax of is given in Fig.~\ref{fig:checkc-syn}.
+%There are two type notions in \systemname.  Types $\tau$ classify
 %word-sized values including integers and pointers, while types
 %$\omega$ classify multi-word values such as arrays, null-terminated
 %arrays, functions, and single-word-size values. 
@@ -219,7 +209,7 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 %$\kappa$, which is $nt$ for null-terminated arrays, and $\cdot$
 %otherwise (we elide $\cdot$ when writing types).
 %
-%\lang{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
+%\systemname{} function types ($\tfun{\overline{x}}{\overline{\tau}}{\tau}$)
 %reflect its dependent function declarations,
 %where $\overline{x}$ represents
 %a list of \tint{} type variables in a dependent function header
@@ -249,7 +239,7 @@ Furthermore, these requirements also ensure that all variables in $\overline{\ta
 %be rewritten $\tptr{\tarrayb{n}{\tau}}{\cmode}$ and
 %$\tptr{\tntarrayb{n}{\tau}}{\cmode}$, respectively.
 \myparagraph{Expressions}
-\lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
+\systemname expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$), dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \cite{li22checkedc}}, the \texttt{strlen} operation ($\estrlen{x}$),
@@ -259,7 +249,7 @@ unchecked blocks ($\eunchecked{\overline{x}}{e}$), and checked blocks ($\echecke
 For example, a dynamic bounds cast
   { \code{dyn_bounds_cast<_Array_ptr<}$\tau$\code{>>(}$e$\code{,count(}$n$\code{))} }
 is formalized as 
-{$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \lang. 
+{$\edyncast{\tptr{\tarrayb{n}{\tau}}{\cmode}}{e}$} in \systemname. 
 % 
 
 % 
@@ -273,15 +263,15 @@ where $\overline{x}$ represents all variables that are allowed to communicate be
 $\erettext$ is introduced by the semantics when evaluating a \texttt{let} binding; explained shortly below.
 
 % 
-\lang{} aims to be simple enough to work with but powerful enough to
+\systemname{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example,
 loops can be encoded as recursive function calls. \code{struct}s are
 not included in~\fig{fig:checkc-syn} for space reasons, but they are
 supported as shown in~\cite{li22checkedc}.
 C-style \code{union}s have no safe typing in \checkedc, so we omit them.
-Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
+Although the base syntax of~\systemname is similar to that of~\checkedc model~\cite{li22checkedc}, there are considerable enhancements to support tainted types ($t$ in $\xi$), special heap handling (\ie $\emalloc{\xi}{\omega}$), and explicit specification of pointers in the $\echeckedtext$ and $\euncheckedtext$ regions.
 
-%\lang expressions include literals ($n\!:\!\tau$), variables ($x$),
+%\systemname expressions include literals ($n\!:\!\tau$), variables ($x$),
 % addition ($\ebinop{e_1}{e_2}$), static casts ($\ecast{\tau}{e}$), 
 %dynamic casts ($\edyncast{\tau}{e}$) \footnote{assumed at compile-time and verified at run-time, see \Cref{app:main}},
 %the \texttt{strlen} operation ($\estrlen{x}$),
@@ -334,7 +324,7 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 %$\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$:
 %$\overline{x}$ restricts all free variables appearing in $e$, and they cannot be checked pointers.
 %
-%\lang aims to be simple enough to work with, but powerful enough to
+%\systemname aims to be simple enough to work with, but powerful enough to
 %encode realistic \systemname idioms. For example, mutable local
 %variables can be encoded as immutable locals that point to the heap;
 %the use of \code{&} can be simulated with \code{malloc};
@@ -374,11 +364,10 @@ $\hspace*{-1.2em}
     \begin{array}{l}
     \begin{array}{lll}
 r & ::= & e \mid \enull \mid \ebounds\\
-E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid \edyncast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}\\[0.2em]
-&&\mid\eassign{\evalue{n}{\tau}}{E}\mid \elet{x}{E}{e}\mid\ret{x}{\evalue{n}{\tau}}{E}\mid \eif{E}{e}{e}\\[0.2em]
-&&\mid \ecall{E}{\overline{e}} \mid \ecall{\evalue{n}{\tau}}{\overline{E}} \mid 
-\eunchecked{\overline{x}}{E}
-\mid \echecked{\overline{x}}{E}
+E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}
+    \mid \eassign{\evalue{n}{\tau}}{E}\\[0.2em]
+&&\mid \elet{x}{E}{e}\mid\ret{x}{\evalue{n}{\tau}}{E}\mid \eif{E}{e}{e}\\[0.2em]
+&& \mid \efree{E}\mid \eunchecked{\overline{x}}{E} \mid \echecked{\overline{x}}{E}
 
 
 \end{array}
@@ -398,7 +387,7 @@ $
 
   \end{mathpar}
 }
-  \caption{\lang Semantics: Evaluation}
+  \caption{\systemname Semantics: Evaluation}
   \label{fig:c-context}
 \end{figure}
 
@@ -497,7 +486,7 @@ $
 \end{figure*}
 \end{DIFnomarkup}
 
-The \lang type system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
+The \systemname type system is a flow-sensitive, gradual type one that generates additional dynamic checks that are inserted in the typing checking stage and executed in the semantic evaluation stage.
 Our type checker restricts the usage of tainted and checked pointer types to ensure that tainted pointers do not affect checked types, along with enforcing~\checkedc typing rules~\cite{li22checkedc}.
 
 As partly shown in \Cref{fig:type-system-1} (labeled as \rulelab{T-}$X$),
@@ -506,7 +495,7 @@ which states that in a type environment $\Gamma$ (mapping variables to
 their types) and a predicate environment $\Theta$ (mapping integer-typed
 variables to Boolean predicates), expression $e$ will have type $\tau$ if evaluated
 in context mode $m$, indicating that the code is in $m$ region.
-The operational semantics for \lang is defined as a small-step
+The operational semantics for \systemname is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$, as shown in \Cref{fig:c-context}.
  Here, $\varphi$ is a
@@ -560,16 +549,16 @@ Evaluation contexts $E$ define a standard left-to-right evaluation order.
 %There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
 
 \myparagraph{Modes, Static Casting, and Subtyping}
-In \lang, Context modes $m$ appearing in a type rule determine the code region 
+In \systemname, Context modes $m$ appearing in a type rule determine the code region 
 that permits pointer dereferences and value-assignments, which also depends on the pointer modes.
 We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
 This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can only perform such operations in $\cmode$ and $\umode$ regions, respectively.
 %Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
 
-\lang also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
+\systemname also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
 an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to another pointer type \tptr{\tau_2}{\xi_2},
 if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2}, i.e., $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
-In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
+In \systemname, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 //_Ptr<int> x; _t_Ptr<int> y; int *z;
@@ -579,7 +568,7 @@ x = (_Ptr<int>)y; // Not allowed.
 
 In the above example, a $\tmode$ mode pointer can be cast to $\umode$ mode but casting $\tmode$ mode to $\cmode$ mode is disallowed.
 The complete subtyping relation was described in \Cref{app:le}.
-Notice that \texttt{let} statements are immutable in \lang, so the following code is not possible, because variables \code{x} and \code{y} must have the same type in \lang.
+Notice that \texttt{let} statements are immutable in \systemname, so the following code is not possible, because variables \code{x} and \code{y} must have the same type in \systemname.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 //_Ptr<int> x;  _t_Ptr<int> y;
@@ -589,10 +578,10 @@ x = y; // Not allowed.
 \myparagraph{Pointer Dereference}
 The type and semantic rules for pointer dereference (\textsc{T-Def}, \textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-DefNull} in \Cref{fig:type-system-1})
-reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
+reflect the key \systemname feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
 The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
 With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a $\enull$ pointer is used,
-\lang captures the runtime error.
+\systemname captures the runtime error.
 Type and semantic rules for array types and pointer assignments are given in \Cref{rem-type,sec:rem-semantics}.
 
 Rules \textsc{S-DefC} and \textsc{S-DefT} are for $\cmode$ and $\tmode$ mode pointer dereferences, respectively.
@@ -744,15 +733,15 @@ makes sure that the function in the global store is well-defined and has the rig
 %   assumption of well typing; we have added more details about that.}
 
 Here, we discuss our main meta-theoretic results for
-\lang: type soundness (progress and preservation),
+\systemname: type soundness (progress and preservation),
 non-exposure, and non-crashing.
 These proofs have been conducted in our Coq model.
 Type soundness relies on several \emph{well-formedness} given in \cite{li22checkedc} and \Cref{sec:meta}.
-The progress theorem below states that a \lang program can always make a move.
+The progress theorem below states that a \systemname program can always make a move.
 
 \begin{thm}[Progress]\label{thm:progress}
 
-For any \lang program $e$, heap $\heap$, stack
+For any \systemname program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed, consistent
 ($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
@@ -776,7 +765,7 @@ type and consistency of the program being reduced, while
 unchecked Preservation states that any evaluation happens at $\umode$ region does not affect the $\cmode$ mode heap.
 
 \begin{thm}[Checked Preservation]
-For any \lang program $e$, heap $\heap$, stack
+For any \systemname program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed, consistent
 ($\Gamma;\Theta\vdash \varphi$ and $\heap \vdash \varphi$) and well
@@ -792,7 +781,7 @@ $\tau'\sqsubseteq_{\Theta} \tau$.
 %{\em Proof:} By induction on the typing derivation.
 %\smallskip
 \begin{thm}[Unchecked Preservation]
-For any \lang program $e$, heap $\heap$, stack
+For any \systemname program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed and well
 typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
@@ -804,7 +793,7 @@ Using the above theorems, we first show the non-exposure theorem,
 where code in $\umode$ region cannot observe a valid checked ($\cmode$) pointer address.
 
 \begin{thm}[Non-Exposure]
-For any \lang program $e$, heap $\heap$, stack
+For any \systemname program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are all are well-formed and well
 typed ($\Gamma;\Theta\vdash_{\cmode} e : \tau$ for some $\tau$), if there exists $\varphi'$,
@@ -825,7 +814,7 @@ $e$ is a non-value that cannot take a step\footnote{Note that
 % \review{- There appears to be a slight discrepancy between the blame theorem in Coq and the one in the paper: the paper mentions some e', which I believe should be r. Also, the Coq code has a further disjunct m=Unchecked in the conclusion.}
 % \liyi{It is a typo. We will add the thing back that we show that either user uses a unchecked mode to evaluate $e$ or $e$ lives in a context that is an unchecked region. This is a bit due to the space limitation. The semantic rules allow users to input the mode $m$ of evaluating an expression, I just forgot to include the $m$ in the result of the proof statement. }
 
-\begin{thm}[Non-Crashing]\label{thm:blame} For any \lang
+\begin{thm}[Non-Crashing]\label{thm:blame} For any \systemname
   program $e$, heap $\heap$, stack
 $\varphi$, type environment $\Gamma$, and variable predicate set $\Theta$
 that are well-formed and consistent
@@ -845,7 +834,7 @@ $(\varphi,\heap,e) \longrightarrow_{m_1} (\varphi_1,\heap_1,e_1)\longrightarrow_
 \subsection{Semantics}\label{sec:semantics}
 
 % The semantics
-% gives an independent account of spatial safety in \lang by
+% gives an independent account of spatial safety in \systemname by
 % checking pointer bounds based on the annotations carried on types at
 % run-time.  While this account makes clear that bounds checking occurs
 % as expected, it suggests an implementation that uses fat pointers to
@@ -867,7 +856,7 @@ $(\varphi,\heap,e) \longrightarrow_{m_1} (\varphi_1,\heap_1,e_1)\longrightarrow_
 % \mwh{Yes, it is modeled as 0, and the semantics checks for
 %   dereferences of 0. }
 
-Here, we discuss the \lang operational semantics (\Cref{fig:semantics}); 
+Here, we discuss the \systemname operational semantics (\Cref{fig:semantics}); 
 mainly focusing on the new changes on top of \checkedc in \cite{li22checkedc} with function pointers, modes, and function calls.
 The other type and semantic rules about (NT)-arrays are given in \cite{li22checkedc} and \Cref{sec:literal-pointer-typing}.
 
@@ -878,7 +867,7 @@ The other type and semantic rules about (NT)-arrays are given in \cite{li22check
 %in context mode $m$. Key rules for this judgment are given in
 %Fig.~\ref{fig:type-system-1},
 
-The operational semantics for \lang is defined as a small-step
+The operational semantics for \systemname is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$.
  Here, $\varphi$ is a
@@ -985,7 +974,7 @@ produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
 %The full formalism, including \kw{struct}
 %and null-terminated bound widening pointer operations, is given in \Cref{app:main}.
 
-%\footnote{This approach is that of the PLT Redex model of \lang; the Coq
+%\footnote{This approach is that of the PLT Redex model of \systemname; the Coq
 %development uses a slightly simpler syntax to achieve the same
 %effect.}
 % \review{the special case raises questions, e.g. why is this syntax-driven and
@@ -1057,7 +1046,7 @@ produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
 
 \myparagraph{Type Equality and Subtyping and Casting}
 %
-In \lang, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
+In \systemname, the type equability ($=_{\Theta}$) and subtype ($\sqsubseteq$) relations are given in \Cref{fig:checkc-subtype}.
 We provide some example descriptions here.
 Type equality $\tau=_{\Theta}\tau'$
 is a type construct equivalent relation defined by the bound equality ($=_{\Theta}$) in (NT-)array pointer types
@@ -1268,7 +1257,7 @@ Note that the \textsc{S-FunC} and \textsc{S-FunT} rules replace the
   annotations $\overline{\tau_a}$ with
   $\overline{\tau}$ (after instantiation) from the function's
   signature. Using $\overline{\tau_a}$ when executing the body of
-the function has no impact on the soundness of \lang, but will violate
+the function has no impact on the soundness of \systemname, but will violate
 Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
 Rule \textsc{S-FunT} defines the tainted version of function call semantics.
 In such case, the verification process 
@@ -1322,15 +1311,15 @@ In \systemname, context and pointer modes determine the particular heap/function
 i.e., $\cmode$ pointers point to checked regions, while $\tmode$ and $\umode$ pointers point to unchecked regions.
 Unchecked regions are associated with a sandbox mechanism that permits exception handling of potential memory failures.
 In the compiled LLVM code, pointer access operations have different syntaxes when the modes are different. 
-\Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \lang). The columns represent different pointer modes and the rows represent context modes.
-For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \lang, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
+\Cref{fig:flagtable} lists the different compiled syntaxes of a deference operation ($\estar{x}$) for the compiler implementation (\textsc{CBox}, stands for \systemname) and formalism (\textsc{Core}, stands for \systemname). The columns represent different pointer modes and the rows represent context modes.
+For example, when we have a $\tmode$-mode pointer in a $\cmode$-mode region, we compile a deference operation to the sandbox pointer access function ($\texttt{sand\_get}(x)$) accessing the data in the \systemname implementation. In \systemname, we create a new deference data-structure on top of the existing $\estar{x}$ operation (in LLVM): $\getstar{m}{x}$. If the mode is $\cmode$, it accesses the checked heap/function store; otherwise, it accesses the unchecked one.
 
-We now show how \lang deals with pointer modes, mode switching and function pointer compilations, 
+We now show how \systemname deals with pointer modes, mode switching and function pointer compilations, 
 with no loss of expressiveness
 as the \checkedc contains the erase of annotations in \cite{li22checkedc} and \Cref{appx:comp1}.
 For the compiler formalism, 
 we present a compilation algorithm that converts from
-\lang to \elang, an untyped language without metadata
+\systemname to \elang, an untyped language without metadata
 annotations, which represents an intermediate layer we build on LLVM for simplifying compilation. 
 In \elang, the syntax for deference, assignment, malloc, function calls are: $\getstar{m}{e}$, $\elassign{m}{e}{e}$, 
 $\emalloc{m}{\omega}$, and $\elcall{m}{e}{\overline{e}}$.
@@ -1344,19 +1333,19 @@ The algorithm sheds
 %annotations can be safely erased: using static information a compiler
 %can insert code to manage and check bounds metadata, with no loss of
 %expressiveness. We present a compilation algorithm that converts from
-%\lang to \elang, an untyped language without metadata
+%\systemname to \elang, an untyped language without metadata
 %annotations. The syntax and semantics \elang
-  %closely mirrors that of \lang; it differs only in that literals lack
+  %closely mirrors that of \systemname; it differs only in that literals lack
   %type annotations and its operational rules perform no
   %bounds and null checks, which are instead inserted during
-  %compilation. Our compilation algorithm is evidence that \lang's
+  %compilation. Our compilation algorithm is evidence that \systemname's
   %semantics, despite its apparent use of fat pointers, faithfully
   %represents Checked C's intended behavior. The algorithm also sheds
   %light on how compilation can be implemented in the real Checked C
   %compiler, while eschewing many important details (\elang has many 
   %differences with LLVM IR).
 
-Compilation is defined by extending \lang's
+Compilation is defined by extending \systemname's
 typing judgment as follows:
 \[\Gamma;\Theta;\rho \vdash_m e \gg \dot e:\tau\]
 There is now a \elang output $\dot e$ and an input $\rho$, which maps
@@ -1372,7 +1361,7 @@ widening.\footnote{Since lower bounds are never widened, the
 % term.
 
 We formalize rules for this judgment in PLT Redex~\cite{pltredex},
-following and extending our Coq development for \lang. To give
+following and extending our Coq development for \systemname. To give
 confidence that compilation is correct, we use Redex's property-based
 random testing support to show that compiled-to $\dot e $ simulates
 $e$, for all $e$.
