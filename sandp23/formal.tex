@@ -705,11 +705,7 @@ it is critically stuck, when $(\varphi,\Theta,\heap,e)$ is stuck, and $e$ is of 
 
 \item $e=\estar{\evalue{n}{\tptr{\tau}{\tmode}}}$.
 
-\item $e=\eassign{\evalue{n}{\tptr{\tau}{\tmode}}}{\evalue{n'}{\tptr{\tau}{m'}}}$,
-and $\estar{\evalue{n'}{\tptr{\tau}{m'}}}$ can make a move.
-
-\item $e=\eassign{\evalue{n}{\tptr{\tau}{m}}}{\evalue{n'}{\tptr{\tau}{\tmode}}}$,
-and $\estar{\evalue{n}{\tptr{\tau}{m}}}$ can make a move.
+\item $e=\eassign{\evalue{n}{\tptr{\tau}{\tmode}}}{\evalue{n'}{\tau'}}$.
 
 \end{itemize}
 \end{defi}

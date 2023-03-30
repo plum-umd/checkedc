@@ -66,9 +66,9 @@
 \text{Type:}&\omega &::=& \tau \mid \tarrayb{\bvar}{\tau} \mid \textcolor{red}{\tfun{\overline{x}}{\overline{\tau}}{\tau}}
 \\[0.2em]
 \text{Expression:}& e & ::= & 
-\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e}
+\evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \estar{e}\mid\eassign{e}{e} 
   \\[0.2em]
-&&\mid& \estar{e}\mid\eassign{e}{e} \mid \textcolor{red}{\emalloc{\xi}{\omega}} \\[0.2em]
+&&\mid& \textcolor{red}{\emalloc{\xi}{\omega}} \mid \textcolor{red}{\toa{m}{\overline{\evalue{x}{\tau}}}{\tau}{e}} \\[0.2em]
 &&\mid&\eif{e}{e}{e} \mid  \elet{x}{e}{e} \mid \textcolor{red}{\ecall{e}{\overline{e}}}
 \end{array}
     \end{array}
@@ -99,7 +99,7 @@
 \hline
 \cmode&$\cmodenor$,$\tmodenor$ & $\cmodenor$,$\tmodenor$ & $\cmodenor$,$\tmodenor$ & $\cmodefun$,$\tmodefun$\\[0.1em]
 \hline
-\umode&$\umode$ & $\tmodenor$,$\umode$ & $\tmodenor$,$\umode$ & $\tmodefun$,$\umode$\\[0.1em]
+\umode&$\tmodenor$,$\umode$ & $\tmodenor$,$\umode$ & $\tmodenor$,$\umode$ & $\tmodefun$,$\umode$\\[0.1em]
 \hline
     \end{tabular}
 }
@@ -130,12 +130,13 @@
 }
 {\footnotesize
 \[
-\begin{array}{c} 
+\begin{array}{l} 
+m \le m \qquad \tmode \le \xi
+\\[0.2em]
 \tmode \wedge \cmode = \umode \qquad \xi \wedge \umode = \umode
 \qquad \cmode \wedge m = m 
 \qquad  m_1 \wedge m_2 = m_2 \wedge m_1
-\\[0.2em]
-\xi \le \xi \qquad \tmode \le \xi
+
 \end{array}
 \]
 }
@@ -254,13 +255,13 @@ $\hspace*{-1.2em}
     \begin{array}{l}
     \begin{array}{lll}
 \mu & ::= & \evalue{n}{\tau} \mid \bot\\[0.1em]
-e & ::= & \ldots \mid \ret{x}{\mu}{e} \mid \textcolor{red}{\toa{m}{e}}\\[0.1em]
+e & ::= & \ldots \mid \ret{x}{\mu}{e}\\[0.1em]
 r & ::= & e \mid \enull \mid \ebounds\\[0.1em]
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}
 \mid\eassign{\evalue{n}{\tau}}{E}\\[0.1em]
 &\mid& \eif{E}{e}{e}\mid \elet{x}{E}{e}\mid\ret{x}{\mu}{E}\\[0.1em]
 &\mid& \textcolor{red}{\ecall{E}{\overline{e}}} \mid \textcolor{red}{\ecall{(\evalue{n}{\tau})}{\overline{E}}}
-\mid \textcolor{red}{\toa{m}{E}}\\[0.1em]
+\mid \textcolor{red}{\toa{m}{\overline{\evalue{x}{\tau}}}{\tau}{E}}\\[0.1em]
 \overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
 \end{array}
 \\ \\
@@ -341,13 +342,16 @@ thus, non-crashing shows that every unchecked region crashing does not affect th
 \begin{figure*}[t]
 {\small
   \begin{mathpar}
-        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+    \inferrule[S-DefArray]{n\in[\eta_{\xi},|\heap(\xi)|)\\\heap(\xi,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\xi},|\heap(\xi)|)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-        \inferrule[S-DefNTArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h]}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+    \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
+     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+
+    \inferrule[S-DefNull]{n\not\in[\eta_{\xi},|\heap(\xi)|)}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\xi}}}) \longrightarrow (\varphi,\heap,\enull)}
 
 
     \inferrule[S-AssignArr]{\heap(n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }

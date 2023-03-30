@@ -493,12 +493,13 @@ typed.
 
 \inferrule [S-Var]{} {(\varphi,\heap,x)\longrightarrow (\varphi,\heap,\varphi(x))}
 
-    \inferrule[S-DefArrayC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} }
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefArrayT]{\heap(\umode,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h) 
-               \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+        \inferrule[S-DefNTArray]{\heap(n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h]}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
     \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
      { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\ebounds)}

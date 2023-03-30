@@ -269,7 +269,7 @@
 \newcommand{\elcall}[3]{\ensuremath{{(#1,#2)}({#3})}}
 
 \newcommand{\ret}[3]{\ensuremath{\kw{ret}({#1},{#2},{#3})}}
-\newcommand{\toa}[2]{\ensuremath{\kw{to}({#1},{#2})}}
+\newcommand{\toa}[4]{\ensuremath{\kw{to}({#1})(#2)\{(#3)#4\}}}
 \newcommand{\totext}{\ensuremath{\kw{to}}}
 \newcommand{\rmtext}{\ensuremath{\kw{rm}}}
 \newcommand{\rettext}{\ensuremath{\kw{ret}}}
@@ -423,7 +423,7 @@
 
 %% Title information
 \iftr
-\title{Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
+\title{\systemname: Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
 \else
 \title{Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
 \fi
@@ -450,7 +450,7 @@
 %% extraction tools.
 
 %% Author with single affiliation.
-\author{Liyi Li,  Arunkumar Bhattar$^\dagger$, Le Chang, Mingwei Zhu, and Aravind Machiry$^\dagger$\\
+\author{Liyi Li,  Arunkumar Bhattar$^\dagger$, Le Chang, Mingwei Zhu, Jason Ruo Liao, and Aravind Machiry$^\dagger$\\
   University of Maryland $\quad\quad ~^\dagger$Purdue University}
   
 %            David Van Horn (University of Maryland, College Park)
