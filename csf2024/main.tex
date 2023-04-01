@@ -269,7 +269,7 @@
 \newcommand{\elcall}[3]{\ensuremath{{(#1,#2)}({#3})}}
 
 \newcommand{\ret}[3]{\ensuremath{\kw{ret}({#1},{#2},{#3})}}
-\newcommand{\toa}[4]{\ensuremath{\kw{to}({#1})(#2)\{(#3)#4\}}}
+\newcommand{\toa}[3]{\ensuremath{\kw{to}({#1})(#2)\{#3\}}}
 \newcommand{\totext}{\ensuremath{\kw{to}}}
 \newcommand{\rmtext}{\ensuremath{\kw{rm}}}
 \newcommand{\rettext}{\ensuremath{\kw{ret}}}
@@ -374,6 +374,8 @@
 \newcommand{\ewidenderef}[4]{\ensuremath{#4 = ~ \vdash_{widenderef}#1, #2, #3}}
 \newcommand{\eleq}[2]{\ensuremath{#1 \leq #2}}
 \newcommand{\systemname}{\textsc{CheckedCT}\xspace}
+\newcommand{\systemnamea}{\textsc{CheckedCBox}\xspace}
+
 \newcommand{\threec}{\textsc{3C}\xspace}
 \newcommand{\sourcerewriter}{\textsc{CheckMate}\xspace}
 \newcommand{\clang}{\textsc{Clang}\xspace}
@@ -425,7 +427,7 @@
 \iftr
 \title{\systemname: Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
 \else
-\title{Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
+\title{\systemname: Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
 \fi
 %% [Short Title] is optional;
 %% when present, will be used in
@@ -548,9 +550,9 @@ While our model's operational semantics uses annotated
 % \ignore{
 % https://github.com/microsoft/checkedc/tree/master/spec/bounds\_safety}
 % }
-
+\input{overview}
 \input{formal.tex}
-%\input{compilation.tex}
+\input{compilation.tex}
 %\input{evaluation}
 % \input{discussion}
 \input{comparison}
@@ -559,9 +561,9 @@ While our model's operational semantics uses annotated
 
 \bigskip
 
-\paragraph*{Acknowledgments}
-We thank the anonymous reviewers for their helpful, constructive
-comments. This work was supported in part by a gift from Microsoft. 
+%\paragraph*{Acknowledgments}
+%We thank the anonymous reviewers for their helpful, constructive
+%comments. This work was supported in part by a gift from Microsoft. 
 
 % \ignore{
 % %% Acknowledgments
@@ -591,7 +593,7 @@ comments. This work was supported in part by a gift from Microsoft.
 
 %%Text of appendix \ldots
 \begin{small}
-\balance
+%\balance
 \bibliography{IEEEabrv,paper,sources}
 %%%%%%%%%%%%%%%%%%% Appendix %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \end{small}

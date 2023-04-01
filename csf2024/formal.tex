@@ -1,49 +1,4 @@
-\section{\systemname Formalism}\label{sec:formal}
-
-% \begin{itemize}
-% \item Describe the types for checked-C as a graph. \dvh{I don't know what this means.}
-
-% \item Describe the subtyping for checked-C types.
-% \begin{itemize}
-% \item State that the subtypes in Checked-C are transitive.
-% \end{itemize}
-
-% \item Describe the syntax of Checked-C
-
-% \item Describe the semantics of Checked-C
-
-% \item Describe the type system of Checked-C
-
-% \item Describe the progress and preservation theorems, and outline the proofs.
-
-% \item Describe the blame theorem and proof.
-
-% \end{itemize}
-
-% \ignore{
-% \begin{figure}
-%   \begin{center}
-%     \includegraphics[height=6in]{syntax.pdf}
-%   \end{center}
-%   \caption{\lang: Syntax}
-% \end{figure}
-
-% \begin{figure}
-%   \begin{center}
-%     \includegraphics[height=6in]{types.pdf}
-%   \end{center}
-%   \caption{\lang: Typing}
-% \end{figure}
-% }
-% \liyi{main text begins here. }
-
-% \review{
-% While reading the semantics, I found the fact that S-Def and S-DefNull are
-%   applicable non-deterministically if n is 0 a bit confusing. Only when
-%   reading the meta-theory section I realized that this is not a concrete issue
-%   because well-formed heaps are such that $\mathcal{H}(0)$ is never defined. It
-%   might be worth pointing this out early on. }
-% \mwh{Done.}
+\section{Formalism}\label{sec:formal}
 
 \begin{figure}
   \small \centering
@@ -57,18 +12,18 @@
 \\[0.5em]
 \begin{array}{llcllcl}
 \text{Context Mode:} & m & ::= & \cmode \mid \umode \\[0.2em]
-\text{Memory Mode:} & \xi & ::= & m \mid \tmodered \\[0.2em]
+\text{Memory Mode:} & \kappa & ::= & m \mid \tmodered \\[0.2em]
 \text{Bound:} & b & ::= & n \mid x \plus n \\[0.2em]
               & \bvar & ::= & (b,b) \\[0.2em]
   
-     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{\xi}
+     \text{Word Type:}& \tau &::=& \tint\mid \tptr{\omega}{\kappa}
 \\[0.2em]
 \text{Type:}&\omega &::=& \tau \mid \tarrayb{\bvar}{\tau} \mid \textcolor{red}{\tfun{\overline{x}}{\overline{\tau}}{\tau}}
 \\[0.2em]
 \text{Expression:}& e & ::= & 
 \evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid \estar{e}\mid\eassign{e}{e} 
   \\[0.2em]
-&&\mid& \textcolor{red}{\emalloc{\xi}{\omega}} \mid \textcolor{red}{\toa{m}{\overline{\evalue{x}{\tau}}}{\tau}{e}} \\[0.2em]
+&&\mid& \textcolor{red}{\emalloc{\kappa}{\omega}} \mid \textcolor{red}{\toa{m}{\overline{x}}{e}} \\[0.2em]
 &&\mid&\eif{e}{e}{e} \mid  \elet{x}{e}{e} \mid \textcolor{red}{\ecall{e}{\overline{e}}}
 \end{array}
     \end{array}
@@ -116,24 +71,24 @@
   {m \vdash \tint}
 \qquad
   \inferrule[]
-  {\xi \wedge m\vdash \tau \\ \xi \le m}
-  {m \vdash \tptr{\tarrayb{\bvar}{\tau}}{\xi}}
+  {\kappa \wedge m\vdash \tau \\ \kappa \le m}
+  {m \vdash \tptr{\tarrayb{\bvar}{\tau}}{\kappa}}
 \qquad
   \inferrule[]
-  {\xi \wedge m \vdash \tau\\ \xi \le m}
-  {m \vdash \tptr{\tau}{\xi}}
+  {\kappa \wedge m \vdash \tau\\ \kappa \le m}
+  {m \vdash \tptr{\tau}{\kappa}}
 
   \inferrule[]
-  {\forall \tau'\in \overline{\tau}\cup\{\tau\}\,.\,\xi \wedge m \vdash \tau'\\ \xi \le m \\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
-  {m \vdash \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi})}
+  {\forall \tau'\in \overline{\tau}\cup\{\tau\}\,.\,\kappa \wedge m \vdash \tau'\\ \kappa \le m \\ \fv(\overline{\tau})\cup\fv(\tau)\subseteq \overline{x}}
+  {m \vdash \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\kappa})}
   \end{mathpar}
 }
 {\footnotesize
 \[
 \begin{array}{l} 
-m \le m \qquad \tmode \le \xi
+m \le m \qquad \tmode \le \kappa
 \\[0.2em]
-\tmode \wedge \cmode = \umode \qquad \xi \wedge \umode = \umode
+\tmode \wedge \cmode = \umode \qquad \kappa \wedge \umode = \umode
 \qquad \cmode \wedge m = m 
 \qquad  m_1 \wedge m_2 = m_2 \wedge m_1
 
@@ -144,26 +99,13 @@ m \le m \qquad \tmode \le \xi
 \label{fig:wftypes}
 \end{figure}
 
-%% \dvh{I don't understand the variable grammar.  What is $T$?  What is $\eta$?  I think $\cmode$ and $\umode$ should be in tt font.}
-%% \liyi{T and $\eta$ can be moved to the appendix, they are useful only for struct types.}
-
-% \review{
-% - Furthermore, inspecting the code also suggests that the expression type (line 155) does not contain constructors for function calls (and I don't see a way to define functions either), conditionals, or strlen, and doesn't distinguish between the two forms of casting. All this contradicts figure 2, and should be clarified
-% }
-% \liyi{It is in the CheckedC.v file, 392. }
-% \mwh{How is this answer helping the reviewer since you've added
-%   nothing to the text? Maybe we should add something to an appendix
-%   that matches the formalism shown in the paper to definitions in the
-%   Coq file?}
-% \liyi{The detailed explanation is in the appendix.}
-
-This section describes \systemname's formal core model, \lang.
+This section describes \lang, the formal core model for both \systemname and \systemnamea.
 We present its syntax, semantics, type system,
-as well as \lang’s meta-theories, including the non-exposure, type soundness, and non-crashing theorems.
-
-%This section describes the formal core model of \systemname, named
-%\lang, making precise its syntax, semantics, type system, and compilation. It also
-%develops \lang's meta-theories, including the type soundness, non-exposure, non-crashing, and the compiler simulation theorems.
+as well as \lang’s meta-theories, including the non-exposure, type soundness, and non-crashing theorems,
+which are verified without the assumptions of the underlining sandbox structure.
+\lang utilizes dynamic checks that are inserted in the compilation time to ensure memory safety, i.e.,
+the \lang semantics (\Cref{sec:semantics}) describes the dynamic checks to perform in transitions,
+while its type system (\Cref{sec:typechecking}) indicates the places needing for inserting such checks.
 
 \subsection{Syntax}\label{sec:syntax}
 \Cref{fig:checkc-syn} shows the syntax of~\lang, with marked red items being new added features different from the \checkedc model \cite{li22checkedc}.
@@ -173,12 +115,12 @@ as well as \lang’s meta-theories, including the non-exposure, type soundness, 
 \systemname and \checkedc are similar in terms of type syntax, except for function types.
 We classify types as word-size value, multi-word
 value, or newly introduced function types (explained shortly below). A word-size value can be either an integer or pointer.
-Every pointer type ($\tptr{\omega}{\xi}$) includes a
+Every pointer type ($\tptr{\omega}{\kappa}$) includes a
 memory mode (explained shortly below), and a type ($\omega$) denoting the valid value type it is pointed to.
-A multi-word value type ($ \tallarrayb{\bvar}{\tau}$) that ranges over 
+A multi-word value type ($ \tarrayb{\bvar}{\tau}$) that ranges over 
 arrays is constructed by the type of elements in the
-array ($\tau$), a bound ($\bvar$) comprised of an upper and
-lower bound on the size of the array $(b_l,b_h)$, and a flag ($\kappa$).
+array ($\tau$), and a bound ($\bvar$) comprised of an upper and
+lower bound on the size of the array $(b_l,b_h)$.
 Bounds $b$ are
 limited to integer literals $n$ and expressions $x + n$.
 An example representation of an array in~\lang is shown below:
@@ -186,7 +128,7 @@ An example representation of an array in~\lang is shown below:
 \[\hspace*{-0.5em}
 \begin{array}{l}
 \begin{array}{rcl}
-$\code{_t_Array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
+$\code{t_array_ptr<}$\tau$\code{> : count(}$n$\code{)}$
 &\Leftrightarrow& \tarrayptr{0}{n}{\tau}{\tmode}
 \end{array}
 \end{array}
@@ -197,50 +139,49 @@ $\tptr{\tarrayb{b}{\tau}}{\cmode}$ to mean $\tptr{\tarray{0}{b}{\tau}}{\cmode}$,
 so the above examples could be rewritten as $\tptr{\tarrayb{n}{\tau}}{\tmode}$.
 There are other syntactic categories for modeling null-terminated array and \code{struct} types in \Cref{app:main}.
 
-\myparagraph{Modes and Well-formed Types}
+\myparagraph{Modes and Type Well-formedness}
 %
-In \systemname, we divide \checkedc modes to context and memory modes.
-In terms of program contexts, modes refer to the partition of a program into checked (\cmode) and unchecked (\umode) regions,
-as the context modes in \Cref{fig:checkc-syn}. In terms of pointers, memory modes classify the partitioned memory ranges that particular pointers point to, either checked (\cmode), tainted (\tmode), or unchecked (\umode) memory ranges.
-More specifically, we partition each of the above ranges to a sub-range (subscripted with $\texttt{f}$) storing static function code data, and a sub-range (subscripted with $\texttt{n}$) storing normal heap data,
-so function pointers and heap pointers point to different sub-ranges conceptually.
-Different operations in different context regions are allowed to access different pointer modes, shown in \Cref{fig:checkc-mode}.
-A \texttt{malloc} operation in \cmode region produces a pointer accessing $\cmodenor$ or $\tmodenor$ memory range, while a \texttt{malloc} in \umode region produces a $\umode$ range pointer.
-Function calls ($\ecall{e}{\overline{e}}$) in \cmode region are allowed to access $\cmodefun$ or $\tmodefun$ range pointers,
-while calls in \umode region are permitted to access $\umode$ range pointers.
+In \checkedc, modes can act as a context division to partition code into checked (\cmode) and unchecked (\umode) regions, and a pointer separation to divide pointers into checked (\cmode) and unchecked (\umode) pointers.
+In \systemname, we keep the context division, while upgrade mode's pointer separation aspect to a memory partition mechanism that separates heap into three disjoint areas: checked (\cmode), tainted (\tmode), or unchecked (\umode) heap regions.
+
+More specifically, we partition each of the above heap regions to a subrange (subscripted by $\texttt{f}$) storing static function code data, and a subrange (subscripted by $\texttt{n}$) storing normal heap data,
+so function pointers and heap pointers point to different subranges conceptually.
+Different operations in different context regions are allowed to access pointers with different modes, shown in \Cref{fig:checkc-mode}.
+For example, \texttt{malloc} operations in \cmode region produce pointers accessing $\cmodenor$ or $\tmodenor$ memory subranges, while a \texttt{malloc} in $\umode$ region produces a pointer accessing $\tmodenor$ and $\umode$ subranges.
+Function calls ($\ecall{e}{\overline{e}}$) in \cmode region are allowed to access pointers in $\cmodefun$ or $\tmodefun$ subranges,
+while calls in \umode region are permitted to access pointers in the $\umode$ heap region.
 
 \systemname nested pointers also has well-formedness type restrictions in~\Cref{fig:wftypes},
 to prevent unsafe pointers, which might leak \cmode mode pointer address to \umode regions, from being constructed.
-Consider the pointer type ~\code{_t_Array_ptr<_Ptr<int>>}, which describes a tainted array of checked pointers.
-This is not well-formed in~\lang because it potentially exposes the checked pointer addresses in a $\umode$ region (a violation of the non-exposure property in \Cref{sec:theorem}), when the tainted ($\tmode$) array is used. 
-  Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{_Array_ptr<_t_Ptr<int>>} is a valid type.
+Consider the pointer type ~\code{t_array_ptr<ptr<int>>}, which describes a tainted array of checked pointers.
+This is not well-formed in~\lang because it potentially exposes the checked pointer addresses in a $\umode$ region (a violation of the non-exposure property in \Cref{sec:theorem}), when the tainted ($\tmode$) array is used. Nevertheless, we can have a checked array whose elements are tainted pointers\mzs{,}\mzr{:}~\eg~\code{array_ptr<t_ptr<int>>} is a valid type.
 
-Function types are represented using a dependent function declarations,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
+Function types represent dependent functions,~\ie $\tfun{\overline{x}}{\overline{\tau}}{\tau}$,
 where $\overline{x}$ represents a list of \tint{} type variables that bind type variables appearing in $\overline{\tau}$ and $\tau$.
 An example of a function pointer type is shown below:
 {\small
 \[\hspace*{-0.5em}
 \begin{array}{l}
-$\code{_t_ptr<(int)(_t_NT_Array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
-\qquad\qquad$\code{_t_NT_Array_ptr<}$\tau_2$\code{>: count(}$n$\code{), int}$\;n$\code{)>}$
+$\code{t_ptr<(int)(t_array_ptr<}$\tau_1$\code{> : count(}$n$\code{),}$\\
+\qquad\qquad$\code{t_array_ptr<}$\tau_2$\code{>: count(}$n$\code{), int}$\;n$\code{)>}$
 \\[0.2em]
-\Leftrightarrow\; $\tptr{(\tfun{n}{\tint \times \tntarrayptr{0}{n}{\tau_2}{\tmode} \times \tntarrayptr{0}{n}{\tau_1}{\tmode}}{\tint})}{\tmode}$
+\Leftrightarrow\; $\tptr{(\tfun{n}{\tint \times \tarrayptr{0}{n}{\tau_2}{\tmode} \times \tarrayptr{0}{n}{\tau_1}{\tmode}}{\tint})}{\tmode}$
 \end{array}
 \]
 }
-The function type also has well-formed requirements (\Cref{fig:wftypes}), which disallows nesting checked pointers inside tainted pointers. Furthermore, these requirements also ensure that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
+The function type also has well-formedness definition (\Cref{fig:wftypes}), which disallows nesting checked pointers inside tainted pointers. Furthermore, the well-formedness also ensures that all variables in $\overline{\tau}$ and $\tau$ are bounded by $\overline{x}$.
 
 \myparagraph{Expressions}
 \lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
 along with expressions that require special handling, such as,
  static casts ($\ecast{\tau}{e}$),
-memory allocations ($\emalloc{\xi}{\omega}$), 
+memory allocations ($\emalloc{\kappa}{\omega}$), 
 function calls ($\ecall{e}{\overline{e}}$).
-We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
-For example, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents a $\enull$ pointer.
+We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\kappa}$), enabling the use of fixed addresses as pointers.
+For example, $\evalue{0}{\tptr{\omega}{\kappa}}$ (for any $\kappa$ and $\omega$) represents a $\enull$ pointer.
 
-Compared with \checkedc, \lang's \texttt{malloc} operation includes a mode $\xi$ to model the allocations of pointers with different modes; $e$ in a function call $\ecall{e}{\overline{e}}$ represents a function pointer whose pointer mode indicates the memory range the function text locates, as well as the context-switch of context regions, explained shortly in \Cref{sec:semantics}.
+Compared with \checkedc, \lang's \texttt{malloc} operation includes a mode $\kappa$ to model the allocations of pointers with different modes; $e$ in a function call $\ecall{e}{\overline{e}}$ represents a function pointer whose pointer mode indicates the memory range the function text locates, as well as the context-switch of context regions, explained shortly in \Cref{sec:semantics}.
 
 \lang{} aims to be simple enough to work with but powerful enough to
 encode realistic \systemname idioms. For example,
@@ -261,7 +202,7 @@ E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\ta
 \mid\eassign{\evalue{n}{\tau}}{E}\\[0.1em]
 &\mid& \eif{E}{e}{e}\mid \elet{x}{E}{e}\mid\ret{x}{\mu}{E}\\[0.1em]
 &\mid& \textcolor{red}{\ecall{E}{\overline{e}}} \mid \textcolor{red}{\ecall{(\evalue{n}{\tau})}{\overline{E}}}
-\mid \textcolor{red}{\toa{m}{\overline{\evalue{x}{\tau}}}{\tau}{E}}\\[0.1em]
+\mid \textcolor{red}{\toa{m}{\overline{x}}{e}}\\[0.1em]
 \overline{E} &::=& E \mid  \evalue{n}{\tau},\overline{E} \mid \overline{E}, e
 \end{array}
 \\ \\
@@ -274,7 +215,7 @@ $
     {(\varphi,\heap,e)\longrightarrow_{m} (\varphi',\heap',E[e''])}
 
 \textcolor{red}{
-    \inferrule[S-Random]{ \umode=\mode(E) \\ \tau=\type(e)}
+    \inferrule[S-Recov]{ \umode=\mode(E) \\ \tau=\type(e)}
     {(\varphi,\heap,E[e])\longrightarrow_{\umode} (\varphi,\heap,E[\evalue{0}{\tau}])}
 }
 
@@ -289,16 +230,22 @@ The operational semantics for \lang is defined as a small-step
 transition relation with the judgment $ (\varphi,\heap,e)
 \longrightarrow_m (\varphi',\heap',r)$. Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$ and
-$\heap$ is a \emph{heap} mapping addresses (integer literals) to
-values $\evalue{n}{\tau}$; for both we ensure
+$\heap$ is a \emph{heap} that is partitioned into three parts ($\cmode$, $\tmode$, and $\umode$ heap regions), each of which
+maps addresses (integer literals) to values $\evalue{n}{\tau}$; for all we ensure
 $\fv(\tau)=\emptyset$.
+
 While heap bindings can change, stack bindings are immutable---once
 variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
-be updated; we can model mutable stack variables as pointers into the
-mutable heap.
+be updated. 
+We wrote $\heap(\kappa)$ to access the $\kappa$ heap region in $\heap$ and
+$\heap(\kappa,n)$ to retrieve the $n$-location heap value in the $\kappa$ heap.
 As mentioned, value $\evalue{0}{\tau}$
-represents a $\enull$ pointer when $\tau$ is a pointer type;
-correspondingly, $\heap(0)$ should always be undefined.
+represents a $\enull$ pointer when $\tau$ is a pointer type.
+Correspondingly, $\heap(m,0)$ should always be undefined.
+For $\kappa=\cmode \vee \kappa = \tmode$, there is a bound value $\eta_{\kappa}$,
+such that range $(0,\eta_{\kappa})$ in $\heap(\kappa)$ is reserved for function code storage, 
+where we define function $\Xi(\kappa,n)$ to access the function code appearing in the $n$-th location of $\kappa$ heap region.
+
 The relation steps to a \emph{result} $r$,
 which is either an expression or a $\enull$ or $\ebounds$ failure,
 representing a null-pointer dereference or out-of-bounds access,
@@ -307,8 +254,7 @@ respectively. Such failures are a \emph{good} outcome; stuck states
 characterize undefined behavior.
 %
 The context mode $m$ indicates whether the
-stepped redex within $e$ was in a checked ($\cmode$) or
-unchecked ($\umode$) region.
+stepped redex within $e$ was in a $\cmode$ or $\umode$ code region.
 
 The rules for the main operational semantics
 judgment---\emph{evaluation}---are given at the bottom of
@@ -319,79 +265,72 @@ it into an \emph{evaluation context} $E$ and a sub-expression $e'$
 $e$), and then evaluates $e'$ according to the \emph{computation}
   relation $(\varphi,\heap,e') \longrightarrow (\varphi,\heap,e'')$,
 whose rules are given in Fig.~\ref{fig:semantics}, discussed
-shortly. Compared with \checkedc, we add three marked red contexts in \Cref{fig:c-context}.
-$\ecall{E}{\overline{e}}$ and $\ecall{(\evalue{n}{\tau})}{\overline{E}}$ are the contexts for function calls,
-since every call requires a function pointer having the address $n$ here,
-while the \checkedc formalism's function call takes a global function variable name \cite{li22checkedc}.
-$\toa{m}{E}$ is the context form of mode switching expression $\toa{m}{e}$.
+shortly. 
+Evaluation contexts $E$ define a
+standard left-to-right evaluation order.
+For example, context $\ecall{(\evalue{n}{\tau})}{\overline{E}}$ means that after the function pointer expression $e$ in $\ecall{e}{\overline{e'}}$ is evaluated to a function pointer $\evalue{n}{\tau}$, we now evaluate each argument expression, appearing in $\overline{e'}$, in sequence, such redex is marked as $\overline{E}$.
 
+Compared with the \checkedc formalism, other than the additional contexts in \Cref{fig:c-context},
+we add a new marked red rule \rulelab{S-Recov},
+referring to that every $\umode$ region transition step might crash, because it represents the unsafe code,
+and we have a mechanism to recover the crash as $\evalue{0}{\tau}$ \footnote{Function $\type$ represents the call of the type judgment in \Cref{sec:typechecking} to provide the type of the expression.}.
 The $\mode$ function
 determines the mode when evaluating $e'$ based on the context $E$:
-if the $\Box$ occurs within $\toa{m}{E'}$ inside $E$ and $E'$ does not contain another $\totext$ expression, then the mode is
-$\umode$; otherwise, it is $\cmode$. Evaluation contexts $E$ define a
-standard left-to-right evaluation order.
-Two expressions $\ret{x}{\mu}{e}$ and $\toa{m}{e}$, which does not appear in source program syntax in \Cref{fig:checkc-syn}, are introduced in evaluating programs. The former is used for remembers $x$ was previously bound to
-$\varphi(x)$ in a $\elettext$ binding, which is described in \citet{li22checkedc} and \Cref{app:main}.
-The latter ($\toa{m}{e}$) is a new $\lang$ syntax for switching the context mode in $e$ as $m$, which is generated when a function is called; explained shortly below.
+if the $\Box$ occurs within $\toa{m}{\overline{x}}{E'}$ inside $E$ and $E'$ does not contain another $\totext$ expression, 
+then the mode is $m$.
+Expression $\ret{x}{\mu}{e}$ does not appear in source program syntax in \Cref{fig:checkc-syn}, are introduced in evaluating programs,
+which is used for remembering $x$ was previously bound to
+$\varphi(x)$ in a $\elettext$ binding, explained shortly below.
 
-The second rule in \Cref{fig:c-context} is newly introduced in \lang, to help the proof of the non-crashing theorem.
-In any given time, executing a unchecked region might non-deterministically cause the program to crash. We assume that there is a recovery mechanism for recover every such crashing, only in unchecked regions, to an initial state $\evalue{0}{\tau}$;
-thus, non-crashing shows that every unchecked region crashing does not affect the program evaluation in the checked regions.
+%The second rule in \Cref{fig:c-context} is newly introduced in \lang, to help the proof of the non-crashing theorem.
+%In any given time, executing a unchecked region might non-deterministically cause the program to crash. We assume that there is a recovery mechanism for recover every such crashing, only in unchecked regions, to an initial state $\evalue{0}{\tau}$;
+%thus, non-crashing shows that every unchecked region crashing does not affect the program evaluation in the checked regions.
 
 \begin{DIFnomarkup}
 \begin{figure*}[t]
 {\small
   \begin{mathpar}
-    \inferrule[S-DefArray]{n\in[\eta_{\xi},|\heap(\xi)|)\\\heap(\xi,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
-    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+    \inferrule[S-DefArr]{\kappa \neq \tmode\\
+      n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap(\kappa,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\xi},|\heap(\xi)|)}
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
+        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\kappa},|\heap(\kappa)|)}
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefArrayBound]{0 \not\in [n_l,n_h)}
-     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\xi}}}) \longrightarrow (\varphi,\heap,\ebounds)}
+    \inferrule[S-DefArrT]{n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap(\kappa,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
+    {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefNull]{n\not\in[\eta_{\xi},|\heap(\xi)|)}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\xi}}}) \longrightarrow (\varphi,\heap,\enull)}
+        \inferrule[S-DefT]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
+    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
+    \inferrule[S-DefArrBound]{0 \not\in [n_l,n_h)}
+     { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\ebounds)}
 
-    \inferrule[S-AssignArr]{\heap(n)=\evalue{n_a}{\tau_a}\\ 0 \in [n_l,n_h) }
-      {(\varphi,\heap,\eassign{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\cmode}}}{\evalue{n_1}{\tau_1}}) \longrightarrow (\varphi,\heap[n \mapsto \evalue{n_1}{\tau}],\evalue{n_1}{\tau})}
+    \inferrule[S-DefNull]{n\not\in[\eta_{\kappa},|\heap(\kappa)|)}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\kappa}}}) \longrightarrow (\varphi,\heap,\enull)}
 
     \inferrule[S-Cast]
               {}
               {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
 
-  \inferrule[S-DynCast]{
-\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{m})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{m} \\ n_l' \le n_l\ \\ n_h \le n_h'}
-    { (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{m}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{m}}}) \longrightarrow (\varphi',\heap',\evalue{n}{\tallarrayptr{n_l'}{n_h'}{\tau_b}{m}})}
-
-
- \inferrule[S-DynCastBound]{\varphi(\tptr{\tallarrayb{\bvar}{\tau}}{\cmode})=\tallarrayptr{n_l'}{n_h'}{\tau_b}{\cmode} \\ n_l' > n_l \vee n_h > n_h'}{ (\varphi,\heap,\edyncast{\tptr{\tallarrayb{\bvar}{\tau}}{\cmode}}{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau_a}{\cmode}}}) 
- \longrightarrow (\varphi',\heap',\ebounds)}
+  \inferrule[S-Malloc]{\varphi(\omega)=\omega_a \\ alloc(\heap,\kappa,\omega_a)=(n,\heap')}
+   { (\varphi,\heap,\emalloc{\kappa}{\omega}) \longrightarrow (\varphi,\heap',\evalue{n}{\tptr{\omega_a}{\kappa}})}
 
         \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
 
-    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
-
-
-    \inferrule[S-Fun]{ \Xi(f) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
-        {(\varphi,\heap,\ecall{f}{{\evalue{\overline{n}}{\overline{\tau_a}}}}) \longrightarrow
+    \inferrule[S-Fun]{ \kappa\neq \umode\\n\in(0,\eta_{\kappa})\\\Xi(\kappa,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
+        {(\varphi,\heap,\ecall{(\evalue{n}{\tptr{\tau}{\kappa})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
    (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
 
-     % \inferrule[S-IfNTF]{\varphi(x)=\evalue{n}{\tau} \\ \heap(n)=0}
-     %      {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_2)}
-      \inferrule[S-StrWiden]{
-         \varphi(x) = \evalue{n}{\tarrayptr{n_l}{n_h}{\tau}{\cmode}}\\ 0 \in [n_l,n_h] \\ n_a > n_h
-\\ \heap(n+n_a) = 0 
-\\\\ (\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i) = \evalue{n_i}{\tau_i} \wedge n_i \neq 0))}
-    {(\varphi,\heap,\estrlen{x}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tarrayptr{n_l}{n_a}{\tau}{\cmode}}],\heap,\evalue{n_a}{\tint})}
+    \inferrule[S-Ret]{}{(\varphi,\heap,\ret{x}{\mu}{\evalue{n}{\tau}}) \longrightarrow (\varphi[x\mapsto \mu],\heap,\evalue{n}{\tau})}
 
-     \inferrule[S-IfNTT]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{0}{\tau}{\cmode}} \\ \heap(n)\neq 0}
-    {(\varphi,\heap,\eif{*x}{e_1}{e_2}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tntarrayptr{n_l}{1}{\tau}{\cmode}}],\heap,e_1)}
+    \inferrule[S-FunU]{ n\in(0,|\heap(\umode)|)\\ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
+        {(\varphi,\heap,\ecall{(\evalue{n}{\tptr{\tau}{\umode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
+   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
 
- % \inferrule[S-IfNTNot]{\varphi(x)=\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\cmode}} \\ \heap(n)\neq 0\\ 0 < n_h}
- %            {(\varphi,\heap,\eif{\estar{x}}{e_1}{e_2}) \longrightarrow (\varphi,\heap,e_1)}
 
+    \inferrule[S-Switch]
+              {}
+              {(\varphi,\heap,\toa{m}{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 \end{mathpar}
 }
 % {\footnotesize
@@ -409,20 +348,7 @@ thus, non-crashing shows that every unchecked region crashing does not affect th
 \end{figure*}
 \end{DIFnomarkup}
 
-% \review{Fig4: it was hard to tell which cases were stuck states, or could reduce
-%   owing to a rule that was not shown}
-% \mwh{Stuck states are those where the expression is a non-value and
-%   not $\enull$ or $\ebounds$. Updated III-B and III-D.}
-% \review{Fig4: can the rules be presented in the same order they were introduced in
-%   the paper?}
-% \liyi{ Reordered }
-
-% \review{Fig4: S-FUN: $\vec\tau_a$ seems unused; why?}
-% \liyi{the list of $\tau_a$ is a list of input argument types. These
-%   are used during type checking, but not during evaluation (as is
-%   typical).} 
-
-% LEO: This has an overfull line...?
+\ignore{
 \begin{figure}[t]
 {\small
 {\captionsetup[lstlisting]{margin = 8 mm}
@@ -450,10 +376,12 @@ nt_array_ptr<char> safe_strcat
 \caption{Implementation of safe \code{strcat}}
 \label{fig:strcat-ex}
 \end{figure}
+}
 
-Fig.~\ref{fig:semantics} shows selected rules for the computation
-relation; we explain them with the help of the example in
-Fig.~\ref{fig:strcat-ex},
+\Cref{fig:semantics} shows selected rules for showing the key guarantees that \systemname and \systemnamea provide
+; we explain them with the help of the example in
+\Cref{sec:overview}.
+\ignore{
   which defines a 
   safe version of \code{strcat} (using actual Checked C syntax).  The
   function takes a target 
@@ -461,65 +389,53 @@ Fig.~\ref{fig:strcat-ex},
   character (determined by \code{strlen}) is at index \code{x} where
   $0 \leq $\code{x}$ \leq n$. It concatenates the \code{src} buffer to
   the end of \code{dst} as long as \code{dst} has sufficient space.
-
+}
 % Below, we introduce low-level transition semantics for some case operations. The design of the low-level individual operation semantics is carefully engineered to perform match our compiler's behavior, such as correctly characterizing the bound widening behaviors for NT-array pointers, even though it is written in terms of fat-pointer formalization.
 
-\myparagraph{Pointer accesses}
+\myparagraph{Pointer accesses, Casts, and Mallocs.}
 %
-The rules for dereference and assignment operations---\textsc{S-Def},
-\textsc{S-DefNull}, \textsc{S-DefNTArray}, and
-\textsc{S-AssignArr}---illustrate how the semantics checks bounds.
-Rule \textsc{S-DefNull} transitions attempted null-pointer
-dereferences to $\enull$, whereas \textsc{S-Def} dereferences a
-non-null (single) pointer.
-  When $\enull$ is returned by the
+We describe rules (\rulelab{S-DefArr}, \rulelab{S-Def}, \rulelab{S-DefArrBound}, \rulelab{S-DefNull}, and \rulelab{S-Cast}) for dereference and cast operations to illustrate how the dynamic checks are performed in \lang.
+For every heap region $\heap(\kappa)$, every dereference and assignment operation (e.g., rule \rulelab{S-Def}) ensures that the pointer address is within the low and high bound range ($[\eta_{\kappa},|\heap(\kappa)|)$) of the heap region,
+where the low bound refers to the bound $\eta_{\kappa}$ splitting the function code and heap data subranges
+and the high bound is the cardinality of the heap ($|\heap(\kappa)|$).
+If the check is not satisfied, the semantics produces a $\enull$ state in \rulelab{S-DefNull}.
+When $\enull$ is returned by the
 computation relation, the evaluation relation halts the entire
 evaluation with $\enull$ (using a rule not shown in Fig.~\ref{fig:c-context}); it
 does likewise when $\ebounds$ is returned (see below).
 
-% \review{- on page 6, section IIIC, paragraph "Pointer Access" mentions that checked pointers cannot be dereferenced in unchecked blocks - this looks funny, shouldn't it be the other way around? The Coq code contains the hypothesis m'=Unchecked -> m Unchecked in various rules of definition well-typed (BoundCheckedC, line 669; rule TyDeref in the code seems closest to the figure's T-DefArr and T-Def in the appendix, although it's a bit concerning that there's no 1-to-1 correspondence of the rules in the code and the paper).
-% }
-% \liyi{Yeah. It is another typo. It should be the other way around.  }
-
-\textsc{S-AssignArr} assigns to an array as long as 0 (the point of
+\rulelab{S-DefArr} dereferences an element in an array as long as $0$ (the point of
 dereference) is within the bounds designated by the pointer's annotation
-and strictly less than the upper bound. For the assignment rule,
-arrays are treated uniformly whether they are null-terminated or not
-($\kappa$ can be $\cdot$ or $nt$)---the semantics does not search past
-the current position for a null terminator. The program
-can widen the bounds as needed, if they currently precede the null
-terminator: \textsc{S-DefNTArray}, which dereferences an NT array
-pointer, allows an upper bound of $0$, since the program may read, but
-not write, the null terminator. A separate rule (not shown) handles
-normal arrays.
+and strictly less than the upper bound ($0 \in [n_l,n_h)$),
+while the location address $n$ should be within the bounds of the specific heap region ($n\in[\eta_{\kappa},|\heap(\kappa)|)$).
+The former check is a $\ebounds$ check that verifies the element dereference is within the array bound,
+while the latter is a $\enull$ check that ensures that the pointer exists in the correct heap region.
+The dereference semantics and type rules are general enough to be used in both $\cmode$ and $\umode$ code regions.
+As we mentioned in \Cref{sec:background}, $\umode$ code regions contain mostly C code that does not have array annotations.
+In this case, a $\umode$ mode array pointer is cast and viewed as a normal C pointer, where we apply rule \rulelab{S-Def} to deal with its dereference.
 
-\myparagraph{Casts}
-%
+Rules \rulelab{S-DefArrT} and \rulelab{S-DefT} define the dereference operations for $\tmode$ mode pointers.
+Here, we perform an additional type verification $\heap;\emptyset \vdash \evalue{n_a}{\tau}$ making sure that the memory location context $n_a$ has the declared type $\tau$ appearing in the operation $\estar{\evalue{n}{\tptr{\tau}{\kappa}}}$.
+Such check not only verifies if $n_a$ has type $\tau$, but also if $n_a$ is a nested pointer,
+the check further verifies if all addresses within $n_a$'s legal scopes are well-typed.
+In \Cref{lst:final}, function \code{read_msg} casts a $\umode$ mode pointer and assigns it to a tainted array pointer and returns to the checked function \code{process_req2}; such behavior is legal in a $\umode$ code region. 
+\code{process_req2} catches the bug in line 10 through the type verification above, because pointer $x$ cannot have type $\tptr{\tarrayptr{0}{5}{\tint}{\tmode}}{\tmode}$ since it is illegal to cast type $\tptr{\tptr{\umode}{\tint}}{\tmode}$ to it.
+
 Static casts of a literal $n\!:\!\tau'$ to a type $\tau$ are handled
-by \textsc{S-Cast}. In a type-correct program, such casts are
+by \rulelab{S-Cast}. In a type-correct program, such casts are
 confirmed safe by the type system. To evaluate a cast, the rule
 updates the type annotation on $n$. Before doing so, it must
 ``evaluate'' any variables that occur in $\tau$ according to their
-bindings in $\varphi$. For example, if $\tau$ was
-$\tarrayptr{0}{x+3}{\tint}{\cmode}$, then $\varphi(\tau)$ would
-produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+bindings in $\varphi$. As an instance, if $\tau$ was
+$\tarrayptr{0}{x+2}{\tint}{\cmode}$, then $\varphi(\tau)$ would
+produce $\tarrayptr{0}{4}{\tint}{\cmode}$ if $\varphi(x) = 2$.
+Rule \rulelab{S-Malloc} creates a new memory pointer $\tptr{\omega_a}{\kappa}$
+in heap region $\heap(\kappa)$ through function $alloc$, which returns a neq heap $\heap'$ that creates a new memory space in $\heap(\kappa)$ and increments $\heap(\kappa)$'s cardinality, as $|\heap'(\kappa)|=|\heap(\kappa)|+$\code{sizeof}$(\omega_a)$;
+$\varphi(\omega)$ evaluates potential bound variables in $\omega$ and returns a new type $\omega_a$ with no variables.
 
-Dynamic casts are accounted for by \textsc{S-DynCast} and
-\textsc{S-DynCastBound}. In a type-correct program, such casts are
-assumed correct by the type system, and later confirmed by the
-semantics. As such, a dynamic cast will cause a $\ebounds$ failure if
-the cast-to type is incompatible with the type of the target pointer,
-as per the $n_l' > n_l \vee n_h > n_h'$ condition in
-\textsc{S-DynCastBound}. An example use of dynamic casts is given on
-line~7 in Fig.~\ref{fig:strcat-ex}. The values of \code{x} and
-\code{n} might not be known statically, so the type system cannot
-confirm that \code{x <= n}; the dynamic cast assumes this inequality
-holds, but then checks it at run-time.
-
-\myparagraph{Binding and Function Calls}
-%
-The semantics handles variable scopes using the special $\erettext$
-form. \textsc{S-Let} evaluates to a configuration whose stack
+\myparagraph{Binding, Function Calls, and Context Switching}
+We handle variable scopes using the special $\erettext$
+operation. \textsc{S-Let} evaluates to a configuration whose stack
 is $\varphi$ extended with a binding for $x$, and whose expression is
 $\ret{x}{\varphi(x)}{e})$ which remembers $x$ was previously bound to
 $\varphi(x)$; if it had no previous binding, $\varphi(x) =
@@ -528,25 +444,30 @@ $n\!:\!\tau$, in which case \textsc{S-Ret} restores the saved
 binding (or $\bot$) in the new stack, and evaluates to
 $n\!:\!\tau$. 
 
-Function calls are handled by \textsc{S-Fun}. Recall that array
-bounds in types may refer to in-scope variables; e.g., parameter
-\code{dst}'s bound \code{count(n)} refers to parameter \code{n} on lines
-2-3 in Fig.~\ref{fig:strcat-ex}. A call to function $f$ causes $f$'s
-definition to be retrieved from $\Xi$,
-% LEO: This is the first occurence of \Xi. It is explained,
-% but reads a bit awkward as it's unclear this is its "introduction"
-which maps function names to
-forms $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e$, where
+Function calls are handled by rules \rulelab{S-FunU} and \rulelab{S-Fun},
+for $\umode$ and non-$\umode$ mode functions \footnote{A $\kappa$ mode function means the function pointer is labeled with mode $\kappa$ and its code is stored in $\kappa$ heap region.}, respectively.
+When calling a function pointer $\evalue{n}{\tptr{\tau}{\kappa}}$,
+we extra the $n$-th location code data from $\Xi(\kappa)$, referring to the function code fields in the $\kappa$ heap region and makes a memory address to $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e$, where
 $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, and $e$ is the
-function body. The call is expanded into a \texttt{let} which binds
+function body.
+We place a bound check in rule \rulelab{S-Fun} to 
+ensure that $\cmode$ and $\tmode$ mode function calls only access addresses in the range $(0,\eta_{\kappa})$,
+the code data field ranges for $\cmode$ and $\tmode$, respectively;
+while $\umode$ function calls (\rulelab{S-FunU}) are allowed to access all $\umode$ heap region.
+Similar to \checkedc, \lang function calls are dependent, i.e.,
+array bounds in types may refer to in-scope variables; e.g., 
+\code{process_req1}'s bound \code{count(m_1)} refers to parameter \code{m_1} in \Cref{lst:final}
+The call is expanded into a \texttt{let} which binds
 parameter variables $\overline{x}$ to the actual arguments
 $\overline{n}$, but annotated with the parameter types
 $\overline{\tau}$ (this will be safe for type-correct programs). The
 function body $e$ is wrapped in a static cast
 $(\tau[\overline{n} / \overline{x}])$ which is the function's return
 type but with any parameter variables $\overline{x}$ appearing in that
-type substituted with the call's actual arguments $\overline{n}$. To
+type substituted with the call's actual arguments $\overline{n}$. 
+\ignore{
+To
 see why this is needed, suppose that \code{safe_strcat} in
 Fig.~\ref{fig:strcat-ex} is defined to return a
 \code{nt_array_ptr<int>:count(n)} typed term, and assume that we
@@ -556,129 +477,76 @@ function returns a value with type \code{nt_array_ptr<int>:count(10)}
 because we substitute bound variable \code{n} in the 
 defined return type with \code{10} from the function call's
 argument list.
+}
 Note that the \textsc{S-Fun} rule replaces the
   annotations $\overline{\tau_a}$ with
   $\overline{\tau}$ (after instantiation) from the function's
   signature. Using $\overline{\tau_a}$ when executing the body of
 the function has no impact on the soundness of \lang, but will violate
 Theorem~\ref{simulation-thm}, which we introduce in Sec.~\ref{sec:compilation}.
+Rule \rulelab{S-Swtich} defines the context mode switch block's semantics, which gets rid of the $\texttt{to}$ block once its context is a value.
 
-\myparagraph{Bounds Widening}
-%
-Bounds widening occurs when branching on a dereference of a NT array
-pointer, or when performing $\estrlentext$. The latter is most useful
-when assigned to a local variable so that subsequent code can use the
-result, e.g., $e$ in $\elet{x}{\estrlen{y}}{e}$.  Lines 4 and 5 in
-Fig.~\ref{fig:strcat-ex} are examples. 
-The widened upper bound
-precipitated by $\estrlen{y}$ is extended beyond the lifetime of $x$, as long as $y$ is live.
-% Even if $x$ returns, if $y$'s upper bound keeps the widened bound that is caused by $\estrlen{y}$.
-For example, \code{x}'s scope in line 4 at runtime is
-the whole function body in \code{safe_strcat} because the lifetime of the pointer \code{dst} is in the function body.
-% Allowing widening to persist
-% outside the scope is sound, % but would precipitate the need for
-% % fat pointers during compilation, which we want to avoid.
-% and we take this approach to give more precise run-time behavior. We
-% show in Sec.~\ref{sec:compilation}
-This is different from the \checkedc specification, 
-which only allows bound widening to happen within the scope of \code{x}, and restoring old bound values once \code{x} dies.
-We allow widening to persist outside the scope at run-time as long as
-we are within the stack frame, and we show
-this does not necessarily require the use of fat pointers in
-Sec.~\ref{sec:compilation}.
-
-Rule \textsc{S-StrWiden} implements $\estrlentext$ widening. The
-predicate
-$\forall i. n \le i < n+n_a \Rightarrow (\exists n_i\;t_i. \heap(n+i)
-= \evalue{n_i}{\tau_i} \wedge n_i \neq 0))$ aims to find a position
-$n+n_a$ in the NT array that stores a null character, where no
-character as indexes between $n$ and $n+n_a$ contains one. (This rule
-handles the case when $n_a > n_h$, the $n_a \le n_h$ case is handled
-by a normal $\estrlentext$ rule; see 
-\iftr
-Appendix~\ref{sec:rem-semantics}.)
-\else
-the supplemental report~\cite{checkedc-tech-report}.)
-\fi
-
-Rule \textsc{S-IfNTT} performs bounds widening on $x$ when the
-dereference $\estar{x}$ is not at the null terminator, but the
-pointer's upper bound is 0 (i.e., it's at the end of its known
-range). $x$'s upper bound is incremented to 1, and this count persists
-as long as $x$ is live.  For example, \code{s}'s increment (lines
-5--8) is live until the return of the function in
-Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
-\code{s}'s upper bound is properly extended. %  For this rule and
-
-
-\subsection{Typing and Semantics}
+\subsection{Typing}
 \label{sec:typechecking}
-
-
 
 \begin{DIFnomarkup}
 \begin{figure*}[t]
 {\small
   \begin{mathpar}
-     \inferrule[T-CastPtr]
-               {\Gamma;\Theta \vdash_m e : \tau' \\
-                 \tau' \sqsubseteq_{\Theta} \tptr{\tau}{\xi}}
-               {\Gamma;\Theta \vdash_m \ecast{\tptr{\tau}{\xi}}{e} : \tptr{\tau}{\xi}}
-                
-    \inferrule[S-Cast]
-              {}
-              {(\varphi,\heap,\ecast{\tau}{\evalue{n}{\tau'}}) \longrightarrow (\varphi,\heap,\evalue{n}{\varphi(\tau)})}
-  \end{mathpar}
-
-  \begin{mathpar}
-    \inferrule[T-Def]
-              {\xi \leq m \\\Gamma;\Theta \vdash_m e : \tptr{\tau}{\xi}}
+    \inferrule[T-DefArr]
+              {\kappa\le m \\ \Gamma;\Theta \vdash_{m} e : \tptr{\tarrayb{\bvar}{\tau}}{\kappa}}
               {\Gamma;\Theta \vdash_m \estar{e} : \tau}
-\quad
-        \inferrule[S-DefC]{\heap(\cmode,n)=\evalue{n_a}{\tau_a} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{c}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-\quad
-        \inferrule[S-DefT]{\heap(\umode,n)=\evalue{n_a}{\tau_a}
-         \\  \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau} }
-    {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
-\quad
-    \inferrule[S-DefNull]{}{(\varphi,\heap,\estar{\evalue{0}{\tptr{\omega}{\cmode}}}) \longrightarrow (\varphi,\heap,\enull)}
-  \end{mathpar}
 
-  \begin{mathpar}
-    \inferrule[T-Checked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                     \\\\\fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
-              {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
+    \inferrule[T-Def]
+              {\kappa \leq m \\\Gamma \vdash_m e : \tptr{\tau}{\kappa}}
+              {\Gamma \vdash_m \estar{e} : \tau}
 
-    \inferrule[T-Unchecked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                \\\\ \fv(e)\in\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
-              {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
+     \inferrule[T-Cast]
+               {\Gamma \vdash_{\cmode} e : \tau' \\
+                 \tau' \sqsubseteq \tptr{\tau}{\kappa}}
+               {\Gamma \vdash_{\cmode} \ecast{\tptr{\tau}{\kappa}}{e} : \tptr{\tau}{\kappa}}
 
-    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
-  \end{mathpar}
+    \inferrule[T-CastU]
+              {\kappa \le \umode \\
+                \Gamma;\Theta \vdash_{\umode} e : \tau'}
+              {\Gamma;\Theta \vdash_{\umode} \ecast{\tptr{\tau}{\kappa}}{e} : \tptr{\tau}{\kappa}}
+                
+    \inferrule[T-Malloc]
+              {\kappa\le m}
+              {\Gamma \vdash_m \emalloc{\kappa}{\omega} : \tptr{\omega}{\kappa}}
 
-  \begin{mathpar}
+   \inferrule[T-Let]
+    { x\not\in \fv(\tau') \\
+        \Gamma \vdash_m e_1 : \tau \\\\
+          \Gamma[x\mapsto \tau] \vdash_m e_2 : \tau'
+             }
+    {\Gamma \vdash_m \elet{x}{e_1}{e_2} : \tau'}
+
+   \inferrule[T-LetInt]
+    {\Gamma \vdash_m e_1 : \tint \\\\
+           \Gamma[x\mapsto \tint] \vdash_m e_2 : \tau'\\\\
+        x\in \fv(\tau') \Rightarrow e_1 \in \text{Bound} 
+             }
+    {\Gamma \vdash_m \elet{x}{e_1}{e_2} : \tau'[e_1 / x]}
+
+\inferrule[T-Ret]
+    {\Gamma(x)\neq \bot \\
+          \Gamma;\Theta \vdash_m e : \tau}
+    {\Gamma;\Theta \vdash_m \eret{x}{\mu}{e} : \tau}
+
+    \inferrule[T-Switch]
+              {\forall x\in\{\overline{x}\}.\,\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
+                     \\\\\fv(e)\subseteq\overline{x}\\\Gamma \vdash_{m'} e : \tau}
+              {\Gamma \vdash_m \toa{m'}{\overline{x}}{e} : \tau}
+
 \inferrule[T-Fun]
-    {\Gamma;\Theta \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \\
-        \Gamma; \Theta \vdash_m \overline{e} : \overline{\tau'} \\
+    {\Gamma \vdash_m e : \tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\kappa} \\
+        \Gamma \vdash_m \overline{e} : \overline{\tau'} \\
          \overline{e'}=\{e'|(e',\tint)\in (\overline{e} : \overline{\tau'})\}\\\\
          \forall e'\;.\;e' \in \overline{e'} \Rightarrow e'\in \text{Bound}\\
-             \overline{\tau'} \sqsubseteq_{\Theta}
+             \overline{\tau'} \sqsubseteq
                \overline{\tau}[\overline{e'} / \overline{x}]}
-    {\Gamma; \Theta \vdash_m e(\overline{e}) : \tau[\overline{e'} / \overline{x}]}
-  \end{mathpar}
-  \begin{mathpar}
-    \inferrule[S-FunC]{ \Xi(\cmode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\cmode,e)}
-        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\cmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
-   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
-\quad
-    \inferrule[S-FunT]{ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\tmode,e)
-                  \\ \emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n}{\tptr{\tau}{\tmode}}}
-        {(\varphi,\heap,\ecall{\evalue{n}{(\tptr{\tau}{\tmode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
-   (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
-
+    {\Gamma \vdash_m e(\overline{e}) : \tau[\overline{e'} / \overline{x}]}
   \end{mathpar}
 }
 % {\footnotesize
@@ -693,15 +561,17 @@ Fig.~\ref{fig:checkedc-example}; thus, line 11 is valid because
 % \end{center}
 % }
 {\footnotesize
+\begin{center}
 $
 \cmode(\tint)=\texttt{false}
 \qquad
 \cmode(\tptr{\omega}{\cmode})=\texttt{true}
 \qquad
-\cmode(\tptr{\omega}{\xi})=\texttt{false}\;\;{[\emph{owise}]}
+\cmode(\tptr{\omega}{\kappa})=\texttt{false}\;\;{[\emph{owise}]}
 $
+\end{center}
 }
-\caption{Selected typing (\rulelab{T}-$X$) and semantic (\rulelab{S}-$X$) rules. First line is for cast operations, second line is for pointer dereferences, third line is for checked/unchecked blocks, and the rest is for function calls.}
+\caption{Selected type rules}
 \label{fig:type-system-1}
 \end{figure*}
 \end{DIFnomarkup}
@@ -764,21 +634,21 @@ Operations in $\umode$ region can non-deterministically crash
 and the \systemname sandbox mechanism recovers
 the program to a safe point ($\evalue{0}{\tau}$)
 and continues with the existing program state.
-Evaluation contexts $E$ define a standard left-to-right evaluation order. 
+Evaluation contexts $E$ define a standard left-to-right evaluation order.
 %(We explain the $\ret{x}{\mu}{e}$ syntax shortly.)
 %There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
 
 \myparagraph{Modes, Static Casting, and Subtyping}
 In \lang, Context modes $m$ appearing in a type rule determine the code region 
 that permits pointer dereferences and value-assignments, which also depends on the pointer modes.
-We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
+We define a three point lattice $\kappa_1 \le \kappa_2$ \footnote{In typing rule, the lattice is usually used as $\kappa \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \kappa$ and $m \le m$.
 This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can only perform such operations in $\cmode$ and $\umode$ regions, respectively.
-%Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\xi_2} ...)}{\xi_1}$, we require $\xi_2\le \xi_1$ to maintain non-exposure.
+%Pointer modes are also useful in determining if a nested pointer has a valid type. For example, in a nested pointer $\tptr{(... \tptr{\tau}{\kappa_2} ...)}{\kappa_1}$, we require $\kappa_2\le \kappa_1$ to maintain non-exposure.
 
 \lang also provides static casting operations. As described in rule \textsc{T-CastPtr} in \Cref{fig:type-system-1},
-an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to another pointer type \tptr{\tau_2}{\xi_2},
-if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2}, i.e., $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.
-In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\xi_1$ and $\xi_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
+an pointer typed expression of type $\tptr{\tau_1}{\kappa_1}$ can be casted to another pointer type \tptr{\tau_2}{\kappa_2},
+if \tptr{\tau_1}{\kappa_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\kappa_2}, i.e., $\tptr{\tau_1}{\kappa_1} \sqsubseteq \tptr{\tau_2}{\kappa_2}$.
+In \lang, except that we can cast a $\tmode$ mode pointer to a $\umode$ mode one, all subtyping relations are between two types with the same mode, meaning that $\kappa_1$ and $\kappa_2$ above are mostly the same and the above mode lattice ($\le$) has no business with subtyping.
 
 \begin{minted}[xleftmargin=30pt, mathescape, escapeinside=||, fontsize=\footnotesize]{c}
 //_Ptr<int> x; _t_Ptr<int> y; int *z;
@@ -799,7 +669,7 @@ x = y; // Not allowed.
 The type and semantic rules for pointer dereference (\textsc{T-Def}, \textsc{S-DefC},
 \textsc{S-DefT}, \textsc{S-DefNull} in \Cref{fig:type-system-1})
 reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
-The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
+The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\kappa \le m$).
 With the dynamic checks inserted by the compiler, rule \textsc{S-DefNull} ensure that if a $\enull$ pointer is used,
 \lang captures the runtime error.
 Type and semantic rules for array types and pointer assignments are given in \Cref{rem-type,sec:rem-semantics}.
@@ -833,7 +703,7 @@ and write $\overline{\tau}[\overline{e'} / \overline{x}]$ to lift the
 substitution to every type in \(\overline{\tau}\).
 % 
 Given an expression $e$ of function pointer type
-($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$) and arguments
+($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\kappa}$) and arguments
 $\overline{e}$ of types $\overline{\tau'}$,
 % 
 the result of the application will
@@ -855,10 +725,10 @@ for $\cmode$ and $\tmode$ mode function pointers, respectively.
 A call to a function pointer $n$ retrieves
  the function definition in $n$'s location in the global function store $\Xi$,
 which maps function pointers to
-function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\xi,e)$, where
+function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\kappa,e)$, where
 $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, 
-$\xi$ determines the mode of the function, and $e$ is the
+$\kappa$ determines the mode of the function, and $e$ is the
 function body. 
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ store regions), each of which
@@ -1217,33 +1087,33 @@ produce $\tarrayptr{0}{5}{\tint}{\cmode}$ if $\varphi(x) = 2$.
 
    \inferrule
        {}
-       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\xi}}
+       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\kappa}}
 
    \inferrule
-       {(m = \cmode \Rightarrow \xi \neq \cmode) \\\\ (m=\umode \Rightarrow \xi = \umode)}
+       {(m = \cmode \Rightarrow \kappa \neq \cmode) \\\\ (m=\umode \Rightarrow \kappa = \umode)}
        {\Theta;\heap;\sigma \vdash_{\cmode} n : \tptr{\omega}{\tmode}}
   
    \inferrule
-       {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+       {(\evalue{n}{\tptr{\omega}{\kappa}})\in \sigma}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
 
 
    \inferrule
-       {\tptr{\omega'}{\xi'} \sqsubseteq_{\Theta} \tptr{\omega}{\xi} 
-            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\xi'}}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+       {\tptr{\omega'}{\kappa'} \sqsubseteq_{\Theta} \tptr{\omega}{\kappa} 
+            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\kappa'}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
 
    \inferrule
-       { \xi \le m 
-     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\xi,e)
+       { \kappa \le m 
+     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\kappa,e)
        \\  \overline{x} = \{x|(x:\tint) \in (\overline{x'}:\overline{\tau}) \}}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\xi}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\kappa}}
   
    \inferrule
-       {\neg\funptr(\omega)\\ \xi \le m\\
+       {\neg\funptr(\omega)\\ \kappa \le m\\
         \forall i \in [0,\size(\omega)) \;.\;
-            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\xi})) \}\vdash_m \heap(m,n+i)}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\kappa})) \}\vdash_m \heap(m,n+i)}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
  \end{mathpar}
  }
 {\footnotesize
@@ -1284,7 +1154,7 @@ $\sqsubseteq$ is built on the type equality ($\tau =_{\Theta} \tau'\Rightarrow\t
 The rule  ($0\le b_l \wedge b_h \le 1 \Rightarrow \tptr{\tau}{m}\sqsubseteq
 \tarrayptr{b_l}{b_h}{\tau}{m}$) permits treating a singleton
 pointer as an array pointer with $b_h\le 1$ and $0 \le b_l$.
-Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\xi}$), 
+Two function pointer types are subtyped ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\kappa} \sqsubseteq_{\Theta} \tptr{\tfun{\overline{x}}{\overline{\tau'}}{\tau'}}{\kappa}$), 
 if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argument types are reversely subtyped ($\overline{\tau'}\sqsubseteq_{\Theta}\overline{\tau}$).
 %There is another casting rule in \Cref{app:main} stating that
 % users are free to cast types in unchecked code regions, since unchecked regions can contain C code.
@@ -1300,33 +1170,33 @@ if the output type are subtyped ($\tau\sqsubseteq_{\Theta}\tau'$) and the argume
 
    \inferrule
        {}
-       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\xi}}
+       {\Theta;\heap;\sigma \vdash_m 0 : \tptr{\omega}{\kappa}}
 
    \inferrule
-       {(m = \cmode \Rightarrow \xi \neq \cmode) \\\\ (m=\umode \Rightarrow \xi = \umode)}
+       {(m = \cmode \Rightarrow \kappa \neq \cmode) \\\\ (m=\umode \Rightarrow \kappa = \umode)}
        {\Theta;\heap;\sigma \vdash_{\cmode} n : \tptr{\omega}{\tmode}}
   
    \inferrule
-       {(\evalue{n}{\tptr{\omega}{\xi}})\in \sigma}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+       {(\evalue{n}{\tptr{\omega}{\kappa}})\in \sigma}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
 
 
    \inferrule
-       {\tptr{\omega'}{\xi'} \sqsubseteq_{\Theta} \tptr{\omega}{\xi} 
-            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\xi'}}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+       {\tptr{\omega'}{\kappa'} \sqsubseteq_{\Theta} \tptr{\omega}{\kappa} 
+            \\ \Theta;\heap;\sigma \vdash_m n : \tptr{\omega'}{\kappa'}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
 
    \inferrule
-       { \xi \le m 
-     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\xi,e)
+       { \kappa \le m 
+     \\\Xi(m,n)=\tau\;(\evalue{\overline{x'}}{\overline{\tau}})\;(\kappa,e)
        \\  \overline{x} = \{x|(x:\tint) \in (\overline{x'}:\overline{\tau}) \}}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\xi}}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{(\tfun{\overline{x}}{\overline{\tau}}{\tau})}{\kappa}}
   
    \inferrule
-       {\neg\funptr(\omega)\\ \xi \le m\\
+       {\neg\funptr(\omega)\\ \kappa \le m\\
         \forall i \in [0,\size(\omega)) \;.\;
-            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\xi})) \}\vdash_m \heap(m,n+i)}
-       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\xi}}
+            \Theta;\heap;(\sigma \cup \{(n:\tptr{\omega}{\kappa})) \}\vdash_m \heap(m,n+i)}
+       {\Theta;\heap;\sigma \vdash_m n : \tptr{\omega}{\kappa}}
  \end{mathpar}
  }
 {\footnotesize
@@ -1433,7 +1303,7 @@ Fig.~\ref{fig:semantics}).
 %$\evalue{n}{\tau}$.
 
 Rule \textsc{T-Fun} in \Cref{fig:type-system-1} is the dependent function call rule. 
-Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\xi}$)
+Given a function pointer type ($\tptr{\tfun{\overline{x}}{\overline{\tau}}{\tau}}{\kappa}$)
 from a type-check for $e$ and the types $\overline{\tau'}$ from the argument type checks for $\overline{e}$,
 we confirm that each of $\overline{\tau'}$ is
 a subtype of the corresponding one in $\overline{\tau}[\overline{e'} / \overline{x}]$,
@@ -1463,10 +1333,10 @@ for $\cmode$ and $\tmode$ mode function pointers, respectively.
 A call to a function pointer $n$ retrieves
  the function definition in $n$'s location in the global function store $\Xi$,
 which maps function pointers to
-function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\xi,e)$, where
+function data $\tau\;(\evalue{\overline{x}}{\overline{\tau}})\;(\kappa,e)$, where
 $\tau$ is the return type, $(\evalue{\overline{x}}{\overline{\tau}})$
 is the parameter list of variables and their types, 
-$\xi$ determines the mode of the function, and $e$ is the
+$\kappa$ determines the mode of the function, and $e$ is the
 function body. 
 Similar to \heap, the global function store $\Xi$ is also partitioned into
 two parts ($\cmode$ and $\umode$ stores), each of which
