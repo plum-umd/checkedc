@@ -288,25 +288,26 @@ $\varphi(x)$ in a $\elettext$ binding, explained shortly below.
 
 \begin{DIFnomarkup}
 \begin{figure*}[t]
-{\small
+{\footnotesize
   \begin{mathpar}
-    \inferrule[S-DefArr]{\kappa \neq \tmode\\
-      n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap(\kappa,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)}
+    \inferrule[S-DefArr]{\kappa \neq \tmode\\ n\ge\eta_{\tmode} \\\heap(\kappa,n)=\evalue{n_a}{\tptr{\tau_a}{\kappa}} \\ 0 \in [n_l,n_h)}
     {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-        \inferrule[S-Def]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\kappa},|\heap(\kappa)|)}
+        \inferrule[S-Def]{\kappa \neq \tmode\\n\ge\eta_{\tmode} \\\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\kappa}} }
     {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefArrT]{n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap(\kappa,n)=\evalue{n_a}{\tau_a} \\ 0 \in [n_l,n_h)\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
+    \inferrule[S-DefArrT]{n\ge\eta_{\tmode}\\\heap(\kappa,n)=\evalue{n_a}{\tptr{\tau_a}{\tmode}} \\ 0 \in [n_l,n_h)\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
     {(\varphi,\heap,\estar{\evalue{n}{\tntarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
-        \inferrule[S-DefT]{\heap(n)=\evalue{n_a}{\tau_a} \\ n\in[\eta_{\kappa},|\heap(\kappa)|)\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
+        \inferrule[S-DefT]{n\ge\eta_{\tmode}\\\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\tmode}}\\\heap;\emptyset \vdash \evalue{n_a}{\tau}}
     {(\varphi,\heap,\estar{\evalue{n}{\tptr{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\evalue{n_a}{\tau})}
 
     \inferrule[S-DefArrBound]{0 \not\in [n_l,n_h)}
      { (\varphi,\heap,\estar{\evalue{n}{\tallarrayptr{n_l}{n_h}{\tau}{\kappa}}}) \longrightarrow (\varphi,\heap,\ebounds)}
 
-    \inferrule[S-DefNull]{n\not\in[\eta_{\kappa},|\heap(\kappa)|)}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\kappa}}}) \longrightarrow (\varphi,\heap,\enull)}
+    \inferrule[S-DefNullF]{n<\eta_{\tmode}}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\kappa}}}) \longrightarrow (\varphi,\heap,\enull)}
+
+    \inferrule[S-DefNull]{\heap(\kappa',n)=\evalue{n_a}{\tptr{\tau_a}{\kappa}}\\\kappa\neq\kappa'}{(\varphi,\heap,\estar{\evalue{n}{\tptr{\omega}{\kappa}}}) \longrightarrow (\varphi,\heap,\enull)}
 
     \inferrule[S-Cast]
               {}
@@ -314,6 +315,10 @@ $\varphi(x)$ in a $\elettext$ binding, explained shortly below.
 
   \inferrule[S-Malloc]{\varphi(\omega)=\omega_a \\ alloc(\heap,\kappa,\omega_a)=(n,\heap')}
    { (\varphi,\heap,\emalloc{\kappa}{\omega}) \longrightarrow (\varphi,\heap',\evalue{n}{\tptr{\omega_a}{\kappa}})}
+
+    \inferrule[S-Switch]
+              {}
+              {(\varphi,\heap,\toa{m}{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 
         \inferrule[S-Let]{}{(\varphi,\heap,\elet{x}{\evalue{n}{\tau}}{e}) \longrightarrow (\varphi[x\mapsto \evalue{n}{\tau}],\heap,\ret{x}{\varphi(x)}{e})}
 
@@ -326,11 +331,6 @@ $\varphi(x)$ in a $\elettext$ binding, explained shortly below.
     \inferrule[S-FunU]{ n\in(0,|\heap(\umode)|)\\ \Xi(\umode,n) = \tau\;(\evalue{\overline{x}}{\overline{\tau}})\;e}
         {(\varphi,\heap,\ecall{(\evalue{n}{\tptr{\tau}{\umode})}}{{\evalue{\overline{n_a}}{\overline{\tau_a}}}}) \longrightarrow
    (\varphi,\heap, \mathtt{let}\;\overline{x}={\evalue{\overline{n}}{(\overline{\tau}[\overline{n} / \overline{x}])}}\;\mathtt{in}\;\ecast{\tau[\overline{n} / \overline{x}]}{e})}
-
-
-    \inferrule[S-Switch]
-              {}
-              {(\varphi,\heap,\toa{m}{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
 \end{mathpar}
 }
 % {\footnotesize

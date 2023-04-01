@@ -1,53 +1,21 @@
 \section{Overview}
 \label{sec:overview}
 
-\begin{listing}[t!]
+\begin{figure*}[t]
   \begin{tabular}{c c}
-    \begin{minipage}[b]{.22\textwidth}
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/orig1.c}
+    \begin{minipage}[b]{.48\textwidth}
+\inputminted[mathescape, escapeinside=||, fontsize=\small{}]{c}{examples/conv1.c}
     \end{minipage} &
-    \begin{minipage}[b]{.22\textwidth}
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/orig2.c}
-    \end{minipage} %\\
-   %(a) Original C code & (b) After initial conversion.\\
-  \end{tabular}
-\caption{C program snippet of a simple network server with an arbitrary memory write vulnerability indicated by~\realbug.}
-\label{lst:comb}
-\end{listing}
-
-\begin{listing}[t!]
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/firstrun.c}
-\caption{Pointers in~\lst{lst:comb} annotated (manually or through automated tools like~\threec) with Checked Types.}
-\label{lst:initialconv}
-\end{listing}
-
-\begin{listing}[t!]
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/humanannotations.c}
-\caption{Initial annotations of tainted functions in~\lst{lst:comb}.}
-\label{lst:humantaint}
-\end{listing}
-
-\begin{listing}[t!]
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/humanadjustments.c}
-\caption{Additional tainted pointers annotations to~\lst{lst:comb} according to typing rules.}
-\label{lst:humanadjust}
-\end{listing}
-
-\begin{listing}[t!]
-  \begin{tabular}{c c}
-    \begin{minipage}[b]{.22\textwidth}
-\inputminted[mathescape, escapeinside=||, fontsize=\tiny{}]{c}{examples/conv1.c}
-    \end{minipage} &
-    \begin{minipage}[b]{.22\textwidth}
-\inputminted[mathescape, highlightlines={1-19}, highlightcolor=taintcolor, escapeinside=||, fontsize=\tiny{}]{c}{examples/conv2.c}
+    \begin{minipage}[b]{.48\textwidth}
+\inputminted[mathescape, highlightlines={1-19}, highlightcolor=taintcolor, escapeinside=||, fontsize=\small{}]{c}{examples/conv2.c}
     \end{minipage} %\\
    %(a) Original C code & (b) After initial conversion.\\
   \end{tabular}
 \caption{Final annotated program of~\lst{lst:comb} with~\textcolor{taintcolor}{tainted} and~\textcolor{checkcolor}{checked} types. The~\colorbox{taintcolor}{highlighted} functions will be executed in a sandbox.}
 \label{lst:final}
-\end{listing}
+\end{figure*}
 
-\input{figures/overview}
+%\input{figures/overview}
 
 \Cref{fig:overview} shows the interaction between various components of~\systemname{}.
 Given an appropriately annotated source program and a sandbox configuration, \systemname{} creates an executable such that all tainted functions and data reside in a sandbox and the~\cregion (non-sandboxed) is not affected by the code in the sandbox.
