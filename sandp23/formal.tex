@@ -350,22 +350,24 @@ $
 
 \begin{DIFnomarkup}
 \begin{figure*}[t]
-{\small
+{\footnotesize
 $\textcolor{blue}{\text{Dereference Operations:}}\\$
   \begin{mathpar}
     \inferrule[T-Def]
               {\xi \leq m \\\Gamma \vdash_m e : \tptr{\tau}{\xi}}
               {\Gamma \vdash_m \estar{e} : \tau}
 
-        \inferrule[S-DefT]{\heap(\tmode,n)=\evalue{n_a}{\tau_a} \\ n \not\in \Theta \\ n < |\heap(\tmode)|}
-    {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
-
-        \inferrule[S-Def]{\xi \neq \tmode \\ \heap(\xi,n)=\evalue{n_a}{\tau_a} }
+        \inferrule[S-Def]{\xi \neq \tmode \\ \heap(n)=\evalue{n_a}{\tptr{\tau_a}{\xi}} }
     {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefNull]{}{(\varphi,\Theta,\heap,\estar{\evalue{0}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\enull)}
+        \inferrule[S-DefT]{\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\tmode}} \\ n \not\in \Theta}
+    {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefBound]{n \in \Theta \vee n \ge |\heap(\tmode)|}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
+    \inferrule[S-DefNull]{}{(\varphi,\Theta,\heap,\estar{\evalue{0}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\enull)}
+\qquad
+    \inferrule[S-DefBoundA]{n \in \Theta}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
+\qquad
+    \inferrule[S-DefBoundB]{\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\xi}}\\\xi\neq \xi'}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi'}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
   \end{mathpar}
 
 $\textcolor{blue}{\text{Malloc and Free:}}\\$
@@ -450,19 +452,22 @@ transition relation with the judgment $ (\varphi,\Theta,\heap,e)
 \longrightarrow_m (\varphi',\Theta',\heap',r)$, as shown in \Cref{fig:c-context}.
  Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$,
-$\Theta$ is a set of $\tmode$ mode memory addresses that are freed at the point of executing $e$,
-and $\heap$ is a \emph{heap} that is partitioned into three parts ($\cmode$, $\tmode$, and $\umode$ heap regions), each of which
-maps addresses (integer literals) to values $\evalue{n}{\tau}$.
-We wrote $\heap(m)$ to retrieve the $m$ heap and $\heap(m,n)$ to retrieve the $n$-location heap value in the $m$ heap.
+$\Theta$ is a set of $\tmode$ mode memory addresses that are freed at the point of executing $e$
+and $\heap$ is a \emph{heap} mapping addresses (integer literals) to
+values $\evalue{n}{\ptr{\tau}{\xi}}$; for both we ensure
+$\fv(\tau)=\emptyset$.
+In a heap value $\evalue{n}{\ptr{\tau}{\xi}}$,
+$\tau$ represents the value's content type, while $\xi$ indicates the mode of the heap location;
+we classify a heap location into $\cmode$, $\tmode$, and $\umode$ modes, corresponding to the three kinds of pointer modes.
 The complete set of typing rules are provided in~\Cref{rem-type,sec:rem-semantics}.
 
 While heap bindings can change, stack bindings are immutable---once
 variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
 be updated. 
 %We can model mutable stack variables as pointers into the mutable heap.
-As mentioned, value $\evalue{0}{\tau}$
+As mentioned, value $\evalue{0}{\tptr{\tau}{\xi}}$
 represents a $\enull$ pointer when $\tau$ is a pointer type.
-Correspondingly, $\heap(m,0)$ should always be undefined.
+Correspondingly, $\heap(0)$ should always be undefined.
 % 
 The relation steps to a \emph{result} $r$, which is either an
 expression, a $\enull$ or $\ebounds$ failure, represent an expression right
@@ -512,21 +517,20 @@ an pointer typed expression of type $\tptr{\tau_1}{\xi_1}$ can be casted to anot
 if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2}, i.e., $\tptr{\tau_1}{\xi_1} \sqsubseteq \tptr{\tau_2}{\xi_2}$.}
 
 \myparagraph{Pointer Dereference}
-The type and semantic rules for pointer dereference (\rulelab{T-Def}, \rulelab{S-DefT},
-\rulelab{S-Def}, \rulelab{S-DefBound}, \rulelab{S-DefNull} in \Cref{fig:type-system-1})
+The type and semantic rules for pointer dereference (the first block in \Cref{fig:type-system-1})
 reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
 The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
 
 Rules \rulelab{S-DefT} and \rulelab{S-Def} are for $\tmode$ mode and other mode pointer dereferences, respectively.
-Operation $\heap(\xi,n)$ not only accesses the $n$-th address location,
+Operation $\heap(n)$ not only accesses the $n$-th address location,
 but also performs a $\enull$ check because $0$ is undefined in all heaps.
-In addition to the no $\enull$ check in rule \rulelab{S-Def},
-we perform checks in \rulelab{S-DefT} to ensure the existence of $\tmode$ mode pointers.
-any dynamic heap access of a tainted ($\tmode$) pointer requires a \textit{verification} ($\emptyset;\heap ; \emptyset \vdash_{\umode}\evalue{n_a}{\tau}$), which refers to that the pointer value $n_a$ is well-defined in $\heap(m,n_a)$ and has right type $\tau$.
-Predicate $n \not\in \Theta$ means that location $n$ is not freed in the $\tmode$ heap region,
-while $n < |\heap(\tmode)|$ makes sure that $n$ does not go out of the high bound of the $\tmode$ heap region,
-where $|\heap(\tmode)|$ refers to the cardinality of the $\tmode$ heap region.
-If dynamic checks are violated, rules \rulelab{S-DefNull} and \rulelab{S-DefBound} are performed, meaning that the evaluation is transitioned into a runtime error that is correctly captured by the \systemname compiler.
+The pointer type ($\evalue{n}{\tptr{\tau}{\tmode}}$) in a dereference operation must have the same mode
+as the one labeled in the type in the heap value $(\evalue{n_a}{\tptr{\tau_a}{\xi}}$).
+The heap value type $\tptr{\tau_a}{\xi}$ is not an additional structure existed in the heap structure,
+but an annotation lives in the compiler and is compiled as a dynamic check to ensure that pointers only access heap locations with right modes. We explain the dynamic check generation shortly below.
+In addition to the above checks in rule \rulelab{S-Def},
+we perform checks in \rulelab{S-DefT} $n \not\in \Theta$ to ensure that location $n$ is not freed in the $\tmode$ heap region.
+If the above dynamic checks are violated, rules \rulelab{S-DefNull}, \rulelab{S-DefBoundA}, and \rulelab{S-DefBoundB} are performed, meaning that the evaluation is transitioned into a runtime error that is correctly captured by the \systemname compiler.
 
 \myparagraph{Malloc and Free}
 The second block (\rulelab{T-Malloc}, \rulelab{T-Free},
@@ -536,6 +540,9 @@ Rules $\rulelab{T-Malloc}$ and $\rulelab{T-Free}$ make sure that $\cmode$ and $\
 The $\mathtt{alloc}(\heap,\Theta,\xi,\tau)$ function in rule \rulelab{S-Malloc} allocates a new pointer in the $\xi$ heap region.
 If $\xi$ is $\tmode$ and $\Theta$ is not empty, the function picks a memory space in $\Theta$ as the new pointer;
 otherwise, the function picks the $|\heap(\xi)|$ as the new pointer and increments $\heap(\xi)$'s cardinality.
+The new location is labeled with a type annotation $\tptr{\tau}{\xi}$, indicating that the location is $\xi$ mode.
+Every time when a deference and assignment is applied on a $\tmode$ pointer, the \systemname compiler applies a dynamic check to verify if the location is labeled with $\tmode$.
+We can think of the dynamic check as $n \in \heap(\tmode)$, checking if a location $n$ is in a set $\heap(\tmode)$ containing all the $\tmode$ addresses. When a $\texttt{malloc}$ function is called to create a new $\tmode$ pointer, we expand set $\heap(\tmode)$ to include the new address. See \Cref{sec:compilation}.
 Rules \rulelab{S-FreeT} and \rulelab{S-Free} define the \texttt{free} operation for $\tmode$ mode and other mode pointers, respectively.
 Rule \rulelab{S-Free} "forgets" about the freed pointer, while \rulelab{S-FreeT} puts the freed $\tmode$ mode pointer address in the $\Theta$ set.
 
