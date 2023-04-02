@@ -1,8 +1,41 @@
 \section{Introduction}\label{sec:intros}
 
+\begin{itemize}
+
+\item Vulnerabilities due to memory corruption are still issues, with examples.
+
+\item We want program partitioning with privilege separation. With a picture, program is split into trusted part and unsafe or high-risk code is separated into an untrusted and least privileged partition.
+
+\item most program partitioning is "data-centric". Nowadays, there is a new group doing "code-centric" program partitioning, which we called it as type-directed program partitioning, such as RLBox and others. It usually contains a type of variables needed to communicate between safe and unsafe regions.
+
+\item however, type-directed program partitioning has no formalism. We do not know what they can actually ensure for memory safety. 1) they obviously cannot ensure spatial safety. 2) clean separation might be too strong because many these implementations have ways to allow users not to follow validity checks for communication data. 3) trusted part might contain bugs creates another problem.
+
+\item We present \systemname, as a formalism for type-directed program partitioning to answer these concerns. The system is based on \checkedc because of the third concern above. In privilege separation, it is obvious that trusted code is viewed as the part that does not have problem, while programs are in untrusted code, which is similar to the concept of checked and unchecked code regions in \checkedc and make it a perfect model to formalize type-directed program partitioning.
+
+\item introduce \checkedc and two code regions.
+
+\item state the design principle of \systemname by adding tainted type to \checkedc and clearly separate the two parts, so that \checkedc's different code regions are turned from a waiting for conversion separation to a type-direction program partitioning. 
+
+\item state three contributions of the paper: 1) the first formalism for type-directed program partitioning with the theorems, clean separation and non-crashing, stating clearly what these mechanism can actually provide. 2) Such formalism is independent with respect to the underlining sandbox mechanism, we find out the independent property and implement a separate-heap based sandbox mechanism to achieve a great overhead compared to the original wasm sandbox based implementation [cite] that faithfully represents the RLBox implementation. 3) we formalize the compiler and show that the simulation relation between the compiler and our formalism.
+
+\item Summary Visualization.
+
+\end{itemize}
+
+
 Vulnerabilities due to memory corruption, especially spatial memory corruption, 
 are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:2013:SRF:2534766.2534798} 
 despite many efforts that tried to prevent them~\cite{song2019sanitizing}.
+\liyi{add some example sentences here. like }
+Software vulnerabilities remain a critical issue of computer security,
+despite decades of research on identifying, preventing, and fixing
+them. Although vulnerabilities often exist in non-privileged code,
+exploiting such vulnerabilities can allow adversaries to gain access
+to privileged code that co-exists with non-privileged code in the
+same program. For example, such vulnerabilities were discovered
+recently in both Linux and Windows applications .
+
+\ignore{
 Several industrial and research efforts, including CCured~\cite{Necula2005},
 Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
 have investigated ways to better compile C programs with automatic spatial safety enforcement.
@@ -20,6 +53,7 @@ and ensuring backward compatibility,~\ie developers can use checked and regular 
 However, as we explain in~\sect{subsec:nosafetyagsintuncheckedcode}, the
 unconverted or unchecked ($\umode$) code can violate guarantees provided in $\cmode$
 regions.
+}
 %
 We need to ensure that~\emph{code executed as part of 
 unchecked ($\umode$) regions does not lead to the safety violations in checked ($\cmode$) regions  with the use of program partitioning mechanism \cite{rul2009towards}}.
