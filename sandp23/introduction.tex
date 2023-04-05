@@ -5,8 +5,30 @@ are still a major issue for C programs~\cite{cvetrend, microsoftmemsafe, Zeng:20
 despite many efforts that tried to prevent them~\cite{song2019sanitizing}.
 Several industrial and research efforts, including CCured~\cite{Necula2005},
 Softbound~\cite{softbound}, and ASAN~\cite{Serebryany2012},
-have investigated ways to better compile C programs with automatic spatial safety enforcement.
-These approaches all impose performance overheads deemed too high for deployment use. 
+have investigated ways to better compile C programs with automatic safety enforcement.
+These approaches impose performance overheads deemed too high for deployment use, especially for resource-constrained embedded systems.
+%
+Previous works~\cite{meng2021bran, du2019leopard} show that vulnerabilities are not uniformly distributed in real programs.
+Some components/functions are likelier to have a certain class of vulnerabilities.
+\eg{} spatial safety issues in string processing functions.
+have.
+
+Program partitioning is a well-known technique that enables separating potentially vulnerable functions (untrusted region) from the rest of the program (trusted region).
+%
+Several automated program partitioning techniques~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} exist, but they have a considerable performance overhead. 
+
+One of the main reasons for this is combining partitioning with~\acf{SFI}.
+Specifically, in addition to partitioning, existing techniques also provide~\ac{SFI} such that code in the untrusted region cannot affect code in the trusted region.\eg{} by executing untrusted partition in a separate process~\cite{liu2017ptrsplit} or executing in a Trusted Execution environment~\cite{lind2017glamdring}.
+However, this extreme partitioning is not always necessary and feasible in certain resource constrained environments.
+For instance, we want to isolate a string processing function only from spatial violations,~\ie any spatial violations (\eg buffer overread) in that function should not affect the program.
+
+But existing partitioning techniques are specialized for a specific~\ac{SFI}~\cite{wahbe1993efficient} technique.
+For instance,~\ptrsplit{}~\cite{liu2017ptrsplit} technique assumes that partitions are hosted as separate processes and data is exchanged through marshaling.
+Any other isolation mechanism or data exchange (\eg shared memory) cannot be supported as the partitioning technique is specialized for marshaling by using~\ac{PDG} and tracking bounds information.
+In summary, existing techniques combine policy (\ie{}~\emph{what} to partition) with mechanism (\ie{}~\emph{how} to partition).
+We argue that existing program partitioning mechanisms are restrictive and inflexible for different use cases (\eg isolation from spatial safety vulnerabilities). We need a technique that enables developers to flexibility partition programs and enforce isolation -- balancing safety guarantees and performance overhead.
+
+ 
 % 
 %\liyi{Should we say this? Is the paper about overhead reducing? }
 Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
