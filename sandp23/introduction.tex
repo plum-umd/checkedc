@@ -36,12 +36,12 @@ We propose a type directed partitioning through untrusted types.
 Specifically, we introduce~\textbf{tainted} (\taintt) qualifiers that can be used to annotate pointer types or functions. 
 The tainted types form the untrusted partition or~\umode~\emph{region} (can only access tainted types), and the non-tainted types will be the trusted partition or~\cmode~\emph{region} (has complete access).
 Through static type checking, our type system ensures that tainted types cannot directly affect untainted types.
-After successful type checking,~\systemname{} creates two sets of source files~\ucregion{} and~\cregion{} containing tainted and untainted entities, respectively.
+After successful type checking,~\systemname{} creates two sets of source files:~\ucregion{} and~\cregion{}, containing tainted and untainted entities, respectively.
 
 These sets of source files will be compiled using~\systemname{} compiler, which enforces the desired isolation through instrumentation.
 Developers can choose a specific isolation mechanism.
 We explore four different isolation mechanisms with varying guarantees and performance overhead (CITE SECTION).
-For instance,~\isoheap{} provides safety against spatial and temporal violations of tainted pointers with almost no performance overhead.
+For instance,~\isoheap{} provides safety against spatial and temporal violations of tainted pointers with almost~\emph{no} performance overhead.
 Whereas~\sandbox{} isolation provides complete~\ac{SFI} with~\avgsandboxoverhead{} runtime overhead.
 
 %Our dynamic instrumentation ensures that tainted pointer accesses are valid according to the desired isolation mechanism.
@@ -62,6 +62,22 @@ Our evaluation shows that ---complete this. \aravind{Complete this.}
 
 In summary following are our contributions:
 
+\myparagraph{\systemname Type System and Formalism}
+We designed and implemented a flexible program partition technique using tainted types.
+Our type system guarantees that the tainted pointers cannot affect untainted pointers and partition the given code into~\ucregion (containing only tainted entities) and~\cregion (CITE SECTION).
+We provide formal proof of the~\emph{clean separation theorem} that guarantees that code in ~\cregion will be separated from~\ucregion according to the target isolation mechanism (CITE SECTION).
+We also integerated~\systemname{} with~\checkedc that provides additional~\emph{non-crashing} and \emph{non-exposure} guarantees (CITE SECTION).
+
+\myparagraph{Flexible Isolation Mechanisms and Implementation}
+We designed four isolation mechanisms with varying guarantees and performance overhead, providing flexibility in choosing a desired isolation mechanism (CITE SECTION).
+We implemented our type system (CITE SECTION) and flexible partitioning (CITE SECTION) by modifying~\clang{} compiler.
+
+\myparagraph{Evaluation}
+Our evaluation on ...
+
+We made our implementation and datasets open-source to foster future research. 
+
+\iffalse
  
 % 
 %\liyi{Should we say this? Is the paper about overhead reducing? }
@@ -383,6 +399,8 @@ Our compiler avoids these attacks by ensuring, either statically or through dyna
 \end{listing}
 %}
 }
+
+\fi
 
 
 
