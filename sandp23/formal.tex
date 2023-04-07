@@ -56,16 +56,15 @@
 \end{array}
 \\[0.5em]
 \begin{array}{llcllcl}
-\text{Context Mode:} & m & ::= & \cmode \mid \umode \\
-\text{Pointer Mode:} & \xi & ::= & m \mid \tmode \\
-     \text{Type:}& \tau &::=& \tint\mid \tptr{\tau}{ \xi}
+\text{Mode:} & m & ::= & \cmode \mid \umode \\
+     \text{Type:}& \tau &::=& \tint\mid \tptr{\tau}{ m}
 \\
 \text{Expression:}& e & ::= & 
 \evalue{n}{\tau} \mid x \mid \ebinop{e}{e}\mid \ecast{\tau}{e} \mid\estar{e}\mid\eassign{e}{e}
   \\
-&&\mid& \emalloc{\xi}{\omega} \mid \efree{e} \mid \elet{x}{e}{e}   \\
+&&\mid& \emalloc{m}{\omega} \mid \efree{e} \mid \elet{x}{e}{e}   \\
 &&\mid& \ret{x}{\evalue{n}{\tau}}{e} \mid \eif{e}{e}{e} \\
-&&\mid&\eunchecked{\overline{x}}{e}\mid \echecked{\overline{x}}{e}
+&&\mid&\toa{m}{\overline{x}}{e}
 \end{array}
     \end{array}
   \]
@@ -138,25 +137,23 @@ i.e., both implementing both separate heap and WASM sandboxes result in the same
 \Cref{fig:checkc-syn} shows the syntax of~\lang, 
 which is based on a subset of the Compcert formalism (C formalism) \cite{Blazy2009}, with some features coming from the \checkedc formalism \cite{li22checkedc}.
 We classify types as integers or pointers.
-Every pointer type ($\tptr{\tau}{\xi}$) includes a
-pointer mode annotation ($\xi$, the difference between context and pointer modes
-is introduced shortly below) that is either checked (\cmode), tainted (\tmode),
-or unchecked (\umode), and a content type ($\tau$) denoting the valid type it is pointed to.
+Every pointer type ($\tptr{\tau}{m}$) includes a
+ mode annotation that is either tainted (\umode) and non-tainted (\cmode),
+and a content type ($\tau$) denoting the valid type it is pointed to.
 
 \lang expressions include common expressions such as addition ($\ebinop{e_1}{e_2}$), 
 pointer dereference ($\estar{e}$) and assignment ($\eassign{e_1}{e_2}$),
  static casts ($\ecast{\tau}{e}$),
-memory allocations ($\emalloc{\xi}{\omega}$) and free ($\efree{e}$), 
-along with expressions that require special handling, such as, tainted blocks ($\eunchecked{\overline{x}}{e}$),
-and checked blocks ($\echecked{\overline{x}}{e}$).
+memory allocations ($\emalloc{m}{\tau}$) and free ($\efree{e}$), 
+along with expressions that require special handling, such as, context switching blocks ($\toa{m}{\overline{x}}{e}$).
 
-We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\omega}{\xi}$), enabling the use of fixed addresses as pointers.
-For example, $\evalue{0}{\tptr{\omega}{\xi}}$ (for any $\xi$ and $\omega$) represents a $\enull$ pointer.
-The heap allocation $\emalloc{\xi}{\omega}$ includes a mode flag $\xi$ for allocating memory in $\xi$ memory heap regions, i.e., heaps are separated into three different regions, classified by $\xi$.
-The $\echeckedtext$ and $\euncheckedtext$ expressions are used to delimit \textit{code} regions,
-where the former represents the $\cmode$ code region in a program that are trusted by users, and the latter represents non-trust $\umode$ code region.
-To guarantee the clean separation property, we extend the C syntax to include $\echecked{\overline{x}}{e}$ and $\eunchecked{\overline{x}}{e}$ blocks,
-where $\overline{x}$ represents all free variables that are allowed to communicate between instructions outside and inside of the block $e$, and it cannot contain checked pointers.
+We denote integer literals $n$ with a type $\tau$ (\ie $\tint$ or $\tptr{\tau}{m}$), enabling the use of fixed addresses as pointers.
+For example, $\evalue{0}{\tptr{\tau}{m}}$ (for any $m$ and $\tau$) represents a $\enull$ pointer.
+The heap allocation $\emalloc{m}{\tau}$ includes a mode flag $m$ for allocating memory in $m$ memory heap regions, i.e., heaps are separated into two different regions, classified by $m$.
+Expression $\toa{m}{\overline{x}}{e}$ is used to delimit \textit{code} regions, where $m$ indicates that $e$ locates in the $m$ code region.
+To guarantee the clean separation property, we extend the C syntax to include $\toa{m}{\overline{x}}{e}$ blocks,
+which represents the flag assigning to a function to indicate if the function is tainted or not.
+$\overline{x}$ represents all free variables that are allowed to communicate between instructions outside and inside of the block $e$, and it cannot contain $\cmode$ mode pointers.
 $\erettext$ is introduced by the semantics when evaluating a \texttt{let} binding; explained shortly below.
 
 \ignore{
@@ -171,9 +168,9 @@ Although the base syntax of~\lang is similar to that of~\checkedc model~\cite{li
 \myparagraph{Disallowing Unsafe Types}
 The well-formedness of these types are presented in~\Cref{app:le}.
 It prevents unsafe types from being constructed.
-  Consider the type ~\code{_t_ptr<_Ptr<int>>}, which describes a tainted pointer of a checked pointer.
-  This is not well-formed in~\lang{} because it potentially exposes the checked pointer addresses in a $\umode$ region when the unchecked ($\umode$) pointer is used. 
-  Nevertheless, we can have a checked pointer whose element is a tainted pointers\mzs{,}\mzr{:}~\eg~\code{_ptr<_t_Ptr<int>>} is a valid type.
+  Consider the type ~\code{_t_ptr<_Ptr<int>>}, which describes a tainted pointer of a $\cmode$ mode pointer.
+  This is not well-formed in~\lang{} because it potentially exposes the $\cmode$ mode pointer addresses in a $\umode$ region when the tainted ($\umode$) pointer is used. 
+  Nevertheless, we can have a $\cmode$ mode pointer whose element is a tainted pointers\mzs{,}\mzr{:}~\eg~\code{_ptr<_t_Ptr<int>>} is a valid type.
 
 %The \systemname syntax of is given in Fig.~\ref{fig:checkc-syn}.
 %There are two type notions in \systemname.  Types $\tau$ classify
@@ -319,7 +316,7 @@ r & ::= & e \mid \enull \mid \ebounds\\
 E &::=& \Box \mid \ebinop{E}{e} \mid \ebinop{\evalue{n}{\tau}}{E}\mid \ecast{\tau}{E} \mid\estar{E}\mid\eassign{E}{e}
     \mid \eassign{\evalue{n}{\tau}}{E}\\[0.2em]
 &&\mid \efree{E}\mid \elet{x}{E}{e}\mid\ret{x}{\evalue{n}{\tau}}{E}\\[0.2em]
-&& \mid \eif{E}{e}{e} \mid \eunchecked{\overline{x}}{E} \mid \echecked{\overline{x}}{E}
+&& \mid \eif{E}{e}{e} \mid \toa{m}{\overline{x}}{E}
 
 
 \end{array}
@@ -354,56 +351,51 @@ $
 $\textcolor{blue}{\text{Dereference Operations:}}\\$
   \begin{mathpar}
     \inferrule[T-Def]
-              {\xi \leq m \\\Gamma \vdash_m e : \tptr{\tau}{\xi}}
+              {m' \leq m \\\Gamma \vdash_m e : \tptr{\tau}{m'}}
               {\Gamma \vdash_m \estar{e} : \tau}
 
-        \inferrule[S-Def]{\xi \neq \tmode \\ \heap(n)=\evalue{n_a}{\tptr{\tau_a}{\xi}} }
-    {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
+        \inferrule[S-Def]{ \heap(n)=\evalue{n_a}{\tptr{\tau_a}{\umode}} }
+    {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\umode}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
 
         \inferrule[S-DefT]{\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\tmode}} \\ n \not\in \Theta}
     {(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{n_a}{\tau})}
 
-    \inferrule[S-DefNull]{}{(\varphi,\Theta,\heap,\estar{\evalue{0}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\enull)}
+    \inferrule[S-DefNull]{}{(\varphi,\Theta,\heap,\estar{\evalue{0}{\tptr{\tau}{m}}}) \longrightarrow (\varphi,\Theta,\heap,\enull)}
 \qquad
-    \inferrule[S-DefBoundA]{n \in \Theta}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
+    \inferrule[S-DefBoundA]{n \in \Theta}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\umode}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
 \qquad
-    \inferrule[S-DefBoundB]{\heap(n)=\evalue{n_a}{\tptr{\tau_a}{\xi}}\\\xi\neq \xi'}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{\xi'}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
+    \inferrule[S-DefBoundB]{\heap(n)=\evalue{n_a}{\tptr{\tau_a}{m}}\\ m\neq m'}{(\varphi,\Theta,\heap,\estar{\evalue{n}{\tptr{\tau}{m'}}}) \longrightarrow (\varphi,\Theta,\heap,\ebounds)}
   \end{mathpar}
 
 $\textcolor{blue}{\text{Malloc and Free:}}\\$
   \begin{mathpar}
     \inferrule[T-Malloc]
-              {\xi \leq m}
-              {\Gamma \vdash_m \emalloc{\xi}{\tau} : \tptr{\tau}{\xi}}
+              {m' \leq m}
+              {\Gamma \vdash_m \emalloc{m'}{\tau} : \tptr{\tau}{m'}}
 
     \inferrule[T-Free]
-              {\xi \leq m \\\Gamma \vdash_m e : \tptr{\tau}{\xi}}
+              {m' \leq m \\\Gamma \vdash_m e : \tptr{\tau}{m'}}
               {\Gamma \vdash_m \efree{e} : \tint}
 
-  \inferrule[S-Malloc]{\mathtt{alloc}(\heap,\Theta,\xi,\tau)=(n,\heap')}
-   { (\varphi,\Theta,\heap,\emalloc{\xi}{\tau}) \longrightarrow (\varphi,\Theta',\heap',\evalue{n}{\tptr{\tau}{\xi}})}
+  \inferrule[S-Malloc]{\mathtt{alloc}(\heap,\Theta,m,\tau)=(n,\heap')}
+   { (\varphi,\Theta,\heap,\emalloc{m}{\tau}) \longrightarrow (\varphi,\Theta',\heap',\evalue{n}{\tptr{\tau}{m}})}
 
-  \inferrule[S-Free]{\xi \neq \tmode}
-   { (\varphi,\Theta,\heap,\efree{\evalue{n}{\tptr{\tau}{\xi}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{0}{\tint})}
+  \inferrule[S-Free]{}
+   { (\varphi,\Theta,\heap,\efree{\evalue{n}{\tptr{\tau}{\cmode}}}) \longrightarrow (\varphi,\Theta,\heap,\evalue{0}{\tint})}
 
   \inferrule[S-FreeT]{}
-   { (\varphi,\Theta,\heap,\efree{\evalue{n}{\tptr{\tau}{\tmode}}}) \longrightarrow (\varphi,\{n\}\cup\Theta,\heap,\evalue{0}{\tint})}
+   { (\varphi,\Theta,\heap,\efree{\evalue{n}{\tptr{\tau}{\umode}}}) \longrightarrow (\varphi,\{n\}\cup\Theta,\heap,\evalue{0}{\tint})}
 
   \end{mathpar}
 
-$\textcolor{blue}{\text{Checked and Unchecked Context Switches:}}\\$
+$\textcolor{blue}{\text{Context Switches:}}\\$
   \begin{mathpar}
-    \inferrule[T-Checked]
+    \inferrule[T-Region]
               {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                     \\\\\fv(e)\subseteq\overline{x}\\\Gamma;\Theta \vdash_c e : \tau}
-              {\Gamma;\Theta \vdash_m \echecked{\overline{x}}{e} : \tau}
+                     \\\fv(e)\subseteq\overline{x}\\\Gamma;\Theta \vdash_{m'} e : \tau}
+              {\Gamma;\Theta \vdash_m \toa{m'}{\overline{x}}{e} : \tau}
 
-    \inferrule[T-Unchecked]
-              {\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))\\\neg\cmode(\tau)
-                \\\\ \fv(e)\subseteq\overline{x}\\\Gamma;\Theta \vdash_u e : \tau}
-              {\Gamma;\Theta \vdash_m \eunchecked{\overline{x}}{e} : \tau}
-
-    \inferrule[S-Unchecked]{}{(\varphi,\heap,\eunchecked{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
+    \inferrule[S-Region]{}{(\varphi,\heap,\toa{m}{\overline{x}}{\evalue{n}{\tau}}) \longrightarrow (\varphi,\heap,\evalue{n}{\tau})}
   \end{mathpar}
 }
 % {\footnotesize
@@ -421,7 +413,7 @@ $\textcolor{blue}{\text{Checked and Unchecked Context Switches:}}\\$
 \begin{center}
 $
 \begin{array}{l}
-\tmode \le \xi
+\umode \le \cmode
 \qquad
 m \le m
 \\[0.2em]
@@ -452,20 +444,20 @@ transition relation with the judgment $ (\varphi,\Theta,\heap,e)
 \longrightarrow_m (\varphi',\Theta',\heap',r)$, as shown in \Cref{fig:c-context}.
  Here, $\varphi$ is a
 \emph{stack} mapping from variables to values $\evalue{n}{\tau}$,
-$\Theta$ is a set of $\tmode$ mode memory addresses that are freed at the point of executing $e$
+$\Theta$ is a set of tainted ($\umode$ mode) memory addresses that are freed at the point of executing $e$
 and $\heap$ is a \emph{heap} mapping addresses (integer literals) to
-values $\evalue{n}{\ptr{\tau}{\xi}}$; for both we ensure
+values $\evalue{n}{\ptr{\tau}{m}}$; for both we ensure
 $\fv(\tau)=\emptyset$.
-In a heap value $\evalue{n}{\ptr{\tau}{\xi}}$,
-$\tau$ represents the value's content type, while $\xi$ indicates the mode of the heap location;
-we classify a heap location into $\cmode$, $\tmode$, and $\umode$ modes, corresponding to the three kinds of pointer modes.
+In a heap value $\evalue{n}{\ptr{\tau}{m}}$,
+$\tau$ represents the value's content type, while $m$ indicates the mode of the heap location;
+we classify a heap location into $\cmode$ and $\umode$ modes, corresponding to the two kinds of pointer modes.
 The complete set of typing rules are provided in~\Cref{rem-type,sec:rem-semantics}.
 
 While heap bindings can change, stack bindings are immutable---once
 variable $x$ is bound to $\evalue{n}{\tau}$ in $\varphi$, that binding will not
 be updated. 
 %We can model mutable stack variables as pointers into the mutable heap.
-As mentioned, value $\evalue{0}{\tptr{\tau}{\xi}}$
+As mentioned, value $\evalue{0}{\tptr{\tau}{m}}$
 represents a $\enull$ pointer when $\tau$ is a pointer type.
 Correspondingly, $\heap(0)$ should always be undefined.
 % 
@@ -491,9 +483,8 @@ whose rules are given along with type rules in Fig.~\ref{fig:type-system-1} (lab
 shortly.
 The $\mode$ function in Fig.~\ref{fig:c-context}
 determines the context mode, i.e., region, that the expression $e'$ locates based on the context $E$.
-If the context hole locates in an $\euncheckedtext$, i.e., $E[\eunchecked{\Box}]$, the context region mode is $\umode$,
-while if the hole locates in a $\echeckedtext$, i.e., $E[\echecked{\Box}]$, its context mode is $\cmode$.
-In \Cref{lst:humantaint}, the function call \code{handle_request} is in $\umode$ region since it is inside an unchecked function \code{server_loop}.
+If the context hole locates in an $\totext(m)$, i.e., $E[\toa{m}{\overline{x}}{\Box}]$, the context region mode is $m$.
+In \Cref{lst:humantaint}, the function call \code{handle_request} is in $\umode$ region since it is inside an tainted function \code{server_loop}.
 
 The second rule describes the exception handling 
 for possible crashing behaviors in $\umode$ regions.
@@ -505,10 +496,10 @@ Evaluation contexts $E$ define a standard left-to-right evaluation order.
 %(We explain the $\ret{x}{\mu}{e}$ syntax shortly.)
 %There are other rules for describing the halts of evaluation to $\enull$ and $\ebounds$ states in \Cref{app:main}.
 
-In \lang, Context modes $m$ appearing in a type rule determine the code region 
+In \lang, modes $m$ appearing in a type rule determine the code region 
 that permits pointer dereferences and value-assignments, which also depends on the pointer modes.
-We define a three point lattice $\xi_1 \le \xi_2$ \footnote{In typing rule, the lattice is usually used as $\xi \le m$ as $m$ represents context modes.} to describe such permission, where $\tmode \le \xi$ and $m \le m$.
-This means that a $\tmode$ pointer can be dereferenced and value-assigned in any region, while $\cmode$ and $\umode$ pointers can only perform such operations in $\cmode$ and $\umode$ regions, respectively.
+We define a two point lattice $m_1 \le m_2$, with $\umode \le \cmode$, to describe such permission.
+This means that a $\umode$ mode pointer can be dereferenced and value-assigned in any region, while $\cmode$ mode pointers can only perform such operations in $\cmode$ region.
 \ignore{
 In \lang, we also provide a static casting operation in \Cref{rem-type},
 
@@ -519,46 +510,46 @@ if \tptr{\tau_1}{\xi_1} subtypes ($\sqsubseteq_{\Theta}$) to \tptr{\tau_2}{\xi_2
 \myparagraph{Pointer Dereference}
 The type and semantic rules for pointer dereference (the first block in \Cref{fig:type-system-1})
 reflect the key \lang feature, where our type checker directs the insertions of dynamic checks executed in the evaluation stage.
-The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($\xi \le m$).
+The type rule (\textsc{T-Def}) ensures that pointers are used with the right modes in the right region ($m' \le m$).
 
-Rules \rulelab{S-DefT} and \rulelab{S-Def} are for $\tmode$ mode and other mode pointer dereferences, respectively.
+Rules \rulelab{S-DefT} and \rulelab{S-Def} are for $\umode$ mode and other mode pointer dereferences, respectively.
 Operation $\heap(n)$ not only accesses the $n$-th address location,
 but also performs a $\enull$ check because $0$ is undefined in all heaps.
-The pointer type ($\evalue{n}{\tptr{\tau}{\tmode}}$) in a dereference operation must have the same mode
-as the one labeled in the type in the heap value $(\evalue{n_a}{\tptr{\tau_a}{\xi}}$).
-The heap value type $\tptr{\tau_a}{\xi}$ is not an additional structure existed in the heap structure,
+The pointer type ($\evalue{n}{\tptr{\tau}{\umode}}$) in a dereference operation must have the same mode
+as the one labeled in the type in the heap value $(\evalue{n_a}{\tptr{\tau_a}{m}}$).
+The heap value type $\tptr{\tau_a}{m}$ is not an additional structure existed in the heap structure,
 but an annotation lives in the compiler and is compiled as a dynamic check to ensure that pointers only access heap locations with right modes. We explain the dynamic check generation shortly below.
 In addition to the above checks in rule \rulelab{S-Def},
-we perform checks in \rulelab{S-DefT} $n \not\in \Theta$ to ensure that location $n$ is not freed in the $\tmode$ heap region.
+we perform checks in \rulelab{S-DefT} $n \not\in \Theta$ to ensure that location $n$ is not freed in the $\umode$ heap region.
 If the above dynamic checks are violated, rules \rulelab{S-DefNull}, \rulelab{S-DefBoundA}, and \rulelab{S-DefBoundB} are performed, meaning that the evaluation is transitioned into a runtime error that is correctly captured by the \systemname compiler.
 
 \myparagraph{Malloc and Free}
 The second block (\rulelab{T-Malloc}, \rulelab{T-Free},
 \rulelab{S-Malloc}, \rulelab{S-Free}, \rulelab{S-FreeT}) in \Cref{fig:type-system-1} defines
 the type and semantic rules for $\texttt{malloc}$ and $\texttt{free}$ operations.
-Rules $\rulelab{T-Malloc}$ and $\rulelab{T-Free}$ make sure that $\cmode$ and $\umode$ mode pointers are allocated and freed only in the $\cmode$ and $\umode$ regions, respectively, while $\tmode$ mode pointers are allowed to allocate and free in both regions.
-The $\mathtt{alloc}(\heap,\Theta,\xi,\tau)$ function in rule \rulelab{S-Malloc} allocates a new pointer in the $\xi$ heap region.
-If $\xi$ is $\tmode$ and $\Theta$ is not empty, the function picks a memory space in $\Theta$ as the new pointer;
-otherwise, the function picks the $|\heap(\xi)|$ as the new pointer and increments $\heap(\xi)$'s cardinality.
-The new location is labeled with a type annotation $\tptr{\tau}{\xi}$, indicating that the location is $\xi$ mode.
-Every time when a deference and assignment is applied on a $\tmode$ pointer, the \systemname compiler applies a dynamic check to verify if the location is labeled with $\tmode$.
-We can think of the dynamic check as $n \in \heap(\tmode)$, checking if a location $n$ is in a set $\heap(\tmode)$ containing all the $\tmode$ addresses. When a $\texttt{malloc}$ function is called to create a new $\tmode$ pointer, we expand set $\heap(\tmode)$ to include the new address. See \Cref{sec:compilation}.
-Rules \rulelab{S-FreeT} and \rulelab{S-Free} define the \texttt{free} operation for $\tmode$ mode and other mode pointers, respectively.
-Rule \rulelab{S-Free} "forgets" about the freed pointer, while \rulelab{S-FreeT} puts the freed $\tmode$ mode pointer address in the $\Theta$ set.
+Rules $\rulelab{T-Malloc}$ and $\rulelab{T-Free}$ make sure that $\cmode$ mode pointers are allocated and freed only in the $\cmode$ region, while $\umode$ mode pointers are allowed to allocate and free in both regions.
+The $\mathtt{alloc}(\heap,\Theta,m,\tau)$ function in rule \rulelab{S-Malloc} allocates a new pointer in the $m$ heap region.
+If $m$ is $\umode$ and $\Theta$ is not empty, the function picks a memory space in $\Theta$ as the new pointer;
+otherwise, the function picks the $|\heap|$ as the new pointer and increments $\heap$'s cardinality.
+The new location is labeled with a type annotation $\tptr{\tau}{m}$, indicating that the location is $m$ mode.
+Every time when a deference and assignment is applied on a $\umode$ pointer, the \systemname compiler applies a dynamic check to verify if the location is labeled with $\umode$.
+We can think of the dynamic check as $n \in \heap(\umode)$, checking if a location $n$ is in a set $\heap(\umode)$ containing all the $\umode$ addresses. When a $\texttt{malloc}$ function is called to create a new $\umode$ pointer, we expand set $\heap(\umode)$ to include the new address. See \Cref{sec:compilation}.
+Rules \rulelab{S-FreeT} and \rulelab{S-Free} define the \texttt{free} operation for $\umode$ mode and other mode pointers, respectively.
+Rule \rulelab{S-Free} "forgets" about the freed pointer, while \rulelab{S-FreeT} puts the freed $\umode$ mode pointer address in the $\Theta$ set.
 
-\myparagraph{Unchecked and Checked Blocks}
-The execution of a $\echeckedtext$ or $\euncheckedtext$ block represents 
+\myparagraph{Context Switching Blocks}
+The execution of a $\totext$ block represents 
 the context switching from a $\cmode$ to an $\umode$ region, or vice versa,
 with its type and semantic rules given in \Cref{fig:type-system-1}.
-In this context switching, to guarantee the checked ($\cmode$) pointer non-exposure property, i.e.,
-checked pointers are not allowed to go cross different regions, which is guaranteed by the predicates 
+In this context switching, to guarantee the $\cmode$ mode pointer non-exposure property, i.e.,
+$\cmode$ pointers are not allowed to go cross different regions, which is guaranteed by the predicates 
 $\forall x\in\overline{x}\;.\;\neg\cmode(\Gamma(x))$ and $\neg\cmode(\tau)$ \footnote{$\cmode(-)$ checks the mode of a pointer.},
 as well as the check that all free variables in the block content $e$ are in $\overline{x}$ ($\fv(e)\subseteq\overline{x}$).
 For example, \code{StringAuth} in \Cref{subsub:gencregion} is a trampoline function that disallows
-checked pointers as arguments and return values.
+$\cmode$ pointers as arguments and return values.
 The use of the function in the following \code{_T_StringAuth}, which is in $\umode$ region,
-cannot legally acknowledges any checked pointers; otherwise, we might expose a checked pointer address to unsafe code regions.
-In \lang, we actually permits the accesses of checked pointers inside \code{StringAuth},
+cannot legally acknowledges any $\cmode$ pointers; otherwise, we might expose a $\cmode$ pointer address to unsafe code regions.
+In \lang, we actually permits the accesses of $\cmode$ pointers inside \code{StringAuth},
 since the function body of a trampoline function is in $\cmode$ region.
 More information is given in \Cref{subsub:gencregion}.
 
@@ -673,7 +664,7 @@ $\tau'\sqsubseteq_{\Theta} \tau$.
 %\smallskip
 
 We first show the non-exposure theorem,
-where code in $\umode$ region cannot observe a valid checked ($\cmode$) pointer address.
+where code in $\umode$ region cannot observe a valid $\cmode$ pointer address.
 
 \begin{thm}[Non-Exposure]
 For any \lang program $e$, heap $\heap$, stack
@@ -682,8 +673,8 @@ that are all are well-formed and well
 typed ($\Gamma\vdash_{m} e : \tau$ for some $\tau$), if there exists $\varphi'$, $\Theta'$,
 $\heap'$ and $e'$, such that $(\varphi,\Theta,\heap,e)
 \longrightarrow_{\umode} (\varphi',\Theta',\heap',e')$ and $e=E[\alpha(x)]$ and $\mode(E)=\umode$,
-where $\alpha(x)$ is some expression (not $\echeckedtext$ nor $\euncheckedtext$) containing variable $x$; 
-thus, it is not a checked pointer.
+where $\alpha(x)$ is some expression (not $\totext$) containing variable $x$; 
+thus, it is not a $\cmode$ pointer.
 \end{thm}
 
 The essence of non-exposure represents how trampoline functions are organized to support the callback mechanism in \systemname.
@@ -691,7 +682,7 @@ The essence of non-exposure represents how trampoline functions are organized to
 \begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
 // u region code
 int func_t(_t_Ptr<char> p : count(5)) {
-  checked (p) { //c region code
+  to(c) (p) { //c region code
    char * q;
    * q = * p;
    func(q)
@@ -710,9 +701,9 @@ For a program $e$ and environment tuple $(\varphi,\Theta,\heap,e)$ and a context
 it is critically stuck, when $(\varphi,\Theta,\heap,e)$ is stuck, and $e$ is of the three situations:
 \begin{itemize}
 
-\item $e=\estar{\evalue{n}{\tptr{\tau}{\tmode}}}$.
+\item $e=\estar{\evalue{n}{\tptr{\tau}{\umode}}}$.
 
-\item $e=\eassign{\evalue{n}{\tptr{\tau}{\tmode}}}{\evalue{n'}{\tau'}}$.
+\item $e=\eassign{\evalue{n}{\tptr{\tau}{\umode}}}{\evalue{n'}{\tau'}}$.
 
 \end{itemize}
 \end{defi}
