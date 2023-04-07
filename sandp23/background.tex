@@ -1,6 +1,67 @@
 \section{Background and Motivation}
+\aravind{I am working on this.}
 %\section{Overview and Transcendence}\label{sec:overview}
 %This section describes \checkedc{} and new features \systemname{} provides.
+
+\subsection{Memory Safety}
+This property ensures that all memory accesses a program makes to valid areas containing the program's data~\cite{payer2019software}.
+Languages that guarantee (or do not) this property are called memory-safe (or memory-unsafe) languages.~\eg Java is a memory-safe language, whereas C/C++ is not.
+There are two main classes of memory safety violations: spatial and temporal.
+Spatial violations occur when a program dereferences a pointer that points outside of the associated object.~\eg buffer overread, underread, array out-of-bounds access, null-ptr dereference, etc.
+Temporal violations occur when a program dereferences a pointer that points to an invalid object which was previously object.~\eg use-after-free, double-free, etc.
+
+\subsection{Program Partioning}
+\label{subsec:background:programpart}
+Program partitioning~\cite{rul2009towards} is a well-known technique for dividing a program into multiple isolated parts or partitions.
+There has been considerable work~\cite{tan2017principles, brumley2004privtrans, bittau2008wedge, lind2017glamdring, liu2017ptrsplit} in the area.
+Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning.
+Specifically, given sensitive data in a program, all functions accessing sensitive data will be considered part of the trusted partition, and all other functions will be in the untrusted partition.
+For instance, in the following code~\code{key} is marked as sensitive and functions that access it,~\ie{}~\code{initkey} and~\code{encrypt} are considered to be part of trusted parition and the other function,~\ie{}~\code{main} will be in the untrusted partition.
+\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
+char __attribute__((annotate("sensitive"))) *key;
+
+void initkey(int sz) {
+ ...
+ for (i=0; i<sz; i++) key[i]= ...;
+}
+
+void encrypt(char *ptxt, int sz) {
+ ..
+ for (i=0; i<sz; i++)
+  ctxt[i]=ptxt[i] ^ key[i];
+ ..
+}
+
+int main() {
+ ..
+ initkey(strlen(txt));
+ encrypt(txt, strlen(txt));
+ ... 
+}
+\end{minted}
+
+As we can see, partitioning is achieved easily in the existing techniques by identifying which functions access sensitive data.
+These partitions can be separated in various ways,~\eg{} as different processes communicating through~\ac{RPC}~\cite{nelson1981remote}, parent and child processes communicating through shared memory, etc.
+
+The main novelty of existing techniques is using various program analysis and dynamic instrumentation methods to facilitate transparent communication between functions in trusted and untrusted partitions.
+Because of their focus on inter-partition interactions, the existing techniques are specialized for the target isolation mechanism. For instance,~\ptrsplit{}~\cite{liu2017ptrsplit} technique assumes that partitions are hosted as separate processes and data is exchanged through marshaling,~\eg{} sending data pointed by~\code{ptxt} and~\code{sz} during calls to~\code{encrypt} (\ie line 18 in the above example) and synchronizing the data back to~\code{ctxt} on return.
+Any other isolation mechanism or data exchange (\eg shared memory) cannot be supported as the partitioning technique is specialized for marshaling by using~\ac{PDG} and tracking bounds information.
+Similarly,~\glamdring~\cite{lind2017glamdring} is specialized for partitioning using SGX-enclaves.
+
+However, these isolation mechanisms may not be available on all systems.
+Furthermore, the existing partioning techniques focus on sensitive data use-case -- where the main goal is to protect the integrity and confidentiality of the sensitive data.
+Such isolation mechanisms might be unnecessary or too expensive for security use cases.
+For instance, consider the case of isolating functions (\eg input parsing) that process tainted data. 
+Here, we do not care about the integrity or confidentiality of the tainted data but rather want to restrict the effect of these functions on the overall program.
+
+Consequently, developers might want to use lightweight isolation mechanisms with low-performance overhead and limited guarantees (\eg isolation against spatial safety issues).
+The existing techniques do not support such flexible use cases because of their tight coupling with the isolation mechanism.
+
+% SFI: mechanisms and its use cases.
+
+% Checked C
+
+% Motivation: vulnerabilities.
 Here, we brief \checkedc and the motivation for~\systemname{}.
 
 \subsection{\checkedc}
