@@ -1,4 +1,5 @@
 \section{Background and Motivation}
+This section presents the necessary background and motivation for a system like~\systemname{}.
 \aravind{I am working on this.}
 %\section{Overview and Transcendence}\label{sec:overview}
 %This section describes \checkedc{} and new features \systemname{} provides.
@@ -7,8 +8,8 @@
 This property ensures that all memory accesses a program makes to valid areas containing the program's data~\cite{payer2019software}.
 Languages that guarantee (or do not) this property are called memory-safe (or memory-unsafe) languages.~\eg Java is a memory-safe language, whereas C/C++ is not.
 There are two main classes of memory safety violations: spatial and temporal.
-Spatial violations occur when a program dereferences a pointer that points outside of the associated object.~\eg buffer overread, underread, array out-of-bounds access, null-ptr dereference, etc.
-Temporal violations occur when a program dereferences a pointer that points to an invalid object which was previously object.~\eg use-after-free, double-free, etc.
+\emph{Spatial violations} occur when a program dereferences a pointer that points outside of the associated object.~\eg buffer overread, underread, array out-of-bounds access, null-ptr dereference, etc.
+\emph{Temporal violations} occur when a program dereferences a pointer that points to an invalid object which was previously object.~\eg use-after-free, double-free, etc.
 
 \subsection{Program Partioning}
 \label{subsec:background:programpart}
@@ -50,7 +51,8 @@ Similarly,~\glamdring~\cite{lind2017glamdring} is specialized for partitioning u
 
 However, these isolation mechanisms may not be available on all systems.
 Furthermore, the existing partioning techniques focus on sensitive data use-case -- where the main goal is to protect the integrity and confidentiality of the sensitive data.
-Such isolation mechanisms might be unnecessary or too expensive for security use cases.
+This extreme isolation also incurs significant performance overhead (37\% - 163\%)~\cite{lind2017glamdring, liu2017ptrsplit}.
+But such isolation mechanisms might be unnecessary or too expensive for security use cases.
 For instance, consider the case of isolating functions (\eg input parsing) that process tainted data. 
 Here, we do not care about the integrity or confidentiality of the tainted data but rather want to restrict the effect of these functions on the overall program.
 
