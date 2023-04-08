@@ -1,6 +1,5 @@
 \section{Background and Motivation}
 This section presents the necessary background and motivation for our work.
-\aravind{I am working on this.}
 %\section{Overview and Transcendence}\label{sec:overview}
 %This section describes \checkedc{} and new features \systemname{} provides.
 
@@ -18,7 +17,7 @@ There has been considerable work~\cite{tan2017principles, brumley2004privtrans, 
 Most of these techniques are~\emph{data-centric}~\cite{lind2017glamdring, liu2017ptrsplit}, wherein program data drives the partitioning.
 Specifically, given sensitive data in a program, all functions accessing sensitive data will be considered part of the trusted partition, and all other functions will be in the untrusted partition.
 For instance, in the following code~\code{key} is marked as sensitive and functions that access it,~\ie{}~\code{initkey} and~\code{encrypt} are considered to be part of trusted parition and the other function,~\ie{}~\code{main} will be in the untrusted partition.
-\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
+\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\scriptsize{}]{c}
 char __attribute__((annotate("sensitive"))) *key;
 
 void initkey(int sz) {
@@ -56,8 +55,8 @@ This extreme isolation incurs significant performance overhead (37\% - 163\%)~\c
 Some isolation mechanisms (\eg Intel SGX) may not be available on all systems.
 Such extreme isolation may not be needed or unnecessary for practical security use cases.
 
-As shown by the recent study from Microsoft, 70\% of the vulnerabilities still occur due to spatial safety violations.
-Several works show that certain functions are more prone to have a certain class of vulnerabilities than others.
+As shown by the recent study from Microsoft~\cite{microsoftmemsafe}, 70\% of the vulnerabilities still occur due to spatial safety violations.
+Several works~\cite{meng2021bran, du2019leopard, ding2022velvet, situ2021vulnerable} show that certain functions are more prone to have a certain class of vulnerabilities than others.
 Moreover, certain vulnerabilities may be impossible to occur in a given function. For instance, a function that cannot invoke (directly or transitively) any heap operations (\eg{} malloc/free) cannot contain temporal violations,~\eg use-after-free.
 Instead of complete isolation, we need~\emph{\acf{SeFI}} from a program partition.
 Formally, we say that a partition is $\phi$-\ac{SeFI} if and only if any violation of the property $\phi$ is contained with the partition and does not affect other partition(s).
@@ -137,12 +136,12 @@ However, the other unconverted code regions (or unsafe regions) can affect point
 
 Although the blameless proof exists~\cite{ruef2019achieving, li22checkedc} for~\checkedc, it does not state that spatial safety violations cannot happen in checked regions but rather states that checked regions~\emph{cannot be blamed for any spatial safety violations}.
 Consider the following example:
-\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
-// c region code
+\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\scriptsize{}]{c}
+// code with checked c annotations
 int func(array_ptr<char> p : count(5)) {
 |\textcolor{red}{\faChainBroken}|..p[4]..
 }
-// u region code
+// unchecked (wild) code
 ...
 str = "he";
 ...
