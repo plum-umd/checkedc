@@ -1,5 +1,5 @@
 \section{Background and Motivation}
-This section presents the necessary background and motivation for a system like~\systemname{}.
+This section presents the necessary background and motivation for our work.
 \aravind{I am working on this.}
 %\section{Overview and Transcendence}\label{sec:overview}
 %This section describes \checkedc{} and new features \systemname{} provides.
@@ -47,25 +47,121 @@ These partitions can be separated in various ways,~\eg{} as different processes 
 The main novelty of existing techniques is using various program analysis and dynamic instrumentation methods to facilitate transparent communication between functions in trusted and untrusted partitions.
 Because of their focus on inter-partition interactions, the existing techniques are specialized for the target isolation mechanism. For instance,~\ptrsplit{}~\cite{liu2017ptrsplit} technique assumes that partitions are hosted as separate processes and data is exchanged through marshaling,~\eg{} sending data pointed by~\code{ptxt} and~\code{sz} during calls to~\code{encrypt} (\ie line 18 in the above example) and synchronizing the data back to~\code{ctxt} on return.
 Any other isolation mechanism or data exchange (\eg shared memory) cannot be supported as the partitioning technique is specialized for marshaling by using~\ac{PDG} and tracking bounds information.
-Similarly,~\glamdring~\cite{lind2017glamdring} is specialized for partitioning using SGX-enclaves.
+Similarly,~\glamdring~\cite{lind2017glamdring} is specialized for partitioning using SGX-enclaves~\cite{costan2016intel}.
 
-However, these isolation mechanisms may not be available on all systems.
-Furthermore, the existing partioning techniques focus on sensitive data use-case -- where the main goal is to protect the integrity and confidentiality of the sensitive data.
-This extreme isolation also incurs significant performance overhead (37\% - 163\%)~\cite{lind2017glamdring, liu2017ptrsplit}.
-But such isolation mechanisms might be unnecessary or too expensive for security use cases.
-For instance, consider the case of isolating functions (\eg input parsing) that process tainted data. 
-Here, we do not care about the integrity or confidentiality of the tainted data but rather want to restrict the effect of these functions on the overall program.
+\subsection{Need for Selective Fault Isolation}
+The existing partitioning techniques focus on sensitive data use-case -- where the main goal is to protect the integrity and confidentiality of the sensitive data.
+Consequently, they try to achieve complete~\acf{SFI},~\ie all executions, data, or faults within a partition do not affect other partitions.
+This extreme isolation incurs significant performance overhead (37\% - 163\%)~\cite{lind2017glamdring, liu2017ptrsplit}.
+Some isolation mechanisms (\eg Intel SGX) may not be available on all systems.
+Such extreme isolation may not be needed or unnecessary for practical security use cases.
 
-Consequently, developers might want to use lightweight isolation mechanisms with low-performance overhead and limited guarantees (\eg isolation against spatial safety issues).
-The existing techniques do not support such flexible use cases because of their tight coupling with the isolation mechanism.
+As shown by the recent study from Microsoft, 70\% of the vulnerabilities still occur due to spatial safety violations.
+Several works show that certain functions are more prone to have a certain class of vulnerabilities than others.
+Moreover, certain vulnerabilities may be impossible to occur in a given function. For instance, a function that cannot invoke (directly or transitively) any heap operations (\eg{} malloc/free) cannot contain temporal violations,~\eg use-after-free.
+Instead of complete isolation, we need~\emph{\acf{SeFI}} from a program partition.
+Formally, we say that a partition is $\phi$-\ac{SeFI} if and only if any violation of the property $\phi$ is contained with the partition and does not affect other partition(s).
+For instance,~\emph{spatial safety-\ac{SeFI}} from a partition provides isolation against spatial safety violations in the partition.
+
+\subsection{\checkedc}
+\label{subsec:checkedc}
+\label{subsec:nosafetyagsintuncheckedcode}
+Recently,~\citet{Elliott2018} and~\citet{li22checkedc} introduced and formalized \checkedc, an
+open-source extension to C,
+to ensure a program’s spatial safety by introducing new pointer types,~\ie checked pointer types.
+Which are represented as system-level memory words without ``fattening'' metadata~\cite{duck2016heap}, 
+and ensuring backward compatibility,~\ie developers can use checked and
+regular (unchecked or wild) pointers within the same program.
+
+\noindent
+\myparagraph{Checked Pointer Types}
+\checkedc{} introduces three varieties of \emph{checked pointer}:
+\begin{itemize}
+\item \code{_Ptr<}$T$\code{>} ($\ptr$) types a pointer that is either null or
+  points to a single object of type $T$.
+\item \code{_Array_ptr<}$T$\code{>} ($\arr$) types a pointer that is either null
+  or points to an array of $T$ objects. The array width is defined
+  by a \emph{bounds} expression, discussed below.
+\item \code{_NT_Array_ptr<}$T$\code{>} ($\ntarr$) is like
+  \code{_Array_ptr<}$T$\code{>} except that the bounds expression
+  defines the \emph{minimum} array width---additional objects may
+  be available past the upper bound, up to a null terminator.
+\end{itemize}
+Both $\arr$ and $\ntarr$ pointers have an associated bounds which defines the
+range of memory referenced by the pointer.
+The three different ways to declare bounds and the corresponding memory range is:
+\begin{footnotesize}
+\begin{tabular}{ll}
+\arrT{|$T$|} \inlinecode{p: count(|$n$|)}
+  &
+$[\inlinecode{p}, \inlinecode{p}+\inlinecode{sizeof}(T) \times n) $ \\
+%$[\inlinecode{p}, )$ \\
+\arrT{|$T$|} \inlinecode{p: byte_count(|$b$|)}
+
+  &
+    $[\code{p}, \code{p}+b)$ \\
+
+
+\arrT{|$T$|} \inlinecode{p: bounds(|$x, y$|)}
+
+  &
+    $[x, y)    $\\  
+\end{tabular}
+\end{footnotesize}
+The bounds can be declared for $\ntarr$ as well, but the memory range can extend further to the right,
+until a~\code{NULL} terminator is reached (\ie \code{NULL} is not within the bounds).
+
+\noindent
+\myparagraph{Ensuring Spatial Memory Safety}
+The \checkedc compiler instruments loads and stores of checked
+pointers to confirm the pointer is non-null, and additionally the access to $\arr$ and $\ntarr$ pointers is within
+their specified bounds.
+For example, in the code \inlinecode{if (n>0) a[n-1] =} $...$ the write
+is via address $\alpha = \inlinecode{a + sizeof(int)}\!\times\!\code{(n-1)}$. 
+If the bounds of \code{a} are \code{count(u)}, the
+inserted check confirms
+$\inlinecode{a} \leq \alpha < \inlinecode{a + sizeof(int)} \!\times\!
+\inlinecode{u}$ prior to dereference.
+Failed checks throw an exception.
+Oftentimes, inserted checks can be optimized away by LLVM resulting in almost no runtime overhead~\cite{duanrefactoring}.
+
+\myparagraph{Backward Compatibility}
+\checkedc is backward compatible with legacy C as all legacy code will type-check and compile.
+However, the compiler adds the aforementioned spatial safety checks to only checked pointers.
+The spatial safety guarantee is partial when the code is not fully ported.
+%Specifically, only code that appears in~\emph{checked code regions}, is guaranteed to be spatially safe.
+
+\myparagraph{No Safety Against Unchecked Pointers}
+A partially annotated program can still enjoy spatial safety only if checked pointers do not communicate with any unchecked ones. For instance, in the example below, there are no spatial safety violations in the function~\code{func} as it uses only checked pointers.
+However, the other unconverted code regions (or unsafe regions) can affect pointers in safe regions and violate certain assumptions leading to vulnerabilities, as demonstrated by cross-language attacks~\cite{mergendahlcross}.
+
+Although the blameless proof exists~\cite{ruef2019achieving, li22checkedc} for~\checkedc, it does not state that spatial safety violations cannot happen in checked regions but rather states that checked regions~\emph{cannot be blamed for any spatial safety violations}.
+Consider the following example:
+\begin{minted}[xleftmargin=25pt, mathescape, linenos, escapeinside=||, fontsize=\footnotesize{}]{c}
+// c region code
+int func(array_ptr<char> p : count(5)) {
+|\textcolor{red}{\faChainBroken}|..p[4]..
+}
+// u region code
+...
+str = "he";
+...
+func(|\textcolor{red}{\faBug}|assume_bounds_cast<char>(str, 5)); 
+\end{minted}
+Here, the checked function~\inlinecode{func} expects a pointer to a buffer of five elements, but the unchecked region code invokes the function (Line 9) with a buffer of 2 elements.
+This results in a spatial safety violation (\textcolor{red}{\faChainBroken}) in the checked function, but of course, the blame or the root cause is in the unchecked function (\textcolor{red}{\faBug}).
+Furthermore, since checked and unchecked functions execute in the same address space, spatial memory corruptions (\eg buffer overflow) in unchecked functions (or regions) can take down the complete program despite
+having checked regions.
+We need~\emph{an isolation mechanism to ensure that code executed as part of unchecked functions does not violate the safety guarantees in checked functions}.
+
 
 % SFI: mechanisms and its use cases.
 
 % Checked C
 
 % Motivation: vulnerabilities.
-Here, we brief \checkedc and the motivation for~\systemname{}.
 
+\iffalse
 \subsection{\checkedc}
 \label{subsec:checkedc}
 % 
@@ -215,7 +311,7 @@ Specifically, given sensitive data in a program, the goal is to partition functi
 The performance overhead of these approaches is dominated by marshaling costs and depends on the usage of sensitive data.
 The overhead of state-of-the-art approaches, such as Glamdring~\cite{lind2017glamdring} and  PtrSplit~
 \cite{liu2017ptrsplit}, is prohibitive and varies from 37\%-163\%.
-
+\fi
 \iffalse
 
 \subsection{Ensuring Memory Safety}

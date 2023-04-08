@@ -39,9 +39,10 @@ The tainted types form the untrusted partition or~\umode~\emph{region} (can only
 Through static type checking, our type system ensures that tainted types cannot directly affect untainted types.
 After successful type checking,~\systemname{} creates two sets of source files:~\ucregion{} and~\cregion{}, containing tainted and untainted entities, respectively.
 
-These sets of source files will be compiled using~\systemname{} compiler, which enforces the desired isolation through instrumentation.
-Developers can choose a specific isolation mechanism.
-We explore four different isolation mechanisms with varying guarantees and performance overhead (CITE SECTION).
+%These sets of source files will be compiled using~\systemname{} compiler, which enforces the desired isolation through instrumentation.
+%Developers can choose a specific isolation mechanism.
+These sets of source files will be compiled using~\systemname{} compiler, which enforces a selected isolation mechanism.
+We introduce the concept of~\emph{\acf{SeFI}} and explore four different isolation mechanisms with varying guarantees and performance overhead (CITE SECTION).
 For instance,~\isoheap{} provides safety against spatial and temporal violations of tainted pointers with almost~\emph{no} performance overhead.
 Whereas~\sandbox{} isolation provides complete~\ac{SFI} with~\avgsandboxoverhead{} runtime overhead.
 
@@ -70,7 +71,7 @@ We provide formal proof of the~\emph{clean separation theorem} that guarantees t
 We also integerated~\systemname{} with~\checkedc that provides additional~\emph{non-crashing} and \emph{non-exposure} guarantees (CITE SECTION).
 
 \myparagraph{Flexible Isolation Mechanisms and Implementation}
-We designed four isolation mechanisms with varying guarantees and performance overhead, providing flexibility in choosing a desired isolation mechanism (CITE SECTION).
+We introduce the concept of~\emph{\acf{SeFI}} and designed four isolation mechanisms with varying guarantees and performance overhead, providing flexibility in choosing a desired isolation mechanism (CITE SECTION).
 We implemented our type system (CITE SECTION) and flexible partitioning (CITE SECTION) by modifying~\clang{} compiler.
 
 \myparagraph{Evaluation}
