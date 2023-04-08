@@ -53,7 +53,7 @@ The existing partitioning techniques focus on sensitive data use-case -- where t
 Consequently, they try to achieve complete~\acf{SFI},~\ie all executions, data, or faults within a partition do not affect other partitions.
 This extreme isolation incurs significant performance overhead (37\% - 163\%)~\cite{lind2017glamdring, liu2017ptrsplit}.
 Some isolation mechanisms (\eg Intel SGX) may not be available on all systems.
-Such extreme isolation may not be needed or unnecessary for practical security use cases.
+Such extreme isolation may not be needed or heavyweight for practical security use cases.
 
 As shown by the recent study from Microsoft~\cite{microsoftmemsafe}, 70\% of the vulnerabilities still occur due to spatial safety violations.
 Several works~\cite{meng2021bran, du2019leopard, ding2022velvet, situ2021vulnerable} show that certain functions are more prone to have a certain class of vulnerabilities than others.
