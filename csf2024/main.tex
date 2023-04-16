@@ -11,7 +11,7 @@
 \makeatother
 
 \IEEEpeerreviewmaketitle
-
+\usepackage{acronym}
 \usepackage{filecontents}
 \usepackage[noadjust]{cite}
 \usepackage{amsmath}
@@ -106,7 +106,17 @@
 \newcommand{\Checkedarr}[2]{{#1}~\lstinline|_Checked[|{#2}\lstinline|]|}
 \newcommand{\CheckedarrT}[1]{\Checkedarr{$\tau$}{#1}}
 
-
+\newcommand{\sandbox}{{\sc Sandbox}\xspace}
+\newcommand{\sandboxedpartition}{{\sc Sandbox}\xspace}
+\newcommand{\sandboxedpartitionabbr}{$S_{all}$}
+\newcommand{\sandboxheap}{{\sc SandMem}\xspace}
+\newcommand{\sandboxheapabbr}{$S_{mem}$}
+\newcommand{\isoheap}{{\sc IsoMem}\xspace}
+\newcommand{\isoheapabbr}{$I_{mem}$}
+\newcommand{\wasm}{{\sc wasm}\xspace}
+\newcommand{\ccflex}{{\sc CheckCFlex}\xspace}
+\newcommand{\ccflexabbr}{$C_{box}$}
+\newcommand{\avgsandboxoverhead}{FIXTHIS1\xspace}
 %\newcommand{\code}[1]{%
 %  \mintinline[fontsize=\footnotesize{},mathescape, escapeinside=||]{c}{#1}%
 %}
@@ -374,6 +384,8 @@
 \newcommand{\ewidenderef}[4]{\ensuremath{#4 = ~ \vdash_{widenderef}#1, #2, #3}}
 \newcommand{\eleq}[2]{\ensuremath{#1 \leq #2}}
 \newcommand{\systemname}{\textsc{CheckedCT}\xspace}
+\newcommand{\systemnameh}{\textsc{CheckedCTH}\xspace}
+
 \newcommand{\systemnamea}{\textsc{CheckedCBox}\xspace}
 
 \newcommand{\threec}{\textsc{3C}\xspace}
@@ -425,9 +437,9 @@
 
 %% Title information
 \iftr
-\title{\systemname: Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
+\title{\systemname: Formalizing Program Partitioning to Ensure Memory Safety in \checkedc}
 \else
-\title{\systemname: Formalizing Separate Heap to Ensure Spatial Safety in \checkedc}
+\title{\systemname: Formalizing Program Partitioning to Ensure Memory Safety in \checkedc}
 \fi
 %% [Short Title] is optional;
 %% when present, will be used in
