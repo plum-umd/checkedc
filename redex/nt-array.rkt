@@ -1769,7 +1769,7 @@
   [(⊢wf Γ (ptr c ω))
    (where #t (⊢malloc-type-wf ω))
    ------------- T-Malloc
-   (⊢ty>>> Γ σ ρ m (malloc ω) (malloc (⊢sizeof ω)) (ptr c ω))]
+   (⊢ty>>> Γ σ ρ m (malloc k ω) (malloc k (⊢sizeof ω)) (ptr k ω))]
 
   [ ....;;      list_sub (freeVars e) x... ->
       ;;well_typed env Q u e t ->
